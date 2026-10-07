@@ -13,15 +13,13 @@ struct FinancialComingUpView: View {
         CuadraoUpcomingSection(spanish: spanish, viewPlan: viewPlan) {
             if let projection = model.homeProjection {
                 let planned = projection.occurrences.filter { $0.status != .fulfilled }
+                let mixedCurrencies = Set(planned.map(\.currency)).count > 1
                 ForEach(Array(planned.prefix(expanded ? planned.count : Self.compactCount))) { occurrence in
-                    let row = PlanPresentation.upcomingRow(occurrence, locale: locale)
+                    let row = PlanPresentation.upcomingRow(occurrence, locale: locale, showsCurrency: mixedCurrencies)
                     Button { Task { await model.open(occurrence) } } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             CuadraoFeedRow(title: row.title, detail: row.detail, amount: row.amount, icon: row.icon)
                             if occurrence.overdue { Text("plan.overdue").font(.caption).foregroundStyle(WelcomePalette.owedNegative) }
-                            if let reason = occurrence.exclusionReason {
-                                Text(LocalizedStringKey("plan.exclusion." + reason)).font(.caption).foregroundStyle(.secondary)
-                            }
                         }.accessibilityElement(children: .combine)
                     }.buttonStyle(.plain).disabled(model.saving).accessibilityIdentifier("home.upcoming." + occurrence.id)
                 }

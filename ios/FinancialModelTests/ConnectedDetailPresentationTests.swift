@@ -85,6 +85,8 @@ final class ConnectedDetailPresentationTests: XCTestCase {
                        PlanUpcomingRow(title: "Internet hogar", detail: "Oct 10, 2026\u{00A0}· Planned", amount: "2,100.00 DOP", icon: "calendar"))
         XCTAssertEqual(PlanPresentation.upcomingRow(salary, locale: locale, text: { english[$0] ?? $0 }),
                        PlanUpcomingRow(title: "Internet hogar", detail: "Oct 10, 2026\u{00A0}· Planned", amount: "+38,500.00 DOP", icon: "arrow.down.left"))
+        XCTAssertEqual(PlanPresentation.upcomingRow(salary, locale: locale, showsCurrency: false, text: { english[$0] ?? $0 }).amount,
+                       "+38,500.00", "one currency in view: rows show bare signed numbers like the approved Preview")
         XCTAssertEqual(PlanPresentation.upcomingRow(review, locale: locale, text: { english[$0] ?? $0 }).detail,
                        "Oct 10, 2026\u{00A0}· Review the linked activity")
         let dominican = Locale(identifier: "es_DO")

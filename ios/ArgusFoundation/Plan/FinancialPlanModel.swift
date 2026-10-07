@@ -294,12 +294,12 @@ enum PlanPresentation {
     static func money(_ minor: String, currency: String, digits: Int, locale: Locale) -> String {
         currency + " " + AccountPresentation.amount(AccountPresentation.decimal(minor, digits: digits), locale: locale)
     }
-    static func upcomingRow(_ occurrence: FinancialPlanOccurrence, locale: Locale,
+    static func upcomingRow(_ occurrence: FinancialPlanOccurrence, locale: Locale, showsCurrency: Bool = true,
                             text: (String) -> String = { NSLocalizedString($0, comment: "") }) -> PlanUpcomingRow {
         let income = occurrence.kind == .income
         return PlanUpcomingRow(title: occurrence.title,
             detail: dateLabel(occurrence.dueDate, locale: locale) + "\u{00A0}· " + text("plan.status." + occurrence.status.rawValue),
-            amount: (income ? "+" : "") + AccountPresentation.amount(occurrence.amount, locale: locale) + " " + occurrence.currency,
+            amount: (income ? "+" : "") + AccountPresentation.amount(occurrence.amount, locale: locale) + (showsCurrency ? " " + occurrence.currency : ""),
             icon: income ? "arrow.down.left" : "calendar")
     }
 }
