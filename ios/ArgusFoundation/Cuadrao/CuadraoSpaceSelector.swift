@@ -31,10 +31,23 @@ struct CuadraoSpaceLabel: View {
     }
 }
 
+/// An available way in, not a space yet: the plus and pine tint say "add", where grey would read as locked.
+struct CuadraoSpaceAddLabel: View {
+    let title: String
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "plus").font(.footnote.weight(.semibold)).accessibilityHidden(true)
+            Text(title).font(.subheadline.weight(.medium))
+        }.foregroundStyle(WelcomePalette.pine).frame(minHeight: 44).contentShape(Rectangle())
+    }
+}
+
 struct CuadraoSpaceSelectorLayout<Content: View>: View {
     let selection: String
     let addTitle: String
     let addIdentifier: String
+    /// Release builds with no other space to add leave the trailing plus out; Debug and the Preview keep it.
+    var showsAdd = true
     let add: () -> Void
     @ViewBuilder let content: () -> Content
     var body: some View {
@@ -45,9 +58,11 @@ struct CuadraoSpaceSelectorLayout<Content: View>: View {
                 }.scrollIndicators(.hidden)
                     .onChange(of: selection) { _, id in proxy.scrollTo(id) }
             }
-            CuadraoSectionAddButton(title: addTitle, action: add)
-                .accessibilityLabel(addTitle)
-                .accessibilityIdentifier(addIdentifier)
+            if showsAdd {
+                CuadraoSectionAddButton(title: addTitle, action: add)
+                    .accessibilityLabel(addTitle)
+                    .accessibilityIdentifier(addIdentifier)
+            }
         }
     }
 }

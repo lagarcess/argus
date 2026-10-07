@@ -15,6 +15,7 @@ struct ConnectedCuadraoSpaces: View {
             if model.isAvailable {
                 CuadraoSpaceSelectorLayout(selection: model.active ? "household" : "personal",
                     addTitle: NSLocalizedString("household.addOrManage", comment: ""), addIdentifier: "household.add",
+                    showsAdd: CuadraoFirstRelease.showsExtraSpaces,
                     add: { showsSpaces = true }) {
                     Button { Task { await model.select(nil) } } label: {
                         CuadraoSpaceLabel(title: NSLocalizedString("household.personal", comment: ""), selected: !model.active)
@@ -36,9 +37,9 @@ struct ConnectedCuadraoSpaces: View {
                             .accessibilityAddTraits(model.active ? [.isSelected] : [])
                     } else {
                         Button { Task { await model.startHousehold() } } label: {
-                            CuadraoSpaceLabel(title: NSLocalizedString("household.title", comment: ""), selected: false)
-                                .contentShape(Rectangle())
+                            CuadraoSpaceAddLabel(title: NSLocalizedString("household.title", comment: ""))
                         }.buttonStyle(.plain).id("household").accessibilityIdentifier("household.start")
+                            .accessibilityLabel(NSLocalizedString("household.addHousehold", comment: ""))
                     }
                 }
                 if model.errorKey == "household.accessEnded" {

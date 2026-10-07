@@ -40,7 +40,7 @@ extension FinancialLoopUITests {
         }
         XCTAssertTrue(app.buttons["spaces.manage"].exists)
         capture("spaces-sheet-connected")
-        tapVisible(app.buttons["spaces.choice.business"])
+        XCTAssertFalse(app.descendants(matching: .any)["spaces.choice.business"].isEnabled, "Business has no backend and stays disabled")
         XCTAssertFalse(app.textFields["space-name"].exists, "Business has no backend and must not open a form")
         tapVisible(app.buttons["spaces.choice.household"])
         XCTAssertTrue(app.buttons["household.intro.create"].waitForExistence(timeout: 10))

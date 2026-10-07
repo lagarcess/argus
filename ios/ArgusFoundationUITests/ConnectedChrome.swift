@@ -127,7 +127,7 @@ extension XCUIApplication {
     func confirmSignOutIfAsked() {
         let alert = alerts.firstMatch
         guard alert.waitForExistence(timeout: 3) else { return }
-        let confirm = alert.buttons["auth.signOut.confirm"]
+        let confirm = alert.buttons.matching(identifier: "auth.signOut.confirm").firstMatch
         if confirm.exists { confirm.tap(); return }
         alert.buttons.matching(NSPredicate(format: "label IN %@", ["Sign out", "Cerrar sesión"])).firstMatch.tap()
     }

@@ -43,6 +43,7 @@ extension FinancialLoopUITests {
         revealPlanForecastControls()
         chooseDate("plan.until", daysAhead: 60)
         assertPlanProjected("DOP -50.00")
+        XCTAssertTrue(homeUpcomingRow(note).exists, "Home keeps its own 30-day window")
         XCTAssertEqual(homeUpcomingRows(note).count, 1, "Home keeps its own 30-day window")
         revealOnHome(homeUpcomingRow(note))
         capture("home-upcoming-unchanged-by-plan-horizon")

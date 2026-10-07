@@ -631,6 +631,7 @@
 "household.personal" = "Personal";
 "household.title" = "Household";
 "household.manage" = "Manage spaces";
+"household.addHousehold" = "Add household";
 "household.addOrManage" = "Add or manage spaces";
 "household.spaces.none" = "You have no other spaces yet.";
 "household.people" = "People";
