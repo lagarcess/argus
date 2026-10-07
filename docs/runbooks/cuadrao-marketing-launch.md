@@ -102,7 +102,7 @@ On `https://cuadrao-marketing.onrender.com` (or the address Render assigns), wit
 
 Read, then prepare, then apply only after approval. Do not change root MX, SPF or DKIM for `cuadrao.ai`, and never add a second SPF record.
 
-1. Read Cloudflare DNS for `cuadrao.ai` and Resend's domain list. Save a sanitized before-state.
+1. Read Cloudflare DNS and Email Routing for `cuadrao.ai` and Resend's domain list. Save a sanitized before-state. On 2026-10-07 public DNS showed no apex records and no published Resend records although Resend listed `cuadrao.ai` as verified, and `hola@cuadrao.ai` had no MX route (see the launch record). Resolve that contradiction first; it may be a zone that is not active.
 2. Add `notify.cuadrao.ai` to Resend. Resend returns the exact records (SPF `include`, DKIM key, return-path MX). Copy them verbatim; do not invent values.
 3. Add a DMARC record for `_dmarc.notify.cuadrao.ai` (start at `p=none` with a report address the founder owns) unless one already covers the subdomain.
 4. Apply only the named records after approval; wait for Resend to show Verified; send one test message to a founder-approved address; read the received headers for SPF, DKIM and DMARC pass.
