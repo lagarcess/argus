@@ -52,10 +52,17 @@ test.describe("page identity", () => {
   });
 
   test("language links keep the visitor on the same page", async ({ page }) => {
+    // Below the desktop width the links live in the menu.
+    const open = async () => {
+      const menu = page.getByRole("button", { name: /Abrir menú|Open menu/ });
+      if (await menu.isVisible()) await menu.click();
+    };
     await page.goto("/contacto");
-    await page.locator('header a[hreflang="en"]').first().click();
+    await open();
+    await page.locator('header a[hreflang="en"]:visible').first().click();
     await expect(page).toHaveURL(/\/en\/contact$/);
-    await page.locator('header a[hreflang="es"]').first().click();
+    await open();
+    await page.locator('header a[hreflang="es"]:visible').first().click();
     await expect(page).toHaveURL(/\/contacto$/);
   });
 });

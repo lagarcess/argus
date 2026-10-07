@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { businessPath } from "@/lib/site-routes";
 import { businessContent, type BusinessLocale } from "./content";
@@ -38,6 +38,10 @@ export function ContactForm({ locale }: { locale: BusinessLocale }) {
   // A retry of the same text reuses its id so the server can recognise it. Any
   // edit is a different message and gets a new id.
   const attempt = useRef<{ id: string; signature: string } | null>(null);
+
+  useEffect(() => {
+    if (state.status === "sent") confirmation.current?.focus();
+  }, [state.status]);
 
   async function submit(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
@@ -84,7 +88,6 @@ export function ContactForm({ locale }: { locale: BusinessLocale }) {
       if (response.status === 202) {
         attempt.current = null;
         setState({ status: "sent", values });
-        requestAnimationFrame(() => confirmation.current?.focus());
       } else {
         setState({
           status: "error",
