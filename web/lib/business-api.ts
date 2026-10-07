@@ -73,6 +73,13 @@ export type BusinessWorkspaceInfo = {
   currencies: CurrencyCode[];
   /** Whether Business conversations can answer questions about saved expenses. */
   assistant_available: boolean;
+  /** What a receipt upload accepts. The backend's document settings own it. */
+  receipt_limits: ReceiptLimits;
+};
+
+export type ReceiptLimits = {
+  max_bytes: number;
+  media_types: string[];
 };
 
 export type BusinessExpense = {
@@ -113,13 +120,6 @@ export type ExpenseInput = {
   merchant: string | null;
   category_id: string | null;
 };
-
-export const BUSINESS_RECEIPT_MEDIA_TYPES = [
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-] as const;
-export const BUSINESS_RECEIPT_MAX_BYTES = 10 * 1024 * 1024;
 
 export async function getBusinessWorkspace(): Promise<BusinessWorkspaceInfo> {
   return apiFetch("/business/workspace");
@@ -165,11 +165,13 @@ export async function listBusinessExpenses(
 export async function uploadBusinessReceipt(
   file: File,
   consentToPrepare: boolean,
+  idempotencyKey: string,
 ): Promise<ReceiptSummary> {
   const authHeaders = await authenticatedRequestHeaders();
   const headers = argusApiRequestHeaders(
     {
       "Content-Type": file.type,
+      "Idempotency-Key": idempotencyKey,
       "X-Document-Filename": encodeURIComponent(file.name),
       ...(consentToPrepare ? { "X-Extraction-Consent": "true" } : {}),
     },

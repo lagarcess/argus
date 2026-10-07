@@ -199,6 +199,7 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
   let receipts = seedReceipts();
   let expenses = seedExpenses();
   let counter = 0;
+  const uploads = new Map<string, ReceiptDetail>();
 
   const find = (id: string) => {
     const found = receipts.find((item) => item.id === id);
@@ -216,7 +217,15 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
     mode: "fixture",
     workspace: async () => {
       await delay();
-      return { accounts: ACCOUNTS, currencies: ["DOP", "USD"], assistant_available: true };
+      return {
+        accounts: ACCOUNTS,
+        currencies: ["DOP", "USD"],
+        assistant_available: true,
+        receipt_limits: {
+          max_bytes: 10 * 1024 * 1024,
+          media_types: ["application/pdf", "image/jpeg", "image/png"],
+        },
+      };
     },
     overview: async (from, to) => {
       await delay();
@@ -287,8 +296,10 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
         .filter((item) => item.occurred_on >= from && item.occurred_on <= to)
         .sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
     },
-    uploadReceipt: async (file, consentToPrepare) => {
+    uploadReceipt: async (file, consentToPrepare, key) => {
       await delay(500);
+      const earlier = uploads.get(key);
+      if (earlier) return earlier;
       counter += 1;
       const created = receipt({
         id: `rcpt-new-${counter}`,
@@ -300,6 +311,7 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
         missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
       });
       receipts = [created, ...receipts];
+      uploads.set(key, created);
       return created;
     },
     prepareReceipt: async (id) => {

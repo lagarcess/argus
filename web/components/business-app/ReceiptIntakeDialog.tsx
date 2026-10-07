@@ -4,27 +4,22 @@ import { useEffect, useRef, useState } from "react";
 import { Camera, ClipboardPaste, FileUp, ReceiptText } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
-import {
-  BUSINESS_RECEIPT_MAX_BYTES,
-  BUSINESS_RECEIPT_MEDIA_TYPES,
-  type ReceiptSummary,
-} from "@/lib/business-api";
+import type { ReceiptLimits, ReceiptSummary } from "@/lib/business-api";
+import { randomId } from "@/lib/random-id";
 import { useBusiness } from "./BusinessWorkspace";
-import { primaryButtonClass, secondaryButtonClass } from "./business-ui";
+import { LoadingRows, primaryButtonClass, secondaryButtonClass } from "./business-ui";
 import { readClipboardFile, useInputCapabilities } from "./useInputCapabilities";
 
 /** Where a captured receipt goes next: its review, or the composer. */
 export type IntakeTarget = "inbox" | "composer";
 
-const ACCEPT = BUSINESS_RECEIPT_MEDIA_TYPES.join(",");
-
 type Rejection = "unsupported" | "too_large" | "heic";
 
-function rejectionFor(file: File): Rejection | null {
+function rejectionFor(file: File, limits: ReceiptLimits): Rejection | null {
   const type = file.type.toLowerCase();
   if (type === "image/heic" || type === "image/heif" || /\.hei[cf]$/i.test(file.name)) return "heic";
-  if (!(BUSINESS_RECEIPT_MEDIA_TYPES as readonly string[]).includes(type)) return "unsupported";
-  if (file.size > BUSINESS_RECEIPT_MAX_BYTES) return "too_large";
+  if (!limits.media_types.includes(type)) return "unsupported";
+  if (file.size > limits.max_bytes) return "too_large";
   return null;
 }
 
@@ -50,33 +45,74 @@ function IntakeSurface({
   onClose: () => void;
   onCaptured: (receipt: ReceiptSummary, target: IntakeTarget) => void;
 }) {
+  const { t } = useTranslation();
+  const { records } = useBusiness();
+  const limits = records.workspace?.receipt_limits;
+  return limits ? (
+    <IntakeForm limits={limits} target={target} onClose={onClose} onCaptured={onCaptured} />
+  ) : (
+    <AdaptivePanel
+      title={t("business.intake.title", "Upload receipt")}
+      closeLabel={t("common.close", "Close")}
+      onClose={onClose}
+      width="md"
+    >
+      <div className="px-4 pb-4">
+        <LoadingRows rows={2} />
+      </div>
+    </AdaptivePanel>
+  );
+}
+
+function IntakeForm({
+  limits,
+  target,
+  onClose,
+  onCaptured,
+}: {
+  limits: ReceiptLimits;
+  target: IntakeTarget;
+  onClose: () => void;
+  onCaptured: (receipt: ReceiptSummary, target: IntakeTarget) => void;
+}) {
   const { t, i18n } = useTranslation();
   const { source } = useBusiness();
   const capabilities = useInputCapabilities();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
+  // Each chosen file gets one upload key, so a retry never saves it twice.
+  const [chosen, setChosen] = useState<{ file: File; key: string } | null>(null);
+  const file = chosen?.file ?? null;
   const [rejection, setRejection] = useState<Rejection | null>(null);
   const [consent, setConsent] = useState(false);
   const [state, setState] = useState<"idle" | "uploading" | "failed">("idle");
   const [dragging, setDragging] = useState(false);
   const [clipboardEmpty, setClipboardEmpty] = useState(false);
+  const uploading = state === "uploading";
+  // Closing waits for the upload, so its result always lands somewhere.
+  const close = () => {
+    if (!uploading) onClose();
+  };
 
   const choose = (candidate: File | null | undefined) => {
-    if (!candidate) return;
+    if (!candidate || uploading) return;
     setClipboardEmpty(false);
-    const reason = rejectionFor(candidate);
+    const reason = rejectionFor(candidate, limits);
     setRejection(reason);
-    setFile(reason ? null : candidate);
+    setChosen(reason ? null : { file: candidate, key: randomId() });
     setState("idle");
   };
+  const chooseRef = useRef(choose);
+  useEffect(() => {
+    chooseRef.current = choose;
+  });
 
   useEffect(() => {
     const onPaste = (event: ClipboardEvent) => {
       const pasted = Array.from(event.clipboardData?.files ?? [])[0];
       if (pasted) {
         event.preventDefault();
-        choose(pasted);
+        chooseRef.current(pasted);
       }
     };
     window.addEventListener("paste", onPaste);
@@ -85,7 +121,7 @@ function IntakeSurface({
 
   const pasteFromClipboard = async () => {
     try {
-      const pasted = await readClipboardFile(BUSINESS_RECEIPT_MEDIA_TYPES);
+      const pasted = await readClipboardFile(limits.media_types);
       if (pasted) choose(pasted);
       else setClipboardEmpty(true);
     } catch {
@@ -94,10 +130,10 @@ function IntakeSurface({
   };
 
   const save = async () => {
-    if (!file) return;
+    if (!chosen) return;
     setState("uploading");
     try {
-      const captured = await source.uploadReceipt(file, consent);
+      const captured = await source.uploadReceipt(chosen.file, consent, chosen.key);
       onCaptured(captured, target);
     } catch {
       setState("failed");
@@ -109,7 +145,7 @@ function IntakeSurface({
 
   const rejectionText: Record<Rejection, string> = {
     unsupported: t("business.intake.unsupported", "This file type isn't supported. Use a PDF, JPG or PNG."),
-    too_large: t("business.intake.too_large", "This file is larger than 10 MB. Use a smaller photo or PDF."),
+    too_large: t("business.intake.too_large", "This file is larger than {{size}} MB. Use a smaller photo or PDF.", { size: sizeLabel(limits.max_bytes) }),
     heic: t("business.intake.heic", "This is an iPhone HEIC photo. Upload it from your iPhone's browser, which converts it, or export it as JPG first."),
   };
 
@@ -117,20 +153,20 @@ function IntakeSurface({
     <AdaptivePanel
       title={t("business.intake.title", "Upload receipt")}
       closeLabel={t("common.close", "Close")}
-      onClose={onClose}
+      onClose={close}
       width="md"
       footer={
         <div className="flex justify-end gap-2 px-4 pb-4">
-          <button type="button" className={secondaryButtonClass} onClick={onClose}>
+          <button type="button" className={secondaryButtonClass} disabled={uploading} onClick={close}>
             {t("common.cancel", "Cancel")}
           </button>
           <button
             type="button"
             className={primaryButtonClass}
-            disabled={!file || state === "uploading"}
+            disabled={!file || uploading}
             onClick={() => void save()}
           >
-            {state === "uploading"
+            {uploading
               ? t("business.intake.saving", "Saving…")
               : t("business.intake.save", "Save to Inbox")}
           </button>
@@ -139,7 +175,7 @@ function IntakeSurface({
     >
       <div className="space-y-4 px-4 pb-2">
         <p className="text-[14px] text-black/60 dark:text-white/60">
-          {t("business.intake.formats", "PDF, JPG or PNG, up to 10 MB. The original stays private to you.")}
+          {t("business.intake.formats", "PDF, JPG or PNG, up to {{size}} MB. The original stays private to you.", { size: sizeLabel(limits.max_bytes) })}
         </p>
 
         <div
@@ -191,7 +227,7 @@ function IntakeSurface({
           <input
             ref={fileInputRef}
             type="file"
-            accept={ACCEPT}
+            accept={limits.media_types.join(",")}
             className="sr-only"
             tabIndex={-1}
             aria-hidden="true"
@@ -203,7 +239,7 @@ function IntakeSurface({
           <input
             ref={cameraInputRef}
             type="file"
-            accept="image/jpeg,image/png"
+            accept={limits.media_types.filter((type) => type.startsWith("image/")).join(",")}
             capture="environment"
             className="sr-only"
             tabIndex={-1}

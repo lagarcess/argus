@@ -2230,13 +2230,13 @@
       "paste": "Pegar",
       "clipboard_empty": "No hay una imagen o PDF de recibo para pegar. Copia uno primero o elige un archivo.",
       "failed": "No pudimos guardar este recibo. Revisa tu conexión y reintenta. No se guardará dos veces.",
-      "formats": "PDF, JPG o PNG, hasta 10 MB. El original es privado para ti.",
+      "formats": "PDF, JPG o PNG, hasta {{size}} MB. El original es privado para ti.",
       "heic": "Esta es una foto HEIC de iPhone. Súbela desde el navegador de tu iPhone, que la convierte, o expórtala como JPG primero.",
       "replace": "Elegir otro",
       "save": "Guardar en la Bandeja",
       "saving": "Guardando…",
       "title": "Subir recibo",
-      "too_large": "Este archivo pesa más de 10 MB. Usa una foto o un PDF más pequeño.",
+      "too_large": "Este archivo pesa más de {{size}} MB. Usa una foto o un PDF más pequeño.",
       "unsupported": "Este tipo de archivo no es compatible. Usa un PDF, JPG o PNG."
     },
     "nav": {

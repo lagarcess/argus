@@ -24,7 +24,7 @@ export type BusinessDataSource = Readonly<{
   receiptSource: (id: string) => Promise<Blob>;
   updates: () => Promise<BusinessUpdate[]>;
   expenses: (from: string, to: string) => Promise<BusinessExpense[]>;
-  uploadReceipt: (file: File, consentToPrepare: boolean) => Promise<ReceiptSummary>;
+  uploadReceipt: (file: File, consentToPrepare: boolean, key: string) => Promise<ReceiptSummary>;
   prepareReceipt: (id: string) => Promise<ReceiptSummary>;
   saveReview: (
     id: string,
