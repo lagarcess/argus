@@ -435,6 +435,7 @@ export default function ChatInput({
     const cursor = getCaretTextOffset(editorRef.current);
     setComposerHasContent(!isComposerEmpty(current));
     setComposerRawText(rawComposerText(current));
+    onDraftChangeRef.current?.(rawComposerText(current));
     updateDiscoveryState(current, cursor);
     scheduleComposerTokenFocus();
   };
