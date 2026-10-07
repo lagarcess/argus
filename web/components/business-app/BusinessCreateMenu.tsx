@@ -44,7 +44,7 @@ export default function BusinessCreateMenu({
     );
   }
 
-  const collapsed = shell.sidebarCollapsed && !shell.isBelowTablet;
+  const collapsed = shell.sidebarCollapsed;
   return (
     <ActionMenu
       actions={actions.create}
