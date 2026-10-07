@@ -93,8 +93,8 @@ def run_backtest_job(job_id: str, nonce: str | None = None) -> dict[str, object]
     timeout_seconds=240,
     retry=Retry(max_retries=0, wait_duration_ms=1000),
 )
-def prepare_document(connection_id: str, attempt_id: str) -> dict[str, str]:
-    return run_document_preparation(connection_id, attempt_id)
+async def prepare_document(connection_id: str, attempt_id: str) -> dict[str, str]:
+    return await run_document_preparation(connection_id, attempt_id)
 
 
 if __name__ == "__main__":

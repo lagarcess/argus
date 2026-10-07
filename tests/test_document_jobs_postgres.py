@@ -178,8 +178,8 @@ async def test_dead_worker_recovers_once_and_its_late_result_is_refused(
     service = DocumentsService(
         hub, PostgresDocumentStore(pool), extractor, jobs_recover_interruptions=True
     )
-    dispatched: list[str] = []
-    jobs = PreparationJobs(service, lambda _, attempt_id: dispatched.append(attempt_id))
+    dispatched: list[tuple[str, str]] = []
+    jobs = PreparationJobs(service, lambda *attempt: dispatched.append(attempt))
     owner = users["owner"]
     captured = await service.upload(
         user_id=owner,
@@ -192,16 +192,16 @@ async def test_dead_worker_recovers_once_and_its_late_result_is_refused(
 
     jobs.start(user_id=owner, connection_id=connection)
     jobs.start(user_id=owner, connection_id=connection)
-    [first] = dispatched
+    [first] = [attempt for target, attempt in dispatched if target == connection]
     dead = asyncio.create_task(run_attempt(service, connection, first))
     while extractor.calls == 0:
         await asyncio.sleep(0.01)
 
     clock.now += DISPATCH_WINDOW - timedelta(seconds=1)
-    assert jobs.sweep().redispatched == []
+    assert connection not in jobs.sweep().redispatched
     clock.now += timedelta(seconds=2)
-    assert jobs.sweep().redispatched == [connection]
-    [_, second] = dispatched
+    assert connection in jobs.sweep().redispatched
+    [_, second] = [attempt for target, attempt in dispatched if target == connection]
 
     assert await run_attempt(service, connection, first) == (
         "document_attempt_superseded"
@@ -217,7 +217,7 @@ async def test_dead_worker_recovers_once_and_its_late_result_is_refused(
     assert extractor.calls == 2
     sink.submit.assert_called_once()
     assert service.store.job(user_id=owner, connection_id=connection).attempt == 2
-    assert jobs.sweep().redispatched == []
+    assert connection not in jobs.sweep().redispatched
     service.forget(hub.connections.get(user_id=owner, connection_id=connection))
 
 
@@ -253,11 +253,13 @@ def test_workflow_worker_prepares_the_dispatched_attempt(
     jobs = PreparationJobs(
         api,
         lambda connection_id, attempt_id: outcomes.append(
-            run_document_preparation(
-                connection_id,
-                attempt_id,
-                env={"ARGUS_WORKFLOW_DATABASE_URL": shared.DSN},
-                extractor=Prepared(),
+            asyncio.run(
+                run_document_preparation(
+                    connection_id,
+                    attempt_id,
+                    env={"ARGUS_WORKFLOW_DATABASE_URL": shared.DSN},
+                    extractor=Prepared(),
+                )
             )
         ),
     )

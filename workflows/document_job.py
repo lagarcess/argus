@@ -8,7 +8,6 @@ recovery belong to the API's reconciler sweep.
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Mapping
 from datetime import datetime, timezone
 
@@ -57,7 +56,7 @@ def postgres_documents_service(
     )
 
 
-def run_document_preparation(
+async def run_document_preparation(
     connection_id: str,
     attempt_id: str,
     *,
@@ -70,9 +69,7 @@ def run_document_preparation(
         max_size=2,
         kwargs={"prepare_threshold": None},
     ) as pool:
-        outcome = asyncio.run(
-            run_attempt(
-                postgres_documents_service(pool, extractor), connection_id, attempt_id
-            )
+        outcome = await run_attempt(
+            postgres_documents_service(pool, extractor), connection_id, attempt_id
         )
     return {"connection_id": connection_id, "attempt_id": attempt_id, "outcome": outcome}
