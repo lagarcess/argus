@@ -276,3 +276,42 @@ def test_flag_off_prepares_through_background_tasks_only(flag_off_client, monkey
     assert document(flag_off_client, connection)["status"] == "review_ready"
     assert service.store.job(user_id=user, connection_id=connection) is None
     assert provider.calls == 1
+
+
+@pytest.mark.parametrize(
+    "env,enabled,sweep",
+    [
+        ({}, False, 30.0),
+        ({"ARGUS_DOCUMENT_JOBS_ENABLED": "yes"}, True, 30.0),
+        ({"ARGUS_DOCUMENT_JOBS_ENABLED": "maybe"}, False, 30.0),
+        (
+            {
+                "ARGUS_DOCUMENT_JOBS_ENABLED": "1",
+                "ARGUS_DOCUMENT_JOBS_SWEEP_SECONDS": "5",
+            },
+            True,
+            5.0,
+        ),
+        (
+            {
+                "ARGUS_DOCUMENT_JOBS_ENABLED": "1",
+                "ARGUS_DOCUMENT_JOBS_SWEEP_SECONDS": "x",
+            },
+            False,
+            30.0,
+        ),
+    ],
+)
+def test_job_settings_share_the_document_convention(monkeypatch, env, enabled, sweep):
+    from argus.domain.ingestion.documents.config import load_document_job_settings
+
+    for name in (
+        "ARGUS_DOCUMENT_JOBS_ENABLED",
+        "ARGUS_DOCUMENT_JOBS_SWEEP_SECONDS",
+        "ARGUS_DOCUMENT_JOBS_WORKFLOW_TASK",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    for name, value in env.items():
+        monkeypatch.setenv(name, value)
+    settings = load_document_job_settings()
+    assert (settings.enabled, settings.sweep_seconds) == (enabled, sweep)
