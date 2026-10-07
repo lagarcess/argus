@@ -3,6 +3,7 @@ import { nextRedirects, nextRewrites } from "./lib/site-routes";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  experimental: { globalNotFound: true },
   async redirects() {
     return nextRedirects();
   },

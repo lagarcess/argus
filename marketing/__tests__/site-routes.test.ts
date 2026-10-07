@@ -7,6 +7,7 @@ import {
   alternateLanguages,
   businessPath,
   internalPath,
+  lowercaseRedirectPath,
   nextRedirects,
   nextRewrites,
   pageUrl,
@@ -50,6 +51,21 @@ describe("public URL map", () => {
   test("the English contact slug is not a Spanish page", () => {
     expect(pageFromSlug("es", ["contact"])).toBeNull();
     expect(pageFromSlug("en", ["contacto"])).toBeNull();
+  });
+});
+
+describe("case handling", () => {
+  test.each([
+    ["/EN", "/en"],
+    ["/en/Personal", "/en/personal"],
+    ["/En/PRIVACY", "/en/privacy"],
+    ["/Contacto", "/contacto"],
+  ])("%s redirects to %s", (path, expected) => {
+    expect(lowercaseRedirectPath(path)).toBe(expected);
+  });
+
+  test("an already lowercase path is left alone", () => {
+    for (const route of SITE_ROUTES) expect(lowercaseRedirectPath(route.path)).toBeNull();
   });
 });
 

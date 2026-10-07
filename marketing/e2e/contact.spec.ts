@@ -40,7 +40,11 @@ for (const locale of ["es", "en"] as const) {
       await expectNothingStoredInBrowser(page);
     });
 
-    test("a double click sends one message", async ({ page, request }, info) => {
+    test("a double click sends one request and one message", async ({ page, request }, info) => {
+      let posts = 0;
+      page.on("request", (req) => {
+        if (req.method() === "POST" && req.url().endsWith("/api/inquiries")) posts += 1;
+      });
       await page.goto(copy.path);
       await page.locator("#contact-name").fill("Ana");
       await page.locator("#contact-email").fill(uniqueAddress(info));
@@ -48,6 +52,7 @@ for (const locale of ["es", "en"] as const) {
       const button = page.getByRole("button", { name: copy.send });
       await button.dblclick();
       await expect(page.getByRole("heading", { name: copy.sent })).toBeVisible();
+      expect(posts).toBe(1);
       expect((await mockState(request)).emails).toHaveLength(1);
     });
 

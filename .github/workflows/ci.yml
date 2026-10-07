@@ -216,6 +216,12 @@ jobs:
           bun-version: ${{ env.ARGUS_CI_BUN_VERSION }}
 
       # The marketing website is an independent package with its own lockfile.
+      # The runbook pins the same Node on Render, so CI proves the runtime that ships.
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+
       - name: Install marketing dependencies
         run: cd marketing && bun install --frozen-lockfile
 

@@ -91,10 +91,34 @@ test.describe("routes", () => {
     });
   }
 
+  test("the not-found page has a language, a title and a way home in both languages", async ({ page }) => {
+    const response = await page.goto("/no-such-page");
+    expect(response?.status()).toBe(404);
+    await expect(page.locator("html")).toHaveAttribute("lang", "es-DO");
+    await expect(page).toHaveTitle(/Cuadrao/);
+    await expect(page.getByRole("link", { name: "Ir al inicio" })).toHaveAttribute("href", "/");
+    await expect(page.getByRole("link", { name: "Go to the home page" })).toHaveAttribute("href", "/en");
+  });
+
+  for (const [from, to] of [["/EN", "/en"], ["/en/Personal", "/en/personal"], ["/En/PRIVACY", "/en/privacy"], ["/Contacto", "/contacto"]]) {
+    test(`${from} redirects to ${to} and does not poison the lowercase page`, async ({ request }) => {
+      const response = await request.get(`${from}?x=1`, { maxRedirects: 0 });
+      expect(response.status()).toBe(308);
+      expect(response.headers().location).toMatch(new RegExp(`${to}\\?x=1$`));
+      expect((await request.get(to)).status()).toBe(200);
+    });
+  }
+
   test("the health endpoint needs no providers", async ({ request }) => {
     const response = await request.get("/api/health");
     expect(response.status()).toBe(200);
     expect(await response.json()).toEqual({ status: "ok" });
+  });
+
+  test("images on a candidate host are also excluded from search", async ({ request }) => {
+    const response = await request.get("/_next/image?url=%2Fcuadrao-site%2Fpersonal-home-preview.png&w=640&q=75");
+    expect(response.status()).toBe(200);
+    expect(response.headers()["x-robots-tag"]).toBe("noindex, nofollow");
   });
 
   test("form endpoints reject GET", async ({ request }) => {

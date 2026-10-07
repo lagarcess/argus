@@ -45,7 +45,7 @@ Create only after the candidate is on `main`, Section 4 is complete and the foun
 | Instance type | Starter, 1 instance (about $7 per month; re-check at purchase) |
 | Persistent disk | none |
 | Build command | `npm install -g bun@1.3.14 && bun install --frozen-lockfile && bun run build` |
-| Start command | `bun run start -- -p $PORT` |
+| Start command | `npm run start -- -p $PORT` (Node only; Bun is needed for install and build, not to serve) |
 | Health check path | `/api/health` (needs no provider) |
 | Auto-Deploy | **Off** |
 | Environment group | none |
@@ -86,6 +86,8 @@ Not part of this launch. If chosen later, switch Auto-Deploy to "After CI Checks
 On `https://cuadrao-marketing.onrender.com` (or the address Render assigns), with indexing off:
 
 - `/api/health` returns 200; deployed commit equals the approved SHA.
+- The per-client limit keys on the visitor, not on a shared proxy address: from one network, a request that sends a spoofed leftmost `X-Forwarded-For` is limited exactly like one that does not, and two networks are limited independently. If every visitor shares one key, set `CUADRAO_TRUSTED_CLIENT_IP_HEADER`.
+- Mixed-case URLs (`/EN`, `/en/Personal`) redirect to lowercase and leave `/en` at 200 after a restart.
 - Every page loads in Spanish and English at 390 and 1440 pixels; titles, canonical, hreflang, icons and share images as in the browser specs; `X-Robots-Tag: noindex, nofollow` and a disallow-all `robots.txt`.
 - Real inquiry from the form arrives at `hola@cuadrao.ai` with the visitor as Reply-To, using a founder-approved test address.
 - Real signup is stored; repeating it creates no second row and looks identical; the restart persistence check redeploys with the manual deploy button and re-reads the row; operator removal erases the address and the same address then registers with an identical visitor-facing answer but no new active row.

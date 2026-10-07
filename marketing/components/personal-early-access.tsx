@@ -8,7 +8,7 @@ import type { BusinessLocale } from "./content";
 import { businessContactEmail } from "./site-copy";
 import styles from "./personal-early-access.module.css";
 
-type SignupState = { status: "idle" } | { status: "submitting" } | { status: "success" } | { status: "error"; message: string };
+type SignupState = { status: "idle" } | { status: "submitting" } | { status: "success" } | { status: "error"; message: string; rejected: boolean };
 
 const homePreview = { src: "/cuadrao-site/personal-home-preview.png", width: 1206, height: 2622 } as const;
 const subscribeToHydration = (): (() => void) => () => {};
@@ -94,10 +94,11 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
         setState({
           status: "error",
           message: response.status === 400 ? c.invalid : response.status === 429 ? c.rateLimited : c.error,
+          rejected: response.status === 400,
         });
       }
     } catch {
-      setState({ status: "error", message: c.error });
+      setState({ status: "error", message: c.error, rejected: false });
     } finally {
       clearTimeout(timeout);
       pending.current = false;
@@ -113,7 +114,7 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
       </div>
       <div className={styles.capture} id="early-access">
         <p className={styles.invitation}>{c.body}</p>
-        <div className={styles.signup} aria-live="polite">
+        <div className={styles.signup}>
           {state.status === "success" ? (
             <div className={styles.confirmation}>
               <span className={styles.check}><Check size={24} aria-hidden="true" /></span>
@@ -126,12 +127,12 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
               <noscript><p className={styles.local}>{c.noScript}</p></noscript>
               <fieldset className={styles.formFields} disabled={!hydrated}>
                 <label htmlFor="personal-email">{c.label}</label>
-                <input id="personal-email" type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-privacy" : "signup-privacy"} aria-invalid={state.status === "error" || undefined} disabled={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
+                <input id="personal-email" type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-privacy" : "signup-privacy"} aria-invalid={(state.status === "error" && state.rejected) || undefined} readOnly={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
                 <div className={styles.trap} aria-hidden="true">
                   <label htmlFor="personal-website">Website</label>
                   <input id="personal-website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
                 </div>
-                <button type="submit" disabled={!hydrated || state.status === "submitting"}>
+                <button type="submit" disabled={!hydrated} aria-disabled={state.status === "submitting"}>
                   {state.status === "submitting" ? c.saving : c.button}
                   <ArrowRight size={19} aria-hidden="true" />
                 </button>

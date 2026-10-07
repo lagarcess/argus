@@ -23,6 +23,12 @@ export type SiteRoute = {
   url: string;
 };
 
+// The path to redirect to when the request spelled it with capitals, else null.
+export function lowercaseRedirectPath(pathname: string): string | null {
+  const lower = pathname.toLowerCase();
+  return lower === pathname ? null : lower;
+}
+
 export function isLocale(value: string): value is BusinessLocale {
   return (LOCALES as readonly string[]).includes(value);
 }

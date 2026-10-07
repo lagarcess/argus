@@ -212,7 +212,8 @@ export function ContactForm({ locale }: { locale: BusinessLocale }) {
             )}
             <button
               type="submit"
-              disabled={!hydrated || sending}
+              disabled={!hydrated}
+              aria-disabled={sending}
               className={styles.button}
             >
               {sending ? copy.sending : copy.submit}
