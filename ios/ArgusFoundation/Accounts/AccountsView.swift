@@ -101,51 +101,7 @@ struct AccountsView: View {
 
 }
 
-struct AccountDetailView: View {
-    let account: FinancialAccount
-    @ObservedObject var model: AccountsModel
-    @ObservedObject var loop: FinancialLoopModel
-    @Environment(\.locale) private var locale
-
-    /// Navigation destinations capture the account at push time; always read the
-    /// model copy so post-confirm balance/version updates paint immediately.
-    private var current: FinancialAccount {
-        model.accounts.first(where: { $0.id == account.id }) ?? account
-    }
-
-    var body: some View {
-        let account = current
-        if account.isOptionalAsset { AssetDetailView(account: account, model: model, loop: loop) }
-        else {
-        AccountSummary(account: account, large: true)
-        AccountActivityView(loop: loop, account: account)
-        }
-        Button("accounts.edit") { model.edit(account) }.buttonStyle(PillButtonStyle(primary: false))
-            .accessibilityIdentifier("accounts.edit")
-        if !account.isOptionalAsset {
-        Button(account.opening == nil ? "accounts.opening.add" : "accounts.opening.correct") { model.opening(account) }
-            .buttonStyle(PillButtonStyle()).accessibilityIdentifier("accounts.opening")
-        if let opening = account.opening {
-            Text("accounts.history").font(ArgusStyle.display(23)).accessibilityAddTraits(.isHeader)
-            ForEach(opening.revisions, id: \.revision) { revision in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(verbatim: account.currency + " " + AccountPresentation.amount(revision.amount, locale: locale))
-                        .monospacedDigit()
-                    Text(verbatim: AccountPresentation.date(revision.asOf, zone: revision.timeZone, locale: locale))
-                    Text(verbatim: revision.timeZone).font(ArgusStyle.body(12, relativeTo: .caption))
-                    if let reason = revision.reason { Text(verbatim: reason) }
-                }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 8)
-                    .accessibilityElement(children: .combine)
-            }
-        }
-        }
-        Button(account.archived ? "accounts.restore" : "accounts.archive") { Task { await model.archive(account) } }
-            .buttonStyle(PillButtonStyle(primary: false)).disabled(model.busy).accessibilityIdentifier("accounts.archive")
-        AccountRequestStatus(model: model) { await model.refresh(account.id) }
-    }
-}
-
-private struct AccountRequestStatus: View {
+struct AccountRequestStatus: View {
     @ObservedObject var model: AccountsModel
     let retry: () async -> Void
 

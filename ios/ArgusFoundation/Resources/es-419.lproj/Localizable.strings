@@ -347,14 +347,13 @@
 "plan.chart.title" = "Saldo proyectado después de cada movimiento";
 "plan.chart.inspect" = "Toca para explorar. Cada paso es un movimiento, no un intervalo de tiempo igual.";
 "plan.chart.accessibility" = "Explorar movimiento";
-"plan.status.planned" = "Planeado, sin registrar";
+"plan.status.planned" = "Previsto";
 "plan.status.fulfilled" = "Registrado";
 "plan.status.needs_review" = "Revisa la actividad vinculada";
 "plan.overdue" = "Vencido, incluido desde hoy";
 "plan.exclusion.account_unassigned" = "Elige una cuenta para incluirlo en la proyección.";
 "plan.exclusion.account_not_selected" = "Esta cuenta no está incluida en la proyección.";
 "plan.exclusion.link_needs_review" = "Excluido hasta que revises la actividad vinculada.";
-"plan.home.disclosure" = "Una estimación de tu plan, separada del patrimonio registrado.";
 "plan.unavailable" = "Esta parte del Plan aún no está disponible. Los ingresos y pagos esperados están en Resumen.";
 "plan.kind" = "Tipo";
 "plan.kind.income" = "Ingreso";
@@ -631,7 +630,10 @@
 
 "household.personal" = "Personal";
 "household.title" = "Hogar";
-"household.manage" = "Administrar espacios";
+"household.manage" = "Gestionar espacios";
+"household.addHousehold" = "Añadir hogar";
+"household.addOrManage" = "Añadir o gestionar espacios";
+"household.spaces.none" = "Aún no tienes otros espacios.";
 "household.people" = "Personas";
 "household.scopeNotice" = "Solo cuentas registradas y compartidas explícitamente. La parte registrada de cada titular cuenta una vez.";
 "household.knownSubtotal" = "Subtotal conocido";
@@ -772,6 +774,8 @@
 "sharedPlan.history" = "Ver historial";
 "sharedPlan.restore" = "Restaurar plan";
 "sharedPlan.archive" = "Archivar plan";
+"sharedPlan.archive.confirm" = "¿Dejamos este plan en pausa?";
+"sharedPlan.archive.body" = "Podrás retomarlo desde Archivados. Su progreso se conserva.";
 "sharedPlan.original" = "Ver movimiento original";
 "sharedPlan.release" = "Quitar vínculo";
 "sharedPlan.purpose.funding" = "Financiar el plan";
@@ -840,3 +844,8 @@
 
 "auth.deletion.uncertain" = "No pudimos confirmar si la eliminación comenzó. Compruébalo antes de usar tu cuenta.";
 "auth.deletion.pending" = "Estamos eliminando tu cuenta. Ya cerraste sesión. Si necesitas ayuda, contacta a soporte.";
+"auth.deletion.checkAgain" = "Comprobar de nuevo";
+"auth.deletion.uncertain.support" = "No pudimos confirmar la eliminación desde este dispositivo. Contacta a soporte para recibir ayuda.";
+"auth.deletion.apple" = "Para eliminar tu cuenta, vuelve a confirmar con Apple.";
+"auth.deletion.support.requested" = "Solicitud enviada. Soporte eliminará tu cuenta y te escribirá por correo electrónico.";
+"auth.deletion.support.unavailable" = "Todavía no se puede eliminar desde la app aquí. Soporte puede eliminar tu cuenta por ti.";

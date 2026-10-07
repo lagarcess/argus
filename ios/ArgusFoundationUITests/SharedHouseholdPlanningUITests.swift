@@ -309,6 +309,7 @@ extension FinancialLoopUITests {
                 dismissMoneyKeyboard(); try confirmNativeSharedContribution()
                 assertText("DOP 25.00")
                 tapSharedControl(app.buttons["sharedPlan.archive"])
+                tapSharedControl(app.buttons["sharedPlan.archive.confirm"])
                 XCTAssertTrue(app.buttons["sharedPlan.restore"].waitForExistence(timeout: 20))
                 capture("shared-budget-archived")
                 tapSharedControl(app.buttons["sharedPlan.restore"])

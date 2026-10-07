@@ -72,6 +72,7 @@ actor AuthServer {
     var appleSubject: String?
     var currencyOverride: String?
     var displayName: String? = "Sample"
+    var preferredName: String?
     var nameInitializationClosed = true
     var appleNameStatuses: [Int] = []
     var loseAppleNameResponse = false
@@ -156,14 +157,18 @@ actor AuthServer {
             let id = mismatchedProfile ? bob : (accessUsers[bearer] ?? alice)
             if let gate = meGate { await gate.enter() }
             let status = meStatuses.isEmpty ? 200 : meStatuses.removeFirst()
-            if status == 200, request.httpMethod == "PATCH" { currencyOverride = body["currency_override"] as? String }
+            if status == 200, request.httpMethod == "PATCH" {
+                if body.keys.contains("currency_override") { currencyOverride = body["currency_override"] as? String }
+                if let name = body["display_name"] as? String { displayName = name }
+                if let name = body["preferred_name"] as? String { preferredName = name.trimmingCharacters(in: .whitespaces).isEmpty ? nil : name }
+            }
             return response(url, status, status == 200 ? profileEnvelope(id) : ["code": "unauthorized"])
         }
         return response(url, 404, [:])
     }
 
     private func profileEnvelope(_ id: UUID) -> [String: Any] {
-        var envelope: [String: Any] = ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": displayName as Any? ?? NSNull(), "language": "en", "currency": currencyOverride ?? "DOP", "currency_override": currencyOverride as Any? ?? NSNull()]]
+        var envelope: [String: Any] = ["user": ["id": id.uuidString, "email": "sample@example.test", "display_name": displayName as Any? ?? NSNull(), "preferred_name": preferredName as Any? ?? NSNull(), "language": "en", "currency": currencyOverride ?? "DOP", "currency_override": currencyOverride as Any? ?? NSNull()]]
         if let appleSubject { envelope["apple_identity"] = ["subject": appleSubject] }
         return envelope
     }

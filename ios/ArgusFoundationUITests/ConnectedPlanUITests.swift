@@ -1,6 +1,51 @@
 import XCTest
 
 extension FinancialLoopUITests {
+    func testPlanDisclosuresAndExampleKeepRealForecastUnchanged() throws {
+        try signIn()
+        let bank = createMoneyAccount("Plan display " + UUID().uuidString.prefix(5), type: "checking", amount: "150")
+        selectPlanAccounts([bank])
+        assertPlanProjected("DOP 150.00")
+        app.terminate(); app.launch()
+        app.openPlanSurface()
+        XCTAssertTrue(app.staticTexts["plan-heading"].waitForExistence(timeout: 15))
+        XCTAssertFalse(app.datePickers["plan.until"].exists)
+        XCTAssertFalse(app.buttons["plan.accounts"].exists)
+        tapVisible(app.buttons["plan-create"])
+        XCTAssertTrue(app.buttons["Add goal"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Add budget"].exists)
+        XCTAssertTrue(app.buttons["Add debt plan"].exists)
+        XCTAssertTrue(app.buttons["Add an expectation"].exists)
+        app.staticTexts["plan-heading"].tap()
+        capture("plan-approved-overview-with-real-balance")
+
+        #if DEBUG
+        let explore = app.buttons["plan-explore"]
+        XCTAssertTrue(explore.waitForExistence(timeout: 5))
+        tapVisible(explore)
+        XCTAssertTrue(app.otherElements["forecast-example-notice"].waitForExistence(timeout: 5)
+            || app.staticTexts["Example scenario"].exists)
+        tapVisible(app.sliders["forecast-slider"])
+        app.sliders["forecast-slider"].adjust(toNormalizedSliderPosition: 0.9)
+        tapVisible(app.buttons["forecast-apply"])
+        assertText("Example updated")
+        XCTAssertFalse(app.staticTexts["Pace saved"].exists)
+        capture("plan-isolated-scenario-example")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        assertPlanProjected("DOP 150.00")
+        #else
+        XCTAssertFalse(app.buttons["plan-explore"].exists)
+        #endif
+
+        revealPlanForecastControls()
+        XCTAssertTrue(app.datePickers["plan.until"].exists)
+        XCTAssertTrue(app.buttons["plan.accounts"].exists)
+        tapVisible(app.buttons["plan-archives"])
+        XCTAssertTrue(app.navigationBars["Archived"].waitForExistence(timeout: 5))
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        assertPlanProjected("DOP 150.00")
+    }
+
     func testConnectedPlanRecordsLinksCorrectsAndReopens() throws {
         try signIn()
         let baseline = homeValue()
@@ -88,12 +133,13 @@ extension FinancialLoopUITests {
         app.terminate(); app.launch()
         try signIn(fresh: true, user: "B")
         openMoneyAccount(isolated); assertText("DOP 111.00")
-        app.buttons["tab.plan"].tap()
+        app.revealConnectedTabBar()
+        app.openPlanSurface()
         XCTAssertFalse(app.buttons["loop.pending.retry"].exists)
         XCTAssertFalse(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.occurrence.' AND label CONTAINS %@", title)).firstMatch.exists)
         capture("plan-pending-command-isolated-from-user-b")
         try signIn(fresh: true)
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         tapVisible(app.buttons["loop.pending.retry"])
         XCTAssertTrue(app.buttons["loop.pending.retry"].waitForNonExistence(timeout: 15))
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
@@ -116,12 +162,15 @@ extension FinancialLoopUITests {
         XCTAssertFalse(app.staticTexts["home.projected.USD"].exists)
         XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists)
         assertText("Balance unknown")
+        XCTAssertFalse(app.staticTexts["plan.knownStarting.USD"].exists,
+                       "No selected account has a known balance; an empty subtotal is not a known zero")
         capture("plan-unknown-dollar-balance")
         openMoneyAccount(unknown); assertText("Balance unknown")
         app.terminate()
         app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "light"]
         app.launch()
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
+        revealPlanForecastControls()
         XCTAssertTrue(app.buttons["plan.accounts"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'plan.'")).firstMatch.exists)
         capture("plan-spanish-light-unknown-currency")
@@ -135,7 +184,7 @@ extension FinancialLoopUITests {
         selectPlanAccounts([archived])
         openMoneyAccount(archived)
         tapVisible(app.buttons["accounts.archive"])
-        XCTAssertTrue(app.buttons["Restore account"].waitForExistence(timeout: 10))
+        app.confirmAccountArchive()
         selectPlanAccounts([])
         XCTAssertFalse(app.staticTexts["plan.projected.DOP"].exists)
         XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists)
@@ -147,7 +196,8 @@ extension FinancialLoopUITests {
         app.buttons["Investments"].tap()
         tapVisible(app.buttons["accounts.save"])
         XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 10))
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
+        revealPlanForecastControls()
         tapVisible(app.buttons["plan.accounts"])
         assertText("Not a cash account. Remove it from this forecast.")
         let toggle = app.switches["plan.selection." + changed.id.uppercased()]
@@ -157,6 +207,15 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["plan.selection.save"].waitForNonExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts["plan.projected.DOP"].exists)
         XCTAssertFalse(app.staticTexts["home.projected.DOP"].exists)
+    }
+
+    func choosePlanDetailAction(_ identifier: String) {
+        let options = app.buttons["plan-detail-options"]
+        XCTAssertTrue(options.waitForExistence(timeout: 10))
+        options.tap()
+        let action = app.buttons[identifier]
+        XCTAssertTrue(action.waitForExistence(timeout: 10))
+        action.tap()
     }
 
     func confirmPlanMoney() {
@@ -169,7 +228,7 @@ extension FinancialLoopUITests {
                             daysAhead: Int = 0, cadence: String = "Once", currency: String = "DOP") {
         // Connected hides the tab bar on account detail; pop before Plan.
         app.revealConnectedTabBar()
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         tapVisible(app.buttons["plan.add"])
         tapVisible(app.buttons["plan.expectation.kind"])
         app.buttons[kind].tap()
@@ -198,7 +257,8 @@ extension FinancialLoopUITests {
 
     func selectPlanAccounts(_ accounts: [MoneyAccount]) {
         app.revealConnectedTabBar()
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
+        revealPlanForecastControls()
         tapVisible(app.buttons["plan.accounts"])
         let ids = Set(accounts.map { "plan.selection." + $0.id.uppercased() })
         let switches = app.switches.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.selection.'")).allElementsBoundByIndex
@@ -210,9 +270,24 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["plan.selection.save"].waitForNonExistence(timeout: 15))
     }
 
+    func revealPlanForecastControls() {
+        if !app.buttons["plan.accounts"].exists {
+            tapVisible(app.buttons["plan.forecast.details"])
+        }
+    }
+
+    func startPlan(_ kind: String) {
+        tapVisible(app.buttons["plan-create"])
+        tapVisible(app.buttons["plan-kind-" + kind])
+    }
+
+    func planCards(_ kind: String, _ title: String) -> XCUIElementQuery {
+        app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@ AND label CONTAINS %@", "plan.card." + kind + ".", title))
+    }
+
     func openPlanOccurrence(_ title: String) {
         app.revealConnectedTabBar()
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'plan.occurrence.' AND label CONTAINS %@", title)).firstMatch
         if !row.exists, app.buttons["plan.showMore"].exists { tapVisible(app.buttons["plan.showMore"]) }
         tapVisible(row)
@@ -220,7 +295,7 @@ extension FinancialLoopUITests {
 
     func assertPlanProjected(_ value: String) {
         app.revealConnectedTabBar()
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         let amount = app.staticTexts["plan.projected.DOP"]
         XCTAssertTrue(amount.waitForExistence(timeout: 15))
         let expected = NSPredicate(format: "label == %@", value)

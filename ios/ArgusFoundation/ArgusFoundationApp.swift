@@ -56,9 +56,6 @@ struct ArgusFoundationApp: App {
                     .environmentObject(auth)
                     .modifier(SessionLifecycle(model: auth))
                     .preferredColorScheme(appearance.colorScheme)
-                    .tint(ArgusStyle.ink)
-                    .foregroundStyle(ArgusStyle.ink)
-                    .font(ArgusStyle.body())
             }
     }
 }

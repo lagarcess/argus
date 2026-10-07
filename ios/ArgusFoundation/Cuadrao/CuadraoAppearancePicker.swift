@@ -5,6 +5,15 @@ struct CuadraoAppearancePicker: View {
     static let storageKey = "cuadrao.design.appearance"
     let spanish: Bool
     @AppStorage(Self.storageKey) private var selection = AppearancePreference.light
+
+    var body: some View {
+        CuadraoAppearanceChoices(spanish: spanish, selection: $selection)
+    }
+}
+
+struct CuadraoAppearanceChoices: View {
+    let spanish: Bool
+    @Binding var selection: AppearancePreference
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {

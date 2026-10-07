@@ -10,6 +10,7 @@ struct CuadraoChatCanvas: View {
     @Binding var editing: Bool
     var contextual = false
     var close: (() -> Void)?
+    var showsPreviewNotice = false
     @State private var sheet: CanvasChatSheet?
     @State private var tray = false
     @State private var ending = false
@@ -173,6 +174,7 @@ struct CuadraoChatCanvas: View {
                         CuadraoBrand().scaleEffect(0.85).accessibilityLabel("Cuadrao")
                         Text(store.current.focus?.groupID.flatMap { receiptWorkspace?.groups.group($0)?.name } ?? (es ? "¿Qué vemos hoy?" : "What shall we look at?"))
                             .font(CuadraoTypography.screen).multilineTextAlignment(.center)
+                        if showsPreviewNotice { previewNotice }
                     }
                     Spacer(minLength: 32)
                 }.frame(maxWidth: .infinity, minHeight: geometry.size.height).padding(.horizontal, 24)
@@ -184,6 +186,7 @@ struct CuadraoChatCanvas: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 32) {
+                    if showsPreviewNotice { previewNotice.frame(maxWidth: .infinity) }
                     if store.temporary {
                         Button { sheet = .temporary } label: {
                             Label { Text((es ? "Temporal · " : "Temporary · ") + (store.useContext ? (es ? "Con mi contexto" : "Using my context") : (es ? "Sin mi contexto" : "Without my context"))) } icon: {
@@ -247,6 +250,13 @@ struct CuadraoChatCanvas: View {
                 .font(.caption).foregroundStyle(.secondary)
             Button(es ? "Ver respuesta de ejemplo" : "Show example response") { store.responseState = .complete }
         }.font(.subheadline)
+    }
+
+    private var previewNotice: some View {
+        Text(es ? "Vista previa del chat. Puedes probar ejemplos; no se envían mensajes ni se cambian tus cuentas."
+             : "Chat preview. Try the examples; no messages are sent and your accounts stay unchanged.")
+            .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+            .multilineTextAlignment(.center).accessibilityIdentifier("chat.preview.notice")
     }
 
     private func composer(thread: Binding<String>) -> some View {

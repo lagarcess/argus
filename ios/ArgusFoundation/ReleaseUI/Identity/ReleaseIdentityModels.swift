@@ -29,11 +29,13 @@ public enum ReleaseDeletionVerification: Equatable {
     }
 }
 
-/// POST /account/delete outcomes: `completed` is 200 done, `pending` is 202 in_progress or 503
-/// account_deletion_incomplete, `failed` is a failure where nothing happened. The owner signs out before
-/// presenting `pending` or `completed`, and `pending` never turns into `completed` on this device.
+/// POST /account/delete outcomes: `completed` is 200 done, `pending` is 202 in_progress, `failed` is a
+/// failure where nothing happened, and `uncertain` is a sent command without a usable answer (lost response
+/// or 503 account_deletion_incomplete). The owner signs out before presenting `pending` or `completed`, and
+/// `pending` never turns into `completed` on this device. The support cases are the flag-off ticket fallback.
 public enum ReleaseDeletionState: Equatable {
     case ready, verificationRejected, verificationResending, submitting, pending, failed, completed
+    case appleAuthorizationRequired, uncertain(canRetry: Bool), supportRequested, supportUnavailable
 
     public var allowsVerificationInput: Bool {
         switch self { case .ready, .verificationRejected: true; default: false }

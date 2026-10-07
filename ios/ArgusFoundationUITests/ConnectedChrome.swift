@@ -15,12 +15,21 @@ extension XCUIApplication {
     func revealConnectedTabBar() {
         for _ in 0..<6 {
             if buttons["tab.home"].exists { return }
+            let nativeBack = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
+            if nativeBack.waitForExistence(timeout: 1) {
+                nativeBack.tap()
+                continue
+            }
             if buttons["accounts.back"].waitForExistence(timeout: 1) {
                 buttons["accounts.back"].tap()
                 continue
             }
             if buttons["activity.back"].waitForExistence(timeout: 1) {
                 buttons["activity.back"].tap()
+                continue
+            }
+            if buttons["household.back"].waitForExistence(timeout: 1) {
+                buttons["household.back"].tap()
                 continue
             }
             if buttons["accounts.manage.back"].waitForExistence(timeout: 1) {
@@ -33,6 +42,49 @@ extension XCUIApplication {
             }
             break
         }
+    }
+
+    func openPlanSurface() {
+        revealConnectedTabBar()
+        XCTAssertTrue(buttons["tab.plan"].waitForExistence(timeout: 10))
+        buttons["tab.plan"].tap()
+    }
+
+    var archivedUndo: XCUIElement { buttons["accounts.archived.undo"] }
+
+    /// Archiving is reviewed first. Connected Home then returns to the list and offers Undo; the tip shell keeps the detail with Restore.
+    @discardableResult
+    func confirmAccountArchive(file: StaticString = #filePath, line: UInt = #line) -> Bool {
+        let confirm = buttons["accounts.archive.confirm"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 10), "archive asks for review before the write", file: file, line: line)
+        confirm.tap()
+        if archivedUndo.waitForExistence(timeout: 10) { return true }
+        let spanish = ProcessInfo.processInfo.environment["ARGUS_TEST_LANGUAGE"] == "es-419"
+        XCTAssertTrue(buttons[spanish ? "Restaurar cuenta" : "Restore account"].waitForExistence(timeout: 5), file: file, line: line)
+        return false
+    }
+
+    var accountBack: XCUIElement {
+        let native = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
+        return native.exists ? native : buttons["accounts.back"]
+    }
+
+    func returnFromDetail(_ legacyIdentifier: String) {
+        let nativeBack = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
+        if nativeBack.waitForExistence(timeout: 2) { nativeBack.tap() }
+        else {
+            XCTAssertTrue(buttons[legacyIdentifier].waitForExistence(timeout: 5))
+            buttons[legacyIdentifier].tap()
+        }
+    }
+
+    func swipeBack(cancel: Bool = false) {
+        coordinate(withNormalizedOffset: CGVector(dx: 0.005, dy: 0.5)).press(
+            forDuration: 0.05,
+            thenDragTo: coordinate(withNormalizedOffset: CGVector(dx: cancel ? 0.15 : 0.9, dy: 0.5)),
+            withVelocity: .slow,
+            thenHoldForDuration: 0.4
+        )
     }
 
     /// Accounts live on Home in Connected; tip keeps a dedicated Accounts tab.
@@ -71,6 +123,15 @@ extension XCUIApplication {
         }
     }
 
+    /// Connected Profile asks before signing out; the tip account section signs out directly.
+    func confirmSignOutIfAsked() {
+        let alert = alerts.firstMatch
+        guard alert.waitForExistence(timeout: 3) else { return }
+        let confirm = alert.buttons.matching(identifier: "auth.signOut.confirm").firstMatch
+        if confirm.exists { confirm.tap(); return }
+        alert.buttons.matching(NSPredicate(format: "label IN %@", ["Sign out", "Cerrar sesión"])).firstMatch.tap()
+    }
+
     func openProfileSurface() {
         if buttons["header.profile"].waitForExistence(timeout: 3) {
             buttons["header.profile"].tap()
@@ -83,5 +144,12 @@ extension XCUIApplication {
 extension FinancialLoopUITests {
     func openAccountsTab() {
         app.openAccountsList()
+    }
+
+    func openPersonalAccounts() {
+        app.openAccountsList()
+        let personal = app.buttons["household.personal"]
+        if personal.waitForExistence(timeout: 2) { tapVisible(personal) }
+        XCTAssertTrue(app.buttons["accounts.add"].waitForExistence(timeout: 10))
     }
 }

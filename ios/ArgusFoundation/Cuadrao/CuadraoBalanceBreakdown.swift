@@ -4,6 +4,10 @@ struct CuadraoBalanceBreakdown: View {
     let period: CanvasBalancePeriod
     let currency: String
     let spanish: Bool
+    /// Rows push the account only where the host stack has an account destination.
+    var linksToAccounts = true
+    /// Connected data has periods with no recorded opening; the Preview's fixtures never do.
+    var missingCoverage = false
     @Environment(\.dynamicTypeSize) private var typeSize
     private func money(_ value: Decimal) -> String { CanvasMoney.format(value, currency: currency) }
     private func signed(_ value: Decimal) -> String { (value > 0 ? "+" : "") + money(value) }
@@ -32,22 +36,13 @@ struct CuadraoBalanceBreakdown: View {
             }
             VStack(spacing: 0) {
                 ForEach(period.changes) { row in
-                    NavigationLink(value: row.id) {
-                        HStack(spacing: 12) {
-                            if typeSize.isAccessibilitySize {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    accountLabel(row)
-                                    accountValue(row, alignment: .leading)
-                                }
-                                Spacer(minLength: 0)
-                            } else {
-                                accountLabel(row)
-                                Spacer(minLength: 8)
-                                accountValue(row, alignment: .trailing)
-                            }
-                            Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary)
-                        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityIdentifier("home-balance-change-" + row.id.uuidString)
+                    if linksToAccounts {
+                        NavigationLink(value: row.id) { rowContent(row) }
+                            .buttonStyle(.plain).accessibilityIdentifier("home-balance-change-" + row.id.uuidString)
+                    } else {
+                        rowContent(row).accessibilityElement(children: .combine)
+                            .accessibilityIdentifier("home-balance-change-" + row.id.uuidString)
+                    }
                 }
             }
             if let change = period.change {
@@ -71,6 +66,22 @@ struct CuadraoBalanceBreakdown: View {
             Text(date(point.date)).font(CuadraoTypography.caption).foregroundStyle(.secondary)
         }.fixedSize(horizontal: false, vertical: true)
     }
+    private func rowContent(_ row: CanvasBalanceChange) -> some View {
+        HStack(spacing: 12) {
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 8) {
+                    accountLabel(row)
+                    accountValue(row, alignment: .leading)
+                }
+                Spacer(minLength: 0)
+            } else {
+                accountLabel(row)
+                Spacer(minLength: 8)
+                accountValue(row, alignment: .trailing)
+            }
+            if linksToAccounts { Image(systemName: "chevron.right").font(.caption2).foregroundStyle(.tertiary) }
+        }.frame(maxWidth: .infinity, alignment: .leading).padding(.vertical, 14).contentShape(Rectangle())
+    }
     private func accountLabel(_ row: CanvasBalanceChange) -> some View {
         HStack(spacing: 10) {
             CanvasAccountIcon(kind: row.account.kind)
@@ -79,13 +90,23 @@ struct CuadraoBalanceBreakdown: View {
     }
     private func accountValue(_ row: CanvasBalanceChange, alignment: HorizontalAlignment) -> some View {
         VStack(alignment: alignment, spacing: 4) {
-            Text(row.change.map(signed) ?? row.closing.map(money) ?? "—").font(CuadraoTypography.rowAmount)
-            if let change = row.change {
-                Text(change == 0 ? (spanish ? "Sin cambio" : "Unchanged") : change > 0 ? (spanish ? "Suma al balance" : "Adds to balance") : (spanish ? "Resta al balance" : "Reduces balance"))
-                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-            } else if row.closing == nil {
-                Text(spanish ? "Sin balance" : "No balance").font(CuadraoTypography.caption).foregroundStyle(.secondary)
+            Text(row.change.map(signed) ?? startingBalance(row) ?? missingAmount).font(CuadraoTypography.rowAmount)
+            if let caption = caption(row) {
+                Text(caption).font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
         }
+    }
+    private var missingAmount: String { missingCoverage ? CuadraoMissingCoverage.amount(spanish) : "—" }
+    /// With no opening anywhere, the rows list each account's starting balance. Once a connected period has
+    /// an opening, an account missing either end shows no data rather than a balance read as a change.
+    private func startingBalance(_ row: CanvasBalanceChange) -> String? {
+        missingCoverage && period.change != nil ? nil : row.closing.map(money)
+    }
+    private func caption(_ row: CanvasBalanceChange) -> String? {
+        if let change = row.change {
+            return change == 0 ? (spanish ? "Sin cambio" : "Unchanged") : change > 0 ? (spanish ? "Suma al balance" : "Adds to balance") : (spanish ? "Resta al balance" : "Reduces balance")
+        }
+        if row.closing == nil { return spanish ? "Sin balance" : "No balance" }
+        return missingCoverage && period.change != nil ? (spanish ? "Sin inicio registrado" : "No recorded opening") : nil
     }
 }

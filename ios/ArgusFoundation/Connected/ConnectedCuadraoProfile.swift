@@ -1,88 +1,87 @@
 import SwiftUI
 
-enum CuadraoProfileDestination: Hashable { case appearance, legal }
-
 struct ConnectedCuadraoProfile: View {
     @Binding var appearance: AppearancePreference
     @Binding var avatar: CuadraoAvatarSelection
+    @Binding var path: [CanvasProfileRoute]
+    var bottomSpace: CGFloat = 88
     @EnvironmentObject private var auth: ProfileAuthModel
     @Environment(\.locale) private var locale
-    @State private var editingAvatar = false
+    @State private var editing = false
+    @State private var confirmingSignOut = false
+    @State private var settingsExamples = CuadraoProfileSettingsDraft()
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
+    private var displayName: String { auth.profile?.displayName ?? (spanish ? "Tu perfil" : "Your profile") }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                if CuadraoFirstRelease.editsAvatar {
-                    Button { editingAvatar = true } label: { identity(editable: true) }
-                        .buttonStyle(.plain).accessibilityIdentifier("release.profile.avatar")
+        NavigationStack(path: $path) {
+            CuadraoProfileBody(spanish: spanish,
+                identity: .init(name: displayName, emailAddress: auth.profile?.email, avatar: avatar),
+                bottomSpace: bottomSpace, editProfile: { editing = true }) {
+                if let invitations = auth.invitations { ConnectedProfileInvitationsRow(model: invitations) }
+            } accountActions: {
+                signOut
+            }
+            .navigationDestination(for: CanvasProfileRoute.self) { route in
+                if route == .invitations, let invitations = auth.invitations {
+                    InvitationsHub(model: invitations).toolbar(.visible, for: .navigationBar)
                 } else {
-                    identity(editable: false).accessibilityElement(children: .combine)
-                        .accessibilityIdentifier("release.profile.display")
+                    CuadraoProfilePage(route: route, settings: $settingsExamples, spanish: spanish,
+                        includeExamples: true, connection: .connected(appearance: $appearance, profile: auth))
                 }
-                VStack(spacing: 0) {
-                    NavigationLink(value: CuadraoProfileDestination.appearance) {
-                        row(spanish ? "Apariencia" : "Appearance", symbol: "paintpalette")
-                    }.accessibilityIdentifier("profile.preferences")
-                    Divider()
-                    if auth.state == .authenticated {
-                        Menu {
-                            ForEach(PlanCurrency.supported, id: \.self) { currency in
-                                Button(currency) { Task { await auth.setPrimaryCurrency(currency) } }
-                            }
-                        } label: {
-                            HStack {
-                                Text(spanish ? "Moneda principal" : "Primary currency")
-                                Spacer()
-                                Text(auth.profile?.currency ?? (spanish ? "Elegir" : "Choose"))
-                                    .foregroundStyle(.secondary)
-                            }.frame(minHeight: 58)
-                        }.disabled(auth.busy).accessibilityIdentifier("profile.primaryCurrency")
-                        Text(spanish ? "Elegir una moneda no convierte ni combina tus balances." : "Choosing a currency does not convert or combine your balances.")
-                            .font(.footnote).foregroundStyle(.secondary).padding(.bottom, 12)
-                        Divider()
-                    }
-                    NavigationLink(value: CuadraoProfileDestination.legal) {
-                        row(spanish ? "Privacidad y términos" : "Privacy and terms", symbol: "hand.raised")
-                    }.accessibilityIdentifier("release.profile.legal")
-                    if let invitations = auth.invitations { InvitationsProfileRow(model: invitations) }
-                }.padding(.horizontal, 16).background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 20))
-                if auth.enabled { ProfileAccountSection(model: auth) }
-            }.padding(24)
-        }
-        .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("").toolbar(.hidden, for: .navigationBar)
-        .sheet(isPresented: $editingAvatar) {
-            CuadraoIdentityEditor(name: auth.profile?.displayName ?? "", selection: $avatar)
-        }
-        .navigationDestination(for: CuadraoProfileDestination.self) { destination in
-            switch destination {
-            case .appearance: AppearancePreferencesView(appearance: $appearance).toolbar(.visible, for: .navigationBar)
-            case .legal: CuadraoLegalLinks(webURL: auth.configuration?.webURL)
             }
+            .sheet(isPresented: $editing) {
+                NavigationStack {
+                    CuadraoProfileEditor(name: .constant(auth.profile?.displayName ?? ""),
+                        preferredName: .constant(auth.profile?.preferredName ?? ""),
+                        emailAddress: auth.profile?.email, avatar: $avatar, spanish: spanish,
+                        saveNames: { await auth.setNames(displayName: $0, preferredName: $1) })
+                }.tint(WelcomePalette.pine).preferredColorScheme(appearance.colorScheme)
+            }
+            .alert(spanish ? "¿Cerrar sesión?" : "Sign out?", isPresented: $confirmingSignOut) {
+                Button(spanish ? "Cancelar" : "Cancel", role: .cancel) {}
+                Button(spanish ? "Cerrar sesión" : "Sign out", role: .destructive) { Task { await auth.signOut() } }
+                    .accessibilityIdentifier("auth.signOut.confirm")
+            } message: {
+                Text(spanish ? "Volverás a la pantalla de inicio de sesión." : "You’ll return to the sign-in screen.")
+            }
+        }
+        .toolbar(.hidden, for: .tabBar)
+        .onChange(of: auth.profile?.id) { _, _ in
+            settingsExamples = CuadraoProfileSettingsDraft()
+            editing = false
+            confirmingSignOut = false
         }
     }
 
-    private func identity(editable: Bool) -> some View {
-        HStack(spacing: 18) {
-            CuadraoIdentityAvatar(selection: avatar, name: auth.profile?.displayName ?? "", size: 64)
-            VStack(alignment: .leading, spacing: 4) {
-                Text(auth.profile?.displayName ?? (spanish ? "Tu perfil" : "Your profile"))
-                    .font(.title2.weight(.semibold)).foregroundStyle(.primary)
-                if editable { Text(spanish ? "Editar avatar" : "Edit avatar").font(CuadraoTypography.supporting) }
+    private var signOut: some View {
+        VStack(spacing: 6) {
+            Button(spanish ? "Cerrar sesión" : "Sign out") { confirmingSignOut = true }
+                .font(.subheadline).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 44)
+                .disabled(auth.busy)
+                .accessibilityIdentifier("auth.signOut")
+            if let key = auth.errorKey {
+                Text(LocalizedStringKey(key)).font(.footnote).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity).multilineTextAlignment(.center)
+                    .accessibilityIdentifier("auth.error")
             }
-            Spacer()
-            if editable { Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary) }
-        }.contentShape(Rectangle())
+        }
     }
+}
 
-    private func row(_ title: String, symbol: String) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol).frame(width: 24)
-            Text(title).foregroundStyle(.primary)
-            Spacer()
-            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
-        }.frame(minHeight: 58).contentShape(Rectangle())
+private struct ConnectedProfileInvitationsRow: View {
+    @ObservedObject var model: InvitationsModel
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        if model.showsInvitations {
+            Rectangle().fill(CanvasSettingsStyle.separator).frame(height: 0.5)
+                .padding(.leading, 54).padding(.trailing, 18).accessibilityHidden(true)
+            NavigationLink(value: CanvasProfileRoute.invitations) {
+                CanvasProfileRow(route: .invitations, spanish: locale.language.languageCode?.identifier == "es")
+            }.buttonStyle(.plain).accessibilityIdentifier("invites.profile")
+        }
     }
 }
 

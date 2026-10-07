@@ -16,16 +16,17 @@ final class FinancialLoopUITests: XCTestCase {
         app.textFields["accounts.amount"].tap(); app.textFields["accounts.amount"].typeText("125")
         app.buttons["Done"].tap(); app.buttons["accounts.save"].tap()
         assertText("DOP 125.00")
-        tapVisible(app.buttons["accounts.back"])
+        tapVisible(app.accountBack)
         let original = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch
         XCTAssertTrue(original.waitForExistence(timeout: 10))
         let originalID = original.identifier
         tapVisible(original)
         tapVisible(app.buttons["accounts.archive"])
-        XCTAssertTrue(app.buttons["Restore account"].waitForExistence(timeout: 10))
-        for _ in 0..<5 { if app.buttons["accounts.back"].isHittable { break }; app.swipeDown() }
-        app.buttons["accounts.back"].tap()
-        XCTAssertFalse(app.buttons[originalID].exists)
+        if !app.confirmAccountArchive() {
+            for _ in 0..<5 { if app.accountBack.isHittable { break }; app.swipeDown() }
+            app.accountBack.tap()
+        }
+        XCTAssertTrue(app.buttons[originalID].waitForNonExistence(timeout: 10))
         capture("archive-active-list")
         assertHome(baseline + 125)
         app.openAccountsList()
@@ -40,9 +41,9 @@ final class FinancialLoopUITests: XCTestCase {
         tapVisible(app.buttons["accounts.archive"])
         XCTAssertTrue(app.buttons["Archive account"].waitForExistence(timeout: 10)
             || app.buttons["accounts.archive"].waitForExistence(timeout: 2))
-        for _ in 0..<5 { if app.buttons["accounts.back"].isHittable { break }; app.swipeDown() }
-        if app.buttons["accounts.back"].waitForExistence(timeout: 3) {
-            app.buttons["accounts.back"].tap()
+        for _ in 0..<5 { if app.accountBack.isHittable { break }; app.swipeDown() }
+        if app.accountBack.waitForExistence(timeout: 3) {
+            app.accountBack.tap()
         }
         // Connected may already show the restored row on Home after detail pop; tip still needs manage.back.
         if !app.buttons[originalID].waitForExistence(timeout: 3) {
@@ -102,7 +103,7 @@ final class FinancialLoopUITests: XCTestCase {
         try signIn()
         let baseline = homeValue()
         app.openAccountsList()
-        if app.buttons["accounts.back"].exists { app.buttons["accounts.back"].tap() }
+        if app.accountBack.exists { app.accountBack.tap() }
         tapVisible(app.buttons["accounts.add"])
         app.buttons["accounts.type.checking"].tap()
         let nickname = "Daily loop " + UUID().uuidString.prefix(6)
@@ -245,6 +246,7 @@ final class FinancialLoopUITests: XCTestCase {
     }
 
     func assertHome(_ expected: Decimal) {
+        openPersonalAccounts()
         app.revealConnectedTabBar()
         XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
         app.buttons["tab.home"].tap()
@@ -258,6 +260,7 @@ final class FinancialLoopUITests: XCTestCase {
     }
 
     func homeValue() -> Decimal {
+        openPersonalAccounts()
         app.revealConnectedTabBar()
         XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
         app.buttons["tab.home"].tap()
@@ -308,6 +311,13 @@ final class FinancialLoopUITests: XCTestCase {
     }
     func tapVisible(_ element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 10))
+        let reference = element.identifier.isEmpty ? element.label : element.identifier
+        let toolbarControl = app.navigationBars.descendants(matching: element.elementType)
+            .matching(identifier: reference).firstMatch
+        if toolbarControl.exists && toolbarControl.frame == element.frame && element.isHittable {
+            element.tap()
+            return
+        }
         var scrolled = false
         for _ in 0..<12 {
             if element.isHittable && element.frame.midY > 115 && element.frame.midY < app.frame.height - 130 { break }
@@ -340,23 +350,25 @@ final class FinancialLoopUITests: XCTestCase {
         app.launch()
         if app.buttons["budget.close"].waitForExistence(timeout: 2) {
             app.buttons["budget.close"].tap()
-            XCTAssertTrue(app.otherElements["budget.detail"].waitForNonExistence(timeout: 10))
+            XCTAssertTrue(app.descendants(matching: .any)["budget.detail"].waitForNonExistence(timeout: 10))
         }
         if app.buttons["goal.close"].waitForExistence(timeout: 2) {
             app.buttons["goal.close"].tap()
-            XCTAssertTrue(app.otherElements["goal.detail"].waitForNonExistence(timeout: 10))
+            XCTAssertTrue(app.descendants(matching: .any)["goal.detail"].waitForNonExistence(timeout: 10))
         }
         if app.buttons["debt.close"].waitForExistence(timeout: 2) {
             app.buttons["debt.close"].tap()
-            XCTAssertTrue(app.otherElements["debt.detail"].waitForNonExistence(timeout: 10))
+            XCTAssertTrue(app.descendants(matching: .any)["debt.detail"].waitForNonExistence(timeout: 10))
         }
+        app.revealConnectedTabBar()
         let connected = app.usesConnectedChrome
             || app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 2)
         if connected {
-            if fresh, app.buttons["header.profile"].waitForExistence(timeout: 2) {
+            if app.buttons["header.profile"].waitForExistence(timeout: 2) {
                 app.buttons["header.profile"].tap()
-                if app.buttons["auth.signOut"].waitForExistence(timeout: 3) {
-                    app.buttons["auth.signOut"].tap()
+                if fresh, app.buttons["auth.signOut"].waitForExistence(timeout: 3) {
+                    tapVisible(app.buttons["auth.signOut"])
+                    app.confirmSignOutIfAsked()
                     XCTAssertTrue(app.buttons["cuadrao.welcome.signin"].waitForExistence(timeout: 20))
                 }
             }

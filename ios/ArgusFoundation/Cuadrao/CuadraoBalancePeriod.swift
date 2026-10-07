@@ -23,7 +23,10 @@ struct CanvasBalancePeriod {
         guard let opening, let closing else { return nil }
         return closing.balance - opening.balance
     }
+}
 
+/// Owners with their own account series build the period memberwise; the canvas derives it from fixtures here.
+extension CanvasBalancePeriod {
     init(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], range: CanvasHistoryRange,
          offset: Int, now: Date = .now) {
         self.init(accounts: accounts, observations: observations, range: range, offset: offset, now: now,

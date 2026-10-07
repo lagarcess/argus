@@ -9,7 +9,7 @@ struct ConnectedCuadraoRoot: View {
         Group {
             switch auth.state {
             case .disabled:
-                FoundationShell(appearance: $appearance)
+                FoundationShell(appearance: $appearance).modifier(ArgusChrome())
             case .authenticated:
                 if let invitations = auth.invitations {
                     InvitationGateHost(model: invitations, household: auth.household, signOut: { Task { await auth.signOut() } }) {
@@ -21,6 +21,7 @@ struct ConnectedCuadraoRoot: View {
             case .accountDeletionUncertain, .accountDeletionPending, .signedOut, .configurationInvalid, .pendingSignOut, .unsupportedAnonymous, .credentialValidationRequired, .reauthenticationRequired:
                 ConnectedCuadraoAuthFlow()
                     .safeAreaInset(edge: .top) { if let invitations = auth.invitations { InvitationPendingNotice(model: invitations) } }
+                    .modifier(ArgusChrome())
             }
         }
         .alert("auth.apple.capture.title", isPresented: $auth.captureNoticePresented) {
@@ -30,5 +31,12 @@ struct ConnectedCuadraoRoot: View {
         }
         .invitationLinks(auth.invitations)
         .onAppear { auth.invitations?.openHousehold = { [weak auth] input in await auth?.household?.beginJoin(input) == true } }
+    }
+}
+
+/// The sample shell and the auth flow keep the Argus tokens; the signed-in Cuadrao shell inherits nothing, like the Preview.
+private struct ArgusChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        content.tint(ArgusStyle.ink).foregroundStyle(ArgusStyle.ink).font(ArgusStyle.body())
     }
 }

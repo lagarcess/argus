@@ -347,14 +347,13 @@
 "plan.chart.title" = "Projected balance after each movement";
 "plan.chart.inspect" = "Touch to inspect. Each step is a movement, not an equal time interval.";
 "plan.chart.accessibility" = "Inspect movement";
-"plan.status.planned" = "Planned, not recorded";
+"plan.status.planned" = "Planned";
 "plan.status.fulfilled" = "Recorded";
 "plan.status.needs_review" = "Review the linked activity";
 "plan.overdue" = "Overdue, included from today";
 "plan.exclusion.account_unassigned" = "Choose an account to include this in the forecast.";
 "plan.exclusion.account_not_selected" = "This account is not included in the forecast.";
 "plan.exclusion.link_needs_review" = "Excluded until you review the linked activity.";
-"plan.home.disclosure" = "An estimate from your plan, separate from recorded net worth.";
 "plan.unavailable" = "This part of Plan is not available yet. Expected income and bills are in Overview.";
 "plan.kind" = "Type";
 "plan.kind.income" = "Income";
@@ -632,6 +631,9 @@
 "household.personal" = "Personal";
 "household.title" = "Household";
 "household.manage" = "Manage spaces";
+"household.addHousehold" = "Add household";
+"household.addOrManage" = "Add or manage spaces";
+"household.spaces.none" = "You have no other spaces yet.";
 "household.people" = "People";
 "household.scopeNotice" = "Only explicitly shared recorded accounts. Each owner’s recorded share counts once.";
 "household.knownSubtotal" = "Known subtotal";
@@ -772,6 +774,8 @@
 "sharedPlan.history" = "View history";
 "sharedPlan.restore" = "Restore plan";
 "sharedPlan.archive" = "Archive plan";
+"sharedPlan.archive.confirm" = "Put this plan aside?";
+"sharedPlan.archive.body" = "You can restore it from Archived. Its progress stays with it.";
 "sharedPlan.original" = "View original activity";
 "sharedPlan.release" = "Release link";
 "sharedPlan.purpose.funding" = "Fund the plan";
@@ -840,3 +844,8 @@
 
 "auth.deletion.uncertain" = "We couldn't confirm whether deletion started. Check again before using your account.";
 "auth.deletion.pending" = "Your account is being deleted. You're signed out. If you need help, contact support.";
+"auth.deletion.checkAgain" = "Check again";
+"auth.deletion.uncertain.support" = "We couldn't confirm your deletion from this device. Contact support for help.";
+"auth.deletion.apple" = "To delete your account, confirm with Apple again.";
+"auth.deletion.support.requested" = "Request sent. Support will delete your account and follow up by email.";
+"auth.deletion.support.unavailable" = "Deleting in the app isn't available here yet. Support can delete your account for you.";

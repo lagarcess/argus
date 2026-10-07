@@ -6,6 +6,7 @@ struct CuadraoForecastPlayground: View {
     let scopeName: String
     let spanish: Bool
     var bottomSpace: CGFloat = 90
+    let isolatedExample: Bool
     @State private var draft: Double
     @State private var selectedDay: Int?
     @State private var exact = false
@@ -18,13 +19,21 @@ struct CuadraoForecastPlayground: View {
         guard let selectedDay else { return nil }
         return (forecast.actual + forecast.projection(daily: draft).dropFirst()).first { $0.day == selectedDay }
     }
-    init(store: CuadraoPlanPreview, scope: String, scopeName: String, spanish: Bool, bottomSpace: CGFloat = 90) {
+    init(store: CuadraoPlanPreview, scope: String, scopeName: String, spanish: Bool, bottomSpace: CGFloat = 90, isolatedExample: Bool = false) {
         self.store = store; self.scope = scope; self.scopeName = scopeName; self.spanish = spanish; self.bottomSpace = bottomSpace
+        self.isolatedExample = isolatedExample
         _draft = State(initialValue: store.daily(for: scope))
     }
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 28) {
+                if isolatedExample {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(spanish ? "Escenario de ejemplo" : "Example scenario").font(.subheadline.weight(.medium))
+                        Text(spanish ? "Datos ficticios, separados de tus cuentas. Los cambios se quedan en este ejemplo." : "Fictional data, separate from your accounts. Changes stay in this example.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }.accessibilityIdentifier("forecast-example-notice")
+                }
                 VStack(alignment: .leading, spacing: 12) {
                     Text("\(spanish ? "Octubre" : "October") · \(scopeName)").font(.subheadline).foregroundStyle(.secondary)
                     Text(spanish ? "Tu mes tiene posibilidades." : "Your month has possibilities.")
@@ -79,16 +88,24 @@ struct CuadraoForecastPlayground: View {
                 assumptions
                 VStack(spacing: 8) {
                     if changed {
-                        PlanPrimaryButton(title: spanish ? "Guardar este ritmo" : "Save this pace") {
+                        PlanPrimaryButton(title: isolatedExample
+                            ? (spanish ? "Aplicar al ejemplo" : "Apply to example")
+                            : (spanish ? "Guardar este ritmo" : "Save this pace")) {
                             store.applyDaily(draft, scope: scope); saved = true
                         }.accessibilityIdentifier("forecast-apply")
-                        Button(spanish ? "Volver a mi plan" : "Reset to my plan") { draft = baseline; selectedDay = nil }
+                        Button(isolatedExample
+                            ? (spanish ? "Restablecer ejemplo" : "Reset example")
+                            : (spanish ? "Volver a mi plan" : "Reset to my plan")) { draft = baseline; selectedDay = nil }
                             .frame(minHeight: 44).accessibilityIdentifier("forecast-reset")
                     } else if saved {
-                        Label(spanish ? "Ritmo guardado" : "Pace saved", systemImage: "checkmark.circle")
+                        Label(isolatedExample
+                            ? (spanish ? "Ejemplo actualizado" : "Example updated")
+                            : (spanish ? "Ritmo guardado" : "Pace saved"), systemImage: "checkmark.circle")
                             .foregroundStyle(WelcomePalette.pine).font(.subheadline).frame(minHeight: 44)
                     }
-                    Text(spanish ? "Solo cambia tu previsión. No mueve dinero." : "Only changes your forecast. No money moves.")
+                    Text(isolatedExample
+                        ? (spanish ? "No cambia tus cuentas ni tus planes." : "Your accounts and plans stay unchanged.")
+                        : (spanish ? "Solo cambia tu previsión. No mueve dinero." : "Only changes your forecast. No money moves."))
                         .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
                 }
                 PlanPreviewFootnote(spanish: spanish)

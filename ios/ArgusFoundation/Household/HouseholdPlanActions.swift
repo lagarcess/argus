@@ -100,7 +100,7 @@ struct HouseholdPlanPresenter: View {
             case .link(let plan): HouseholdPlanActionSheet(model: model, plan: plan)
             case .allocation(let plan): HouseholdPlanActionSheet(model: model, plan: plan, allocating: true)
             case .original(let plan, let contribution): HouseholdPlanOriginalView(model: model, plan: plan, contribution: contribution)
-            } }.preferredColorScheme(.light).tint(WelcomePalette.pine).foregroundStyle(ArgusStyle.ink)
+            } }.tint(WelcomePalette.pine).foregroundStyle(ArgusStyle.ink)
         }
     }
 }

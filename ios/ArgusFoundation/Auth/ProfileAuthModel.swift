@@ -17,6 +17,7 @@ final class ProfileAuthModel: ObservableObject {
     @Published private(set) var household: HouseholdModel?
     @Published private(set) var invitations: InvitationsModel?
     @Published private(set) var financialSearch: FinancialSearchModel?
+    @Published private(set) var deletion: AccountDeletionModel?
     let configuration: NativeAuthConfiguration?
     /// Native Apple and Google buttons; `.off` unless email auth is configured too.
     let providers: NativeProviderConfiguration
@@ -50,6 +51,9 @@ final class ProfileAuthModel: ObservableObject {
         self.providers = providers
         state = initialState
         if let loadedController {
+            deletion = AccountDeletionModel(controller: loadedController, appleAvailable: providers.apple,
+                                            cleanup: { try CuadraoReceiptStore.removeConnectedDrafts(userID: $0) })
+            deletion?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             financialSearch = FinancialSearchModel(controller: loadedController, prefix: (loadedConfiguration?.session.storagePrefix ?? "") + ".search.")
             financialSearch?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             accounts = AccountsModel(controller: loadedController)
@@ -80,6 +84,7 @@ final class ProfileAuthModel: ObservableObject {
         guard !started else { return }
         started = true
         await restore()
+        await deletion?.load()
     }
 
     func restore() async {
@@ -192,6 +197,14 @@ final class ProfileAuthModel: ObservableObject {
         await perform { try await controller.setPrimaryCurrency(currency, expectedIdentity: identity) }
     }
 
+    /// True only when the profile the server returns carries both names.
+    func setNames(displayName: String, preferredName: String) async -> Bool {
+        guard let controller, state == .authenticated, !busy else { return false }
+        let identity = await controller.snapshot()
+        await perform { try await controller.setNames(displayName: displayName, preferredName: preferredName, expectedIdentity: identity) }
+        return profile?.displayName == displayName && (profile?.preferredName ?? "") == preferredName
+    }
+
     func signOut() async {
         guard let controller else { return }
         household?.bind(nil)
@@ -199,6 +212,7 @@ final class ProfileAuthModel: ObservableObject {
         accounts?.bind(nil)
         financialLoop?.bind(nil)
         await perform { try await controller.signOut() }
+        await deletion?.load()
     }
 
     func retryPendingSignOut() async {

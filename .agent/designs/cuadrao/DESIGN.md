@@ -18,6 +18,31 @@ This is a reference organized by design rule, not a sequence of polish notes.
 The [Argus guide](../argus/DESIGN.md) supplies the document structure; Cuadrao keeps
 its native type, palette and artwork. Delivery evidence belongs in the roadmap.
 
+## Connected presentation ownership
+
+The October 5 connection uses the existing approved Preview views. Connecting a
+backend does not authorize a second Home, different typography, new artwork, or a
+replacement navigation bar. Preview and connected hosts render shared components.
+Preview owns sample records. Existing account, financial-loop, and Plan models own
+live reads, review, confirmation, and recovery.
+
+This applies to the full interface: Home and expanded charts, Plan, Chat, Search,
+Updates, Profile, settings, and Household destinations. The shared app shell owns
+the approved menu bar, temporary-chat exit, keyboard and voice presentation. Each
+connected host supplies its authorized records and actions to the shared views.
+Check must preserve the complete experience before a replacement build is called
+restored. Verifying only the connected money slice is insufficient.
+
+Development examples for capabilities awaiting a backend remain visibly labeled
+and isolated from real financial writes. Preserve the separate Preview app and
+source checkpoint during recovery; install candidates over Check only.
+
+Missing live data uses the approved empty treatment. A current balance does not
+establish historical coverage. Future Plan points do not become balance history.
+Home's Upcoming reads its own rolling 30-day projection. A row opens review;
+a due date never records a payment. Simulator evidence and physical-phone
+acceptance remain distinct.
+
 ## 1. Character and surface purpose
 
 Cuadrao is warm, clear and personal. Home offers a calm first glance; Plan makes
@@ -746,9 +771,9 @@ native release. They do not remove existing production web capabilities.
 
 ### Integration is the starting point
 
-Household and Connected changes start from current integration's existing screens,
-models and permission checks. The design preview supplies style and accepted
-interaction details, not a replacement household store or auth flow. Preserve
+Household and Connected changes retain current integration's models, commands,
+auth flow and permission checks. Their presentation uses the approved shared
+Preview views, artwork and interaction details. Preserve
 create, accept, consent, transfer, leave, remove, close and recovery behavior.
 Administrator authority over membership is separate from ownership of money.
 A household membership does not expose accounts, files or conversations by itself.
@@ -959,7 +984,7 @@ favors permission requests in context.
 | Shared decision | Single code owner | Usage |
 | --- | --- | --- |
 | Typography roles | [CuadraoTypography.swift](../../../ios/ArgusFoundation/Cuadrao/CuadraoTypography.swift) | Use named roles for expressive headings and amounts. Native navigation titles, text bodies and system controls retain their semantic text styles. |
-| Adaptive palette | [WelcomePalette](../../../ios/ArgusFoundation/Cuadrao/CuadraoCanvas.swift) | Pine, sage, background, surface, ink, borders and positive input text. The historical type name remains; do not create a competing Cuadrao palette. Adaptive light/dark values are gated behind the design-preview flag, `CuadraoDesignPreview.isActive` (`--cuadrao-design`, or a build whose Info.plist sets `CUADRAO_DESIGN_PREVIEW` to `true`); every other launch keeps the shipped tokens. |
+| Adaptive palette | [WelcomePalette](../../../ios/ArgusFoundation/Cuadrao/CuadraoCanvas.swift) | Pine, sage, background, surface, ink, borders and positive input text. Shared native Cuadrao views use these adaptive light/dark values in both Preview and connected hosts. The historical type name remains; do not create a competing Cuadrao palette. Preview routing stays isolated from real financial records. |
 | Money parsing and caret behavior | [CanvasDecimalInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasDecimalInput.swift) | Accounts uses this native text editor on integration. Since #785 (design PR 2), Plan uses the same editor through `PlanAmountInput` and `CanvasMoneyValueInput`, inside the design preview only; Home reaches Plan since #786 (design PR 3). |
 | Currency precision, formatting and limits | [CanvasMoney.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoney.swift) | Derive preview limits and formatting here; currency selection/immutability retains its plan/group owner. |
 | Numeric preview bridge | [CanvasMoneyValueInput.swift](../../../ios/ArgusFoundation/Cuadrao/CanvasMoneyValueInput.swift) | Adapts existing numeric preview models to decimal editing text; it is not a new financial store. |

@@ -1,55 +1,125 @@
 import SwiftUI
 
-struct CuadraoSpacesSheet: View {
+/// What a row in the Spaces sheet does. The shared sheet draws every row; a host decides the outcome.
+enum CuadraoSpaceChoice {
+    /// Pushes a page inside the sheet.
+    case page(AnyView)
+    /// Runs the host's action, then closes the sheet.
+    case act(() -> Void)
+    /// Designed but has no backend yet: shown disabled with a caption.
+    case soon
+}
+
+protocol CuadraoSpacesSource {
+    /// Business and custom rows appear only when true.
+    var showsExtraSpaces: Bool { get }
+    /// The outcome for Household, Business and Custom. Personal is never offered.
+    func choice(_ kind: CanvasSpaceKind, finish: @escaping () -> Void) -> CuadraoSpaceChoice
+    func manage(finish: @escaping () -> Void) -> CuadraoSpaceChoice
+}
+
+/// The design preview: every row works on the fixture in `CuadraoAccountsPreview`.
+struct CuadraoPreviewSpacesSource: CuadraoSpacesSource {
     let data: CuadraoAccountsPreview
     let spanish: Bool
+    var showsExtraSpaces: Bool { CuadraoFirstRelease.showsExtraSpaces }
+    func choice(_ kind: CanvasSpaceKind, finish: @escaping () -> Void) -> CuadraoSpaceChoice {
+        switch kind {
+        case .household: .page(AnyView(CuadraoHouseholdIntroduction(data: data, spanish: spanish, finished: finish)))
+        case .business, .custom: .page(AnyView(CuadraoSpaceNameForm(data: data, kind: kind, spanish: spanish, finished: finish)))
+        case .personal: .soon
+        }
+    }
+    func manage(finish: @escaping () -> Void) -> CuadraoSpaceChoice {
+        .page(AnyView(CuadraoManageSpaces(data: data, spanish: spanish, open: finish)))
+    }
+}
+
+struct CuadraoSpacesSheet: View {
+    let source: any CuadraoSpacesSource
+    let spanish: Bool
     @Environment(\.dismiss) private var dismiss
+
+    init(source: any CuadraoSpacesSource, spanish: Bool) {
+        self.source = source; self.spanish = spanish
+    }
+    init(data: CuadraoAccountsPreview, spanish: Bool) {
+        self.init(source: CuadraoPreviewSpacesSource(data: data, spanish: spanish), spanish: spanish)
+    }
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 8) {
-                NavigationLink {
-                    CuadraoHouseholdIntroduction(data: data, spanish: spanish, finished: { dismiss() })
-                } label: {
-                    spaceChoice(.household, subtitle: spanish ? "Lo que comparten en casa" : "What you share at home")
-                }.buttonStyle(.plain)
+                choiceRow(.household, subtitle: spanish ? "Lo que comparten en casa" : "What you share at home")
                 Divider()
-                ForEach([CanvasSpaceKind.business, .custom]) { kind in
-                    NavigationLink {
-                        CuadraoSpaceNameForm(data: data, kind: kind, spanish: spanish, finished: { dismiss() })
-                    } label: {
-                        spaceChoice(kind, subtitle: kind == .business
+                if source.showsExtraSpaces {
+                    ForEach([CanvasSpaceKind.business, .custom]) { kind in
+                        choiceRow(kind, subtitle: kind == .business
                             ? (spanish ? "Tus finanzas del negocio" : "Your business finances")
                             : (spanish ? "Un espacio a tu manera" : "A space of your own"))
-                    }.buttonStyle(.plain)
-                    Divider()
+                        Divider()
+                    }
                 }
-                NavigationLink {
-                    CuadraoManageSpaces(data: data, spanish: spanish, open: { dismiss() })
-                } label: {
-                    Label(spanish ? "Gestionar espacios" : "Manage spaces", systemImage: "slider.horizontal.3")
-                        .font(.subheadline).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).contentShape(Rectangle())
-                }.buttonStyle(.plain)
+                manageRow
                 Spacer(minLength: 0)
             }.padding(.horizontal, 24).padding(.top, 12)
                 .navigationTitle(spanish ? "Espacios" : "Spaces").navigationBarTitleDisplayMode(.inline)
                 .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { dismiss() } } }
         }.tint(WelcomePalette.pine).presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
     }
-    private func spaceChoice(_ kind: CanvasSpaceKind, subtitle: String) -> some View {
+
+    @ViewBuilder private func choiceRow(_ kind: CanvasSpaceKind, subtitle: String) -> some View {
+        let choice = source.choice(kind, finish: { dismiss() })
+        let content = spaceChoice(kind, subtitle: subtitle, caption: caption(for: choice))
+        switch choice {
+        case .page(let destination):
+            NavigationLink { destination } label: { content.contentShape(Rectangle()) }.buttonStyle(.plain)
+                .accessibilityIdentifier("spaces.choice." + kind.rawValue)
+        case .act(let run):
+            Button { run(); dismiss() } label: { content.contentShape(Rectangle()) }.buttonStyle(.plain)
+                .accessibilityIdentifier("spaces.choice." + kind.rawValue)
+        case .soon:
+            content.opacity(0.55).accessibilityElement(children: .combine)
+                .accessibilityIdentifier("spaces.choice." + kind.rawValue)
+        }
+    }
+
+    @ViewBuilder private var manageRow: some View {
+        let label = Label(spanish ? "Gestionar espacios" : "Manage spaces", systemImage: "slider.horizontal.3")
+            .font(.subheadline).foregroundStyle(.secondary).frame(maxWidth: .infinity, minHeight: 52, alignment: .leading).contentShape(Rectangle())
+        switch source.manage(finish: { dismiss() }) {
+        case .page(let destination):
+            NavigationLink { destination } label: { label.contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("spaces.manage")
+        case .act(let run):
+            Button { run(); dismiss() } label: { label.contentShape(Rectangle()) }.buttonStyle(.plain).accessibilityIdentifier("spaces.manage")
+        case .soon:
+            label.opacity(0.55).accessibilityIdentifier("spaces.manage")
+        }
+    }
+
+    private func caption(for choice: CuadraoSpaceChoice) -> String? {
+        if case .soon = choice { return spanish ? "Próximamente" : "Coming soon" }
+        return nil
+    }
+
+    private func spaceChoice(_ kind: CanvasSpaceKind, subtitle: String, caption: String?) -> some View {
         HStack(spacing: 16) {
             Image(systemName: kind.symbol).font(.title3).frame(width: 28).foregroundStyle(WelcomePalette.pine)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 5) {
                 Text(kind.title(spanish)).font(CuadraoTypography.action)
                 Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
+                if let caption { Text(caption).font(.caption.weight(.medium)).foregroundStyle(.secondary) }
             }
             Spacer()
-            Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true)
+            if caption == nil {
+                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true)
+            }
         }.padding(.vertical, 14).contentShape(Rectangle())
     }
 }
 
-private struct CuadraoSpaceNameForm: View {
+struct CuadraoSpaceNameForm: View {
     let data: CuadraoAccountsPreview
     let kind: CanvasSpaceKind
     let spanish: Bool
@@ -86,7 +156,7 @@ private struct CuadraoSpaceNameForm: View {
     private var valid: Bool { data.spaceNameAvailable(name, except: existing?.id) }
 }
 
-private struct CuadraoManageSpaces: View {
+struct CuadraoManageSpaces: View {
     let data: CuadraoAccountsPreview
     let spanish: Bool
     let open: () -> Void

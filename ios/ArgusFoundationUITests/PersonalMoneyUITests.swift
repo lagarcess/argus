@@ -347,14 +347,17 @@ extension FinancialLoopUITests {
     }
 
     func createMoneyAccount(_ name: String, type: String, amount: String? = nil, negative: Bool = false, currency: String = "DOP") -> MoneyAccount {
-        app.openAccountsList()
-        if app.buttons["accounts.back"].exists { scrollMoneyTop(); app.buttons["accounts.back"].tap() }
+        openPersonalAccounts()
+        if app.accountBack.exists { scrollMoneyTop(); app.accountBack.tap() }
         tapVisible(app.buttons["accounts.add"])
         tapVisible(app.buttons["accounts.type." + type])
         fillMoneyField("accounts.nickname", with: name)
         if currency != "DOP" {
             tapVisible(app.buttons["accounts.currency"])
-            app.buttons[currency].tap()
+            // The currency list shows each code with its name.
+            let option = app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", currency)).firstMatch
+            XCTAssertTrue(option.waitForExistence(timeout: 5))
+            option.tap()
         }
         if let amount {
             fillMoneyField("accounts.amount", with: amount)
@@ -366,7 +369,7 @@ extension FinancialLoopUITests {
             print("MONEY_UI_STATE " + app.debugDescription)
             XCTFail("Saved activity or account should return to account details")
         }
-        scrollMoneyTop(); app.buttons["accounts.back"].tap()
+        scrollMoneyTop(); app.accountBack.tap()
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.' AND label CONTAINS %@", name)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         let result = MoneyAccount(name: name, id: String(row.identifier.dropFirst("accounts.row.".count)))
@@ -376,7 +379,7 @@ extension FinancialLoopUITests {
 
     func openMoneyAccount(_ account: MoneyAccount) {
         app.openAccountsList()
-        if app.buttons["accounts.back"].exists { scrollMoneyTop(); app.buttons["accounts.back"].tap() }
+        if app.accountBack.exists { scrollMoneyTop(); app.accountBack.tap() }
         tapVisible(app.buttons["accounts.row." + account.id])
         if !app.buttons["accounts.record"].waitForExistence(timeout: 10) {
             capture("navigation-failed")
@@ -411,16 +414,32 @@ extension FinancialLoopUITests {
         if picker.label.contains(account.name) { return }
         tapVisible(picker)
         let option = app.buttons.matching(NSPredicate(format: "label == %@ AND NOT identifier BEGINSWITH 'loop.' AND NOT identifier BEGINSWITH 'accounts.'", account.name)).firstMatch
+        let menu = app.collectionViews.element(boundBy: app.collectionViews.count - 1)
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        for _ in 0..<40 {
+            if option.exists && option.isHittable { break }
+            let visibleOptions = menu.buttons.allElementsBoundByIndex.filter(\.isHittable)
+            guard !visibleOptions.isEmpty else {
+                XCTFail("The account menu has no visible options")
+                return
+            }
+            let start = visibleOptions[visibleOptions.count / 2]
+                .coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: -100)),
+                        withVelocity: .slow, thenHoldForDuration: 0.2)
+        }
         XCTAssertTrue(option.waitForExistence(timeout: 5))
         option.tap()
     }
 
     func fillMoneyField(_ identifier: String, with value: String) {
+        dismissMoneyKeyboard()
         let field = moneyField(identifier)
         tapVisible(field); field.typeText(value)
     }
 
     func replaceMoneyField(_ identifier: String, with value: String) {
+        dismissMoneyKeyboard()
         let field = moneyField(identifier)
         tapVisible(field)
         let old = field.value as? String ?? ""
@@ -481,7 +500,7 @@ extension FinancialLoopUITests {
 
     func scrollMoneyTop() {
         for _ in 0..<8 {
-            if app.buttons["accounts.back"].isHittable { break }
+            if app.accountBack.isHittable { break }
             app.swipeDown()
         }
     }

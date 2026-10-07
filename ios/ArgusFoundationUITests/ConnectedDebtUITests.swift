@@ -46,13 +46,13 @@ extension FinancialLoopUITests {
         fillMoneyField("loop.reason", with: "Actual receipt correction")
         dismissMoneyKeyboard(); reviewDebtPayment(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
-        tapVisible(app.buttons["debt.activity.back"]); assertDebt("DOP -750.00")
+        app.swipeBack(); assertDebt("DOP -750.00")
         tapVisible(payment); tapVisible(app.buttons["activity.return"])
         assertReturnedMoneyDirection(from: "Loan " + stamp, to: funding.name)
         debtSplit(total: "100", principal: "80", interest: "15", fees: "5")
         reviewDebtPayment(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
-        tapVisible(app.buttons["debt.activity.back"]); assertDebt("DOP -830.00")
+        app.returnFromDetail("debt.activity.back"); assertDebt("DOP -830.00")
         capture("debt-return-preserves-original-payment")
         app.terminate(); app.launch()
         assertDebt("DOP -830.00")
@@ -64,15 +64,15 @@ extension FinancialLoopUITests {
         tapVisible(app.buttons["debt.link"])
         tapVisible(app.buttons["debt.action.cancel"])
         XCTAssertTrue(app.buttons["debt.record"].isHittable)
-        tapVisible(app.buttons["debt.edit"])
+        choosePlanDetailAction("debt.edit")
         replaceMoneyField("debt.name", with: "Updated loan " + stamp)
         dismissMoneyKeyboard(); tapVisible(app.buttons["debt.save"])
         XCTAssertTrue(app.buttons["debt.save"].waitForNonExistence(timeout: 15))
-        tapVisible(app.buttons["debt.archive"])
+        choosePlanDetailAction("debt.archive")
         app.buttons.matching(identifier: "debt.archive.confirm").firstMatch.tap()
         XCTAssertTrue(app.buttons["debt.restore"].waitForExistence(timeout: 15))
         tapVisible(app.buttons["debt.restore"]); assertDebt("DOP -550.00")
-        app.buttons["debt.close"].tap()
+        app.returnFromDetail("debt.close")
         verifyDebtSearch("Updated loan " + stamp, balance: "DOP -550.00")
     }
 
@@ -111,7 +111,7 @@ extension FinancialLoopUITests {
         assertDebt("DOP -300.00")
         XCTAssertEqual(payments.count, 1)
         capture("card-existing-payment-linked-once")
-        app.buttons["debt.close"].tap()
+        app.returnFromDetail("debt.close")
         openMoneyAccount(bank); assertText("DOP 900.00")
         openMoneyAccount(card); assertText("DOP -300.00")
         openDebt("Card plan " + stamp)
@@ -126,10 +126,10 @@ extension FinancialLoopUITests {
         fillMoneyField("loop.amount", with: "100"); dismissMoneyKeyboard()
         reviewDebtPayment(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
-        tapVisible(app.buttons["debt.activity.back"]); assertDebt("DOP -400.00")
+        app.returnFromDetail("debt.activity.back"); assertDebt("DOP -400.00")
         XCTAssertEqual(payments.count, 1)
         capture("card-linked-original-return-updates-plan")
-        app.buttons["debt.close"].tap()
+        app.returnFromDetail("debt.close")
         openMoneyAccount(bank); assertText("DOP 1,000.00")
     }
 
@@ -139,9 +139,9 @@ extension FinancialLoopUITests {
         app.buttons["tab.home"].tap()
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'debt.row.home.' AND label CONTAINS %@", query)).firstMatch
         tapVisible(row)
-        XCTAssertTrue(app.buttons["debt.close"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["debt.recorded"].waitForExistence(timeout: 15))
         capture("debt-home-current-truth")
-        app.buttons["debt.close"].tap()
+        app.returnFromDetail("debt.close")
         verifyDebtSearch(query, balance: nil)
     }
 
@@ -178,13 +178,13 @@ extension FinancialLoopUITests {
         dismissMoneyKeyboard()
     }
     private func openDebt(_ title: String) {
-        app.buttons["tab.plan"].tap(); tapVisible(app.buttons["plan.debts"])
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'debt.row.plan.' AND label CONTAINS %@", title)).firstMatch
+        app.openPlanSurface()
+        let row = planCards("debt", title).firstMatch
         tapVisible(row)
-        XCTAssertTrue(app.buttons["debt.close"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["debt.recorded"].waitForExistence(timeout: 15))
     }
     private func assertDebt(_ amount: String) {
-        let value = app.otherElements["debt.detail"].staticTexts["debt.recorded"]
+        let value = app.descendants(matching: .any)["debt.detail"].staticTexts["debt.recorded"]
         XCTAssertTrue(value.waitForExistence(timeout: 15))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", amount), object: value)], timeout: 15), .completed)
     }
@@ -194,23 +194,23 @@ extension FinancialLoopUITests {
         XCTAssertTrue(query.waitForExistence(timeout: 10)); query.tap()
         if app.buttons["search.clear"].exists { app.buttons["search.clear"].tap(); query.tap() }
         query.typeText(title + "\n")
-        tapVisible(app.buttons["search.filter.debt"])
+        chooseSearchPlans()
         let hit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.debt.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(hit)
         if let balance { assertDebt(balance) }
         capture("debt-search-current-detail")
-        app.buttons["debt.close"].tap()
+        app.returnFromDetail("debt.close")
         XCTAssertTrue(query.waitForExistence(timeout: 10))
         XCTAssertEqual(query.value as? String, title)
-        XCTAssertTrue(app.buttons["search.filter.debt"].isSelected)
+        XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
         XCTAssertTrue(hit.waitForExistence(timeout: 15))
         tapVisible(hit)
         app.terminate(); app.launch()
-        XCTAssertTrue(app.buttons["debt.close"].waitForExistence(timeout: 15))
-        app.buttons["debt.close"].tap()
+        XCTAssertTrue(app.staticTexts["debt.recorded"].waitForExistence(timeout: 15))
+        app.returnFromDetail("debt.close")
         XCTAssertTrue(query.waitForExistence(timeout: 10))
         XCTAssertEqual(query.value as? String, title)
-        XCTAssertTrue(app.buttons["search.filter.debt"].isSelected)
+        XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
         XCTAssertTrue(hit.waitForExistence(timeout: 15))
         capture("debt-search-query-and-filter-restored")
     }

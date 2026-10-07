@@ -9,7 +9,7 @@ extension FinancialLoopUITests {
     func testHomeMovementOpensDetailAndBackKeepsPosition() throws {
         try signIn()
         let stamp = String(UUID().uuidString.prefix(4))
-        _ = createMoneyAccount("Tap home " + stamp, type: "cash", amount: "300")
+        let account = createMoneyAccount("Tap home " + stamp, type: "cash", amount: "300")
         recordMoney(kind: "expense", amount: "12", note: "Bus " + stamp)
         recordMoney(kind: "income", amount: "40", note: "Tips " + stamp)
         let row = homeMovementRow("Bus " + stamp)
@@ -20,15 +20,45 @@ extension FinancialLoopUITests {
         assertText("Bus " + stamp)
         assertText("DOP 12.00")
         capture("home-movement-detail")
-        tapVisible(app.buttons["activity.back"])
+        tapVisible(app.buttons["activity-detail-account." + account.id])
+        XCTAssertTrue(app.buttons["accounts.record"].waitForExistence(timeout: 10))
+        app.swipeBack(cancel: true)
+        XCTAssertTrue(app.buttons["accounts.record"].exists, "A cancelled swipe keeps the account open")
+        app.swipeBack()
+        XCTAssertTrue(app.buttons["activity.correct"].waitForExistence(timeout: 10))
+        assertText("Bus " + stamp)
+        app.swipeBack()
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         XCTAssertEqual(row.frame.minY, before.minY, accuracy: 2, "Home returns to the same scroll position")
         XCTAssertEqual(row.frame.height, before.height, accuracy: 2)
         capture("home-movement-back-same-position")
-        // The row at that same frame still opens its detail: the real meaning of "still hittable".
         openMovement(row)
-        tapVisible(app.buttons["activity.back"])
+        app.navigationBars.buttons.matching(identifier: "BackButton").firstMatch.tap()
         XCTAssertTrue(app.descendants(matching: .any)["screen.activity"].waitForNonExistence(timeout: 10))
+    }
+
+    func testAccountRowHoldAndDragReordersAndKeepsTheOrderAfterRelaunch() throws {
+        try XCTSkipUnless(homeSwipesAvailable, "Hold reorders on iOS 27; older systems open the row menu")
+        try signIn()
+        let stamp = String(UUID().uuidString.prefix(4))
+        let first = createMoneyAccount("Order first " + stamp, type: "checking", amount: "10")
+        let second = createMoneyAccount("Order second " + stamp, type: "cash", amount: "20")
+        app.openAccountsList()
+        let firstRow = app.buttons["accounts.row." + first.id]
+        let secondRow = app.buttons["accounts.row." + second.id]
+        revealOnHome(secondRow)
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 10))
+        let before = (firstRow.frame.minY, secondRow.frame.minY)
+        XCTAssertLessThan(before.0, before.1, "a new account is listed after the earlier one")
+        secondRow.press(forDuration: 1.2, thenDragTo: firstRow)
+        let moved = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in secondRow.frame.minY < firstRow.frame.minY }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [moved], timeout: 10), .completed, "hold and drag moves the row above the other")
+        capture("account-row-reordered")
+        app.terminate(); app.launch()
+        app.openAccountsList()
+        revealOnHome(secondRow)
+        XCTAssertTrue(firstRow.waitForExistence(timeout: 10))
+        XCTAssertLessThan(secondRow.frame.minY, firstRow.frame.minY, "the order stays on this device after a relaunch")
     }
 
     func testAccountRowSwipesAddEditAndMoreArchive() throws {
@@ -78,6 +108,7 @@ extension FinancialLoopUITests {
             row.press(forDuration: 1.0)
             tapVisible(app.buttons["Archive"])
         }
+        XCTAssertTrue(app.confirmAccountArchive(), "Home offers Undo after archiving")
         XCTAssertTrue(row.waitForNonExistence(timeout: 10))
         capture("account-archived-from-more")
         openArchivedAccounts()
@@ -116,7 +147,7 @@ extension FinancialLoopUITests {
             capture("movement-swipe-category")
             tapVisible(app.buttons["home.activity.swipe.category"])
         } else {
-            if app.buttons["activity.back"].exists { app.buttons["activity.back"].tap() }
+            app.revealConnectedTabBar()
             revealOnHome(row); row.tap()
             tapVisible(app.buttons["activity.correct"])
         }
@@ -127,7 +158,7 @@ extension FinancialLoopUITests {
         capture("movement-category-shortcut")
         cancelEditor()
         XCTAssertTrue(app.textFields["loop.reason"].waitForNonExistence(timeout: 10))
-        if app.buttons["activity.back"].exists { app.buttons["activity.back"].tap() }
+        app.revealConnectedTabBar()
     }
 
     /// The Archived accounts entry sits in the Accounts header; scroll Home itself back up to it.

@@ -2,11 +2,12 @@ import SwiftUI
 import ArgusSession
 
 struct FinancialBudgetNavigation: Codable, Equatable {
-    enum Origin: String, Codable { case home, plan, search }
+    enum Origin: String, Codable { case home, plan, planOverview, search }
     var budgetID: UUID
     var origin: Origin
     var activityID: UUID?
     var anchor: UUID?
+    var anchorOffset: Double?
 }
 
 @MainActor
@@ -56,15 +57,38 @@ final class FinancialBudgetModel: ObservableObject {
         }
     }
     func close() { request = UUID(); navigation = nil; detail = nil; errorKey = nil; persist() }
-    func activity(_ id: UUID?) { navigation?.activityID = id; if let id { navigation?.anchor = id }; persist() }
+    func activity(_ id: UUID?, preservingScrollPosition: Bool = false) {
+        navigation?.activityID = id
+        if let id, !preservingScrollPosition { navigation?.anchor = id; navigation?.anchorOffset = nil }
+        persist()
+    }
+    var scrollContext: FinancialScrollContext? {
+        guard let navigation else { return nil }
+        let ticket = generation
+        return .init(id: ticket.uuidString + navigation.budgetID.uuidString + navigation.origin.rawValue,
+            anchor: navigation.anchor?.uuidString, offset: navigation.anchorOffset,
+            availableAnchors: !loading && detail?.budget.id == navigation.budgetID ? detail?.contributors.map { $0.activityId.uuidString } : nil,
+            active: navigation.activityID == nil,
+            remember: { [weak self] anchor, offset in
+                guard let self, self.generation == ticket, !self.loading, let anchor = UUID(uuidString: anchor), offset.isFinite,
+                      self.navigation?.budgetID == navigation.budgetID, self.navigation?.origin == navigation.origin,
+                      self.navigation?.activityID == nil, self.detail?.contributors.contains(where: { $0.activityId == anchor }) == true,
+                      self.navigation?.anchor != anchor || self.navigation?.anchorOffset != offset else { return }
+                self.navigation?.anchor = anchor; self.navigation?.anchorOffset = offset; self.persist()
+            })
+    }
     func create() async {
         guard loop.pendingConfirmation == nil, let projection = loop.plan.projection else { return }
         draft = FinancialBudgetDraft(month: projection.home.period?.month ?? String(projection.startDate.prefix(7)), currency: projection.accounts.first?.currency ?? "DOP")
         await loadOptions()
     }
     func edit() async {
-        guard loop.pendingConfirmation == nil, let detail else { return }
-        draft = FinancialBudgetDraft(budget: detail.budget)
+        guard let budget = detail?.budget else { return }
+        await edit(budget)
+    }
+    func edit(_ budget: FinancialBudget) async {
+        guard loop.pendingConfirmation == nil else { return }
+        draft = FinancialBudgetDraft(budget: budget)
         await loadOptions()
     }
     func loadOptions() async {
@@ -77,18 +101,26 @@ final class FinancialBudgetModel: ObservableObject {
         } catch { if generation == ticket { errorKey = FinancialActivityEditor.message(error) } }
     }
     func save(locale: Locale) async {
-        guard let draft, !saving else { return }
+        guard let draft else { return }
+        await save(draft, locale: locale)
+    }
+    func save(_ draft: FinancialBudgetDraft, locale: Locale) async {
+        guard !saving else { return }
         let ticket = generation; saving = true; errorKey = nil
         defer { if generation == ticket { saving = false } }
         do {
             let operation: FinancialPlanOperation = draft.existing.map { .editBudget(id: $0.id, version: $0.version) } ?? .createBudget
             try await loop.confirmPlan(operation, command: draft.command(locale: locale), originAccountId: nil)
             guard generation == ticket else { return }
-            self.draft = nil
+            if self.draft === draft { self.draft = nil }
         } catch { if generation == ticket { errorKey = FinancialActivityEditor.message(error) } }
     }
     func archive(_ archived: Bool) async {
-        guard let budget = detail?.budget, !saving else { return }
+        guard let budget = detail?.budget else { return }
+        await archive(budget, archived: archived)
+    }
+    func archive(_ budget: FinancialBudget, archived: Bool) async {
+        guard !saving else { return }
         let ticket = generation; saving = true; errorKey = nil
         defer { if generation == ticket { saving = false } }
         do {

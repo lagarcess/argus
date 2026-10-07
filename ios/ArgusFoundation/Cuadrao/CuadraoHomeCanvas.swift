@@ -7,7 +7,6 @@ struct CuadraoHomeCanvas: View {
     @State private var selectedTab: CuadraoTab = .home
     @State private var chat = CuadraoChatPreview(spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
         includeExamples: CuadraoCanvas.standalonePreview || ProcessInfo.processInfo.arguments.contains("--home-populated"))
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var plans = CuadraoPlanPreview(
         spanish: !ProcessInfo.processInfo.arguments.contains("--design-english"),
         reset: ProcessInfo.processInfo.arguments.contains("--plan-reset"),
@@ -25,7 +24,6 @@ struct CuadraoHomeCanvas: View {
     @State private var searchChatOrigin = false
     @State private var chatEditing = false
     @State private var voiceProposal: CanvasVoiceProposal?
-    @State private var pendingTab: CuadraoTab?
     @State private var navigationScroll = CuadraoNavigationScroll()
     @State private var sheet: HomeSheet?
     @State private var data = CuadraoAccountsPreview(
@@ -34,7 +32,6 @@ struct CuadraoHomeCanvas: View {
     private enum HomeRoute: Hashable { case account(UUID), activity(UUID) }
     @State private var accountPath: [HomeRoute] = []
     @State private var archivedID: UUID?
-    private let navigationBarHeight: CGFloat = 72
     private let spanish = !ProcessInfo.processInfo.arguments.contains("--design-english")
 
     private enum HomeSheet: Identifiable {
@@ -44,39 +41,29 @@ struct CuadraoHomeCanvas: View {
     }
 
     var body: some View {
-        TabView(selection: tabSelection) {
+        CuadraoAppShell(selection: $selectedTab, chat: chat, spanish: spanish,
+            showsNavigation: (accountPath.isEmpty || selectedTab != .home) &&
+                (profilePath.isEmpty || selectedTab != .profile) && !(selectedTab == .assistant && chatEditing),
+            compact: selectedTab == .home && navigationScroll.compact,
+            avatar: profile.avatar, profileName: profile.name,
+            showProposal: { voiceProposal = .proposed }) { selection in
             NavigationStack(path: $accountPath) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 36) {
-                        VStack(alignment: .leading, spacing: 18) {
-                            header
-                            CuadraoSpaceSelector(data: data, spanish: spanish, add: { sheet = .spaces })
-                            if data.selectedSpace.kind == .household {
-                                Button { sheet = .household } label: {
-                                    PlanAvatarStack(members: data.acceptedHouseholdMembers(spanish: spanish))
-                                        .frame(minHeight: 44).contentShape(Rectangle())
-                                }.buttonStyle(.plain)
-                                    .accessibilityLabel(spanish ? "Personas del hogar" : "Household members")
-                                    .accessibilityValue(String(data.acceptedHouseholdMembers(spanish: spanish).count))
-                                    .accessibilityIdentifier("home-household-members")
-                            }
-                        }
-                        ForEach(CuadraoHomeSection.decode(homeOrder)) { section in
-                            homeSection(section)
-                        }
-                        if !data.active.isEmpty {
-                            Button { sheet = .customize } label: {
-                                Label(spanish ? "Ordenar Inicio" : "Reorder Home", systemImage: "slider.horizontal.3")
-                                    .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44)
-                            }.foregroundStyle(.secondary).accessibilityIdentifier("customize-home")
-                        }
+                CuadraoHomeLayout(order: CuadraoHomeSection.decode(homeOrder),
+                    canCustomize: !data.active.isEmpty, spanish: spanish, customize: { sheet = .customize }) {
+                    header
+                    CuadraoSpaceSelector(data: data, spanish: spanish, add: { sheet = .spaces })
+                    if data.selectedSpace.kind == .household {
+                        Button { sheet = .household } label: {
+                            PlanAvatarStack(members: data.acceptedHouseholdMembers(spanish: spanish))
+                                .frame(minHeight: 44).contentShape(Rectangle())
+                        }.buttonStyle(.plain)
+                            .accessibilityLabel(spanish ? "Personas del hogar" : "Household members")
+                            .accessibilityValue(String(data.acceptedHouseholdMembers(spanish: spanish).count))
+                            .accessibilityIdentifier("home-household-members")
                     }
-                    .padding(.horizontal, 24).padding(.top, 28).padding(.bottom, 32)
-                }
+                } notice: { EmptyView() } section: { homeSection($0) }
                 .modifier(CuadraoNavigationScrollObserver(scroll: navigationScroll,
                     enabled: selectedTab == .home && sheet == nil && accountPath.isEmpty))
-                .safeAreaPadding(.bottom, 80)
-                .background(WelcomePalette.background)
                 .navigationTitle("").navigationBarTitleDisplayMode(.inline)
                 .toolbar(.hidden, for: .navigationBar)
                 .navigationDestination(for: HomeRoute.self) { route in
@@ -93,50 +80,9 @@ struct CuadraoHomeCanvas: View {
             .toolbar(.hidden, for: .tabBar)
             .tag(CuadraoTab.home)
             ForEach(CuadraoTab.allCases.filter { $0 != .home }) { tab in
-                destination(tab).tag(tab)
+                destination(tab, selection: selection).tag(tab)
             }
         }
-        .cuadraoScrollBar(edge: .bottom) {
-            VStack(spacing: 0) {
-            if chat.voiceContextOwner == nil && selectedTab != .assistant && chat.voice.active && chat.voice.presentation != .expanded {
-                CuadraoVoiceBar(voice: chat.voice, spanish: spanish)
-            }
-            if (accountPath.isEmpty || selectedTab != .home) &&
-                (profilePath.isEmpty || selectedTab != .profile) && !(selectedTab == .assistant && chatEditing) {
-            ZStack {
-                if chat.voiceMessage.state != .recording {
-                    CuadraoNavigationBar(selection: tabSelection,
-                        compact: selectedTab == .home && navigationScroll.compact, spanish: spanish,
-                        avatar: profile.avatar, profileName: profile.name)
-                        .padding(.horizontal, 20)
-                        .frame(height: 64, alignment: .bottom)
-                        .padding(.bottom, 8)
-                        .transition(.opacity)
-                }
-            }.frame(height: navigationBarHeight)
-                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: chat.voiceMessage.state == .recording)
-            }
-            }
-        }
-        .cuadraoSoftScrollEdges()
-        .cuadraoVoicePresentation(chat: chat, spanish: spanish, ownsPresentation: chat.voiceContextOwner == nil,
-            keyboard: {
-                selectedTab = .assistant
-                chat.voice.presentation = .keyboard
-            }, showProposal: {
-                voiceProposal = .proposed
-                selectedTab = .plan
-                chat.voice.presentation = .compact
-            })
-        .confirmationDialog(spanish ? "¿Terminar el chat temporal?" : "End temporary chat?",
-            isPresented: Binding(get: { pendingTab != nil }, set: { if !$0 { pendingTab = nil } }), titleVisibility: .visible) {
-            Button(spanish ? "Terminar y salir" : "End and leave", role: .destructive) {
-                let destination = pendingTab; chat.leaveTemporary(for: .returnToRegular); pendingTab = nil
-                if let destination { selectedTab = destination }
-            }
-            Button(spanish ? "Seguir aquí" : "Stay here", role: .cancel) { pendingTab = nil }
-        } message: { Text(spanish ? "Se descartará el contenido temporal. Tu chat anterior quedará intacto." : "Temporary content will be discarded. Your previous chat stays intact.") }
-        .tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         .sheet(item: $sheet) { item in modal(item) }
         .receiptPresentation(route: $receiptRoute, workspace: receiptWorkspace, spanish: spanish)
         .environment(\.receiptWorkspace, receiptWorkspace)
@@ -158,29 +104,11 @@ struct CuadraoHomeCanvas: View {
         }
         .overlay(alignment: .bottom) {
             if let archivedID {
-                HStack {
-                    Text(spanish ? "Cuenta archivada" : "Account archived")
-                    Spacer()
-                    Button(spanish ? "Deshacer" : "Undo") {
-                        data.archive(archivedID, false); self.archivedID = nil
-                    }
-                    Button { self.archivedID = nil } label: { Image(systemName: "xmark").frame(width: 44, height: 44) }
-                        .accessibilityLabel(spanish ? "Cerrar" : "Close")
-                }.font(.subheadline).padding(.leading, 20).padding(.trailing, 6)
-                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
-                    .padding(.horizontal, 20).padding(.bottom, 90)
+                CuadraoArchivedAccountToast(spanish: spanish, undo: {
+                    data.archive(archivedID, false); self.archivedID = nil
+                }, close: { self.archivedID = nil })
             }
         }
-    }
-
-    private var tabSelection: Binding<CuadraoTab> {
-        Binding(get: { selectedTab }, set: { next in
-            if selectedTab == .assistant && next != .assistant && chat.hasTemporaryContent { pendingTab = next }
-            else {
-                if selectedTab == .assistant && next != .assistant && chat.temporary { chat.leaveTemporary(for: .returnToRegular) }
-                selectedTab = next
-            }
-        })
     }
 
     @ViewBuilder private func homeSection(_ section: CuadraoHomeSection) -> some View {
@@ -198,11 +126,7 @@ struct CuadraoHomeCanvas: View {
 
     private var header: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 5) {
-                Text((spanish ? "Hola" : "Hello") + (profile.preferredName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    ? "" : ", " + profile.preferredName.trimmingCharacters(in: .whitespacesAndNewlines)))
-                    .font(.title2.weight(.semibold)).accessibilityIdentifier("home-greeting")
-            }
+            CuadraoHomeGreeting(name: profile.preferredName, spanish: spanish)
                 .contextMenu {
                     #if DEBUG
                     Button(spanish ? "Revisión de lanzamiento" : "Release UI review") { sheet = .releaseReview }
@@ -221,19 +145,7 @@ struct CuadraoHomeCanvas: View {
                     }
                 }
             Spacer()
-            Button { sheet = .updates } label: {
-                Image("CuadraoNotifications").frame(width: 44, height: 44)
-                    .overlay(alignment: .topTrailing) {
-                        if unreadUpdates > 0 {
-                            Text(String(unreadUpdates)).font(.caption2.weight(.medium))
-                                .foregroundStyle(WelcomePalette.onAccent).padding(4)
-                                .background(WelcomePalette.pine, in: Circle()).accessibilityHidden(true)
-                        }
-                    }
-            }
-            .accessibilityLabel(spanish ? "Novedades" : "Updates")
-            .accessibilityValue(spanish ? "\(unreadUpdates) sin leer" : "\(unreadUpdates) unread")
-            .accessibilityIdentifier("cuadrao.updates.open")
+            CuadraoUpdatesButton(spanish: spanish, unread: unreadUpdates) { sheet = .updates }
         }
     }
 
@@ -291,27 +203,13 @@ struct CuadraoHomeCanvas: View {
     }
 
     private var upcoming: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack {
-                sectionTitle(spanish ? "Próximamente" : "Coming up")
-                Spacer()
-                Button(spanish ? "Ver plan" : "View plan") { selectedTab = .plan }
-                    .font(.subheadline).frame(minHeight: 44)
-            }
-            feedRow("Internet", detail: spanish ? "Mañana · Previsto" : "Tomorrow · Planned", amount: "1,500.00", icon: "wifi")
+        CuadraoUpcomingSection(spanish: spanish, viewPlan: { selectedTab = .plan }) {
+            CuadraoFeedRow(title: "Internet", detail: spanish ? "Mañana · Previsto" : "Tomorrow · Planned", amount: "1,500.00", icon: "wifi")
         }
     }
 
     private func feedRow(_ title: String, detail: String, amount: String, icon: String) -> some View {
-        HStack(alignment: .center, spacing: 14) {
-            Image(systemName: icon).font(.body).frame(width: 28).foregroundStyle(.secondary).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(title).font(.body)
-                Text(detail).font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            Text(amount).font(CuadraoTypography.rowAmount)
-        }.padding(.vertical, 6).contentShape(Rectangle())
+        CuadraoFeedRow(title: title, detail: detail, amount: amount, icon: icon)
     }
 
     private func sectionTitle(_ title: String) -> some View {
@@ -323,7 +221,7 @@ struct CuadraoHomeCanvas: View {
                          capture: { receiptRoute = .capture($0, $1) }, open: { receiptRoute = .review($0) })
     }
 
-    @ViewBuilder private func destination(_ tab: CuadraoTab) -> some View {
+    @ViewBuilder private func destination(_ tab: CuadraoTab, selection: Binding<CuadraoTab>) -> some View {
         if tab == .search {
             // Design-preview Search. Connected keeps FinancialSearchDestination; these results stay sample-only.
             CuadraoSearchCanvas(data: data, spanish: spanish, includeExamples: populated,
@@ -333,7 +231,7 @@ struct CuadraoHomeCanvas: View {
             CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing)
                 .safeAreaInset(edge: .top, spacing: 0) {
                     if searchChatOrigin {
-                        Button { tabSelection.wrappedValue = .search } label: {
+                        Button { selection.wrappedValue = .search } label: {
                             Label(spanish ? "Volver a Buscar" : "Back to Search", systemImage: "chevron.left")
                                 .font(.subheadline).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         }.padding(.horizontal, 24).background(WelcomePalette.background)
@@ -342,7 +240,7 @@ struct CuadraoHomeCanvas: View {
                 }
         } else if tab == .profile {
             CuadraoProfileCanvas(spanish: spanish, includeExamples: populated, profile: $profile,
-                path: $profilePath, bottomSpace: navigationBarHeight + 8 + (chat.voice.active ? 64 : 0))
+                path: $profilePath, bottomSpace: CuadraoAppShellMetrics.navigationHeight + 8 + (chat.voice.active ? 64 : 0))
         } else if tab == .plan && voiceProposal == nil {
             CuadraoPlanCanvas(store: plans, accounts: data, spanish: spanish,
                 bottomSpace: chat.voice.active ? 160 : 90, groups: groups)

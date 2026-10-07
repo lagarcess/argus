@@ -1,6 +1,45 @@
 import XCTest
 
 extension FinancialLoopUITests {
+    func testPlanCardKeepsItsOriginAfterCloseAndRelaunch() throws {
+        try signIn()
+        let stamp = String(UUID().uuidString.prefix(5))
+        let account = createMoneyAccount("Plan card " + stamp, type: "savings", amount: "100")
+        let title = "Return to Plan " + stamp
+        app.revealConnectedTabBar()
+        prepareGoal(title, destination: account)
+        tapVisible(app.buttons["goal.save"])
+        XCTAssertTrue(app.buttons["goal.save"].waitForNonExistence(timeout: 15))
+        let card = planCards("goal", title).firstMatch
+        tapVisible(card)
+        assertGoal("DOP 0.00")
+        XCTAssertTrue(app.navigationBars.buttons["BackButton"].waitForExistence(timeout: 5))
+        app.swipeBack(cancel: true)
+        assertGoal("DOP 0.00")
+        XCTAssertFalse(app.buttons["tab.home"].exists)
+        app.swipeBack()
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        tapVisible(card)
+        assertGoal("DOP 0.00")
+        app.terminate(); app.launch()
+        assertGoal("DOP 0.00")
+        tapVisible(app.buttons["goal.allocate"])
+        let allocation = app.textFields.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.allocation.amount.'")).firstMatch
+        XCTAssertTrue(allocation.waitForExistence(timeout: 10))
+        app.buttons["goal.action.cancel"].tap()
+        tapVisible(app.buttons["goal.record"])
+        XCTAssertTrue(app.textFields["loop.amount"].waitForExistence(timeout: 10))
+        app.navigationBars.buttons["Cancel"].tap()
+        app.returnFromDetail("goal.close")
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+        capture("plan-card-returned-to-overview")
+        _ = openGoal(title)
+        app.terminate(); app.launch()
+        assertGoal("DOP 0.00")
+        app.returnFromDetail("goal.close")
+        XCTAssertTrue(card.waitForExistence(timeout: 10))
+    }
+
     func testConnectedGoalAllocationContributionCorrectionSearchAndRestore() throws {
         try signIn()
         let stamp = String(UUID().uuidString.prefix(5))
@@ -33,7 +72,7 @@ extension FinancialLoopUITests {
         fillMoneyField("loop.reason", with: "Correct contribution amount")
         dismissMoneyKeyboard(); reviewMoney(); tapVisible(app.buttons["loop.confirm"])
         XCTAssertTrue(app.buttons["loop.confirm"].waitForNonExistence(timeout: 15))
-        app.buttons["goal.activity.back"].tap()
+        app.returnFromDetail("goal.activity.back")
         assertGoal("DOP 750.00")
         capture("goal-original-correction-propagated")
         let release = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.release.' AND identifier != 'goal.release.confirm'")).firstMatch
@@ -45,20 +84,20 @@ extension FinancialLoopUITests {
         tapVisible(candidate); tapVisible(app.buttons["goal.link.confirm"])
         assertGoal("DOP 750.00")
         capture("goal-released-original-relinked-once")
-        tapVisible(app.buttons["goal.edit"])
+        choosePlanDetailAction("goal.edit")
         replaceMoneyField("goal.target", with: "2500")
-        tapVisible(app.switches["goal.hasDate"])
         dismissMoneyKeyboard(); tapVisible(app.buttons["goal.save"])
         XCTAssertTrue(app.buttons["goal.save"].waitForNonExistence(timeout: 15))
         assertGoal("DOP 750.00")
+        tapVisible(app.buttons["The details, clearly"])
         assertText("DOP 2,500.00")
-        capture("goal-target-date-edited")
-        tapVisible(app.buttons["goal.archive"])
+        capture("goal-target-edited")
+        choosePlanDetailAction("goal.archive")
         app.buttons.matching(identifier: "goal.archive.confirm").firstMatch.tap()
         XCTAssertTrue(app.buttons["goal.restore"].waitForExistence(timeout: 15))
         tapVisible(app.buttons["goal.restore"])
         assertGoal("DOP 750.00")
-        app.buttons["goal.close"].tap()
+        app.returnFromDetail("goal.close")
         verifyGoalSearch(title, supported: "DOP 750.00")
     }
 
@@ -74,15 +113,15 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["loop.pending.retry"].waitForExistence(timeout: 30))
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         app.terminate(); app.launch()
-        app.buttons["tab.plan"].tap()
+        app.openPlanSurface()
         tapVisible(app.scrollViews["screen.plan"].buttons["loop.pending.retry"])
         XCTAssertTrue(app.buttons["loop.pending.retry"].waitForNonExistence(timeout: 20))
         _ = openGoal(title)
         assertGoal("DOP 0.00")
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         capture("goal-exact-command-recovered-once")
-        app.buttons["goal.close"].tap()
-        XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.row.plan.' AND label CONTAINS %@", title)).count, 1)
+        app.returnFromDetail("goal.close")
+        XCTAssertEqual(planCards("goal", title).count, 1)
     }
 
     func testGoalContributionResponseLossRecoversOneTransferAfterRelaunch() throws {
@@ -111,7 +150,7 @@ extension FinancialLoopUITests {
         XCTAssertEqual(app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.activity.' AND identifier != 'goal.activity.back'")).count, 1)
         XCTAssertEqual(try faultStatus(arm: false), before + 1)
         capture("goal-transfer-recovered-once-after-relaunch")
-        app.buttons["goal.close"].tap()
+        app.returnFromDetail("goal.close")
         openMoneyAccount(source); assertText("DOP 800.00")
         openMoneyAccount(destination); assertText("DOP 1,200.00")
     }
@@ -127,7 +166,7 @@ extension FinancialLoopUITests {
         tapVisible(row); assertGoal(amount)
         verifyGoalSheetCancellation()
         capture("goal-home-recorded-progress")
-        app.buttons["goal.close"].tap()
+        app.returnFromDetail("goal.close")
         verifyGoalSearch(title, supported: amount)
     }
 
@@ -143,29 +182,26 @@ extension FinancialLoopUITests {
     }
 
     func prepareGoal(_ title: String, destination: MoneyAccount) {
-        app.buttons["tab.plan"].tap()
-        tapVisible(app.buttons["plan.goals"])
-        tapVisible(app.buttons["goal.add"])
+        app.openPlanSurface()
+        startPlan("goal")
         fillMoneyField("goal.name", with: title)
         fillMoneyField("goal.target", with: "2000")
         dismissMoneyKeyboard()
-        tapVisible(app.buttons["goal.destination"])
-        app.buttons[destination.name].tap()
+        chooseMoneyAccount("goal.destination", account: destination)
     }
 
     @discardableResult func openGoal(_ title: String) -> String {
-        app.buttons["tab.plan"].tap()
-        tapVisible(app.buttons["plan.goals"])
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'goal.row.plan.' AND label CONTAINS %@", title)).firstMatch
+        app.openPlanSurface()
+        let row = planCards("goal", title).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15))
-        let id = String(row.identifier.dropFirst("goal.row.plan.".count))
+        let id = String(row.identifier.dropFirst("plan.card.goal.".count))
         tapVisible(row)
-        XCTAssertTrue(app.otherElements["goal.detail"].staticTexts["goal.supported"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.descendants(matching: .any)["goal.detail"].staticTexts["goal.supported"].waitForExistence(timeout: 15))
         return id
     }
 
     func assertGoal(_ amount: String) {
-        let value = app.otherElements["goal.detail"].staticTexts["goal.supported"]
+        let value = app.descendants(matching: .any)["goal.detail"].staticTexts["goal.supported"]
         XCTAssertTrue(value.waitForExistence(timeout: 15))
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == %@", amount), object: value)], timeout: 15), .completed)
     }
@@ -176,14 +212,14 @@ extension FinancialLoopUITests {
         XCTAssertTrue(query.waitForExistence(timeout: 10)); query.tap()
         if app.buttons["search.clear"].exists { app.buttons["search.clear"].tap(); query.tap() }
         query.typeText(title + "\n")
-        tapVisible(app.buttons["search.filter.goal"])
+        chooseSearchPlans()
         let hit = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.goal.' AND label CONTAINS %@", title)).firstMatch
         tapVisible(hit); assertGoal(supported)
         app.terminate(); app.launch(); assertGoal(supported)
         capture("goal-detail-restored-after-relaunch")
-        app.buttons["goal.close"].tap()
+        app.returnFromDetail("goal.close")
         XCTAssertEqual(app.textFields["search.query"].value as? String, title)
-        XCTAssertTrue(app.buttons["search.filter.goal"].isSelected)
+        XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
         XCTAssertTrue(hit.waitForExistence(timeout: 15)); capture("goal-search-origin-restored")
         tapVisible(hit)
         app.terminate(); app.launchArguments = ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO", "-appearancePreference", "light"]
@@ -191,6 +227,6 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.staticTexts["goal.supported"].waitForExistence(timeout: 15))
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'goal.'")).firstMatch.exists)
         capture("goal-spanish-detail")
-        app.buttons["goal.close"].tap()
+        app.returnFromDetail("goal.close")
     }
 }

@@ -15,15 +15,20 @@ struct CuadraoHomeBalanceChart: View {
     var controls: CuadraoInsightControls?
     /// Built by the owner from the same accounts and observations, when it already has one.
     var history: CanvasBuiltBalanceHistory?
+    /// An owner that totals its own history also says whether any account is unknown.
+    var partial: Bool?
+    var amountIdentifier = "home-chart-amount"
     @Binding var range: CanvasHistoryRange
     @Binding var periodOffset: Int
     init(accounts: [CanvasAccount], observations: [CanvasBalanceObservation], currency: String,
          currencies: [String], spanish: Bool, shared: Bool, chooseCurrency: @escaping (String) -> Void,
          expanded: Bool = false, expand: @escaping () -> Void = {}, controls: CuadraoInsightControls? = nil,
-         history: CanvasBuiltBalanceHistory? = nil, range: Binding<CanvasHistoryRange> = .constant(.month), periodOffset: Binding<Int> = .constant(0)) {
+         history: CanvasBuiltBalanceHistory? = nil, partial: Bool? = nil, amountIdentifier: String = "home-chart-amount",
+         range: Binding<CanvasHistoryRange> = .constant(.month), periodOffset: Binding<Int> = .constant(0)) {
         self.accounts = accounts; self.observations = observations; self.currency = currency
         self.currencies = currencies; self.spanish = spanish; self.shared = shared; self.chooseCurrency = chooseCurrency
         self.expanded = expanded; self.expand = expand; self.controls = controls; self.history = history
+        self.partial = partial; self.amountIdentifier = amountIdentifier
         _range = range; _periodOffset = periodOffset
     }
     var body: some View {
@@ -31,7 +36,7 @@ struct CuadraoHomeBalanceChart: View {
             currencies: currencies, spanish: spanish, shared: shared, chooseCurrency: chooseCurrency,
             expanded: expanded, expand: expand, controls: controls,
             built: history ?? CanvasBuiltBalanceHistory(accounts: accounts, observations: observations, now: .now),
-            range: $range, periodOffset: $periodOffset)
+            partialOverride: partial, amountIdentifier: amountIdentifier, range: $range, periodOffset: $periodOffset)
     }
 }
 
@@ -47,6 +52,8 @@ private struct CuadraoHomeBalanceChartContent: View {
     let expand: () -> Void
     let controls: CuadraoInsightControls?
     let built: CanvasBuiltBalanceHistory
+    let partialOverride: Bool?
+    let amountIdentifier: String
     @Environment(\.dynamicTypeSize) var typeSize
     @State var compactRange: CanvasHomeRange = .month
     @Binding var range: CanvasHistoryRange
@@ -93,7 +100,7 @@ private struct CuadraoHomeBalanceChartContent: View {
             selected: selected, shown: selected ?? (expanded ? period?.closing : points.last),
             bounds: (floor((low - step * 0.2) / step) * step)...(ceil((high + step * 0.2) / step) * step), period: period)
     }
-    private var partial: Bool { accounts.contains { $0.balance == nil } }
+    private var partial: Bool { partialOverride ?? accounts.contains { $0.balance == nil } }
     var body: some View {
         let reading = reading
         let points = reading.points, xDomain = reading.xDomain, selected = reading.selected, shown = reading.shown
@@ -127,7 +134,7 @@ private struct CuadraoHomeBalanceChartContent: View {
                         : (spanish ? "No hay nuevos balances registrados en este período." : "No new balances were recorded in this period."))
                     .accessibilityIdentifier("home-chart-empty")
             }
-            if expanded, let period = reading.period, period.closing != nil {
+            if expanded, let period = reading.period, period.closing != nil, !period.changes.isEmpty {
                 CuadraoBalanceBreakdown(period: period, currency: currency, spanish: spanish)
             }
             if !expanded && availableRanges.count > 1 {
@@ -152,25 +159,9 @@ private struct CuadraoHomeBalanceChartContent: View {
             .sensoryFeedback(.selection, trigger: periodOffset)
     }
     private func amountRow(_ shown: CanvasBalancePoint?) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-                if currencies.count > 1 {
-                    CuadraoChoiceMenu(title: spanish ? "Moneda" : "Currency",
-                        selection: Binding(get: { currency }, set: { selectedDate = nil; chooseCurrency($0) }),
-                        values: currencies, valueTitle: { $0 })
-                        .accessibilityIdentifier("home-chart-currency")
-                } else { Text(currency).foregroundStyle(.secondary) }
-                Text(shown.map { CanvasMoney.format($0.balance, currency: currency) } ?? "—")
-                    .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
-                    .accessibilityIdentifier("home-chart-amount")
-                if !expanded {
-                    Spacer(minLength: 0)
-                    Button(action: expand) {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right").font(.body)
-                            .frame(width: 44, height: 44).contentShape(Rectangle())
-                    }.buttonStyle(.plain).accessibilityLabel(spanish ? "Explorar balance" : "Explore balance")
-                        .accessibilityIdentifier("home-history-expand")
-                }
-            }.font(CuadraoTypography.supporting)
+        CuadraoBalanceAmount(amount: shown.map { CanvasMoney.format($0.balance, currency: currency) } ?? "—",
+            currency: currency, currencies: currencies, spanish: spanish, expanded: expanded, amountIdentifier: amountIdentifier,
+            chooseCurrency: { selectedDate = nil; chooseCurrency($0) }, expand: expand)
     }
     private func periodCanvas(_ reading: Reading) -> some View {
         chart(reading).padding(expanded ? 14 : 0)

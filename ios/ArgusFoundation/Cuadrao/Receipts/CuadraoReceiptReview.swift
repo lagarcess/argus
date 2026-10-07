@@ -44,6 +44,10 @@ private struct ReceiptEditor: View {
                 VStack(alignment: .leading, spacing: 10) {
                     Label(draft.prepared ? (es ? "Guardado · por revisar" : "Saved · ready to review") : (es ? "Confirmado" : "Confirmed"), systemImage: draft.prepared ? "checkmark.circle" : "checkmark.seal")
                         .font(CuadraoTypography.caption).foregroundStyle(.secondary).accessibilityIdentifier("receipt-status")
+                    if !workspace.postingCapability.allowsPosting {
+                        Text(es ? "Este recibo se queda en este dispositivo y no crea un gasto." : "This receipt stays on this device and does not create an expense.")
+                            .font(CuadraoTypography.caption).foregroundStyle(.secondary).accessibilityIdentifier("receipt-local-draft-notice")
+                    }
                     if draft.example { Text(es ? "Recibo de ejemplo" : "Sample receipt").font(CuadraoTypography.caption).foregroundStyle(WelcomePalette.pine) }
                     Text(posted?.title ?? (draft.merchant.isEmpty ? (es ? "Tu recibo" : "Your receipt") : draft.merchant)).font(CuadraoTypography.feature)
                     if draft.lines.isEmpty && posted == nil {
@@ -130,13 +134,15 @@ private struct ReceiptEditor: View {
                     totalRow(es ? "Total del recibo" : "Receipt total", draft.receiptTotal)
                     if draft.addedTipCents > 0 { totalRow(es ? "Con propina adicional" : "Including extra tip", draft.total) }
                 }
-                if draft.prepared { destination }
-                else if case .personal(let accountID) = draft.destination, let accountID, let account = workspace.accounts.account(accountID) {
-                    Section(es ? "Guardado en" : "Saved to") {
-                        Label(account.displayName(es) + " · " + currency, systemImage: "creditcard")
+                if workspace.postingCapability.allowsPosting {
+                    if draft.prepared { destination }
+                    else if case .personal(let accountID) = draft.destination, let accountID, let account = workspace.accounts.account(accountID) {
+                        Section(es ? "Guardado en" : "Saved to") {
+                            Label(account.displayName(es) + " · " + currency, systemImage: "creditcard")
+                        }
                     }
+                    if let group { splitSection(group) }
                 }
-                if let group { splitSection(group) }
             }
             Section {
                 if let pin = draft.captureLocation {
@@ -145,21 +151,25 @@ private struct ReceiptEditor: View {
                     }.frame(height: 150).clipShape(RoundedRectangle(cornerRadius: 16))
                     Text((es ? "Ubicación añadida el " : "Location added on ") + pin.recordedAt.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
                     if draft.prepared { Button(es ? "Quitar ubicación" : "Remove location", role: .destructive) { draft.captureLocation = nil } }
-                } else if draft.prepared {
+                } else if draft.prepared && location.isAvailable {
                     Button { location.request() } label: { Label(es ? "Añadir ubicación actual" : "Add current location", systemImage: "location").frame(minHeight: 44) }
                     Text(es ? "Opcional. No es la dirección del comercio." : "Optional. This is not the merchant's address.").font(.caption).foregroundStyle(.secondary)
                 }
                 if location.unavailable { Text(es ? "No pudimos obtener tu ubicación. Puedes continuar sin ella." : "Your location is unavailable. You can continue without it.").font(.caption).foregroundStyle(.secondary) }
             }
-            Section {
-                if !error.isEmpty { Text(error).foregroundStyle(.red).font(.subheadline).accessibilityIdentifier("receipt-error") }
-                if draft.prepared {
-                    Button { confirm() } label: {
-                        Text(es ? "Confirmar gasto" : "Confirm expense").font(CuadraoTypography.action).frame(maxWidth: .infinity, minHeight: 44)
-                    }.disabled(!valid).accessibilityIdentifier("receipt-confirm")
-                    Text(es ? "Hasta confirmar, este recibo no cambia ningún balance." : "Until you confirm, this receipt changes no balances.").font(.caption).foregroundStyle(.secondary)
-                } else {
-                    Label(es ? "Gasto guardado" : "Expense saved", systemImage: "checkmark.seal.fill").foregroundStyle(WelcomePalette.pine).accessibilityIdentifier("receipt-confirmed")
+            if workspace.postingCapability.allowsPosting || !error.isEmpty {
+                Section {
+                    if !error.isEmpty { Text(error).foregroundStyle(.red).font(.subheadline).accessibilityIdentifier("receipt-error") }
+                    if workspace.postingCapability.allowsPosting {
+                        if draft.prepared {
+                            Button { confirm() } label: {
+                                Text(es ? "Confirmar gasto" : "Confirm expense").font(CuadraoTypography.action).frame(maxWidth: .infinity, minHeight: 44)
+                            }.disabled(!valid).accessibilityIdentifier("receipt-confirm")
+                            Text(es ? "Hasta confirmar, este recibo no cambia ningún balance." : "Until you confirm, this receipt changes no balances.").font(.caption).foregroundStyle(.secondary)
+                        } else {
+                            Label(es ? "Gasto guardado" : "Expense saved", systemImage: "checkmark.seal.fill").foregroundStyle(WelcomePalette.pine).accessibilityIdentifier("receipt-confirmed")
+                        }
+                    }
                 }
             }
         }.cuadraoFormKeyboard().scrollContentBackground(.hidden).background(WelcomePalette.background)

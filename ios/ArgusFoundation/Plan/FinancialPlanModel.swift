@@ -3,7 +3,6 @@ import ArgusSession
 
 @MainActor
 final class FinancialPlanModel: ObservableObject {
-    @Published var section = PlanSection.overview
     @Published private(set) var projection: FinancialPlanProjection?
     /// Home's rolling window: the server default horizon, never Plan's chosen end date.
     @Published private(set) var homeProjection: FinancialPlanProjection?
@@ -35,7 +34,6 @@ final class FinancialPlanModel: ObservableObject {
     func bind(_ snapshot: SessionSnapshot?) {
         generation = UUID(); request = UUID(); detailRequest = UUID()
         identity = snapshot?.phase == .authenticated ? snapshot : nil
-        section = .overview
         projection = nil; homeProjection = nil; draft = nil; selectedOccurrence = nil; candidates = []; linkedActivity = nil
         endDate = nil; afterOccurrence = nil; loading = false; loadingDetails = false; saving = false; errorKey = nil; homeErrorKey = nil
     }
@@ -296,4 +294,19 @@ enum PlanPresentation {
     static func money(_ minor: String, currency: String, digits: Int, locale: Locale) -> String {
         currency + " " + AccountPresentation.amount(AccountPresentation.decimal(minor, digits: digits), locale: locale)
     }
+    static func upcomingRow(_ occurrence: FinancialPlanOccurrence, locale: Locale, showsCurrency: Bool = true,
+                            text: (String) -> String = { NSLocalizedString($0, comment: "") }) -> PlanUpcomingRow {
+        let income = occurrence.kind == .income
+        return PlanUpcomingRow(title: occurrence.title,
+            detail: dateLabel(occurrence.dueDate, locale: locale) + "\u{00A0}· " + text("plan.status." + occurrence.status.rawValue),
+            amount: (income ? "+" : "") + AccountPresentation.amount(occurrence.amount, locale: locale) + (showsCurrency ? " " + occurrence.currency : ""),
+            icon: income ? "arrow.down.left" : "calendar")
+    }
+}
+
+struct PlanUpcomingRow: Equatable {
+    let title: String
+    let detail: String
+    let amount: String
+    let icon: String
 }

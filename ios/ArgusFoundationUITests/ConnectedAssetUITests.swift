@@ -57,10 +57,16 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 15))
         tapVisible(app.buttons["accounts.archive"])
         let spanish = ProcessInfo.processInfo.environment["ARGUS_TEST_LANGUAGE"] == "es-419"
-        let restore = app.buttons[spanish ? "Restaurar cuenta" : "Restore account"]
-        XCTAssertTrue(restore.waitForExistence(timeout: 10))
-        capture("asset-archived-record-preserved")
-        tapVisible(restore)
+        if app.confirmAccountArchive() {
+            XCTAssertTrue(app.buttons["accounts.row." + house.id].waitForNonExistence(timeout: 10))
+            capture("asset-archived-record-preserved")
+            tapVisible(app.archivedUndo)
+            tapVisible(app.buttons["accounts.row." + house.id])
+            XCTAssertTrue(app.scrollViews["screen.accounts"].buttons["assets.update"].waitForExistence(timeout: 15))
+        } else {
+            capture("asset-archived-record-preserved")
+            tapVisible(app.buttons[spanish ? "Restaurar cuenta" : "Restore account"])
+        }
         XCTAssertTrue(app.buttons[spanish ? "Archivar cuenta" : "Archive account"].waitForExistence(timeout: 10))
         assertAssetContribution("DOP 2,250,000.00")
         XCTAssertTrue(app.buttons["assets.debt.open"].exists)
@@ -80,7 +86,7 @@ extension FinancialLoopUITests {
         assertAssetContribution("DOP 2,250,000.00", in: detail)
         verifyAssetLinkedDebt(in: detail)
         assertAssetContribution("DOP 2,250,000.00", in: detail)
-        scrollMoneyTop(); tapVisible(detail.buttons["search.back"])
+        searchBack()
         XCTAssertEqual(query.value as? String, "Updated home " + stamp)
         XCTAssertTrue(app.buttons["search.filter.account"].isSelected)
         capture("asset-search-origin-preserved")
@@ -95,7 +101,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(detail.buttons["Archivar cuenta"].exists)
         XCTAssertEqual(detail.staticTexts["assets.basis.value"].label, "Recent manual estimate")
         verifyAssetLinkedDebt(in: detail)
-        scrollMoneyTop(); tapVisible(detail.buttons["search.back"])
+        searchBack()
         XCTAssertTrue(hit.waitForExistence(timeout: 15))
         XCTAssertEqual(query.value as? String, "Updated home " + stamp)
         XCTAssertTrue(app.buttons["search.filter.account"].isSelected)
@@ -111,7 +117,7 @@ extension FinancialLoopUITests {
         assertAssetContribution("DOP 0.00")
         capture("asset-zero-remains-known")
         guard ProcessInfo.processInfo.environment["ARGUS_TEST_RESPONSE_LOSS_PROXY"] == "true" else { return }
-        app.openAccountsList(); scrollMoneyTop(); tapVisible(app.buttons["accounts.back"])
+        app.openAccountsList(); scrollMoneyTop(); tapVisible(app.accountBack)
         tapVisible(app.buttons["accounts.add"]); tapVisible(app.buttons["accounts.otherAssets"])
         tapVisible(app.buttons["accounts.type.vehicle"])
         let name = "Recovered vehicle " + stamp
@@ -128,7 +134,7 @@ extension FinancialLoopUITests {
         XCTAssertTrue(retry.waitForExistence(timeout: 20)); tapVisible(retry)
         XCTAssertTrue(retry.waitForNonExistence(timeout: 20))
         app.openAccountsList()
-        if app.buttons["accounts.back"].exists { scrollMoneyTop(); tapVisible(app.buttons["accounts.back"]) }
+        if app.accountBack.exists { scrollMoneyTop(); tapVisible(app.accountBack) }
         let rows = app.scrollViews["screen.accounts"].buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.' AND label CONTAINS %@", name))
         XCTAssertEqual(rows.count, 1)
         tapVisible(rows.firstMatch); assertAssetContribution("DOP 1,000.00")
@@ -137,16 +143,19 @@ extension FinancialLoopUITests {
 
     func createAsset(_ name: String, type: String, amount: String?, half: Bool = false) -> MoneyAccount {
         app.openAccountsList()
-        if app.buttons["accounts.back"].exists { scrollMoneyTop(); tapVisible(app.buttons["accounts.back"]) }
+        if app.accountBack.exists { scrollMoneyTop(); tapVisible(app.accountBack) }
         tapVisible(app.buttons["accounts.add"]); tapVisible(app.buttons["accounts.otherAssets"])
         tapVisible(app.buttons["accounts.type." + type])
         fillMoneyField("accounts.nickname", with: name)
         if let amount { fillMoneyField("accounts.amount", with: amount) }
         dismissMoneyKeyboard()
-        if half { tapVisible(app.buttons["assets.share.change"]); tapVisible(app.buttons["assets.share.half"]) }
+        if half {
+            let spanish = ProcessInfo.processInfo.environment["ARGUS_TEST_LANGUAGE"] == "es-419"
+            tapVisible(app.buttons["assets.share.change"]); tapVisible(app.buttons[spanish ? "La mitad · 50%" : "Half · 50%"])
+        }
         tapVisible(app.buttons["accounts.save"])
         XCTAssertTrue(app.scrollViews["screen.accounts"].buttons["assets.update"].waitForExistence(timeout: 15))
-        scrollMoneyTop(); tapVisible(app.buttons["accounts.back"])
+        scrollMoneyTop(); tapVisible(app.accountBack)
         let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.' AND label CONTAINS %@", name)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10))
         let result = MoneyAccount(name: name, id: String(row.identifier.dropFirst("accounts.row.".count)))

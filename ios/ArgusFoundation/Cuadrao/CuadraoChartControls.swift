@@ -4,6 +4,7 @@ struct CuadraoChartViewChoice: View {
     @Binding var distribution: Bool
     let spanish: Bool
     var activity = false
+    var distributionEnabled = true
     var body: some View {
         HStack(spacing: 0) {
             option(false)
@@ -25,7 +26,8 @@ struct CuadraoChartViewChoice: View {
                 .frame(width: 44, height: 44)
                 .background(distribution == breakdown ? WelcomePalette.sage : .clear, in: Circle())
                 .contentShape(Rectangle())
-        }.buttonStyle(.plain)
+                .opacity(breakdown && !distributionEnabled ? 0.35 : 1)
+        }.buttonStyle(.plain).disabled(breakdown && !distributionEnabled)
             .accessibilityLabel(breakdown ? (spanish ? "Distribución" : "Breakdown") : (spanish ? "Evolución" : "History"))
             .accessibilityAddTraits(distribution == breakdown ? .isSelected : [])
             .accessibilityIdentifier(breakdown ? "home-view-distribution" : "home-view-history")
@@ -59,6 +61,7 @@ struct CuadraoInsightControls: View {
     @Binding var distribution: Bool
     let spanish: Bool
     var activity = false
+    var distributionEnabled = true
     var body: some View {
         ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) { periods; Spacer(minLength: 0); views }
@@ -66,5 +69,7 @@ struct CuadraoInsightControls: View {
         }
     }
     private var periods: some View { CuadraoHistoryPeriodChoice(range: $range, spanish: spanish) }
-    private var views: some View { CuadraoChartViewChoice(distribution: $distribution, spanish: spanish, activity: activity) }
+    private var views: some View {
+        CuadraoChartViewChoice(distribution: $distribution, spanish: spanish, activity: activity, distributionEnabled: distributionEnabled)
+    }
 }

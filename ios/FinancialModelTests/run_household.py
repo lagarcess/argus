@@ -14,6 +14,7 @@ with tempfile.TemporaryDirectory(prefix="argus-household-models-") as temporary:
     source.mkdir(parents=True)
     tests.mkdir(parents=True)
     shutil.copy(root / "ios/ArgusFoundation/Household/HouseholdModel.swift", source)
+    shutil.copy(root / "ios/ArgusFoundation/Connected/ConnectedSpacesPolicy.swift", source)
     shutil.copy(root / "ios/ArgusFoundation/Household/HouseholdPlanModel.swift", source)
     shutil.copy(root / "ios/ArgusFoundation/Accounts/AccountEntry.swift", source)
     editor = (

@@ -4,6 +4,7 @@ import SwiftUI
 /// One wording for a period whose coverage is missing, so no surface reads it as zero.
 enum CuadraoMissingCoverage {
     static func amount(_ spanish: Bool) -> String { spanish ? "Sin datos" : "No data" }
+    static func title(_ spanish: Bool) -> String { spanish ? "Falta una parte de la historia" : "Part of the story is missing" }
     static func detail(_ spanish: Bool) -> String {
         spanish ? "El historial de este período está incompleto. No lo contamos como cero."
             : "This period's history is incomplete. We don't count it as zero."
@@ -61,20 +62,13 @@ struct CuadraoSpendingChart: View {
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
-                    Text((inspected ?? entries).isEmpty && !story.covered ? CuadraoMissingCoverage.amount(spanish) : money(inspected.map(CanvasSpendingHistory.total) ?? total))
-                        .font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
-                        .accessibilityIdentifier("home-spending-total")
-                }
-                Text(selectedSlot.map { range == .year ? $0.start.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US"))) : story.periodText($0, spanish: spanish) } ?? (spanish ? "Gastos registrados" : "Recorded spending"))
-                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                if story.state == .populated || story.state == .emptyPeriod {
-                    Text(insight).font(CuadraoTypography.supporting).fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("home-spending-insight")
-                }
-            }
+            CuadraoSpendingReading(currency: currency,
+                amount: (inspected ?? entries).isEmpty && !story.covered ? CuadraoMissingCoverage.amount(spanish)
+                    : money(inspected.map(CanvasSpendingHistory.total) ?? total),
+                caption: selectedSlot.map { range == .year
+                    ? $0.start.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: spanish ? "es_DO" : "en_US")))
+                    : story.periodText($0, spanish: spanish) } ?? (spanish ? "Gastos registrados" : "Recorded spending"),
+                insight: story.state == .populated || story.state == .emptyPeriod ? insight : nil)
             if let controls { controls }
             if story.state == .populated {
                 if distribution { allocation } else { chart }
@@ -110,7 +104,7 @@ struct CuadraoSpendingChart: View {
     private var emptyTitle: String {
         switch story.state {
         case .firstUse: return spanish ? "Tu historia empieza aquí" : "Your story starts here"
-        case .unavailable: return spanish ? "Falta una parte de la historia" : "Part of the story is missing"
+        case .unavailable: return CuadraoMissingCoverage.title(spanish)
         case .emptyPeriod: return spanish ? "Sin gastos" : "No spending"
         case .populated: return ""
         }
@@ -244,4 +238,26 @@ struct CuadraoSpendingChart: View {
     }
     private func fraction(_ value: Decimal) -> Double { total > 0 ? NSDecimalNumber(decimal: value / total).doubleValue : 0 }
     private func clearSelection() { selectedPosition = nil; selectedCategory = nil }
+}
+
+struct CuadraoSpendingReading: View {
+    let currency: String
+    let amount: String
+    let caption: String
+    var insight: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(currency).font(CuadraoTypography.supporting).foregroundStyle(.secondary)
+                Text(amount).font(CuadraoTypography.amount).lineLimit(1).minimumScaleFactor(0.5)
+                    .accessibilityIdentifier("home-spending-total")
+            }
+            Text(caption).font(CuadraoTypography.caption).foregroundStyle(.secondary)
+            if let insight {
+                Text(insight).font(CuadraoTypography.supporting).fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("home-spending-insight")
+            }
+        }
+    }
 }

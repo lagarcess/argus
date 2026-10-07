@@ -23,6 +23,11 @@ final class AuthJourneyUITests: XCTestCase {
         app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", spanish ? "(es)" : "(en)", "-AppleLocale", spanish ? "es_DO" : "en_US"]
         app.launch()
+        app.revealConnectedTabBar()
+        if app.buttons["header.profile"].waitForExistence(timeout: 3) {
+            app.openProfileSurface()
+            if app.buttons["auth.signOut"].waitForExistence(timeout: 3) { signOutFromProfile() }
+        }
         app.openSignedOutAuthEntry()
         app.textFields["auth.email"].tap(); app.textFields["auth.email"].typeText(email)
         pastePassword(password)
@@ -31,20 +36,38 @@ final class AuthJourneyUITests: XCTestCase {
         submit.tap()
         XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 30))
         app.openProfileSurface()
+        let preferences = app.buttons["cuadrao.profile.preferences"]
+        XCTAssertTrue(preferences.waitForExistence(timeout: 10))
+        preferences.tap()
         let choice = app.buttons["profile.primaryCurrency"]
         XCTAssertTrue(choice.waitForExistence(timeout: 10))
+        choice.tap(); app.buttons["DOP"].tap()
+        let initial = NSPredicate(format: "value == %@", "DOP")
+        expectation(for: initial, evaluatedWith: choice)
+        waitForExpectations(timeout: 15)
         choice.tap(); app.buttons["USD"].tap()
-        let saved = NSPredicate(format: "label CONTAINS %@", "USD")
+        let saved = NSPredicate(format: "value == %@", "USD")
         expectation(for: saved, evaluatedWith: choice)
         waitForExpectations(timeout: 15)
         capture(spanish ? "primary-currency-es-saved" : "primary-currency-en-saved")
         app.terminate(); app.launch()
         XCTAssertTrue(app.buttons["header.profile"].waitForExistence(timeout: 30))
         app.openProfileSurface()
+        XCTAssertTrue(preferences.waitForExistence(timeout: 10))
+        preferences.tap()
         XCTAssertTrue(choice.waitForExistence(timeout: 10))
-        XCTAssertTrue(choice.label.contains("USD"))
+        XCTAssertEqual(choice.value as? String, "USD")
         capture(spanish ? "primary-currency-es-restored" : "primary-currency-en-restored")
-        app.buttons["auth.signOut"].tap()
+        app.navigationBars.buttons.matching(identifier: "BackButton").firstMatch.tap()
+        signOutFromProfile()
+    }
+
+    private func signOutFromProfile() {
+        let signOut = app.buttons["auth.signOut"]
+        XCTAssertTrue(signOut.waitForExistence(timeout: 10))
+        for _ in 0..<6 where !signOut.isHittable { app.swipeUp() }
+        signOut.tap()
+        app.confirmSignOutIfAsked()
     }
 
     func testRegisteredSessionSurvivesRelaunchAndSignsOut() throws {
@@ -59,6 +82,7 @@ final class AuthJourneyUITests: XCTestCase {
         openProfile()
         if app.buttons["auth.signOut"].exists {
             app.buttons["auth.signOut"].tap()
+            app.confirmSignOutIfAsked()
         }
         openEmailAuthAfterSignOut()
         capture("auth-entry")
@@ -75,7 +99,8 @@ final class AuthJourneyUITests: XCTestCase {
             app.openProfileSurface()
         }
         XCTAssertTrue(app.buttons["auth.signOut"].waitForExistence(timeout: 30))
-        XCTAssertTrue(app.descendants(matching: .any)["auth.identity"].exists)
+        XCTAssertTrue(app.descendants(matching: .any)["auth.identity"].exists
+            || app.buttons["cuadrao.profile.identity"].label.contains(email))
         capture("auth-verified")
 
         app.terminate()
@@ -85,6 +110,7 @@ final class AuthJourneyUITests: XCTestCase {
         XCTAssertFalse(app.textFields["auth.email"].exists)
         capture("auth-restored")
         app.buttons["auth.signOut"].tap()
+        app.confirmSignOutIfAsked()
         openEmailAuthAfterSignOut()
         XCTAssertFalse(app.buttons["auth.signOut"].exists)
         capture("auth-signed-out")

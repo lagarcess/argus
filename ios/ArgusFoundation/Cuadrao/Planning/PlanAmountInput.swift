@@ -11,13 +11,14 @@ struct PlanAmountInput: View {
     var currencySelectable = false
     var showCurrencyLock = false
     var prominent = true
+    var currencyIdentifier = "plan-edit-currency"
     @State private var focused = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .center, spacing: 12) {
                 PlanCurrencyChoice(currency: $currency, locked: !currencySelectable,
-                                   spanish: spanish, showLock: showCurrencyLock)
+                                   spanish: spanish, showLock: showCurrencyLock, identifier: currencyIdentifier)
                 CanvasMoneyValueInput(value: $value, error: $error, currency: currency, spanish: spanish,
                                       identifier: identifier, title: title, size: prominent ? .prominent : .secondary,
                                       onFocus: { focused = $0 })

@@ -5,6 +5,24 @@ import XCTest
 
 @MainActor
 final class FinancialModelTests: XCTestCase {
+    func testHomeDoesNotTreatAnUnreadOrRetiredAccountListAsFirstUse() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let accounts = AccountsModel(controller: fixture.client)
+        accounts.bind(identity)
+        XCTAssertFalse(accounts.hasLoaded)
+        await accounts.load()
+        XCTAssertTrue(accounts.hasLoaded)
+        XCTAssertFalse(accounts.accounts.isEmpty)
+        accounts.bind(nil)
+        XCTAssertFalse(accounts.hasLoaded, "another session must not inherit a successful empty/read state")
+        accounts.bind(identity)
+        await fixture.server.readReply("/api/v1/financial-accounts", body: "{}", status: 503)
+        await accounts.load()
+        XCTAssertNotNil(accounts.errorKey)
+        XCTAssertFalse(accounts.hasLoaded, "a failed initial read must show recovery, not the first-account invitation")
+    }
+
     func testServerFailuresStayConnectionErrorsWhileValidationKeepsItsMessage() {
         for (mapper, validationKey) in [(FinancialEditor.message, "accounts.error.amount_invalid"), (FinancialActivityEditor.message, "loop.error.amount_invalid")] {
             XCTAssertEqual(mapper(SessionFailure.rejected(status: 503, code: "storage_unavailable")), "loop.error.connection")
@@ -135,6 +153,60 @@ final class FinancialModelTests: XCTestCase {
         }
         XCTAssertEqual(reopenedAccounts.accounts.first { $0.id == account.id }?.balance.amount, "80.00")
         XCTAssertNil(reopenedAccounts.selected, "Recovering a write does not navigate the Accounts tab")
+    }
+
+    func testRenameSendsOnlyTheNicknameAgainstTheReadVersion() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let model = AccountsModel(controller: fixture.client)
+        model.bind(identity)
+        await model.load()
+        let account = try XCTUnwrap(model.accounts.first)
+        model.rename(account)
+        XCTAssertEqual(model.draft?.mode, .rename)
+        model.draft?.nickname = "Everyday"
+        await model.save()
+        XCTAssertNil(model.errorKey)
+        XCTAssertNil(model.draft, "An accepted rename closes the sheet")
+        let patches = await fixture.server.archivePatches
+        XCTAssertEqual(patches.count, 1)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: XCTUnwrap(patches.first?.httpBody)) as? [String: Any])
+        XCTAssertEqual(Set(payload.keys), ["expected_version", "nickname"], "Rename never resends type, currency or ownership")
+        XCTAssertEqual(payload["nickname"] as? String, "Everyday")
+        XCTAssertEqual(payload["expected_version"] as? Int, account.version)
+    }
+
+    func testCanvasEntryCreatesOneRequestWithTheConnectedTypeAndPlainAmount() async throws {
+        XCTAssertEqual(CanvasAccountKind.allCases.map { ConnectedAccountPresentation.type($0) },
+                       ["cash", "checking", "savings", "investment", "credit_card", "other_debt", "property", "vehicle", "other_asset"])
+        for kind in CanvasAccountKind.allCases {
+            XCTAssertEqual(ConnectedAccountPresentation.artwork(ConnectedAccountPresentation.type(kind)), kind)
+        }
+        let cases: [(CanvasAccountEntry, type: String, amount: String?, share: Int)] = [
+            (CanvasAccountEntry(kind: .property, name: "  Casa  ", amount: "8000000.5", currency: "USD", share: 50), "property", "8000000.5", 5000),
+            (CanvasAccountEntry(kind: .checking, name: "Banco", amount: "-25.50", currency: "DOP", share: 50), "checking", "-25.50", 10000),
+            (CanvasAccountEntry(kind: .card, name: "", amount: "", currency: "DOP"), "credit_card", nil, 10000),
+        ]
+        for (entry, type, amount, share) in cases {
+            let fixture = try PresentationFixture()
+            let identity = try await fixture.login()
+            let model = AccountsModel(controller: fixture.client)
+            model.bind(identity)
+            let created = try fixture.account()
+            var sent: [CreateFinancialAccountRequest] = []
+            model.confirmCreate = { request in sent.append(request); return created }
+            model.create()
+            model.draft?.apply(entry)
+            await model.save(locale: Locale(identifier: "en_US_POSIX"))
+            XCTAssertNil(model.errorKey)
+            XCTAssertEqual(sent.count, 1)
+            XCTAssertEqual(sent.first?.type, type)
+            XCTAssertEqual(sent.first?.nickname, entry.trimmedName)
+            XCTAssertEqual(sent.first?.currency, entry.currency)
+            XCTAssertEqual(sent.first?.amount, amount)
+            XCTAssertEqual(sent.first?.ownershipShareBps, share, "Only assets carry a partial share")
+            XCTAssertEqual(model.selected?.id, created.id, "A created account opens its detail")
+        }
     }
 
     func testArchiveReloadAndRestorePreserveBalanceAndListPlacement() async throws {
@@ -404,7 +476,7 @@ private actor PresentationServer {
         let body: String
         if request.httpMethod == "PATCH", path.hasSuffix(Self.id.uuidString) {
             let payload = try JSONSerialization.jsonObject(with: request.httpBody!) as! [String: Any]
-            archived = payload["archived"] as! Bool
+            if let value = payload["archived"] as? Bool { archived = value }
             accountVersion += 1
             archivePatches.append(request)
             // A concurrent matching write (409), or an accepted write with a lost response (503).
@@ -718,7 +790,7 @@ extension FinancialModelTests {
         let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
         defer { defaults.removePersistentDomain(forName: name) }
         let model = FinancialSearchModel(controller: fixture.client, defaults: defaults)
-        model.bind(identity); model.update(query: "Café %_\\", kind: .some(.account), currency: .some("DOP"))
+        model.bind(identity); model.update(query: "Café %_\\", scope: .accounts, currency: .some("DOP"))
         let second = UUID()
         let pages = [(200, PresentationServer.searchPage([PresentationServer.id], cursor: "next")), (200, PresentationServer.searchPage([second]))]
         await fixture.server.replies(pages)
@@ -754,6 +826,44 @@ extension FinancialModelTests {
         XCTAssertTrue(model.items.isEmpty)
     }
 
+    func testSearchPlansScopeReadsEveryPlanKindAndRelaunchReplaysIt() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let name = UUID().uuidString
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let model = FinancialSearchModel(controller: fixture.client, defaults: defaults)
+        model.bind(identity); model.update(scope: .plans)
+        let bill = UUID(), laterBill = UUID(), goal = UUID()
+        let pages = [(200, PresentationServer.searchPage([bill], cursor: "bills-2")), (200, PresentationServer.searchPage([laterBill])),
+            (200, PresentationServer.searchPage([])), (200, PresentationServer.searchPage([goal])), (200, PresentationServer.searchPage([]))]
+        await fixture.server.replies(pages)
+        await model.activate()
+        XCTAssertEqual(model.items.map(\.recordID), [bill])
+        XCTAssertEqual(model.cursor, "bills-2")
+        await model.more()
+        XCTAssertEqual(model.items.map(\.recordID), [bill, laterBill, goal])
+        XCTAssertNil(model.cursor)
+        func sent(_ requests: [URLRequest]) -> [String] {
+            requests.map { request in
+                let values = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!.queryItems ?? []
+                return [values.first { $0.name == "kind" }?.value, values.first { $0.name == "cursor" }?.value]
+                    .compactMap { $0 }.joined(separator: "@")
+            }
+        }
+        let expected = ["expectation", "expectation@bills-2", "budget", "goal", "debt"]
+        let first = await fixture.server.searches
+        XCTAssertEqual(sent(first), expected)
+        let reopened = FinancialSearchModel(controller: fixture.client, defaults: defaults)
+        reopened.bind(identity)
+        XCTAssertEqual(reopened.origin.scope, .plans)
+        await fixture.server.replies(pages)
+        await reopened.activate()
+        XCTAssertEqual(reopened.items.map(\.recordID), [bill, laterBill, goal])
+        let all = await fixture.server.searches
+        XCTAssertEqual(sent(Array(all.dropFirst(first.count))), expected)
+    }
+
     func testUnchangedSearchControlsRetainLoadedPagesAndScrollOrigin() async throws {
         let fixture = try PresentationFixture()
         let identity = try await fixture.login()
@@ -762,7 +872,7 @@ extension FinancialModelTests {
         defer { defaults.removePersistentDomain(forName: name) }
         let model = FinancialSearchModel(controller: fixture.client, defaults: defaults)
         model.bind(identity)
-        model.update(query: "Synthetic", kind: .some(.account), currency: .some("DOP"))
+        model.update(query: "Synthetic", scope: .accounts, currency: .some("DOP"))
         await fixture.server.replies([(200, PresentationServer.searchPage([PresentationServer.id], cursor: "next")),
             (200, PresentationServer.searchPage([UUID()], cursor: "third"))])
         await model.activate(); await model.more()
@@ -770,7 +880,7 @@ extension FinancialModelTests {
         model.remember(anchor: ids[1], offset: -19)
         let origin = model.origin
         model.update(query: origin.query)
-        model.update(kind: .some(origin.kind))
+        model.update(scope: origin.scope)
         model.update(currency: .some(origin.currency))
         model.update()
         XCTAssertEqual(model.items.map(\.id), ids)
@@ -780,17 +890,51 @@ extension FinancialModelTests {
         let searches = await fixture.server.searches
         XCTAssertEqual(searches.count, 2, "Repeated control values must not invalidate a loaded search")
         model.update(currency: .some(nil))
-        XCTAssertTrue(model.items.isEmpty)
+        XCTAssertEqual(model.items.map(\.id), ids)
+        XCTAssertNil(model.cursor)
         XCTAssertEqual(model.origin.pages, 1)
         XCTAssertNil(model.origin.currency)
     }
 
+    func testSearchFilterChangeKeepsRowsUntilTheReplacementLands() async throws {
+        let fixture = try PresentationFixture()
+        let identity = try await fixture.login()
+        let model = FinancialSearchModel(controller: fixture.client, defaults: UserDefaults(suiteName: UUID().uuidString)!)
+        model.bind(identity)
+        let shown = UUID(), replacement = UUID()
+        await fixture.server.replies([(200, PresentationServer.searchPage([shown], cursor: "next"))])
+        await model.activate()
+        model.remember(anchor: model.items[0].id, offset: -12)
+        model.update(scope: .accounts)
+        XCTAssertEqual(model.items.map(\.recordID), [shown], "A filter change cannot blank the rows it is replacing")
+        XCTAssertNil(model.cursor)
+        XCTAssertFalse(model.loading)
+        XCTAssertNil(model.origin.anchor)
+        XCTAssertEqual(model.origin.pages, 1)
+        model.remember(anchor: model.items[0].id, offset: -30)
+        XCTAssertNil(model.origin.anchor, "A row from the previous filter cannot become the new scroll origin")
+        let gate = RequestGate(); await fixture.server.holdSearch(gate)
+        await fixture.server.replies([(200, PresentationServer.searchPage([replacement]))])
+        let pending = Task { await model.activate() }
+        await gate.waitUntilStarted()
+        XCTAssertTrue(model.loading)
+        XCTAssertEqual(model.items.map(\.recordID), [shown])
+        await gate.release(); await pending.value
+        XCTAssertEqual(model.items.map(\.recordID), [replacement])
+        XCTAssertNil(model.restoration)
+        model.update(query: "unreachable")
+        await fixture.server.replies([(503, #"{"code":"unavailable"}"#)])
+        await model.activate()
+        XCTAssertTrue(model.items.isEmpty, "A failed filter change cannot leave the previous filter's rows on screen")
+        XCTAssertEqual(model.errorKey, "search.error")
+    }
+
     func testSearchRestorationWaitsForLayoutAndAllowsRemovedRowBoundary() {
-        let saved = FinancialSearchRestoration(anchor: "account.saved", offset: -51)
+        let saved = FinancialScrollRestoration(anchor: "account.saved", offset: -51)
         XCTAssertEqual(saved.adjustment(rowOffset: 0, contentOffset: 1000, minimum: 0, maximum: 1000), .waitForLayout)
         XCTAssertEqual(saved.adjustment(rowOffset: 0, contentOffset: 1000, minimum: 0, maximum: 1100), .move(1051))
         XCTAssertEqual(saved.adjustment(rowOffset: -51, contentOffset: 1051, minimum: 0, maximum: 1100), .complete)
-        let fallback = FinancialSearchRestoration(anchor: "account.survivor", offset: -51, permitsBoundaryFallback: true)
+        let fallback = FinancialScrollRestoration(anchor: "account.survivor", offset: -51, permitsBoundaryFallback: true)
         XCTAssertEqual(fallback.adjustment(rowOffset: 0, contentOffset: 800, minimum: 0, maximum: 800), .complete)
     }
 
@@ -883,7 +1027,8 @@ extension FinancialModelTests {
         XCTAssertEqual(model.items.map(\.id), retained)
         XCTAssertEqual(model.errorKey, "search.error")
         model.update(query: "different")
-        XCTAssertTrue(model.items.isEmpty)
+        XCTAssertEqual(model.items.map(\.id), retained)
+        XCTAssertNil(model.cursor)
         XCTAssertNil(model.errorKey)
         await fixture.server.replies([(200, PresentationServer.searchPage([first], cursor: "stale")),
             (409, #"{"code":"financial_search_stale_cursor"}"#),
@@ -925,7 +1070,7 @@ extension FinancialModelTests {
                 XCTAssertTrue(search.opening)
                 switch field {
                 case "query": search.update(query: "A newer search")
-                case "kind": search.update(kind: .some(.activity))
+                case "kind": search.update(scope: .activity)
                 default: search.update(currency: .some("USD"))
                 }
                 XCTAssertFalse(search.opening)

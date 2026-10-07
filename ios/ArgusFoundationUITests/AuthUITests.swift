@@ -61,6 +61,32 @@ final class AuthUITests: XCTestCase {
         }
     }
 
+    func testConnectedSignInFilledFieldsInBothAppearances() throws {
+        guard ProcessInfo.processInfo.environment["ARGUS_TEST_AUTH_UI_ENABLED"] == "true" else {
+            throw XCTSkip("Requires the configured local auth build.")
+        }
+        continueAfterFailure = false
+        for appearance in ["light", "dark"] {
+            app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                                   "-appearancePreference", appearance]
+            app.launch()
+            openProfile()
+            let email = app.textFields["auth.email"]
+            let password = app.secureTextFields["auth.password"]
+            XCTAssertTrue(email.waitForExistence(timeout: 10))
+            email.tap(); email.typeText("contrast@example.test")
+            password.tap(); password.typeText("Local-contrast-check")
+            XCTAssertEqual(email.value as? String, "contrast@example.test")
+            XCTAssertTrue(app.buttons["auth.submit"].isEnabled)
+            capture("connected-\(appearance)-filled-fields")
+            if app.buttons["Done"].exists { app.buttons["Done"].tap() }
+            else { app.scrollViews.firstMatch.swipeDown() }
+            try app.performAccessibilityAudit(for: [.contrast])
+            capture("connected-\(appearance)-contrast")
+            app.terminate()
+        }
+    }
+
     private func verifyEntry(_ language: LanguageCase, scenario: String) throws {
         XCTAssertEqual(app.textFields["auth.email"].label, language.email)
         XCTAssertEqual(app.secureTextFields["auth.password"].label, language.password)

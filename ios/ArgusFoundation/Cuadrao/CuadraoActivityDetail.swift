@@ -7,6 +7,7 @@ struct CuadraoActivityDetail: View {
     let actions: (CanvasAccountSheet) -> Void
     let record: (UUID) -> Void
     @State private var chatFocus: CanvasChatFocus?
+    @Environment(\.locale) private var locale
 
     var body: some View {
         Group {
@@ -14,36 +15,17 @@ struct CuadraoActivityDetail: View {
                let account = data.account(entry.accountID),
                !data.spaces.contains(where: { $0.id == account.spaceID && $0.deleted }) {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 28) {
-                        Text(entry.title).font(CuadraoTypography.feature)
-                            .accessibilityIdentifier("activity-detail-title")
-                        Text(account.currency + " " + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency))
-                            .font(CuadraoTypography.amount).monospacedDigit()
-                            .accessibilityIdentifier("activity-detail-amount")
-                        LabeledContent(spanish ? "Tipo" : "Type", value: entry.income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"))
-                        if !entry.income {
-                            LabeledContent(spanish ? "Categoría" : "Category") {
-                                HStack {
-                                    CuadraoExpenseCategoryIcon(category: entry.category)
-                                    Text(entry.category.title(spanish))
-                                }
-                            }
-                        }
-                        LabeledContent(spanish ? "Fecha" : "Date") {
-                            Text(entry.date, format: .dateTime.day().month(.wide).year())
-                        }
+                    CanvasActivityDetailContent(value: CanvasActivityDetailValue(
+                        title: entry.title,
+                        amount: account.currency + " " + (entry.income ? "+" : "−") + CanvasMoney.format(entry.amount, currency: account.currency),
+                        kind: entry.income ? (spanish ? "Ingreso" : "Income") : (spanish ? "Gasto" : "Expense"),
+                        date: entry.date.formatted(.dateTime.day().month(.wide).year().locale(locale)),
+                        category: entry.income ? nil : CanvasActivityCategoryValue(title: entry.category.title(spanish), artwork: entry.category)),
+                        spanish: spanish) {
                         NavigationLink {
                             CuadraoAccountCanvas(data: data, accountID: account.id, spanish: spanish, actions: actions, record: record)
                         } label: {
-                            HStack(spacing: 16) {
-                                CanvasAccountIcon(kind: account.kind)
-                                VStack(alignment: .leading, spacing: 6) {
-                                    Text(account.displayName(spanish)).font(CuadraoTypography.action)
-                                    Text(account.currency).font(.caption).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true)
-                            }.frame(minHeight: 62).contentShape(Rectangle())
+                            CanvasActivityAccountRowContent(title: account.displayName(spanish), detail: account.currency, artwork: account.kind)
                         }.buttonStyle(.plain).accessibilityIdentifier("activity-detail-account")
                         Button {
                             chatFocus = .activity(id: entry.id, title: entry.title)
