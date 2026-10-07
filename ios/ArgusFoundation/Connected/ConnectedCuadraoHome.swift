@@ -352,7 +352,8 @@ struct ConnectedCuadraoHome: View {
                     switch ConnectedAddMovement.target(for: activeAccounts, loaded: accounts.hasLoaded) {
                     case .record(let account): loop.record(account)
                     case .choose: choosingAccount = true
-                    case .createAccount, .loadAccounts: break
+                    case .loadAccounts: Task { await accounts.load() }
+                    case .createAccount: break
                     }
                 }
                 .disabled(activeAccounts.isEmpty || loop.pendingConfirmation != nil)

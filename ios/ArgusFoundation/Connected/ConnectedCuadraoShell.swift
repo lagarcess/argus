@@ -16,6 +16,7 @@ struct ConnectedCuadraoShell: View {
     @State private var chatEditing = false
     @State private var searchDetail = false
     @State private var choosingAddAccount = false
+    @State private var addNotice: AddNotice?
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
@@ -89,6 +90,11 @@ struct ConnectedCuadraoShell: View {
                 }.accessibilityIdentifier("nav.add.account." + account.id.uuidString)
             }
         }
+        .alert(addNotice.map { LocalizedStringKey($0.title) } ?? "", isPresented: Binding(get: { addNotice != nil }, set: { if !$0 { addNotice = nil } }),
+               presenting: addNotice) { _ in
+        } message: { notice in
+            if let message = notice.message { Text(LocalizedStringKey(message)) }
+        }
         .connectedReceiptDrafts(
             userID: auth.profile.flatMap { UUID(uuidString: $0.id) },
             chat: chat,
@@ -158,17 +164,21 @@ struct ConnectedCuadraoShell: View {
     }
 
     /// The navigation "+" records a movement from any tab, through the same rule as Home's Activity "+".
-    /// Home explains the two cases the + cannot act on (a write waiting for confirmation, accounts that
-    /// did not load), so the + takes the person there instead of doing nothing.
+    /// When it cannot act (accounts not ready, or a write waiting for confirmation) it says why in an
+    /// alert, because the personal Home that explains it is not on screen in every mode.
     private func addMovement() {
-        guard let loop = auth.financialLoop, let accounts = auth.accounts, loop.pendingConfirmation == nil else {
-            tab = .home
+        guard let loop = auth.financialLoop, let accounts = auth.accounts else {
+            addNotice = AddNotice(title: "accounts.loading", message: nil)
+            return
+        }
+        guard loop.pendingConfirmation == nil else {
+            addNotice = AddNotice(title: loop.pendingTitle, message: "loop.pending.body")
             return
         }
         Task {
             if !accounts.hasLoaded { await accounts.load() }
             switch ConnectedAddMovement.target(for: addableAccounts, loaded: accounts.hasLoaded) {
-            case .loadAccounts: tab = .home
+            case .loadAccounts: addNotice = AddNotice(title: accounts.errorKey ?? "accounts.loading", message: nil)
             case .createAccount: accounts.create()
             case .record(let account): loop.record(account)
             case .choose: choosingAddAccount = true
@@ -223,6 +233,13 @@ struct ConnectedCuadraoShell: View {
         case .profile: break
         }
     }
+}
+
+/// Why the navigation + could not act, as localization keys.
+private struct AddNotice: Identifiable {
+    let title: String
+    let message: String?
+    var id: String { title }
 }
 
 private struct HouseholdNavigationVisibility<Content: View>: View {
