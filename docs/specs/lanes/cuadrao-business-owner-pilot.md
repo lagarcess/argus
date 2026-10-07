@@ -72,6 +72,27 @@ Company logo customization, a detachable/draggable desktop composer, dashboard
 builders, invoicing, bank integration, team billing and the native Business app
 are outside this slice.
 
+## Adapt starter chips and preserve personality
+
+Founder clarification on October 7 keeps the existing starter-chip interaction.
+Adapt chips to actual pilot entry points, such as uploading a receipt, reviewing
+pending receipts and asking about saved expenses. Chips open the correct flow or
+prepare an editable question. They must not auto-approve expenses, invoke paid
+AI without consent or advertise unfinished features. Test empty and populated
+Business states so suggestions lead somewhere useful.
+
+The founder's reference to new-chat type-out messages means the rotating welcome
+or starter copy, not a new chart type. Business-specific greetings and additional
+Cuadrao personality are optional later polish. Preserve suitable existing copy
+and motion without making a copywriting pass a pilot requirement. Respect reduced
+motion and avoid repeatedly announcing animated text to screen readers.
+
+Inventory the Argus A in the chat background, chat-loading transitions and the
+top-left corner. Replace those through a shared brand asset once the founder
+approves the Cuadrao logo. Logo design and that replacement are not pilot blockers.
+Do not invent a final logo or treat marketing's provisional favicon as approved
+application branding. Keep a clear asset owner so future replacement is consistent.
+
 ## Adapt the composer to receipt intake
 
 Founder clarification on October 7 adds the consumer ingestion experience to

@@ -26,7 +26,10 @@ reference with the actual PR URL. The founder remains the product reviewer.
 > Adapt the consumer receipt ingestion options to the web composer. Use browser
 > capabilities for available inputs and viewport size for layout. Replace the
 > Business asset/indicator @ affordance with an attachment/add control. Preserve
-> the existing Argus chat picker and consumer iOS behavior.
+> the existing Argus chat picker and consumer iOS behavior. Adapt starter chips
+> to working pilot flows. Business welcome/type-out copy is optional later polish.
+> Inventory the Argus A in background, loading and corner branding for replacement
+> when the Cuadrao logo is approved; do not make logo design a blocker.
 >
 > Finish WhatsApp and web upload into one private receipt pipeline, owner review,
 > exactly-once expense save and retrieval with the original receipt. Add bounded
