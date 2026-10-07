@@ -1,0 +1,374 @@
+import type {
+  BusinessAccount,
+  BusinessExpense,
+  BusinessUpdate,
+  ReceiptDetail,
+  ReceiptReviewFields,
+} from "@/lib/business-api";
+import type { BusinessDataSource } from "./business-data";
+
+/**
+ * Synthetic records for the local design preview only. Every merchant and
+ * amount is invented; the preview labels itself as sample data.
+ */
+
+const ACCOUNTS: BusinessAccount[] = [
+  { id: "acct-ops", nickname: "Operating account", type: "checking", currency: "DOP" },
+  { id: "acct-card", nickname: "Business card", type: "credit_card", currency: "USD" },
+];
+
+function daysAgo(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString();
+}
+
+function dayOnly(iso: string): string {
+  return iso.slice(0, 10);
+}
+
+function receipt(
+  partial: Partial<ReceiptDetail> & Pick<ReceiptDetail, "id" | "status">,
+): ReceiptDetail {
+  return {
+    channel: "web",
+    filename: `${partial.id}.jpg`,
+    media_type: "image/jpeg",
+    size_bytes: 412_000,
+    received_at: daysAgo(1),
+    error_code: null,
+    expense_id: null,
+    merchant: null,
+    occurred_on: null,
+    amount: null,
+    currency: null,
+    category_id: null,
+    account_id: null,
+    version: 1,
+    evidence: null,
+    missing_fields: [],
+    ...partial,
+  };
+}
+
+function seedReceipts(): ReceiptDetail[] {
+  return [
+    receipt({
+      id: "rcpt-ferreteria",
+      status: "review_ready",
+      channel: "whatsapp",
+      filename: "IMG_2214.jpg",
+      received_at: daysAgo(0),
+      merchant: "Ferretería La Esquina",
+      occurred_on: dayOnly(daysAgo(0)),
+      amount: "3450.00",
+      currency: "DOP",
+      category_id: "other",
+      missing_fields: ["account_id"],
+      evidence: {
+        merchant: "FERRETERIA LA ESQUINA SRL",
+        occurred_on: dayOnly(daysAgo(0)),
+        total: "3450.00",
+        currency: "DOP",
+        tax: "526.27",
+        tip: null,
+        service: null,
+        lines: [
+          { description: "Pintura blanca 1 gal", amount: "1850.00" },
+          { description: "Brochas x3", amount: "1073.73" },
+        ],
+      },
+    }),
+    receipt({
+      id: "rcpt-papeleria",
+      status: "review_ready",
+      filename: "papeleria-oct.pdf",
+      media_type: "application/pdf",
+      received_at: daysAgo(1),
+      merchant: "Papelería Central",
+      occurred_on: dayOnly(daysAgo(2)),
+      amount: "980.50",
+      currency: "DOP",
+      category_id: "shopping",
+      account_id: "acct-ops",
+      evidence: {
+        merchant: "Papeleria Central",
+        occurred_on: dayOnly(daysAgo(2)),
+        total: "980.50",
+        currency: "DOP",
+        tax: "149.57",
+        tip: null,
+        service: null,
+        lines: [],
+      },
+    }),
+    receipt({
+      id: "rcpt-blurry",
+      status: "needs_attention",
+      channel: "whatsapp",
+      filename: "IMG_2209.jpg",
+      received_at: daysAgo(2),
+      error_code: "document_unreadable",
+      missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
+    }),
+    receipt({
+      id: "rcpt-saved",
+      status: "saved",
+      filename: "almuerzo-cliente.png",
+      media_type: "image/png",
+      received_at: daysAgo(3),
+      missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
+    }),
+    receipt({
+      id: "rcpt-confirmed",
+      status: "confirmed",
+      filename: "hosting-sep.pdf",
+      media_type: "application/pdf",
+      received_at: daysAgo(6),
+      merchant: "Nube Hosting",
+      occurred_on: dayOnly(daysAgo(6)),
+      amount: "24.00",
+      currency: "USD",
+      category_id: "other",
+      account_id: "acct-card",
+      expense_id: "exp-hosting",
+    }),
+  ];
+}
+
+function seedExpenses(): BusinessExpense[] {
+  return [
+    {
+      id: "exp-hosting",
+      merchant: "Nube Hosting",
+      amount: "24.00",
+      currency: "USD",
+      category_id: "other",
+      account_id: "acct-card",
+      occurred_on: dayOnly(daysAgo(6)),
+      receipt_id: "rcpt-confirmed",
+    },
+    {
+      id: "exp-gas",
+      merchant: "Estación Ruta 3",
+      amount: "2100.00",
+      currency: "DOP",
+      category_id: "transport",
+      account_id: "acct-ops",
+      occurred_on: dayOnly(daysAgo(4)),
+      receipt_id: null,
+    },
+    {
+      id: "exp-lunch",
+      merchant: "Comedor Doña Ana",
+      amount: "1250.00",
+      currency: "DOP",
+      category_id: "dining",
+      account_id: "acct-ops",
+      occurred_on: dayOnly(daysAgo(8)),
+      receipt_id: null,
+    },
+  ];
+}
+
+function sampleReceiptImage(detail: ReceiptDetail): Blob {
+  const lines = [
+    detail.evidence?.merchant ?? detail.merchant ?? "RECEIPT",
+    detail.occurred_on ?? "",
+    ...(detail.evidence?.lines ?? []).map(
+      (line) => `${line.description}  ${line.amount ?? ""}`,
+    ),
+    detail.amount ? `TOTAL ${detail.currency ?? ""} ${detail.amount}` : "",
+    "SAMPLE DATA",
+  ].filter(Boolean);
+  const text = lines
+    .map(
+      (line, index) =>
+        `<text x="24" y="${56 + index * 30}" font-family="monospace" font-size="16" fill="#191c1f">${line
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")}</text>`,
+    )
+    .join("");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="520" viewBox="0 0 360 520"><rect width="360" height="520" fill="#fffdf7"/><rect x="8" y="8" width="344" height="504" fill="none" stroke="#d9d4c7" stroke-dasharray="4 4"/>${text}</svg>`;
+  return new Blob([svg], { type: "image/svg+xml" });
+}
+
+const delay = (ms = 240) => new Promise((resolve) => setTimeout(resolve, ms));
+
+export function createFixtureBusinessDataSource(): BusinessDataSource {
+  let receipts = seedReceipts();
+  let expenses = seedExpenses();
+  let counter = 0;
+
+  const find = (id: string) => {
+    const found = receipts.find((item) => item.id === id);
+    if (!found) throw Object.assign(new Error("not_found"), { status: 404 });
+    return found;
+  };
+  const replace = (next: ReceiptDetail) => {
+    receipts = receipts.map((item) => (item.id === next.id ? next : item));
+    return next;
+  };
+  const missing = (fields: ReceiptReviewFields) =>
+    (Object.keys(fields) as (keyof ReceiptReviewFields)[]).filter(
+      (key) => key !== "category_id" && !fields[key],
+    );
+
+  return {
+    mode: "fixture",
+    workspace: async () => {
+      await delay();
+      return { accounts: ACCOUNTS, currencies: ["DOP", "USD"], assistant_available: true };
+    },
+    overview: async (from, to) => {
+      await delay();
+      const inPeriod = expenses.filter(
+        (item) => item.occurred_on >= from && item.occurred_on <= to,
+      );
+      const byCurrency = new Map<string, { amount: number; count: number }>();
+      for (const item of inPeriod) {
+        const current = byCurrency.get(item.currency) ?? { amount: 0, count: 0 };
+        byCurrency.set(item.currency, {
+          amount: current.amount + Number(item.amount),
+          count: current.count + 1,
+        });
+      }
+      return {
+        from,
+        to,
+        totals: [...byCurrency.entries()].map(([currency, total]) => ({
+          currency,
+          amount: total.amount.toFixed(2),
+          count: total.count,
+        })),
+        awaiting_review: receipts.filter((item) =>
+          ["saved", "queued", "preparing", "review_ready"].includes(item.status),
+        ).length,
+        needs_attention: receipts.filter((item) => item.status === "needs_attention").length,
+        last_received_at: receipts[0]?.received_at ?? null,
+        last_confirmed_at: daysAgo(6),
+      };
+    },
+    receipts: async (view) => {
+      await delay();
+      return view === "all"
+        ? receipts
+        : receipts.filter((item) => item.status !== "confirmed" && item.status !== "dismissed");
+    },
+    receipt: async (id) => {
+      await delay();
+      return find(id);
+    },
+    receiptSource: async (id) => {
+      await delay(120);
+      return sampleReceiptImage(find(id));
+    },
+    updates: async () => {
+      await delay();
+      const items: BusinessUpdate[] = receipts
+        .filter((item) => ["review_ready", "needs_attention", "confirmed"].includes(item.status))
+        .map((item) => ({
+          id: `upd-${item.id}`,
+          kind:
+            item.status === "confirmed"
+              ? "expense_confirmed"
+              : item.status === "needs_attention"
+                ? "receipt_needs_attention"
+                : "receipt_ready",
+          occurred_at: item.received_at,
+          receipt_id: item.id,
+          expense_id: item.expense_id,
+          error_code: item.error_code,
+          label: item.merchant ?? item.filename,
+        }));
+      return items;
+    },
+    expenses: async (from, to) => {
+      await delay();
+      return expenses
+        .filter((item) => item.occurred_on >= from && item.occurred_on <= to)
+        .sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
+    },
+    uploadReceipt: async (file, consentToPrepare) => {
+      await delay(500);
+      counter += 1;
+      const created = receipt({
+        id: `rcpt-new-${counter}`,
+        status: consentToPrepare ? "queued" : "saved",
+        filename: file.name,
+        media_type: file.type,
+        size_bytes: file.size,
+        received_at: new Date().toISOString(),
+        missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
+      });
+      receipts = [created, ...receipts];
+      return created;
+    },
+    prepareReceipt: async (id) => {
+      await delay();
+      return replace({ ...find(id), status: "queued" });
+    },
+    saveReview: async (id, version, fields) => {
+      await delay();
+      const current = find(id);
+      if (current.version !== version) {
+        throw Object.assign(new Error("stale_version"), { status: 409, code: "stale_version" });
+      }
+      const merged = { ...current, ...fields };
+      return replace({
+        ...merged,
+        version: current.version + 1,
+        missing_fields: missing(merged),
+      });
+    },
+    confirmReceipt: async (id, version) => {
+      await delay(400);
+      const current = find(id);
+      if (current.expense_id) return current;
+      if (current.version !== version) {
+        throw Object.assign(new Error("stale_version"), { status: 409, code: "stale_version" });
+      }
+      if (current.missing_fields.length > 0) {
+        throw Object.assign(new Error("missing_fields"), { status: 422, code: "missing_fields" });
+      }
+      const expenseId = `exp-${id}`;
+      expenses = [
+        {
+          id: expenseId,
+          merchant: current.merchant,
+          amount: current.amount ?? "0",
+          currency: current.currency ?? "DOP",
+          category_id: current.category_id,
+          account_id: current.account_id ?? "acct-ops",
+          occurred_on: current.occurred_on ?? dayOnly(new Date().toISOString()),
+          receipt_id: id,
+        },
+        ...expenses,
+      ];
+      return replace({ ...current, status: "confirmed", expense_id: expenseId });
+    },
+    recordExpense: async (input) => {
+      await delay();
+      counter += 1;
+      const account = ACCOUNTS.find((item) => item.id === input.account_id) ?? ACCOUNTS[0];
+      const created: BusinessExpense = {
+        id: `exp-manual-${counter}`,
+        merchant: input.merchant,
+        amount: input.amount,
+        currency: account.currency,
+        category_id: input.category_id,
+        account_id: account.id,
+        occurred_on: input.occurred_on,
+        receipt_id: null,
+      };
+      expenses = [created, ...expenses];
+      return created;
+    },
+    createAccount: async (input) => {
+      await delay();
+      const created = { id: `acct-${Date.now()}`, ...input };
+      ACCOUNTS.push(created);
+      return created;
+    },
+  };
+}
