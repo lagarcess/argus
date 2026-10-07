@@ -40,4 +40,3 @@ export default defineConfig({
     start(PUBLIC_PORT, { CUADRAO_SITE_INDEXING: "public" }),
   ],
 });
-
