@@ -50,6 +50,8 @@ type ChatInputProps = {
   leadingControl?: ReactNode;
   /** Unsent text, so a workspace can keep a draft across navigation. */
   onDraftChange?: (text: string) => void;
+  /** Called once a send is accepted. */
+  onSent?: () => void;
 };
 
 export type DiscoverySection = {
@@ -101,6 +103,7 @@ export default function ChatInput({
   draftText,
   leadingControl,
   onDraftChange,
+  onSent,
 }: ChatInputProps) {
   const { t } = useTranslation();
   const [segments, setSegments] = useState<ComposerSegment[]>([{ type: "text", text: "" }]);
@@ -350,6 +353,7 @@ export default function ChatInput({
     if (message) {
       const accepted = await onSend(message, composerMentions(current, message));
       if (accepted === false) return;
+      onSent?.();
       setSegments([{ type: "text", text: "" }]);
       setComposerHasContent(false);
       setComposerRawText("");

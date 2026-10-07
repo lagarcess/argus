@@ -7,8 +7,8 @@ import { useBusiness } from "./BusinessWorkspace";
 
 /**
  * The Business composer's leading control. It replaces the asset mention
- * picker. A captured receipt shows here as an attachment and is never sent
- * with the message on its own.
+ * picker. A receipt added here is saved to the Inbox; the chip says so until
+ * the next send or conversation, and is never part of the message.
  */
 export default function ComposerAttachControl() {
   const { t } = useTranslation();
@@ -25,16 +25,16 @@ export default function ComposerAttachControl() {
           <ReceiptText className="h-4 w-4 shrink-0" />
           <button
             type="button"
+            title={attachedReceipt.filename ?? undefined}
             className="min-w-0 truncate text-left font-medium hover:underline"
             onClick={() => openPanel({ kind: "receipt", receiptId: attachedReceipt.id })}
           >
-            {t("business.composer.attached", "{{name}} saved to Inbox", {
-              name: attachedReceipt.filename ?? t("business.receipt.untitled", "Receipt"),
-            })}
+            {t("business.composer_receipt.saved", "Saved to Inbox")}
           </button>
           <button
             type="button"
-            aria-label={t("business.composer.remove_attachment", "Remove from this message")}
+            aria-label={t("business.composer_receipt.dismiss", "Dismiss")}
+            title={t("business.composer_receipt.dismiss", "Dismiss")}
             onClick={clearAttachedReceipt}
             className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/5"
           >

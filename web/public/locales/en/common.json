@@ -2325,9 +2325,11 @@
     "composer": {
       "placeholder_ask": "Ask about your saved expenses",
       "placeholder": "Write a message",
-      "add": "Add",
-      "attached": "{{name}} saved to Inbox",
-      "remove_attachment": "Remove from this message"
+      "add": "Add"
+    },
+    "composer_receipt": {
+      "saved": "Saved to Inbox",
+      "dismiss": "Dismiss"
     }
   }
 }

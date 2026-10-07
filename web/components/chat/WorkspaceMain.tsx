@@ -81,8 +81,8 @@ export function workspaceComposerProps(
   bridge: ChatShellBridge,
 ) {
   if (!workspace) return {};
-  const { leadingControl, draftText, onDraftChange, placeholder } = workspace.composer(bridge);
-  return { leadingControl, draftText, onDraftChange, placeholder };
+  const { leadingControl, draftText, onDraftChange, placeholder, onSent } = workspace.composer(bridge);
+  return { leadingControl, draftText, onDraftChange, placeholder, onSent };
 }
 
 type WorkspaceMainProps = {
@@ -145,6 +145,7 @@ export function WorkspaceMain({
                 leadingControl={composer.leadingControl}
                 draftText={composer.draftText}
                 onDraftChange={composer.onDraftChange}
+                onSent={composer.onSent}
               />
             </div>
           </div>

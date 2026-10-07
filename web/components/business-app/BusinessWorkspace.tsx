@@ -139,6 +139,12 @@ export function BusinessWorkspaceProvider({
 
   const reload = useCallback(() => setRevision((value) => value + 1), []);
 
+  // A receipt saved from the composer belongs to the conversation it was added in.
+  const conversationId = bridge?.conversationId ?? null;
+  useEffect(() => {
+    setAttachedReceipt(null);
+  }, [conversationId]);
+
   useEffect(() => {
     let cancelled = false;
     Promise.all([
@@ -229,6 +235,7 @@ export function BusinessWorkspaceProvider({
             drafts.current.set(key, text);
             setDraftRevision((value) => value + 1);
           },
+          onSent: () => setAttachedReceipt(null),
         };
       },
       onShellChange: (shell) => setBridge(shell),

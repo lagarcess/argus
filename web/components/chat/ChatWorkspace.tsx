@@ -34,6 +34,7 @@ export type WorkspaceComposer = Readonly<{
   draftKey: string;
   onDraftChange: (text: string) => void;
   replaceDraft: (text: string) => void;
+  onSent: () => void;
 }>;
 
 export type ChatWorkspace = Readonly<{

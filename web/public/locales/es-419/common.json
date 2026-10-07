@@ -2190,9 +2190,7 @@
     "composer": {
       "placeholder_ask": "Pregunta por tus gastos guardados",
       "placeholder": "Escribe un mensaje",
-      "add": "Agregar",
-      "attached": "{{name}} guardado en la Bandeja",
-      "remove_attachment": "Quitar de este mensaje"
+      "add": "Agregar"
     },
     "create": {
       "label": "Crear"
@@ -2328,6 +2326,10 @@
       "ready": "{{name}} está listo para revisar",
       "subtitle": "Resultados de tus recibos y lo que necesita tu atención.",
       "title": "Novedades"
+    },
+    "composer_receipt": {
+      "saved": "Guardado en la Bandeja",
+      "dismiss": "Descartar"
     }
   }
 }

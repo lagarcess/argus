@@ -113,6 +113,7 @@ export default function EmptyChatSurface({
           draftText={draftText}
           leadingControl={workspace?.composer.leadingControl}
           onDraftChange={workspace?.composer.onDraftChange}
+          onSent={workspace?.composer.onSent}
         />
         {guestSubmissionPending && (
           <div
