@@ -44,6 +44,17 @@ Through the connected Render and Resend tools and public DNS lookups. Nothing wa
 - **Lifetime.** A non-persistent branch is removed when its PR is closed or merged, and preview branches auto-pause after inactivity.
 - **Decision.** Automatic previews are not part of the agreed spending plan. The steps below disable them and remove this branch. They have not been run; each is a hosted write that needs the founder's go.
 
+### Automatic Supabase behavior before promotion (read-only evidence, 2026-10-07)
+
+The integration's settings page cannot be read from here, so each finding rests on what the integration did.
+
+| Behavior | State | Evidence |
+| --- | --- | --- |
+| Automatic production migrations from `main` | **Off, as far as the evidence shows** | The production branch record has no Git branch (`git_branch` is empty). The `Supabase Preview` check on `main`'s promotion commit (2026-09-18) and on integration's head reads "skipped: this git branch is not associated with any Supabase Branch". The record's status has not changed since 2026-06-04 although `main` was promoted since. So a push to `main` is not wired to production migrations. |
+| Automatic preview branching | **On** | A branch was created for PR 895 seven seconds after it opened, and the check says "open a PR to create a new branch". |
+
+Promotion therefore waits on the founder disabling previews (steps below). Founder confirmation of the production-deploy setting in the dashboard is still worth one look, because the evidence is indirect.
+
 ### Disable automatic previews and remove this preview
 
 Disable first, then delete. Deleting first lets the next push recreate the branch; disabling first leaves this branch running only until step 2.

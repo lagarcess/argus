@@ -17,12 +17,12 @@ Measured 2026-10-07 with `git fetch origin`:
 
 **Option A, full promotion.** Rejected for this launch: it ships the whole integration backlog and 35 unapplied migrations.
 
-**Option B, bounded promotion (recommended).** Land the marketing PR into `codex/private-alpha-next` under the normal rules, then open a second PR into `main` from a branch cut from `origin/main` that contains only the marketing change. Prepared and measured against `origin/main` (`a9286b21`) from this PR's content: **127 new files and 1 modified file, 10,148 added lines, nothing deleted.**
+**Option B, bounded promotion (recommended).** Land the marketing PR into `codex/private-alpha-next` under the normal rules, then open a second PR into `main` from a branch cut from `origin/main` that contains only the marketing change. Prepared and measured against `origin/main` (`a9286b21`) from this PR's content: **127 new files and 2 modified files, about 10,200 added lines, nothing deleted.** The count is regenerated with `git diff --name-status origin/main...<candidate>` on each refresh.
 
 - `marketing/**` (new)
 - `supabase/migrations/20260920000000_cuadrao_early_access_signups.sql` and `tests/test_cuadrao_early_access_postgres.py` (new)
 - `docs/specs/cuadrao-marketing-forms-contract.md`, this runbook, the launch record and its evidence folder (new)
-- `.github/workflows/ci.yml` (the only modified file): a `marketing-checks` job and its entry in the aggregate `ci` job's `needs`, 46 added lines, written for `main`'s simpler workflow
+- `.github/workflows/ci.yml` and `tests/test_ci_workflow.py` (the two modified files): a `marketing-checks` job and its entry in the aggregate `ci` job's `needs`, written for `main`'s simpler workflow, and the matching expectations in the workflow test, which asserts that exact `needs` list on `main`
 
 It carries no change to `web/`, `src/`, `ios/`, `render.yaml` or any other migration. Left out because they only exist, or only make sense, on integration: the Cuadrao design guide (it links five integration-only documents), the documentation-authority row and the integration-report pointer. They arrive with the normal promotion, and the package README's link to the design guide is dead on `main` until then. The migration is dated between `main`'s latest (`20260914120000`) and integration's first newer one (`20260925120000`), so a fresh replay orders it correctly on both branches. Identical content merges cleanly when integration is later promoted. The candidate was built in a separate worktree from `origin/main`; its typecheck and 112 unit tests pass there.
 
@@ -45,6 +45,13 @@ Yes at the schema level, with one ordering rule and one shared-tool gap. Checked
 - **No dependency on the unrecorded currency-pair migration.** The consumer plans to run `20260505000001` first, unrecorded, because production's asset-class checks lack currency pairs. That is a separate repair of production's history; this migration does not read `asset_class`.
 
 The practical consequence: the signup table can go to production alone and early, or with the batch, as the founder prefers, provided it precedes the consumer files.
+
+### Before any promotion
+
+1. Automatic Supabase preview branching is off and the PR 895 branch is removed (launch record, "Disable automatic previews"). On 2026-10-07 it was on.
+2. Automatic production migrations from `main` are off. The evidence says they are not wired (launch record); confirm the integration's deploy-to-production setting in the dashboard once.
+3. Supabase stays on the Free plan; nothing here depends on a plan change.
+4. CI is terminal and green on the exact candidate, and the signup migration is not applied by promotion: the consumer's applier is the only production path.
 
 ## 2. Render service
 
