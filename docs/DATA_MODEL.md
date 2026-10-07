@@ -155,6 +155,13 @@ financial_import_observations
 financial_import_account_links
 ```
 
+Default-off, service-role only (`ARGUS_WHATSAPP_INTAKE_ENABLED`):
+```text
+whatsapp_link_codes
+whatsapp_sender_links
+whatsapp_inbound_messages
+```
+
 Optional or later:
 ```
 - assets
@@ -3337,6 +3344,32 @@ live device digests and inserts the new one in a single transaction under a
 per-person advisory lock, so the five-device limit holds under concurrency. Row level security is enabled
 with no policies and every client grant revoked, so no client role can read or
 write it. Proven by `tests/test_ingestion_shortcuts_postgres.py`.
+
+WhatsApp receipt intake keeps three service-role-only tables (migration
+`20261008130000_whatsapp_intake.sql`). Phone numbers, provider message ids and
+link codes are stored only as HMAC-SHA256 digests under
+`ARGUS_WHATSAPP_SENDER_KEY`. `destination_owner_id` references `auth.users`
+and is the person today; it becomes the business principal if the Business
+boundary proposal is approved.
+
+- `whatsapp_link_codes`: `destination_owner_id`, `code_digest` (unique),
+  `created_at`, `expires_at`, `consumed_at`. Single use; issuing a new code
+  deletes the owner's unused ones.
+- `whatsapp_sender_links`: `destination_owner_id`, `wa_id_hash`, `last4`,
+  `status` (`active` or `revoked`), `linked_at`, `revoked_at`. Partial unique
+  indexes allow one active link per sender and one per destination; linking
+  revokes whichever active link it replaces.
+- `whatsapp_inbound_messages`: one row per provider message, unique on
+  `provider_message_key`, with `sender_hash`, `destination_owner_id`,
+  `status` (`received`, `linked`, `rejected`, `captured`, `failed`),
+  `connection_id` (the captured document's statement connection), `error_code`,
+  `claim_until`, `received_at` and `updated_at`. Linked, rejected and captured
+  are final. A received row whose claim lapsed, or a failed row, is reclaimed by
+  a redelivery of the same message. A captured row's draft is owned by
+  `financial_document_extractions`.
+
+Row level security is enabled with no policies and every client grant revoked.
+Proven by `tests/test_whatsapp_intake_postgres.py`.
 
 ## Import reconciliation
 
