@@ -78,7 +78,8 @@ private struct ConnectedBalanceReading: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch history {
-            case .recorded(let points, let unavailableAccounts, let accounts):
+            case .recorded(let points, let unavailableAccounts, let accounts)
+                where Set(points.map { Calendar.current.startOfDay(for: $0.date) }).count > 1:
                 CuadraoHomeBalanceChart(accounts: [], observations: [], currency: summary.currency, currencies: currencies,
                     spanish: spanish, shared: false, chooseCurrency: chooseCurrency, expanded: expanded, expand: expand,
                     history: CanvasBuiltBalanceHistory(points: points, now: .now), partial: partial,
@@ -94,29 +95,40 @@ private struct ConnectedBalanceReading: View {
                         CuadraoBalanceBreakdown(period: period, currency: summary.currency, spanish: spanish, linksToAccounts: false)
                     }
                 }
+            case .recorded:
+                balanceOnly(chart: CuadraoChartState(title: spanish ? "Tu historial empieza hoy" : "Your history starts today",
+                    detail: spanish ? "Con otro día registrado, aquí verás la línea de tu balance." : "Once another day is recorded, your balance line appears here.")
+                    .accessibilityIdentifier("home-chart-history-starts"))
             case .unknown, nil:
-                let value = ConnectedBalanceSummary(summary: summary)
-                CuadraoBalanceAmount(amount: value.balance(locale: locale) ?? "—", currency: summary.currency,
-                    currencies: currencies, spanish: spanish, expanded: expanded, amountIdentifier: amountIdentifier,
-                    chooseCurrency: chooseCurrency, expand: expand)
-                Text(partial ? (spanish ? "Balance parcial" : "Partial balance") : (spanish ? "Balance neto" : "Net balance"))
-                    .font(CuadraoTypography.caption).foregroundStyle(.secondary)
-                    .accessibilityIdentifier("home-chart-date")
-                if history == nil, value.known {
-                    CuadraoChartState(title: spanish ? "Leyendo tus balances registrados" : "Reading your recorded balances",
+                if history == nil, ConnectedBalanceSummary(summary: summary).known {
+                    balanceOnly(chart: CuadraoChartState(title: spanish ? "Leyendo tus balances registrados" : "Reading your recorded balances",
                         detail: spanish ? "Tu historial aparece en cuanto termina la lectura." : "Your history appears as soon as the read completes.",
                         loading: true)
-                        .accessibilityIdentifier("home-chart-loading")
+                        .accessibilityIdentifier("home-chart-loading"))
                 } else {
-                    CuadraoChartState(title: spanish ? "Tu balance, a tu ritmo" : "Your balance, at your pace",
+                    balanceOnly(chart: CuadraoChartState(title: spanish ? "Tu balance, a tu ritmo" : "Your balance, at your pace",
                         detail: spanish ? "Los balances que registres darán forma a este espacio." : "Your recorded balances will give this space its shape.")
-                        .accessibilityIdentifier("home-chart-empty")
+                        .accessibilityIdentifier("home-chart-empty"))
                 }
             }
             if partial {
                 Text(verbatim: String(format: NSLocalizedString("loop.home.unknownCount", comment: ""), summary.unknownAccounts))
                     .font(CuadraoTypography.caption).foregroundStyle(.secondary)
             }
+        }
+    }
+
+    /// The hero amount over the approved cold-start art; used while the recorded history cannot yet draw a line.
+    private func balanceOnly(chart: some View) -> some View {
+        let value = ConnectedBalanceSummary(summary: summary)
+        return VStack(alignment: .leading, spacing: 12) {
+            CuadraoBalanceAmount(amount: value.balance(locale: locale) ?? "—", currency: summary.currency,
+                currencies: currencies, spanish: spanish, expanded: expanded, amountIdentifier: amountIdentifier,
+                chooseCurrency: chooseCurrency, expand: expand)
+            Text(partial ? (spanish ? "Balance parcial" : "Partial balance") : (spanish ? "Balance neto" : "Net balance"))
+                .font(CuadraoTypography.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("home-chart-date")
+            chart
         }
     }
 
