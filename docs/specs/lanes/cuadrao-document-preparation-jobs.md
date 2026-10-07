@@ -114,7 +114,9 @@ unchanged. With the flag on, an attempt that would previously stop at
 - Up to three vision calls per preparation through the existing OpenRouter key.
 - One indexed query per API instance every 30 seconds. No new service.
 - The workflows service would need `ARGUS_WORKFLOW_DATABASE_URL`,
-  `ARGUS_DOCUMENT_EXTRACTION_ENABLED`, `ARGUS_VISION_MODEL` and the OpenRouter key;
+  `ARGUS_DOCUMENT_EXTRACTION_ENABLED`, `ARGUS_VISION_MODEL`, the OpenRouter key,
+  and `SUPABASE_URL` with `SUPABASE_SERVICE_ROLE_KEY` to read sources from the
+  private Storage bucket (#778);
   the API would need `ARGUS_DOCUMENT_JOBS_WORKFLOW_TASK` and `RENDER_API_KEY`.
 
 ## Evidence
