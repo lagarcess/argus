@@ -173,6 +173,8 @@ def unavailable_problem(request: Request) -> HTTPException:
         code="financial_connections_unavailable",
         title="Not Found",
         detail="Financial connections are not available.",
+        # The answer changes with a flag, so no cache may keep it.
+        headers={"Cache-Control": "no-store"},
     )
 
 

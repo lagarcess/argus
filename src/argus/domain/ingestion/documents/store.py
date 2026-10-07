@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import threading
 from datetime import datetime
 from typing import Protocol
@@ -15,6 +16,12 @@ from argus.domain.ingestion.documents.models import (
     DocumentDraft,
     ExtractionBatch,
     PreparationJob,
+)
+from argus.domain.ingestion.documents.objects import (
+    InMemorySourceObjects,
+    SourceObjects,
+    connection_prefix,
+    source_path,
 )
 
 
@@ -63,11 +70,16 @@ class DocumentStore(Protocol):
 
 
 class InMemoryDocumentStore:
-    def __init__(self, connections: InMemoryConnectionRepository) -> None:
+    def __init__(
+        self,
+        connections: InMemoryConnectionRepository,
+        objects: SourceObjects | None = None,
+    ) -> None:
         self.connections = connections
+        self.objects = objects if objects is not None else InMemorySourceObjects()
         self._rows: dict[tuple[str, str], str] = {}
         self._drafts: dict[tuple[str, str], str] = {}
-        self._sources: dict[tuple[str, str], bytes] = {}
+        self._sources: dict[tuple[str, str], str] = {}
         self._jobs: dict[tuple[str, str], str] = {}
         self._lock = threading.RLock()
 
@@ -116,11 +128,12 @@ class InMemoryDocumentStore:
 
     def source(self, *, user_id: str, connection_id: str) -> bytes | None:
         with self.connections._lock, self._lock:
-            return (
+            path = (
                 self._sources.get((user_id, connection_id))
                 if self._live(user_id, connection_id)
                 else None
             )
+            return self.objects.get(path) if path is not None else None
 
     def capture(self, *, user_id: str, draft: DocumentDraft, content: bytes) -> bool:
         with self.connections._lock, self._lock:
@@ -130,8 +143,14 @@ class InMemoryDocumentStore:
             if key not in self._drafts:
                 if key in self._rows:
                     draft = draft.model_copy(update={"status": "review_ready"})
+                path = source_path(
+                    user_id=user_id,
+                    connection_id=draft.connection_id,
+                    sha256=hashlib.sha256(content).hexdigest(),
+                )
+                self.objects.put(path, content, draft.media_type)
                 self._drafts[key] = draft.model_dump_json()
-                self._sources[key] = content
+                self._sources[key] = path
             return True
 
     def update(
@@ -179,6 +198,9 @@ class InMemoryDocumentStore:
             return True
 
     def forget(self, *, user_id: str, connection_id: str) -> None:
+        self.objects.delete(
+            connection_prefix(user_id=user_id, connection_id=connection_id)
+        )
         with self._lock:
             key = (user_id, connection_id)
             self._rows.pop(key, None)

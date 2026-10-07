@@ -22,10 +22,13 @@ from argus.domain.apple_sign_in.credentials_postgres import (
     PostgresAppleCredentialRepository,
 )
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
+from argus.domain.ingestion.documents.models import DocumentDraft
+from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 from argus.domain.ingestion.secrets import SecretBox
 from psycopg_pool import ConnectionPool
 
 from tests import apple_sign_in_support as apple_support
+from tests.document_sources_support import LOCAL_STORAGE, source_objects, stored_paths
 from tests.household.financial_fixtures import DSN, NOW, key
 from tests.household.financial_fixtures import lane as lane  # noqa: F401 - fixture
 from tests.test_account_deletion_fk_census_postgres import (
@@ -430,3 +433,62 @@ def test_an_unreadable_apple_token_is_discarded_only_under_its_own_key(lane, wor
         assert _apple_state(a, run_id) == (False, False, "done", "unrecoverable")
     finally:
         apple.close()
+
+
+class _StorageDown:
+    bucket = "financial-document-sources"
+
+    def delete(self, prefix: str) -> None:
+        raise ConnectionError("storage unavailable")
+
+
+@pytest.mark.skipif(not LOCAL_STORAGE, reason="Local Supabase Storage required")
+def test_document_sources_are_erased_before_the_account_delete(lane, world):  # noqa: F811
+    """#778: every object under the person's prefix goes, a referenced capture
+    and an unreferenced one alike; anyone else's stays. Storage down keeps the
+    run pending and the account locked, like any third party."""
+    a, b = world["a"], world["b"]
+    objects = source_objects()
+    orphan, theirs = f"{a}/{uuid4()}/{'a' * 64}", f"{b}/{uuid4()}/{'b' * 64}"
+    for path in (orphan, theirs):
+        objects.put(path, b"%PDF-fixture", "application/pdf")
+    with ConnectionPool(DSN, min_size=0, max_size=2) as pool:
+        statement = PostgresConnectionRepository(pool).create(
+            user_id=a, source="statement", external_ref=key(), label=None, now=NOW
+        )
+        draft = DocumentDraft(
+            connection_id=statement.id,
+            filename="statement.pdf",
+            media_type="application/pdf",
+            sha256="0" * 64,
+            size_bytes=12,
+            created_at=NOW,
+            updated_at=NOW,
+        )
+        assert PostgresDocumentStore(pool, objects).capture(
+            user_id=a, draft=draft, content=b"%PDF-fixture"
+        )
+    with psycopg.connect(DSN) as c:
+        assert len(stored_paths(c, f"{a}/")) == 2
+    try:
+        admin = SqlAuthAdmin()
+        with pytest.raises(AccountDeletionIncomplete) as raised:
+            _service(lane, admin, source_objects=_StorageDown()).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+        assert raised.value.pending == ["storage"]
+        assert _locked(a) == (True, True)
+        assert admin.deleted == []
+        run_id = _run_id(a)
+        assert _run(run_id)[4]["last_error"] == {"storage": "storage_delete_failed"}
+
+        done = _service(lane, SqlAuthAdmin(), source_objects=objects).delete_account(
+            user_id=a
+        )
+        assert done.status == "done"
+        assert _run(run_id)[4]["storage"] == "deleted"
+        with psycopg.connect(DSN) as c:
+            assert stored_paths(c, f"{a}/") == []
+            assert stored_paths(c, f"{b}/") == [theirs]
+    finally:
+        objects.delete(f"{a}/")
+        objects.delete(f"{b}/")

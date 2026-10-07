@@ -8,12 +8,17 @@ recovery belong to the API's reconciler sweep.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 from datetime import datetime, timezone
 
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
 from argus.domain.ingestion.documents.extractor import DocumentExtractor
 from argus.domain.ingestion.documents.jobs import run_attempt
+from argus.domain.ingestion.documents.objects import (
+    SourceObjects,
+    SupabaseSourceObjects,
+)
 from argus.domain.ingestion.documents.service import DocumentsService, Extractor
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
@@ -36,8 +41,28 @@ def _clock() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def storage_source_objects(env: Mapping[str, str] | None = None) -> SourceObjects:
+    """The private source bucket through the service role, as the API reaches it."""
+    from argus.domain.supabase_gateway import _supabase_client_options
+
+    from supabase import create_client
+
+    source = os.environ if env is None else env
+    url = source.get("SUPABASE_URL") or source.get("SUPABASE_PROJECT_URL")
+    key = source.get("SUPABASE_SERVICE_ROLE_KEY")
+    if not url or not key:
+        raise RuntimeError(
+            "The document worker reads sources from Storage and needs "
+            "SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+        )
+    client = create_client(url, key, options=_supabase_client_options())
+    return SupabaseSourceObjects(client.storage)
+
+
 def postgres_documents_service(
-    pool: ConnectionPool, extractor: Extractor | None = None
+    pool: ConnectionPool,
+    objects: SourceObjects,
+    extractor: Extractor | None = None,
 ) -> DocumentsService:
     """The API's durable document graph: connections, sink and checkpoint."""
     connections = PostgresConnectionRepository(pool)
@@ -50,7 +75,7 @@ def postgres_documents_service(
     hub = IngestionHub(connections, box=None, sink=sink, clock=_clock)
     return DocumentsService(
         hub,
-        PostgresDocumentStore(pool),
+        PostgresDocumentStore(pool, objects),
         extractor or DocumentExtractor(),
         jobs_recover_interruptions=True,
     )
@@ -61,8 +86,10 @@ async def run_document_preparation(
     attempt_id: str,
     *,
     env: Mapping[str, str] | None = None,
+    objects: SourceObjects | None = None,
     extractor: Extractor | None = None,
 ) -> dict[str, str]:
+    objects = objects if objects is not None else storage_source_objects(env)
     with ConnectionPool(
         require_database_url(env),
         min_size=0,
@@ -70,6 +97,8 @@ async def run_document_preparation(
         kwargs={"prepare_threshold": None},
     ) as pool:
         outcome = await run_attempt(
-            postgres_documents_service(pool, extractor), connection_id, attempt_id
+            postgres_documents_service(pool, objects, extractor),
+            connection_id,
+            attempt_id,
         )
     return {"connection_id": connection_id, "attempt_id": attempt_id, "outcome": outcome}

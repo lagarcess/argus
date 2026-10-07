@@ -20,6 +20,7 @@ from argus.domain.ingestion.documents.models import (
     ExtractionBatch,
     PreparationJob,
 )
+from argus.domain.ingestion.documents.objects import InMemorySourceObjects
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
@@ -27,6 +28,7 @@ from argus.domain.ingestion.sink import SubmitResult
 from psycopg_pool import ConnectionPool
 
 from tests import test_financial_accounts_postgres as shared
+from tests.document_sources_support import source_objects, stored_paths
 
 users = shared.users
 pytestmark = pytest.mark.skipif(
@@ -58,7 +60,8 @@ def test_advance_names_one_current_attempt_and_respects_the_lease(
     pool: ConnectionPool, users: dict[str, str]
 ) -> None:
     now = datetime.now(timezone.utc)
-    repo, store = PostgresConnectionRepository(pool), PostgresDocumentStore(pool)
+    repo = PostgresConnectionRepository(pool)
+    store = PostgresDocumentStore(pool, source_objects())
     owner, other = users["owner"], users["other"]
     row = repo.create(
         user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
@@ -176,7 +179,10 @@ async def test_dead_worker_recovers_once_and_its_late_result_is_refused(
     repo = PostgresConnectionRepository(pool)
     hub = IngestionHub(repo, box=None, sink=sink, clock=clock)
     service = DocumentsService(
-        hub, PostgresDocumentStore(pool), extractor, jobs_recover_interruptions=True
+        hub,
+        PostgresDocumentStore(pool, source_objects()),
+        extractor,
+        jobs_recover_interruptions=True,
     )
     dispatched: list[tuple[str, str]] = []
     jobs = PreparationJobs(service, lambda *attempt: dispatched.append(attempt))
@@ -248,7 +254,8 @@ def test_workflow_worker_prepares_the_dispatched_attempt(
             )
             return ExtractionBatch(candidates=(candidate,))
 
-    api = postgres_documents_service(pool, Prepared())
+    objects = source_objects()
+    api = postgres_documents_service(pool, objects, Prepared())
     outcomes: list[dict[str, str]] = []
     jobs = PreparationJobs(
         api,
@@ -258,6 +265,7 @@ def test_workflow_worker_prepares_the_dispatched_attempt(
                     connection_id,
                     attempt_id,
                     env={"ARGUS_WORKFLOW_DATABASE_URL": shared.DSN},
+                    objects=objects,
                     extractor=Prepared(),
                 )
             )
@@ -287,7 +295,17 @@ def test_workflow_worker_prepares_the_dispatched_attempt(
             "where user_id=%s and connection_id=%s",
             (owner, captured.connection_id),
         ).fetchone()
+        legacy = connection.execute(
+            "select source_bytes is null, source_sha256 "
+            "from public.financial_document_extractions where connection_id=%s",
+            (captured.connection_id,),
+        ).fetchone()
+        prefix = f"{owner}/{captured.connection_id}/"
+        paths = stored_paths(connection, prefix)
     assert events == (1,)
+    assert legacy[0] is True, "the worker read the source from Storage, not bytea"
+    if not isinstance(objects, InMemorySourceObjects):
+        assert paths == [prefix + legacy[1]], "stored at {user}/{connection}/{sha256}"
     api.forget(
         api.hub.connections.get(user_id=owner, connection_id=captured.connection_id)
     )
