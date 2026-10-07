@@ -32,7 +32,7 @@ Production's newest migration (`20260914120000`) equals `main`'s newest file, bu
 
 The consumer lane's reviewed applier (PR #894) plans one ordered production batch: an unrecorded `20260505000001_add_currency_pair_asset_class`, then this lane's `20260920000000`, then the consumer's 35 files `20260925120000` to `20261005230000`. The applier refuses a skipped version, so this migration must be applied before theirs, not after. This lane does not apply it alone. The founder holds the only production DSN and runs the read-only gate (`scripts/ops/production_migration_gate.py`) and the applier; the gate report and backup precede the apply.
 
-The consumer lane recommends one integration-to-main promotion that carries both lanes, because a second commit on `main` makes the exact-candidate proof of the first stale. That is a real cost of Option B; the choice is the founder's. Option B departs from the usual "main is promoted from integration" practice. It needs the founder's approval as a workflow exception before the second PR is opened. The exact file list is regenerated from `git diff --name-status origin/main...<candidate>` and posted with the request.
+Option B departs from the usual "main is promoted from integration" practice. It needs the founder's approval as a workflow exception before the second PR is opened. The exact file list is regenerated from `git diff --name-status origin/main...<candidate>` and posted with the request.
 
 ### Can the signup migration ship independently of the consumer's 35?
 
