@@ -2360,7 +2360,7 @@ export default function ChatInterface() {
             </h1>
 
             {/* Action cluster (guest settings or durable owner menu) */}
-            <div className="flex shrink-0 items-center justify-end gap-2 pointer-events-auto">
+            <div className={`flex shrink-0 justify-end pointer-events-auto${workspace ? " items-center gap-2" : ""}`}>
               {workspace?.headerActions(shellBridge)}
               {currentView === "chat" && isGuest ? (
                 <GuestHeader

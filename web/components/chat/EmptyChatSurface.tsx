@@ -65,7 +65,7 @@ export default function EmptyChatSurface({
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
   const { isBelowTablet } = useResponsiveLayout();
-  const landingDraftText = useLandingStarterPrefill(canConsumeLandingStarter);
+  const landingDraftText = useLandingStarterPrefill(canConsumeLandingStarter && !workspace);
   const draftText = workspace ? workspace.composer.draftText : landingDraftText;
   const disabled =
     isStreamingResponse ||

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { readReturnPath } from "../lib/auth-return-path";
-import { authLoginPathFromSearch } from "../lib/landing-intent";
+import { authLoginPathFromSearch, pathWithSearch } from "../lib/landing-intent";
 
 describe("sign-in return path", () => {
   test("a signed-out Business receipt link returns to that receipt", () => {
@@ -23,5 +23,11 @@ describe("sign-in return path", () => {
 
   test("chat sign-in keeps its existing shape", () => {
     expect(authLoginPathFromSearch("", "/chat")).toBe("/?from_path=%2Fchat&auth=login");
+  });
+
+  test("a refused return_to never rides into the chat URL", () => {
+    expect(pathWithSearch("/chat", "?return_to=%2Faccount%2Fsecurity&utm_campaign=x&auth=login")).toBe(
+      "/chat?utm_campaign=x",
+    );
   });
 });

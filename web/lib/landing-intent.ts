@@ -386,7 +386,10 @@ export function pathWithSearch(pathname: string, search: string): string {
   const params = new URLSearchParams(
     search.startsWith("?") ? search.slice(1) : search,
   );
-  if (pathname === "/chat") params.delete("auth");
+  if (pathname === "/chat") {
+    params.delete("auth");
+    params.delete("return_to");
+  }
   const query = params.toString();
   return query ? `${pathname}?${query}` : pathname;
 }

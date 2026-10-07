@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 import {
   ChatWorkspaceProvider,
@@ -86,9 +87,8 @@ function panelFromUrl(): BusinessPanelState {
 
 function initialShellView(): ChatShellView {
   if (typeof window === "undefined") return "workspace";
-  return new URL(window.location.href).searchParams.has("conversation")
-    ? "chat"
-    : "workspace";
+  const params = new URL(window.location.href).searchParams;
+  return params.has("conversation") || params.get("view") === "chat" ? "chat" : "workspace";
 }
 
 function writePanelToUrl(view: ChatShellView, panel: BusinessPanelState) {
@@ -157,9 +157,12 @@ export function BusinessWorkspaceProvider({
     };
   }, [period.from, period.to, revision, source]);
 
+  // The shell may replace the route while leaving a conversation; writing again
+  // once that navigation lands keeps the panel in the address bar.
+  const search = useSearchParams().toString();
   useEffect(() => {
     if (bridge) writePanelToUrl(bridge.currentView, panel);
-  }, [bridge, panel]);
+  }, [bridge, panel, search]);
 
   const openPanel = useCallback(
     (next: BusinessPanelState) => {
