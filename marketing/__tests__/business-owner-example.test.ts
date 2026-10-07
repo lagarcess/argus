@@ -1,6 +1,6 @@
 import { describe, test } from "bun:test";
 import { deepEqual, equal } from "node:assert/strict";
-import { accountSummary, budgetActual, exampleBudgets, exampleGoal, exampleMovements, movementCashEffect, projectedCash } from "../components/business/owner-example";
+import { accountSummary, budgetActual, exampleBudgets, exampleGoal, exampleMovements, movementCashEffect, projectedCash } from "../components/owner-example";
 
 describe("Business illustrative money", () => {
   test("keeps currencies separate and derives balances from movements", () => {

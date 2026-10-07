@@ -1,4 +1,4 @@
-import type { BusinessLocale } from "@/lib/business-site";
+import type { BusinessLocale } from "@/lib/site-routes";
 
 export const businessContactEmail = "hola@cuadrao.ai";
 

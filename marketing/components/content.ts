@@ -1,5 +1,5 @@
 import { siteCopy } from "./site-copy";
-export type { BusinessLocale } from "@/lib/business-site";
+export type { BusinessLocale } from "@/lib/site-routes";
 
 const es = {
   navigation: {

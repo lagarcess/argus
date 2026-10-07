@@ -1,6 +1,6 @@
 import Image from "next/image";
 import { ArrowDown, ArrowUpRight } from "lucide-react";
-import { businessPath } from "@/lib/business-site";
+import { businessPath } from "@/lib/site-routes";
 import { businessContent, type BusinessLocale } from "./content";
 import { businessContactEmail, siteCopy } from "./site-copy";
 import { BusinessHeader } from "./business-header";
@@ -15,6 +15,7 @@ import { BusinessSurfaces } from "./business-surfaces";
 import { ProductPreview } from "./product-preview";
 import { DemoForm } from "./demo-form";
 import { PersonalEarlyAccess } from "./personal-early-access";
+export { PrivacyPage } from "./privacy-page";
 import styles from "./business.module.css";
 
 function FounderIdentity({ locale }: { locale: BusinessLocale }) {
@@ -50,7 +51,7 @@ function ContactLink({
   return (
     <a
       className={`${styles.button} ${light ? styles.buttonLight : ""}`}
-      href={businessPath(locale, "demo")}
+      href={businessPath(locale, "contact")}
     >
       {siteCopy[locale].cta}
       <ArrowUpRight size={19} aria-hidden="true" />
@@ -104,7 +105,7 @@ function BusinessFooter({
           <nav aria-label={c.footerTalk}>
             <span>{c.footerTalk}</span>
             <a href={`${businessPath(locale)}#nosotros`}>{c.about}</a>
-            <a href={businessPath(locale, "demo")}>{c.contact}</a>
+            <a href={businessPath(locale, "contact")}>{c.contact}</a>
             <a href="https://www.linkedin.com/in/lucasgarces" target="_blank" rel="noopener noreferrer">Lucas · LinkedIn <ArrowUpRight size={14} aria-hidden="true" /></a>
           </nav>
           <div className={styles.footerAvailability}>
@@ -120,7 +121,7 @@ function BusinessFooter({
         <nav aria-label={businessContent[locale].closing.footerLabel}>
           <a href={businessPath(locale)}>{c.business}</a>
           <a href={businessPath(locale, "personal")}>{c.personal}</a>
-          <a href={personal ? `mailto:${businessContactEmail}` : businessPath(locale, "demo")}>{personal ? businessContactEmail : c.contact}</a>
+          <a href={personal ? `mailto:${businessContactEmail}` : businessPath(locale, "contact")}>{personal ? businessContactEmail : c.contact}</a>
         </nav>
         <div>
           <p>{personal ? locale === "es" ? "Cuadrao Personal · acceso anticipado" : "Cuadrao Personal · early access" : c.footerLocal}</p>
@@ -229,7 +230,7 @@ export function BusinessLanding({ locale }: { locale: BusinessLocale }) {
   );
 }
 
-export function DemoPage({ locale }: { locale: BusinessLocale }) {
+export function ContactPage({ locale }: { locale: BusinessLocale }) {
   const c = siteCopy[locale];
   return (
     <div
@@ -237,7 +238,7 @@ export function DemoPage({ locale }: { locale: BusinessLocale }) {
       lang={locale === "es" ? "es-DO" : "en"}
       id="top"
     >
-      <BusinessHeader locale={locale} page="demo" />
+      <BusinessHeader locale={locale} page="contact" />
       <main id="business-main" tabIndex={-1} className={styles.demoLayout}>
         <section className={styles.demoIntro}>
           <h1>{c.contactLead}</h1>

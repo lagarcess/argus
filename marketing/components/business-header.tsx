@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Menu, X } from "lucide-react";
-import { businessPath, type BusinessPage } from "@/lib/business-site";
+import { businessPath, type BusinessPage } from "@/lib/site-routes";
 import { businessContent, type BusinessLocale } from "./content";
 import styles from "./business.module.css";
 import { siteCopy } from "./site-copy";
@@ -20,7 +20,7 @@ export function BusinessHeader({
   const copy = businessContent[locale].navigation;
   const home = businessPath(locale);
   const personal = page === "personal";
-  const primaryHref = personal ? "#early-access" : businessPath(locale, "demo");
+  const primaryHref = personal ? "#early-access" : businessPath(locale, "contact");
   const primaryLabel = personal ? locale === "es" ? "Acceso anticipado" : "Early access" : copy.demo;
 
   useEffect(() => {
@@ -92,7 +92,7 @@ export function BusinessHeader({
             </a>
           </div>
           <div className={styles.utilityNav}>
-            {page === "demo" ? (
+            {page === "contact" ? (
               backLink
             ) : !personal ? (
               <>
@@ -101,7 +101,7 @@ export function BusinessHeader({
               </>
             ) : null}
             {languageLinks}
-            {page !== "demo" && (
+            {page !== "contact" && (
               <a
                 className={styles.buttonSmall}
                 href={primaryHref}
@@ -149,7 +149,7 @@ export function BusinessHeader({
             {!personal && <a href={`${home}#nosotros`}>{copy.about}</a>}
             {page !== "personal" && <a href={`${home}#preguntas`}>{siteCopy[locale].faqLink}</a>}
             {languageLinks}
-            {page === "demo" ? backLink : (
+            {page === "contact" ? backLink : (
               <a className={styles.button} href={primaryHref}>
                 {primaryLabel}
               </a>

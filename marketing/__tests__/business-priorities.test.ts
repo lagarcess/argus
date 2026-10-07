@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { sampleInvoiceStory } from "../components/business/sample-data";
-import { priorityAmount, priorityName, sampleExpenseStory, samplePriorities } from "../components/business/sample-priorities";
+import { sampleInvoiceStory } from "../components/sample-data";
+import { priorityAmount, priorityName, sampleExpenseStory, samplePriorities } from "../components/sample-priorities";
 
 describe("illustrative business priorities", () => {
   test("connects collections to the same invoice shown in the replay", () => {
