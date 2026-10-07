@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
 import { randomId } from "@/lib/random-id";
 import { useBusiness } from "./BusinessWorkspace";
-import { RECEIPT_CATEGORY_IDS } from "./business-format";
+import { normalizeAmount, RECEIPT_CATEGORY_IDS } from "./business-format";
 import { primaryButtonClass, secondaryButtonClass, useCategoryLabel } from "./business-ui";
 
 const inputClass =
@@ -38,28 +38,35 @@ function RecordExpenseSurface({ onClose, onRecorded }: { onClose: () => void; on
   const [amount, setAmount] = useState("");
   const [occurredOn, setOccurredOn] = useState(today);
   const [categoryId, setCategoryId] = useState("");
-  const [accountId, setAccountId] = useState(accounts[0]?.id ?? "");
+  const [chosenAccountId, setAccountId] = useState("");
+  const accountId = chosenAccountId || accounts[0]?.id || "";
   const [state, setState] = useState<"idle" | "saving" | "failed">("idle");
-  const key = useRef(randomId());
+  const [problem, setProblem] = useState<string | null>(null);
+  // One key per submitted expense, so a retry replays it and an edit is new.
+  const key = useRef<{ payload: string; key: string } | null>(null);
   const account = accounts.find((item) => item.id === accountId);
-  const valid = Boolean(accountId && /^\d+(\.\d{1,2})?$/.test(amount.trim()) && Number(amount) > 0 && occurredOn);
+  const normalizedAmount = normalizeAmount(amount);
+  const valid = Boolean(accountId && normalizedAmount && !(Number(normalizedAmount) <= 0) && occurredOn);
 
   const save = async () => {
     if (!valid) return;
     setState("saving");
+    setProblem(null);
+    const input = {
+      account_id: accountId,
+      amount: normalizedAmount,
+      occurred_on: occurredOn,
+      merchant: merchant.trim() || null,
+      category_id: categoryId || null,
+    };
+    const payload = JSON.stringify(input);
+    if (key.current?.payload !== payload) key.current = { payload, key: randomId() };
     try {
-      await source.recordExpense(
-        {
-          account_id: accountId,
-          amount: amount.trim(),
-          occurred_on: occurredOn,
-          merchant: merchant.trim() || null,
-          category_id: categoryId || null,
-        },
-        key.current,
-      );
+      await source.recordExpense(input, key.current.key);
       onRecorded();
-    } catch {
+    } catch (error) {
+      const { status, message } = error as { status?: number; message?: string };
+      setProblem(status === 400 || status === 422 ? message || null : null);
       setState("failed");
     }
   };
@@ -122,7 +129,7 @@ function RecordExpenseSurface({ onClose, onRecorded }: { onClose: () => void; on
         </label>
         {state === "failed" ? (
           <p role="alert" className="text-[14px] text-[#a8434c] dark:text-[#ec9aa0]">
-            {t("business.record.failed", "We couldn't save this expense. Try again. It won't be saved twice.")}
+            {problem ?? t("business.record.failed", "We couldn't save this expense. Try again. It won't be saved twice.")}
           </p>
         ) : null}
       </div>
