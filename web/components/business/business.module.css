@@ -857,6 +857,8 @@
   margin: 0 2vw;
 }
 .wordmarkCrop > span {
+  -webkit-text-fill-color: transparent;
+  -webkit-text-stroke: 1px currentColor;
   display: block;
   font:
     700 27vw/0.94 var(--font-space-grotesk),
