@@ -31,7 +31,7 @@ planned experiences. They do not establish shipped capabilities or integrations.
 - Personal uses ivory and sage. Do not restore the earlier lavender treatment.
 - Keep the supplied native Home screenshot as a labelled preview with sample data.
 - Keep the founder portrait beside the handwritten Lucas Garcés signature.
-- Keep the large footer wordmark filled and lowered, partly cropped at the bottom.
+- Keep the large footer wordmark hollow with a one-pixel outline and lowered, partly cropped at the bottom. Keep Space Grotesk for headings and Inter for body text.
 - Remove the extra footer line "Pensado para los negocios de aquí" and its English equivalent.
 - Keep "Las cuentas claras. El negocio, adelante." as the Business footer message.
 
