@@ -107,7 +107,13 @@ Not part of this launch. If chosen later, switch Auto-Deploy to "After CI Checks
 
 ## 5. Hosted acceptance on the Render address
 
-On `https://cuadrao-marketing.onrender.com` (or the address Render assigns), with indexing off:
+On `https://cuadrao-marketing.onrender.com` (or the address Render assigns), with indexing off. First run the read-only verifier, which checks every page, redirect, icon, header, robots and sitemap against the route owner and exits non-zero on any miss:
+
+```bash
+cd marketing && bun run scripts/verify-origin.ts https://cuadrao-marketing.onrender.com
+```
+
+Then the checks it cannot make:
 
 - `/api/health` returns 200; deployed commit equals the approved SHA.
 - The per-client limit keys on the visitor, not on a shared proxy address: from one network, a request that sends a spoofed leftmost `X-Forwarded-For` is limited exactly like one that does not, and two networks are limited independently. If every visitor shares one key, set `CUADRAO_TRUSTED_CLIENT_IP_HEADER`.
@@ -139,7 +145,7 @@ After hosted acceptance and the founder's publication approval, coordinating wit
 2. In Render add `cuadrao.ai`; Render adds `www.cuadrao.ai` and redirects it to the apex automatically. Use the exact DNS targets Render displays for the apex and `www`; do not assume an apex CNAME.
 3. Keep the records DNS only (grey cloud) so Render issues and renews the certificate. If the domain has CAA records they must allow Let's Encrypt and Google Trust Services.
 4. Set `CUADRAO_SITE_INDEXING=public` and restart. If the records were instead proxied through Cloudflare, also set `CUADRAO_TRUSTED_CLIENT_IP_HEADER=CF-Connecting-IP`; behind a proxy the rightmost `X-Forwarded-For` entry would be the proxy, not the visitor.
-5. Verify HTTPS, certificate, apex/www redirect, language routes, old `/business` redirects, titles, favicon, canonical, hreflang, sitemap, robots and share previews on the public origin; repeat the inquiry and signup/removal journeys; verify Search Console ownership and submit `https://cuadrao.ai/sitemap.xml`. Record the submission; do not promise indexing.
+5. Run `bun run scripts/verify-origin.ts https://cuadrao.ai --public --www https://www.cuadrao.ai`, then verify HTTPS, certificate, apex/www redirect, language routes, old `/business` redirects, titles, favicon, canonical, hreflang, sitemap, robots and share previews on the public origin; repeat the inquiry and signup/removal journeys; verify Search Console ownership and submit `https://cuadrao.ai/sitemap.xml`. Record the submission; do not promise indexing.
 6. Rollback: set `CUADRAO_SITE_INDEXING` back to unset, remove the two Render custom domains and restore the saved DNS records. Registrations and suppression records are untouched.
 
 `app.cuadrao.ai` and `news.cuadrao.ai` are not part of this launch ([#892](https://github.com/lagarcess/argus/issues/892)).

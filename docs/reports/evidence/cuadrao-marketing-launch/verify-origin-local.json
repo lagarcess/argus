@@ -1,0 +1,17 @@
+{
+ "candidateMode": {
+  "origin": "local production build",
+  "checks": 85,
+  "failed": 0
+ },
+ "publicMode": {
+  "origin": "local production build",
+  "checks": 86,
+  "failed": 0
+ },
+ "wrongModeIsRejected": {
+  "publicBuildCheckedAsCandidate": true,
+  "failed": 10
+ },
+ "note": "Read-only GET/HEAD checks from marketing/scripts/verify-origin.ts against local production builds. Hosted runs use the same command against the Render address and the public domain."
+}
