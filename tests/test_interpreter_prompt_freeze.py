@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.evals.measurement_eval_scorecard import assert_scorecard_complete
 from tests.interpreter_prompt_surface import (
     FINGERPRINT_PATH,
     load_fingerprint,
@@ -98,7 +99,10 @@ def test_fingerprint_names_a_scorecard_that_exists(
         "the measurement has to travel with it."
     )
 
-    totals = json.loads(scorecard.read_text(encoding="utf-8"))["totals"]
+    document = json.loads(scorecard.read_text(encoding="utf-8"))
+    # A run the budget cut short measured nothing for the cases it skipped.
+    assert_scorecard_complete(document)
+    totals = document["totals"]
     assert totals["passed"] == measured["passed"]
     assert totals["failed"] == measured["failed"]
 

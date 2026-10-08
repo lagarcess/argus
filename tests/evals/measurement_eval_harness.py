@@ -20,6 +20,7 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UserState,
 )
+from argus.agent_runtime.turn_execution import turn_execution_scope
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
@@ -35,6 +36,7 @@ from tests.evals.measurement_assertions import (
 )
 from tests.evals.measurement_eval_scorecard import (
     FIXTURE_DIR,
+    SKIPPED_BUDGET_STATUS,
     measurement_fixture_documents,
 )
 from tests.evals.measurement_outcome import (
@@ -188,59 +190,59 @@ def run_eval_case(
         else OpenRouterClarificationGenerator()
     )
     route_token = begin_openrouter_route_receipt_capture()
-    confirm_result = None
-    clarify_result = None
-    followup_result = None
+    confirm_result = clarify_result = followup_result = None
     try:
-        interpret_result = interpret_stage(
-            state=state,
-            user=user,
-            latest_task_snapshot=case.snapshot,
-            selected_thread_metadata={
-                "ui_language": case.ui_language,
-                "last_stage_outcome": "await_approval",
-                **case.thread_metadata,
-            },
-            structured_interpreter=interpreter,
-        )
-        if interpret_result.outcome == "ready_for_confirmation":
-            confirm_state = _state_for_confirmation(
-                case=case,
-                interpret_patch=interpret_result.patch,
+        # Production's call corridor: one turn_execution_scope per turn.
+        with turn_execution_scope(entry_state={}):
+            interpret_result = interpret_stage(
+                state=state,
+                user=user,
+                latest_task_snapshot=case.snapshot,
+                selected_thread_metadata={
+                    "ui_language": case.ui_language,
+                    "last_stage_outcome": "await_approval",
+                    **case.thread_metadata,
+                },
+                structured_interpreter=interpreter,
             )
-            confirm_result = confirm_stage(
-                state=confirm_state,
-                contract=contract,
-                language=case.user_language,
-            )
-            if confirm_result.outcome == "needs_clarification":
+            if interpret_result.outcome == "ready_for_confirmation":
+                confirm_state = _state_for_confirmation(
+                    case=case,
+                    interpret_patch=interpret_result.patch,
+                )
+                confirm_result = confirm_stage(
+                    state=confirm_state,
+                    contract=contract,
+                    language=case.user_language,
+                )
+                if confirm_result.outcome == "needs_clarification":
+                    clarify_result = clarify_stage(
+                        state=_state_from_interpret_patch(
+                            case=case,
+                            interpret_patch={
+                                **interpret_result.patch,
+                                **confirm_result.patch,
+                            },
+                        ),
+                        contract=contract,
+                        clarification_generator=clarifier,
+                        language=case.user_language,
+                    )
+            elif interpret_result.outcome == "needs_clarification":
+                clarify_state = _state_from_interpret_patch(
+                    case=case,
+                    interpret_patch=interpret_result.patch,
+                )
                 clarify_result = clarify_stage(
-                    state=_state_from_interpret_patch(
-                        case=case,
-                        interpret_patch={
-                            **interpret_result.patch,
-                            **confirm_result.patch,
-                        },
-                    ),
+                    state=clarify_state,
                     contract=contract,
                     clarification_generator=clarifier,
                     language=case.user_language,
+                    prefilled_assistant_prompt=(
+                        interpret_result.patch.get("assistant_response")
+                        or interpret_result.patch.get("assistant_prompt")
+                    ),
                 )
-        elif interpret_result.outcome == "needs_clarification":
-            clarify_state = _state_from_interpret_patch(
-                case=case,
-                interpret_patch=interpret_result.patch,
-            )
-            clarify_result = clarify_stage(
-                state=clarify_state,
-                contract=contract,
-                clarification_generator=clarifier,
-                language=case.user_language,
-                prefilled_assistant_prompt=(
-                    interpret_result.patch.get("assistant_response")
-                    or interpret_result.patch.get("assistant_prompt")
-                ),
-            )
         followup_result = _run_followup_turn_if_needed(
             case=case,
             user=user,
@@ -281,16 +283,22 @@ def run_eval_case(
                 "runtime composer did not return prose"
             )
         elif not assistant_text.strip():
-            judge_result = _missing_prose_judge_result()
+            judge_result = {
+                "pass": False,
+                "failed_criteria": ["missing_assistant_text"],
+                "notes": "case requested prose judging but produced no assistant text",
+                "rubric_version": PROSE_JUDGE_RUBRIC_VERSION,
+            }
             failed_checks.append("prose_judge:missing_assistant_text")
         else:
             judge_route_token = begin_openrouter_route_receipt_capture()
             try:
-                judge_result = judge_prose_quality(
-                    case=case,
-                    assistant_text=assistant_text,
-                    rendered_beside_reply=rendered_surface,
-                )
+                with turn_execution_scope(entry_state={}):
+                    judge_result = judge_prose_quality(
+                        case=case,
+                        assistant_text=assistant_text,
+                        rendered_beside_reply=rendered_surface,
+                    )
             finally:
                 route_receipts.extend(
                     receipt.as_dict()
@@ -503,11 +511,13 @@ def typed_expectation_failures(
 def blocking_eval_results(
     results: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Return result states that must fail a sanctioned live evaluation gate."""
+    """Return result states that must fail a sanctioned live evaluation gate.
+    A case the budget could not start is a missing measurement, never a pass."""
     return [
         result
         for result in results
-        if result.get("status") in {"failed", "unexpected_pass", "infrastructure_error"}
+        if result.get("status")
+        in {"failed", "unexpected_pass", "infrastructure_error", SKIPPED_BUDGET_STATUS}
         or result.get("infrastructure_errors")
     ]
 
@@ -549,15 +559,6 @@ def judge_prose_quality(
     }
 
 
-def _missing_prose_judge_result() -> dict[str, Any]:
-    return {
-        "pass": False,
-        "failed_criteria": ["missing_assistant_text"],
-        "notes": "case requested prose judging but produced no assistant text",
-        "rubric_version": PROSE_JUDGE_RUBRIC_VERSION,
-    }
-
-
 def _run_followup_turn_if_needed(
     *,
     case: EvalCase,
@@ -580,55 +581,55 @@ def _run_followup_turn_if_needed(
             [{"role": "assistant", "content": assistant_text}] if assistant_text else []
         ),
     )
-    followup_interpret = interpret_stage(
-        state=state,
-        user=user,
-        latest_task_snapshot=case.snapshot
-        or _followup_snapshot(case, final_clarify_patch, clarify_result.outcome),
-        selected_thread_metadata=_followup_thread_metadata(
-            final_clarify_patch,
-            last_stage_outcome=str(clarify_result.outcome),
-        ),
-        structured_interpreter=OpenRouterStructuredInterpreter(contract=contract),
-    )
-    followup_confirm = None
-    followup_clarify = None
-    if followup_interpret.outcome == "ready_for_confirmation":
-        followup_confirm = confirm_stage(
-            state=_state_for_followup_confirmation(
-                prompt=case.followup_prompt,
-                interpret_patch=followup_interpret.patch,
+    followup_confirm = followup_clarify = None
+    with turn_execution_scope(entry_state={}):
+        followup_interpret = interpret_stage(
+            state=state,
+            user=user,
+            latest_task_snapshot=case.snapshot
+            or _followup_snapshot(case, final_clarify_patch, clarify_result.outcome),
+            selected_thread_metadata=_followup_thread_metadata(
+                final_clarify_patch,
+                last_stage_outcome=str(clarify_result.outcome),
             ),
-            contract=contract,
-            language=case.user_language,
+            structured_interpreter=OpenRouterStructuredInterpreter(contract=contract),
         )
-        if followup_confirm.outcome == "needs_clarification":
+        if followup_interpret.outcome == "ready_for_confirmation":
+            followup_confirm = confirm_stage(
+                state=_state_for_followup_confirmation(
+                    prompt=case.followup_prompt,
+                    interpret_patch=followup_interpret.patch,
+                ),
+                contract=contract,
+                language=case.user_language,
+            )
+            if followup_confirm.outcome == "needs_clarification":
+                followup_clarify = clarify_stage(
+                    state=_state_for_followup_clarification(
+                        prompt=case.followup_prompt,
+                        interpret_patch={
+                            **followup_interpret.patch,
+                            **followup_confirm.patch,
+                        },
+                    ),
+                    contract=contract,
+                    clarification_generator=clarification_generator,
+                    language=case.user_language,
+                )
+        elif followup_interpret.outcome == "needs_clarification":
             followup_clarify = clarify_stage(
                 state=_state_for_followup_clarification(
                     prompt=case.followup_prompt,
-                    interpret_patch={
-                        **followup_interpret.patch,
-                        **followup_confirm.patch,
-                    },
+                    interpret_patch=followup_interpret.patch,
                 ),
                 contract=contract,
                 clarification_generator=clarification_generator,
                 language=case.user_language,
+                prefilled_assistant_prompt=(
+                    followup_interpret.patch.get("assistant_response")
+                    or followup_interpret.patch.get("assistant_prompt")
+                ),
             )
-    elif followup_interpret.outcome == "needs_clarification":
-        followup_clarify = clarify_stage(
-            state=_state_for_followup_clarification(
-                prompt=case.followup_prompt,
-                interpret_patch=followup_interpret.patch,
-            ),
-            contract=contract,
-            clarification_generator=clarification_generator,
-            language=case.user_language,
-            prefilled_assistant_prompt=(
-                followup_interpret.patch.get("assistant_response")
-                or followup_interpret.patch.get("assistant_prompt")
-            ),
-        )
     return {
         "interpret_result": followup_interpret,
         "confirm_result": followup_confirm,
@@ -829,9 +830,7 @@ def _snapshot_from_raw(raw: dict[str, Any] | None) -> TaskSnapshot | None:
             payload.pop("pending_strategy")
         )
     if "active_confirmation_reference" in payload:
-        reference = payload["active_confirmation_reference"]
-        payload["active_confirmation_reference"] = reference
-        payload["artifact_references"] = [reference]
+        payload["artifact_references"] = [payload["active_confirmation_reference"]]
     return TaskSnapshot.model_validate(payload)
 
 

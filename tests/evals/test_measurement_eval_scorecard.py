@@ -10,6 +10,8 @@ import pytest
 
 from tests.evals import measurement_eval_scorecard as scorecards
 
+_COMPLETE_BUDGET = {"budget_usd": "5.000000", "spent_usd": "0.000000", "complete": True}
+
 
 def _valid_scorecard_provenance(
     *fixture_case_ids: str,
@@ -57,6 +59,7 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
             "case-c",
             "case-d",
         ),
+        budget=_COMPLETE_BUDGET,
     )
 
     assert scorecard["category_pass_rates"]["messy_english"] == {
@@ -66,6 +69,7 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
         "unexpected_pass": 0,
         "skipped": 0,
         "infrastructure_error": 0,
+        "skipped_budget": 0,
         "pass_rate": 0.5,
     }
     assert scorecard["category_pass_rates"]["messy_spanish"] == {
@@ -75,6 +79,7 @@ def test_scorecard_reports_per_category_pass_rates() -> None:
         "unexpected_pass": 1,
         "skipped": 0,
         "infrastructure_error": 0,
+        "skipped_budget": 0,
         "pass_rate": 0.0,
     }
     assert scorecard["totals"]["unexpected_pass"] == 1
@@ -154,9 +159,11 @@ def test_scorecard_records_provenance_and_provider_cost() -> None:
     scorecard = scorecards.scorecard_for_results(
         results,
         provenance=_valid_scorecard_provenance("costed-case"),
+        budget=_COMPLETE_BUDGET,
     )
 
-    assert scorecard["schema_version"] == 3
+    assert scorecard["schema_version"] == 4
+    assert scorecard["budget"] == _COMPLETE_BUDGET
     assert scorecard["provenance"] == {
         "evaluation_mode": "live",
         "market_data_provider_mode": "live_provider",

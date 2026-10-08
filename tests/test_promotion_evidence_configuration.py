@@ -248,5 +248,5 @@ def test_scorecard_records_a_disagreeing_environment_without_substituting_contra
     provenance = writer.build_scorecard_provenance(evaluation_mode="mocked")
     path = writer.write_scorecard([], provenance=provenance, output_dir=tmp_path)
     recorded = json.loads(path.read_text())
-    assert recorded["schema_version"] == 3
+    assert recorded["schema_version"] == 4
     assert recorded["provenance"]["release_configuration"][key] == different
