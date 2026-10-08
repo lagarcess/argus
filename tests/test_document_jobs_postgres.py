@@ -531,7 +531,12 @@ def test_redispatch_refuses_a_marker_or_a_finished_draft_that_landed_after_the_s
     store = PostgresDocumentStore(pool, source_objects())
     owner = users["owner"]
     row = repo.create(
-        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+        user_id=owner,
+        source="statement",
+        external_ref=str(uuid4()),
+        label=None,
+        now=now,
+        scope=PERSONAL,
     )
     assert store.capture(user_id=owner, draft=draft(row.id, now), content=b"%PDF-x")
     first = PreparationJob(attempt=1, attempt_id="a1", draft_version=1, dispatched_at=now)
@@ -554,7 +559,7 @@ def test_redispatch_refuses_a_marker_or_a_finished_draft_that_landed_after_the_s
         holder="worker",
         now=marked_at,
     )
-    lease = repo.get(user_id=owner, connection_id=row.id).lease_until
+    lease = repo.get(user_id=owner, connection_id=row.id, scope=PERSONAL).lease_until
     assert lease == marked_at + DEFAULT_LEASE, "the marker renews the lease"
 
     later = lease + timedelta(seconds=1)
@@ -606,7 +611,12 @@ def test_only_the_named_attempt_claims_and_records_it(
     store = PostgresDocumentStore(pool, source_objects())
     owner = users["owner"]
     row = repo.create(
-        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+        user_id=owner,
+        source="statement",
+        external_ref=str(uuid4()),
+        label=None,
+        now=now,
+        scope=PERSONAL,
     )
     assert store.capture(user_id=owner, draft=draft(row.id, now), content=b"%PDF-x")
     job = PreparationJob(attempt=1, attempt_id="a1", draft_version=1, dispatched_at=now)
@@ -626,7 +636,12 @@ def test_only_the_named_attempt_claims_and_records_it(
     assert store.job(user_id=owner, connection_id=row.id).claimed is True
 
     other = repo.create(
-        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+        user_id=owner,
+        source="statement",
+        external_ref=str(uuid4()),
+        label=None,
+        now=now,
+        scope=PERSONAL,
     )
     assert store.capture(user_id=owner, draft=draft(other.id, now), content=b"%PDF-y")
     assert store.advance(

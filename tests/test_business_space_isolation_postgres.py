@@ -446,11 +446,14 @@ def test_whatsapp_links_and_captures_into_the_business_space(world: World) -> No
     store.issue_code(
         destination_owner_id=person,
         code_digest=code,
+        reply_language="es-419",
         now=now,
         expires_at=now + timedelta(minutes=10),
     )
     assert (
-        store.redeem_code(code_digest=code, sender_hash=sender, last4="1234", now=now)
+        store.redeem_code(
+            code_digest=code, sender_hash=sender, last4="1234", now=now
+        ).destination_owner_id
         == person
     )
     with world.pool.connection() as connection:
