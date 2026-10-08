@@ -81,7 +81,7 @@ class Captured:
 
 
 class IntakeDestination(Protocol):
-    """Where a linked sender's receipt lands. Pending the Business boundary."""
+    """Where a linked sender's receipt lands: the owner's Business space."""
 
     async def capture(
         self, *, owner_id: str, content: bytes, filename: str, media_type: str
@@ -177,9 +177,11 @@ class WhatsAppIntake:
             await self._settle(key, held, Settlement("failed", error_code=code))
             log.warning("WhatsApp message failed", failure_mode=type(error).__name__)
             raise
-        if not await self._settle(key, held, settlement):
+        settled = await self._settle(key, held, settlement)
+        if settled is None:
             log.warning("WhatsApp message claim lost before settling")
             return False
+        settlement = settled
         log.info(
             "WhatsApp message settled",
             status=settlement.status,
@@ -190,7 +192,7 @@ class WhatsAppIntake:
 
     async def _settle(
         self, key: bytes, held: datetime | None, settlement: Settlement
-    ) -> bool:
+    ) -> Settlement | None:
         return await asyncio.to_thread(
             self.store.settle,
             provider_message_key=key,

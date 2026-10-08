@@ -16,6 +16,7 @@ from typing import Any, Protocol
 import httpx
 
 from argus.domain.ingestion.whatsapp.media import GRAPH_HOST
+from argus.domain.ingestion.whatsapp.store import SENDER_LINK_REVOKED
 
 # Proposed copy, pending founder approval (docs/specs/lanes/cuadrao-whatsapp-intake.md).
 _RESEND = (
@@ -77,6 +78,9 @@ REPLIES: dict[str, tuple[str, str]] = {
 _SAME_REPLY = {
     "whatsapp_media_untrusted": "whatsapp_media_unavailable",
     "whatsapp_processing_failed": "whatsapp_capture_failed",
+    # The link ended while the receipt was in flight: answer as for any
+    # number that is not linked.
+    SENDER_LINK_REVOKED: "whatsapp_sender_not_linked",
 }
 
 

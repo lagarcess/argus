@@ -1,8 +1,10 @@
 import * as api from "@/lib/business-api";
+import type { ArgusLanguage } from "@/lib/language-features";
 import type {
   BusinessAccount,
   BusinessExpense,
   BusinessOverview,
+  BusinessSpace,
   BusinessUpdate,
   BusinessWorkspaceInfo,
   ExpenseInput,
@@ -17,6 +19,7 @@ import type {
  */
 export type BusinessDataSource = Readonly<{
   mode: "live" | "fixture";
+  ensureSpace: (language: ArgusLanguage) => Promise<BusinessSpace>;
   workspace: () => Promise<BusinessWorkspaceInfo>;
   overview: (from: string, to: string) => Promise<BusinessOverview>;
   receipts: (view: "inbox" | "all") => Promise<ReceiptSummary[]>;
@@ -41,6 +44,7 @@ export type BusinessDataSource = Readonly<{
 
 export const liveBusinessDataSource: BusinessDataSource = {
   mode: "live",
+  ensureSpace: api.startBusinessSpace,
   workspace: api.getBusinessWorkspace,
   overview: api.getBusinessOverview,
   receipts: api.listBusinessReceipts,

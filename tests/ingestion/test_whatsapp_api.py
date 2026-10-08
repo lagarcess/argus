@@ -8,6 +8,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 from argus.api import state as api_state
+from argus.api.business_spaces import business_spaces
 from argus.api.documents import documents_service
 from argus.api.main import app
 from argus.api.whatsapp import (
@@ -16,13 +17,14 @@ from argus.api.whatsapp import (
     configure_whatsapp,
     whatsapp_runtime,
 )
+from argus.domain.business.scope import resolve_business_scope
 from argus.domain.ingestion.whatsapp.replies import CloudApiTransport
 from argus.domain.ingestion.whatsapp.store import InMemoryWhatsAppStore
 from argus.domain.owner_scope import PERSONAL
 from fastapi.testclient import TestClient
 from loguru import logger
 
-from tests.ingestion.conftest import ALICE, GUEST, bearer
+from tests.ingestion.conftest import ALICE, BOB, GUEST, bearer
 from tests.ingestion.whatsapp_support import (
     ALICE_PHONE,
     ENV,
@@ -46,7 +48,9 @@ def graph() -> FakeGraph:
 
 
 @pytest.fixture
-def wa_client(ingestion_env, gateway, monkeypatch, graph) -> Iterator[TestClient]:  # noqa: ANN001
+def wa_client(
+    ingestion_env, gateway, identities, monkeypatch, graph
+) -> Iterator[TestClient]:  # noqa: ANN001
     for name, value in ENV.items():
         monkeypatch.setenv(name, value)
     with (
@@ -60,11 +64,15 @@ def wa_client(ingestion_env, gateway, monkeypatch, graph) -> Iterator[TestClient
             build_whatsapp(
                 runtime.settings,
                 documents=documents_service(),
+                spaces=business_spaces(),
                 store=InMemoryWhatsAppStore(),
                 client=graph.client(),
                 app_origin="https://app.test",
             )
         )
+        # Linking needs a Business space; both people have started theirs.
+        for token in (ALICE, BOB):
+            business_spaces().create(identities[token]["id"], "Mi negocio")
         yield test_client
 
 
@@ -180,11 +188,18 @@ def test_link_capture_status_and_revoke_over_http(
     assert post(wa_client, fixture("image_message.json")).status_code == 200
     assert post(wa_client, fixture("image_message.json")).status_code == 200
     owner = identities[ALICE]["id"]
-    [connection] = documents_service().hub.connections.list(user_id=owner, scope=PERSONAL)
-    document = wa_client.get(
+    business = resolve_business_scope(business_spaces(), owner).owner
+    connections = documents_service().hub.connections
+    assert connections.list(user_id=owner, scope=PERSONAL) == []
+    [connection] = connections.list(user_id=owner, scope=business)
+    document = documents_service().get(
+        user_id=owner, connection_id=connection.id, scope=business
+    )
+    assert (document.status, document.consent) == ("saved", False)
+    personal = wa_client.get(
         f"/api/v1/financial-documents/{connection.id}", headers=bearer(ALICE)
-    ).json()
-    assert (document["status"], document["consent"]) == ("saved", False)
+    )
+    assert personal.status_code == 404
 
     assert wa_client.delete(LINK, headers=bearer(ALICE)).status_code == 204
     assert wa_client.get(LINK, headers=bearer(ALICE)).json()["linked"] is False
@@ -219,8 +234,9 @@ def test_unfinished_delivery_answers_503_and_redelivery_resumes(
     assert post(wa_client, fixture("image_message.json")).status_code == 200
     assert post(wa_client, fixture("image_message.json")).status_code == 200
     owner = identities[ALICE]["id"]
+    business = resolve_business_scope(business_spaces(), owner).owner
     assert (
-        len(documents_service().hub.connections.list(user_id=owner, scope=PERSONAL)) == 1
+        len(documents_service().hub.connections.list(user_id=owner, scope=business)) == 1
     )
     assert len(calls) == 2
 

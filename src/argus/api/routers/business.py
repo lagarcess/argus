@@ -1,7 +1,8 @@
 """Business pilot: receipts in, reviewed expenses out. Thin transport.
 
-Default-off and isolation pending (see ``argus.domain.business.scope``). Rules
-live in ``argus.domain.business``; each fact stays with its existing owner.
+Default-off. Each person's Business records live in their own space (see
+``argus.domain.business.scope``), apart from Personal. Rules live in
+``argus.domain.business``; each fact stays with its existing owner.
 """
 
 from __future__ import annotations
@@ -23,14 +24,17 @@ from fastapi.concurrency import run_in_threadpool
 
 from argus.api.business import (
     BusinessContext,
+    BusinessPerson,
     require_business,
     require_business_document_write,
+    require_business_person,
     require_business_surface,
 )
 from argus.api.business_schemas import (
     BusinessAccount,
     BusinessExpense,
     BusinessOverview,
+    BusinessSpaceInfo,
     BusinessWorkspace,
     ConfirmBody,
     CreateBusinessAccount,
@@ -40,8 +44,11 @@ from argus.api.business_schemas import (
     ReceiptPage,
     ReceiptReviewBody,
     ReceiptSummary,
+    RenameBusinessSpace,
+    StartBusinessSpace,
     UpdatePage,
 )
+from argus.api.business_spaces import space_missing_problem
 from argus.api.dependencies import problem
 from argus.api.documents import (
     NO_STORE,
@@ -52,6 +59,7 @@ from argus.api.documents import (
 )
 from argus.api.financial_accounts import domain_problem
 from argus.domain.business.service import BusinessError
+from argus.domain.business.spaces import Space, default_space_name
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.documents.config import SOURCE_MEDIA_TYPES
 from argus.domain.ingestion.documents.models import DocumentExtractionError
@@ -116,6 +124,48 @@ def _problem(request: Request, error: Exception) -> HTTPException:
     if isinstance(error, (DocumentServiceError, DocumentExtractionError)):
         return document_problem(request, error)
     return domain_problem(request, error)
+
+
+def _space(space: Space) -> dict[str, Any]:
+    return {"id": space.id, "name": space.name}
+
+
+@router.get("/space", response_model=BusinessSpaceInfo)
+def get_space(
+    request: Request,
+    person: BusinessPerson = Depends(require_business_person),  # noqa: B008
+) -> dict[str, Any]:
+    space = person.spaces.open_space(person.person_id)
+    if space is None:
+        raise space_missing_problem(request)
+    return _space(space)
+
+
+@router.post("/space", response_model=BusinessSpaceInfo, status_code=201)
+def start_space(
+    response: Response,
+    body: StartBusinessSpace,
+    person: BusinessPerson = Depends(require_business_person),  # noqa: B008
+) -> dict[str, Any]:
+    """Idempotent: an existing space is returned unchanged, with 200."""
+
+    space, created = person.spaces.create(
+        person.person_id, body.name or default_space_name(body.language)
+    )
+    response.status_code = 201 if created else 200
+    return _space(space)
+
+
+@router.patch("/space", response_model=BusinessSpaceInfo)
+def rename_space(
+    request: Request,
+    body: RenameBusinessSpace,
+    person: BusinessPerson = Depends(require_business_person),  # noqa: B008
+) -> dict[str, Any]:
+    space = person.spaces.rename(person.person_id, body.name)
+    if space is None:
+        raise space_missing_problem(request)
+    return _space(space)
 
 
 @router.get("/workspace", response_model=BusinessWorkspace)

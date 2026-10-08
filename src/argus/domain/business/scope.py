@@ -9,20 +9,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from argus.domain.owner_scope import PERSONAL, OwnerScope
+from argus.domain.business.spaces import SpaceStore
+from argus.domain.owner_scope import BusinessSpace
 
 
 @dataclass(frozen=True)
 class BusinessScope:
     person_id: str
-    owner: OwnerScope
+    owner: BusinessSpace
 
 
-def resolve_business_scope(person_id: str) -> BusinessScope:
-    """The signed-in person's Business scope.
+def resolve_business_scope(spaces: SpaceStore, person_id: str) -> BusinessScope | None:
+    """The signed-in person's open Business space, or None before they start one.
 
-    Until the Business space resolver lands, Business reads and writes the
-    person's Personal records, the same rows Personal sees.
+    A space belongs only to the person who created it; nothing here reads a
+    membership or a client-supplied id.
     """
 
-    return BusinessScope(person_id=person_id, owner=PERSONAL)
+    space = spaces.open_space(person_id)
+    if space is None:
+        return None
+    return BusinessScope(person_id=person_id, owner=BusinessSpace(space.id))

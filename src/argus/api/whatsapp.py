@@ -1,8 +1,9 @@
-"""WhatsApp intake wiring, exposure gate and the pending destination resolver.
+"""WhatsApp intake wiring, exposure gate and the Business destination.
 
 Default-off behind ``ARGUS_WHATSAPP_INTAKE_ENABLED`` and nested inside the
-document surface: a WhatsApp receipt is a saved document draft, so intake
-cannot be on while documents are off. Every route answers 404 when off.
+document surface and the Business pilot: a WhatsApp receipt is a saved document
+draft in the owner's Business space, so intake cannot be on while either is
+off. Every route answers 404 when off.
 """
 
 from __future__ import annotations
@@ -17,10 +18,13 @@ from fastapi import Depends, HTTPException, Request
 from loguru import logger
 
 from argus.api import state as api_state
+from argus.api.business_spaces import business_spaces, space_missing_problem
 from argus.api.dependencies import problem
 from argus.api.documents import documents_service
 from argus.api.ingestion import IngestionContext, ingestion_hub, require_ingestion_context
+from argus.domain.business.config import business_pilot_enabled
 from argus.domain.business.scope import resolve_business_scope
+from argus.domain.business.spaces import SpaceStore
 from argus.domain.ingestion.documents.config import load_document_extraction_settings
 from argus.domain.ingestion.documents.models import DocumentExtractionError
 from argus.domain.ingestion.documents.service import (
@@ -40,7 +44,10 @@ from argus.domain.ingestion.whatsapp.intake import (
 )
 from argus.domain.ingestion.whatsapp.media import GraphMedia
 from argus.domain.ingestion.whatsapp.replies import CloudApiTransport
-from argus.domain.ingestion.whatsapp.store import InMemoryWhatsAppStore
+from argus.domain.ingestion.whatsapp.store import (
+    SENDER_LINK_REVOKED,
+    InMemoryWhatsAppStore,
+)
 
 WEBHOOK_PATH = "/api/v1/webhooks/whatsapp"
 
@@ -65,18 +72,6 @@ if not any(isinstance(f, _RedactWebhookQuery) for f in _access_logger.filters):
     _access_logger.addFilter(_RedactWebhookQuery())
 
 
-def resolve_intake_destination(user_id: str) -> str:
-    """The owner id WhatsApp receipts for this signed-in person land under.
-
-    Read from the Business scope, so intake and the Business routes always
-    agree on one owner. Isolation is pending the founder-approved boundary
-    (docs/specs/lanes/cuadrao-business-boundary-proposal.md); until then the
-    scope is the person. Every WhatsApp route reads the destination here.
-    """
-
-    return resolve_business_scope(user_id).person_id
-
-
 _REJECTED_CAPTURE = {
     "document_too_large": "whatsapp_media_too_large",
     "unsupported_media_type": "whatsapp_media_unsupported",
@@ -84,18 +79,24 @@ _REJECTED_CAPTURE = {
 
 
 class DocumentsDestination:
-    """Saves the bytes as a document draft with ``consent=False``; never queues."""
+    """Saves the bytes as a document draft in the owner's Business space, with
+    ``consent=False``; never queues."""
 
     def __init__(
         self,
         documents: DocumentsService,
+        spaces: SpaceStore,
         language_of: Callable[[str], str | None] = lambda _owner: None,
     ) -> None:
-        self.documents, self._language_of = documents, language_of
+        self.documents, self.spaces, self._language_of = documents, spaces, language_of
 
     async def capture(
         self, *, owner_id: str, content: bytes, filename: str, media_type: str
     ) -> Captured:
+        # A link needs a space, so an owner without one has no link to send through.
+        scope = resolve_business_scope(self.spaces, owner_id)
+        if scope is None:
+            raise CaptureRejected(SENDER_LINK_REVOKED)
         try:
             outcome = await self.documents.upload(
                 user_id=owner_id,
@@ -103,7 +104,7 @@ class DocumentsDestination:
                 filename=filename,
                 media_type=media_type,
                 consent=False,
-                scope=resolve_business_scope(owner_id).owner,
+                scope=scope.owner,
             )
         except DocumentExtractionError as error:
             raise CaptureRejected(
@@ -150,6 +151,7 @@ def build_whatsapp(
     settings: WhatsAppSettings,
     *,
     documents: DocumentsService,
+    spaces: SpaceStore,
     store,  # noqa: ANN001
     client: httpx.AsyncClient,
     language_of: Callable[[str], str | None] = lambda _owner: None,
@@ -174,7 +176,7 @@ def build_whatsapp(
             graph_api_version=settings.graph_api_version,
             max_bytes=max_bytes,
         ),
-        destination=DocumentsDestination(documents, language_of),
+        destination=DocumentsDestination(documents, spaces, language_of),
         clock=documents.hub.clock,
         transport=transport,
         app_origin=app_origin,
@@ -186,7 +188,8 @@ def build_whatsapp(
 def start_whatsapp(app: object) -> None:
     settings = load_whatsapp_settings()
     documents = documents_service()
-    if not settings.intake_ready or documents is None:
+    spaces = business_spaces()
+    if not settings.intake_ready or documents is None or spaces is None:
         configure_whatsapp(None)
         return
     try:
@@ -208,6 +211,7 @@ def start_whatsapp(app: object) -> None:
             build_whatsapp(
                 settings,
                 documents=documents,
+                spaces=spaces,
                 store=store,
                 client=httpx.AsyncClient(),
                 language_of=language_of,
@@ -239,6 +243,7 @@ def require_whatsapp_surface(request: Request) -> WhatsAppRuntime:
     documents = documents_service()
     if (
         runtime is None
+        or not business_pilot_enabled()
         or not load_whatsapp_settings().intake_ready
         or not load_document_extraction_settings().enabled
         or documents is None
@@ -255,7 +260,14 @@ class WhatsAppOwnerContext:
 
 
 def require_whatsapp_owner(
+    request: Request,
     runtime: WhatsAppRuntime = Depends(require_whatsapp_surface),  # noqa: B008
     context: IngestionContext = Depends(require_ingestion_context),  # noqa: B008
 ) -> WhatsAppOwnerContext:
-    return WhatsAppOwnerContext(runtime, resolve_intake_destination(context.user_id))
+    """Linking needs the person's Business space: captures land there."""
+
+    spaces = business_spaces()
+    scope = resolve_business_scope(spaces, context.user_id) if spaces else None
+    if scope is None:
+        raise space_missing_problem(request)
+    return WhatsAppOwnerContext(runtime, scope.person_id)

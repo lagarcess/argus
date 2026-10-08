@@ -7,6 +7,8 @@ from urllib.parse import quote
 from uuid import uuid4
 
 import pytest
+from argus.api.business_spaces import business_spaces
+from argus.domain.business.scope import BusinessScope, resolve_business_scope
 from fastapi.testclient import TestClient
 
 from tests.business.conftest import ALICE, BOB
@@ -34,9 +36,20 @@ EVIDENCE = {
 class Owner:
     """One signed-in person's calls, with the headers the web client sends."""
 
-    def __init__(self, client: TestClient, token: str) -> None:
+    def __init__(self, client: TestClient, token: str, person: str = "") -> None:
         self.client = client
+        self.person = person
         self.auth = {"Authorization": f"Bearer {token}"}
+
+    def scope(self) -> BusinessScope:
+        spaces = business_spaces()
+        assert spaces is not None
+        scope = resolve_business_scope(spaces, self.person)
+        assert scope is not None
+        return scope
+
+    def start(self, body: dict | None = None):
+        return self.client.post(BASE + "/space", json=body or {}, headers=self.auth)
 
     def get(self, path: str, **params: str):
         return self.client.get(BASE + path, params=params, headers=self.auth)
@@ -84,14 +97,19 @@ class Owner:
         return found.json()
 
 
-@pytest.fixture
-def alice(biz: TestClient) -> Owner:
-    return Owner(biz, ALICE)
+def started(owner: Owner) -> Owner:
+    assert owner.start().status_code == 201
+    return owner
 
 
 @pytest.fixture
-def bob(biz: TestClient) -> Owner:
-    return Owner(biz, BOB)
+def alice(biz: TestClient, identities) -> Owner:  # noqa: ANN001
+    return started(Owner(biz, ALICE, identities[ALICE]["id"]))
+
+
+@pytest.fixture
+def bob(biz: TestClient, identities) -> Owner:  # noqa: ANN001
+    return started(Owner(biz, BOB, identities[BOB]["id"]))
 
 
 def prepared(alice: Owner) -> str:
@@ -118,15 +136,108 @@ def test_flag_off_every_route_is_404_before_auth(client: TestClient, monkeypatch
         client.post(f"{BASE}/expenses", json={}),
         client.get(f"{BASE}/overview"),
         client.get(f"{BASE}/updates"),
+        client.get(f"{BASE}/space"),
+        client.post(f"{BASE}/space", json={}),
+        client.patch(f"{BASE}/space", json={"name": "x"}),
     ]
     assert [(r.status_code, r.json()["code"]) for r in calls] == [
         (404, "business_unavailable")
-    ] * 13
+    ] * 16
     assert {r.headers["Cache-Control"] for r in calls} == {"no-store"}
 
 
 def test_flag_on_still_requires_a_registered_session(biz: TestClient) -> None:
     assert biz.get(f"{BASE}/workspace").status_code == 401
+    assert biz.post(f"{BASE}/space", json={}).status_code == 401
+
+
+def test_every_route_waits_for_the_space_and_starting_it_is_idempotent(
+    biz: TestClient,
+) -> None:
+    alice = Owner(biz, ALICE)
+    receipt = f"/receipts/{uuid4()}"
+    before = [
+        alice.get("/workspace"),
+        alice.get("/receipts"),
+        alice.get(receipt),
+        alice.get("/expenses", **{"from": "2026-10-01", "to": "2026-10-31"}),
+        alice.get("/overview", **{"from": "2026-10-01", "to": "2026-10-31"}),
+        alice.get("/updates"),
+        alice.get("/space"),
+        biz.patch(f"{BASE}/space", json={"name": "Taller"}, headers=alice.auth),
+    ]
+    assert [(r.status_code, r.json()["code"]) for r in before] == [
+        (404, "business_space_missing")
+    ] * 8
+    first = alice.start()
+    assert first.status_code == 201
+    assert first.json()["name"] == "Mi negocio"
+    again = alice.start({"name": "Otro nombre"})
+    assert (again.status_code, again.json()) == (200, first.json())
+    renamed = biz.patch(
+        f"{BASE}/space", json={"name": "  Taller Gómez "}, headers=alice.auth
+    )
+    assert renamed.json() == {"id": first.json()["id"], "name": "Taller Gómez"}
+    assert alice.get("/space").json() == renamed.json()
+    assert alice.get("/workspace").status_code == 200
+    bob = Owner(biz, BOB)
+    english = bob.start({"language": "en"})
+    assert (english.status_code, english.json()["name"]) == (201, "My business")
+    assert english.json()["id"] != first.json()["id"]
+    assert alice.get("/space").json()["name"] == "Taller Gómez"
+    refused = [
+        alice.start({"name": "   "}),
+        biz.patch(f"{BASE}/space", json={"name": "x" * 81}, headers=alice.auth),
+        alice.start({"space_id": first.json()["id"]}),
+    ]
+    assert [r.status_code for r in refused] == [422, 422, 422]
+
+
+def test_business_and_personal_never_see_each_other(alice: Owner) -> None:
+    client, auth = alice.client, alice.auth
+    personal = client.post(
+        "/api/v1/financial-accounts",
+        json={"type": "checking", "currency": "DOP", "nickname": "Casa"},
+        headers={**auth, "Idempotency-Key": str(uuid4())},
+    )
+    assert personal.status_code == 201, personal.text
+    personal_id = personal.json()["id"]
+    business_id = alice.account("DOP", "Caja")
+    assert [a["id"] for a in alice.get("/workspace").json()["accounts"]] == [business_id]
+    listed = client.get("/api/v1/financial-accounts", headers=auth).json()
+    assert [a["id"] for a in listed["accounts"]] == [personal_id]
+    assert (
+        client.get(f"/api/v1/financial-accounts/{business_id}", headers=auth).status_code
+        == 404
+    )
+    expense = {
+        "account_id": personal_id,
+        "amount": "125.00",
+        "occurred_on": "2026-10-06",
+        "merchant": "Colmado",
+        "category_id": None,
+    }
+    refused = alice.post("/expenses", expense, key=str(uuid4()))
+    assert refused.status_code == 404, refused.text
+    receipt_id = prepared(alice)
+    documents = client.get("/api/v1/financial-documents", headers=auth).json()
+    assert receipt_id not in {d["connection_id"] for d in documents["items"]}
+    assert (
+        client.get(f"/api/v1/financial-documents/{receipt_id}", headers=auth).status_code
+        == 404
+    )
+    personal_upload = client.post(
+        "/api/v1/financial-documents",
+        content=RECEIPT,
+        headers={**auth, "Content-Type": "image/png"},
+    )
+    assert personal_upload.status_code in (200, 201), personal_upload.text
+    personal_document = personal_upload.json()["connection_id"]
+    assert personal_document != receipt_id
+    assert [r["id"] for r in alice.get("/receipts", view="all").json()["items"]] == [
+        receipt_id
+    ]
+    assert alice.get(f"/receipts/{personal_document}").status_code == 404
 
 
 def test_workspace_lists_expense_accounts_and_document_limits(alice: Owner) -> None:

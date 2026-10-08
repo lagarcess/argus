@@ -7,22 +7,23 @@ from unittest.mock import patch
 
 import pytest
 from argus.api import state as api_state
+from argus.api.business_spaces import business_spaces
 from argus.api.documents import documents_service
 from argus.api.main import app
 from argus.api.whatsapp import (
     build_whatsapp,
     configure_whatsapp,
-    resolve_intake_destination,
     whatsapp_runtime,
 )
 from argus.domain.business.scope import BusinessScope, resolve_business_scope
+from argus.domain.business.spaces import InMemorySpaceStore
 from argus.domain.ingestion.whatsapp.store import InMemoryWhatsAppStore
-from argus.domain.owner_scope import PERSONAL
+from argus.domain.owner_scope import BusinessSpace
 from fastapi.testclient import TestClient
 
 from tests.business.conftest import ALICE, BOB
 from tests.business.receipt_stub import ReceiptStub
-from tests.business.test_business_api import Owner
+from tests.business.test_business_api import Owner, started
 from tests.ingestion.test_whatsapp_api import link_alice, post
 from tests.ingestion.whatsapp_cases import FORWARDED
 from tests.ingestion.whatsapp_support import (
@@ -53,6 +54,7 @@ def wa_biz(
             build_whatsapp(
                 runtime.settings,
                 documents=documents_service(),
+                spaces=business_spaces(),
                 store=InMemoryWhatsAppStore(),
                 client=graph.client(),
                 app_origin="https://app.test",
@@ -64,14 +66,45 @@ def wa_biz(
         yield test_client, stub
 
 
-def test_scope_is_the_person_until_the_boundary_is_approved() -> None:
-    assert resolve_business_scope("person-1") == BusinessScope("person-1", PERSONAL)
-    assert resolve_intake_destination("person-1") == "person-1"
+def test_scope_is_the_persons_own_space_once_started() -> None:
+    spaces = InMemorySpaceStore()
+    assert resolve_business_scope(spaces, "person-1") is None
+    space, _ = spaces.create("person-1", "Mi negocio")
+    assert resolve_business_scope(spaces, "person-1") == BusinessScope(
+        "person-1", BusinessSpace(space.id)
+    )
+    assert resolve_business_scope(spaces, "person-2") is None
+
+
+def test_linking_waits_for_the_space(wa_biz) -> None:  # noqa: ANN001
+    client, _ = wa_biz
+    alice = Owner(client, ALICE)
+    calls = [
+        client.post("/api/v1/whatsapp/link-codes", headers=alice.auth),
+        client.get("/api/v1/whatsapp/link", headers=alice.auth),
+        client.delete("/api/v1/whatsapp/link", headers=alice.auth),
+    ]
+    assert [(r.status_code, r.json()["code"]) for r in calls] == [
+        (404, "business_space_missing")
+    ] * 3
+
+
+def test_whatsapp_is_off_while_business_is_off(wa_biz, monkeypatch) -> None:  # noqa: ANN001
+    client, _ = wa_biz
+    monkeypatch.delenv("ARGUS_BUSINESS_PILOT_ENABLED")
+    alice = Owner(client, ALICE)
+    responses = [
+        client.post("/api/v1/whatsapp/link-codes", headers=alice.auth),
+        post(client, fixture("image_message.json")),
+    ]
+    assert [(r.status_code, r.json()["code"]) for r in responses] == [
+        (404, "whatsapp_unavailable")
+    ] * 2
 
 
 def test_whatsapp_receipt_is_reviewed_and_confirmed_like_an_upload(wa_biz) -> None:  # noqa: ANN001
     client, stub = wa_biz
-    alice, bob = Owner(client, ALICE), Owner(client, BOB)
+    alice, bob = started(Owner(client, ALICE)), started(Owner(client, BOB))
     link_alice(client)
     assert post(client, fixture("image_message.json")).status_code == 200
     [captured] = alice.get("/receipts", view="inbox").json()["items"]
@@ -106,11 +139,13 @@ def test_whatsapp_receipt_is_reviewed_and_confirmed_like_an_upload(wa_biz) -> No
         for e in alice.get("/expenses", **window).json()["items"]
     ] == [(first["expense_id"], receipt_id)]
     assert bob.get(f"/receipts/{receipt_id}").status_code == 404
+    personal = client.get("/api/v1/financial-documents", headers=alice.auth).json()
+    assert personal["items"] == []
 
 
 def test_forwards_and_captions_reach_the_inbox_like_a_direct_send(wa_biz) -> None:  # noqa: ANN001
     client, stub = wa_biz
-    alice = Owner(client, ALICE)
+    alice = started(Owner(client, ALICE))
     link_alice(client)
     for name, source, media_type, _filename in FORWARDED:
         body = fixture(name)

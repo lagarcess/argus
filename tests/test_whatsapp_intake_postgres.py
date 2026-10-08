@@ -4,6 +4,7 @@ from collections.abc import Iterator
 
 import pytest
 from argus.api.whatsapp import _profile_language
+from argus.domain.business.spaces import PostgresSpaceStore
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
@@ -39,13 +40,16 @@ def _world(
     clock = cases.Clock()
     connections = PostgresConnectionRepository(pool)
     hub = IngestionHub(connections, box=None, sink=None, clock=clock)
-    documents = DocumentsService(hub, PostgresDocumentStore(pool, source_objects()), RefusingExtractor())
+    documents = DocumentsService(
+        hub, PostgresDocumentStore(pool, source_objects()), RefusingExtractor()
+    )
     return cases.build_world(
         documents=documents,
         store=PostgresWhatsAppStore(pool),
         clock=clock,
         alice=users["owner"],
         bob=users["other"],
+        spaces=PostgresSpaceStore(pool),
         language_of=_profile_language(pool),
     )
 

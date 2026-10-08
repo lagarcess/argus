@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from argus.domain.business.spaces import MAX_NAME_LENGTH
 from argus.domain.ingestion.receipt_review import ReceiptStatus
 
 ExpenseAccountType = Literal["cash", "checking", "savings", "credit_card"]
@@ -15,6 +16,28 @@ ExpenseAccountType = Literal["cash", "checking", "savings", "credit_card"]
 
 class _Wire(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+SpaceName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_NAME_LENGTH),
+]
+
+
+class BusinessSpaceInfo(_Wire):
+    id: str
+    name: str
+
+
+class StartBusinessSpace(_Wire):
+    """No name starts the space with the default name in ``language``."""
+
+    name: SpaceName | None = None
+    language: Literal["es-419", "en"] | None = None
+
+
+class RenameBusinessSpace(_Wire):
+    name: SpaceName
 
 
 class BusinessAccount(_Wire):

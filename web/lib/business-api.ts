@@ -1,5 +1,6 @@
 import { authenticatedRequestHeaders } from "./chat-auth-ownership";
 import { apiFetch, ARGUS_API_BASE_URL, argusApiRequestHeaders } from "./argus-api-transport";
+import type { ArgusLanguage } from "./language-features";
 
 /**
  * The Business pilot's view of `/api/v1/business`. The backend owns every
@@ -120,6 +121,22 @@ export type ExpenseInput = {
   merchant: string | null;
   category_id: string | null;
 };
+
+/** The owner's one Business space. Business records live only inside it. */
+export type BusinessSpace = { id: string; name: string };
+
+/**
+ * Starts the owner's Business space, or returns the one they already have.
+ * Every other Business route answers 404 until it exists. The server names a
+ * new space in `language`.
+ */
+export async function startBusinessSpace(language: ArgusLanguage): Promise<BusinessSpace> {
+  return apiFetch("/business/space", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language }),
+  });
+}
 
 export async function getBusinessWorkspace(): Promise<BusinessWorkspaceInfo> {
   return apiFetch("/business/workspace");

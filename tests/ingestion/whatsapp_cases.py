@@ -16,6 +16,8 @@ from uuid import uuid4
 
 import pytest
 from argus.api.whatsapp import DocumentsDestination
+from argus.domain.business.scope import resolve_business_scope
+from argus.domain.business.spaces import SpaceStore
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.whatsapp.identity import WhatsAppKeys
 from argus.domain.ingestion.whatsapp.intake import (
@@ -27,7 +29,7 @@ from argus.domain.ingestion.whatsapp.intake import (
 from argus.domain.ingestion.whatsapp.media import GraphMedia
 from argus.domain.ingestion.whatsapp.payload import parse_delivery
 from argus.domain.ingestion.whatsapp.store import Settlement
-from argus.domain.owner_scope import PERSONAL
+from argus.domain.owner_scope import PERSONAL, BusinessSpace
 
 from tests.ingestion.whatsapp_support import (
     ALICE_PHONE,
@@ -70,6 +72,12 @@ class World:
     alice: str
     bob: str
     keys: WhatsAppKeys
+    spaces: SpaceStore
+
+    def business(self, owner: str) -> BusinessSpace:
+        scope = resolve_business_scope(self.spaces, owner)
+        assert scope is not None
+        return scope.owner
 
     async def deliver(self, body: dict, sent_at: datetime | None = None) -> None:
         raw = encode(body, sent_at or self.clock.now)
@@ -88,9 +96,14 @@ class World:
         assert self.store.sender_link(sender_hash=self.keys.sender(phone)) is not None
 
     def captures(self, owner: str) -> list[str]:
+        """Captured documents in the owner's Business space; Personal holds none."""
+
+        assert self.documents.hub.connections.list(user_id=owner, scope=PERSONAL) == []
         return [
             row.id
-            for row in self.documents.hub.connections.list(user_id=owner, scope=PERSONAL)
+            for row in self.documents.hub.connections.list(
+                user_id=owner, scope=self.business(owner)
+            )
             if row.source == "statement"
         ]
 
@@ -105,8 +118,11 @@ def build_world(
     clock: Clock,
     alice: str,
     bob: str,
+    spaces: SpaceStore,
     language_of: Callable[[str], str | None] = lambda _owner: None,
 ) -> World:
+    for owner in (alice, bob):
+        spaces.create(owner, "Mi negocio")
     graph, transport = FakeGraph(), RecordingTransport()
     # A key per world keeps message digests unique across runs on a shared database.
     keys = WhatsAppKeys(f"{SENDER_KEY}-{uuid4()}")
@@ -119,13 +135,15 @@ def build_world(
             graph_api_version="v23.0",
             max_bytes=MAX_BYTES,
         ),
-        destination=DocumentsDestination(documents, language_of),
+        destination=DocumentsDestination(documents, spaces, language_of),
         clock=clock,
         transport=transport,
         app_origin=ORIGIN,
         max_bytes=MAX_BYTES,
     )
-    return World(intake, documents, store, graph, transport, clock, alice, bob, keys)
+    return World(
+        intake, documents, store, graph, transport, clock, alice, bob, keys, spaces
+    )
 
 
 def image(media_id: str, message_id: str, sender: str = ALICE_PHONE) -> dict:
@@ -147,7 +165,9 @@ async def linked_image_is_saved_unqueued_and_replay_converges(world: World) -> N
 
     [connection_id] = world.captures(world.alice)
     draft = world.documents.get(
-        user_id=world.alice, connection_id=connection_id, scope=PERSONAL
+        user_id=world.alice,
+        connection_id=connection_id,
+        scope=world.business(world.alice),
     )
     assert (draft.status, draft.consent) == ("saved", False)
     record = world.record("wamid.CASE-IMAGE")
@@ -185,7 +205,9 @@ async def document_message_is_captured(world: World) -> None:
     )
     [connection_id] = world.captures(world.alice)
     draft = world.documents.get(
-        user_id=world.alice, connection_id=connection_id, scope=PERSONAL
+        user_id=world.alice,
+        connection_id=connection_id,
+        scope=world.business(world.alice),
     )
     assert (draft.filename, draft.media_type, draft.status) == (
         "factura.pdf",
@@ -435,18 +457,24 @@ async def a_live_claim_blocks_a_concurrent_redelivery(world: World) -> None:
     second = claim(lapsed)
     assert second.claimed
     settled = Settlement("rejected", error_code="whatsapp_sender_not_linked")
-    assert not store.settle(
-        provider_message_key=key,
-        claim_until=first.record.claim_until,
-        settlement=settled,
-        now=lapsed,
+    assert (
+        store.settle(
+            provider_message_key=key,
+            claim_until=first.record.claim_until,
+            settlement=settled,
+            now=lapsed,
+        )
+        is None
     )
     assert store.inbound(key).status == "received"
-    assert store.settle(
-        provider_message_key=key,
-        claim_until=second.record.claim_until,
-        settlement=settled,
-        now=lapsed,
+    assert (
+        store.settle(
+            provider_message_key=key,
+            claim_until=second.record.claim_until,
+            settlement=settled,
+            now=lapsed,
+        )
+        == settled
     )
     assert not claim(lapsed + lease * 2).claimed
     assert store.inbound(key).status == "rejected"
@@ -578,7 +606,9 @@ async def forwarded_and_captioned_messages_capture_like_a_direct_send(
         record = world.record(message["id"])
         assert (record.status, record.destination_owner_id) == ("captured", world.alice)
         draft = world.documents.get(
-            user_id=world.alice, connection_id=record.connection_id, scope=PERSONAL
+            user_id=world.alice,
+            connection_id=record.connection_id,
+            scope=world.business(world.alice),
         )
         assert (draft.filename, draft.media_type, draft.status, draft.consent) == (
             filename,
@@ -601,6 +631,34 @@ async def forwarded_and_captioned_messages_capture_like_a_direct_send(
     assert RefusingExtractor.calls == 0
 
 
+async def a_link_revoked_before_settling_keeps_no_capture(world: World) -> None:
+    await world.link(world.alice, ALICE_PHONE)
+    world.graph.media["700000000000140"] = Media(RECEIPT_PNG, "image/png")
+    destination = world.intake.destination
+    capture = destination.capture
+
+    async def capture_then_revoke(**kwargs):  # noqa: ANN003, ANN202
+        captured = await capture(**kwargs)
+        world.store.revoke(destination_owner_id=world.alice, now=world.clock.now)
+        return captured
+
+    destination.capture = capture_then_revoke  # type: ignore[method-assign]
+    await world.deliver(image("700000000000140", "wamid.CASE-REVOKED-IN-FLIGHT"))
+
+    record = world.record("wamid.CASE-REVOKED-IN-FLIGHT")
+    assert (
+        record.status,
+        record.error_code,
+        record.connection_id,
+        record.destination_owner_id,
+    ) == ("rejected", "sender_link_revoked", None, world.alice)
+    assert world.store.captured_connections(destination_owner_id=world.alice) == set()
+    assert world.transport.bodies()[-1] == (
+        "Este número no está conectado a Cuadrao. "
+        "Conéctalo desde Cuadrao en la web y vuelve a enviar el recibo."
+    )
+
+
 CASES = (
     linked_image_is_saved_unqueued_and_replay_converges,
     document_message_is_captured,
@@ -618,4 +676,5 @@ CASES = (
     no_reply_outside_the_service_window,
     same_bytes_in_a_new_message_get_the_duplicate_reply,
     forwarded_and_captioned_messages_capture_like_a_direct_send,
+    a_link_revoked_before_settling_keeps_no_capture,
 )

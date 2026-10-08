@@ -5,10 +5,8 @@ from __future__ import annotations
 import pytest
 from argus.api.documents import documents_service
 from argus.api.ingestion import ingestion_hub
-from argus.domain.business.scope import resolve_business_scope
 from argus.domain.business.service import BusinessService
 from argus.domain.ingestion.reconcile.service import ReconciliationService
-from argus.domain.owner_scope import PERSONAL
 from argus.domain.recording.money_service import MoneyService
 
 from tests.business.receipt_stub import PURCHASE
@@ -82,7 +80,7 @@ def test_a_same_key_confirm_inside_another_records_one_expense(
     receipt_id = prepared(alice)
     account = alice.account()
     service = BusinessService(documents_service(), ingestion_hub().sink, frozenset)
-    scope = resolve_business_scope(_person(alice))
+    scope = alice.scope()
     event_id = service.receipt(scope, receipt_id).review.event_id
     # The account is known without a Business review, as a remembered account
     # link would make it; the import's own kind is still undecided.
@@ -91,7 +89,7 @@ def test_a_same_key_confirm_inside_another_records_one_expense(
         event_id=event_id,
         version=alice.detail(receipt_id)["version"],
         changes={"account_id": account},
-        scope=PERSONAL,
+        scope=scope.owner,
     )["version"]
     assert alice.detail(receipt_id)["missing_fields"] == []
     accept = ReconciliationService.accept_reviewed
@@ -109,7 +107,7 @@ def test_a_same_key_confirm_inside_another_records_one_expense(
     assert inner[0].review.expense_id == outer.review.expense_id
     assert _expense_ids(alice) == [outer.review.expense_id]
     [activity] = ingestion_hub().sink.money.purchases(
-        user_id=scope.person_id, scope=PERSONAL
+        user_id=scope.person_id, scope=scope.owner
     )["items"]
     assert activity["kind"] == "expense"
 
@@ -122,10 +120,10 @@ def test_a_replayed_key_that_is_not_an_expense_is_a_conflict(
     body = {"account_id": account, "amount": "10.00", "occurred_on": "2026-10-02"}
     recorded = MoneyService.write_entered(
         ingestion_hub().sink.money,
-        user_id=_person(alice),
+        user_id=alice.person,
         request=_income(account),
         idempotency_key="exp-1",
-        scope=PERSONAL,
+        scope=alice.scope().owner,
     )
     assert recorded["activity"]["kind"] == "income"
 
@@ -138,16 +136,6 @@ def test_a_replayed_key_that_is_not_an_expense_is_a_conflict(
         409,
         "idempotency_conflict",
     )
-
-
-def _person(alice: Owner) -> str:  # noqa: F811
-    accounts = ingestion_hub().sink.money.accounts
-    owners = {
-        stored.account.user_id
-        for stored in accounts._repository._accounts.values()  # noqa: SLF001
-    }
-    [owner] = owners
-    return owner
 
 
 def _income(account: str):  # noqa: ANN202

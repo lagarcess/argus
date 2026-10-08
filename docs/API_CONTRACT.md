@@ -8707,9 +8707,12 @@ media id from Graph, then the download URL Graph returns. Outbound replies are
 a third kind, and they are off by default. It never reads message history,
 contacts or profiles.
 
-The destination owner is read only through `resolve_intake_destination`,
-which takes it from `resolve_business_scope` (Business pilot below). Today that
-is the signed-in person; it is pending the Business boundary decision.
+Intake is on only while the Business pilot (below) is on too. A receipt lands
+in the owner's Business space, read through `resolve_business_scope`; it never
+appears in Personal documents or imports. The link routes answer 404
+`business_space_missing` until the person starts their space. A capture whose
+sender link ended before it settled is recorded `rejected` with
+`sender_link_revoked`, keeps no connection, and gets the not-linked reply.
 
 - GET `/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…`
   answers 200 `text/plain` with the challenge when the verify token matches,
@@ -8743,7 +8746,7 @@ whose bytes the owner's inbox already holds gets the duplicate reply. A message 
 timestamp is more than 24 hours old is still captured but gets no reply, so
 nothing is sent outside the service window.
 
-### Business pilot (default-off, isolation pending)
+### Business pilot (default-off)
 
 Off unless `ARGUS_BUSINESS_PILOT_ENABLED` is true and the document surface
 above is on. While the flag is off every route below answers 404
@@ -8751,12 +8754,23 @@ above is on. While the flag is off every route below answers 404
 `Cache-Control: no-store`. The routes are registered-only and match
 `web/lib/business-api.ts`.
 
-**Isolation is pending.** Each route takes its scope from
-`resolve_business_scope(person)`, never from the client. Until the
-founder-approved boundary
-([proposal](specs/lanes/cuadrao-business-boundary-proposal.md), #819) the scope
-is the person with `space_id: null`, so Business reads and writes the same
-accounts, documents, imports and expenses as Personal.
+**Business has its own space.** Each person has at most one Business space,
+owned only by them. Each route takes its scope from
+`resolve_business_scope(person)`, never from the client, and reads and writes
+only that space's accounts, documents, imports and expenses. Personal routes
+never return Business records, and a Business route never returns Personal
+ones: an id from the other side, or from another person, is 404. Until the
+person starts their space, every route below except the space routes answers
+404 `business_space_missing`
+([slice plan](specs/lanes/cuadrao-business-space-slice-plan.md)).
+
+- POST `/api/v1/business/space` takes `{name?, language?}` and answers 201
+  `{id, name}` with a new space, or 200 with the existing one unchanged.
+  Without `name` the space is named "Mi negocio", or "My business" when
+  `language` is `en`. Concurrent calls create one space. A name is 1 to 80
+  characters after trimming, else 422.
+- GET `/api/v1/business/space` returns `{id, name}`.
+- PATCH `/api/v1/business/space` takes `{name}` and returns the renamed space.
 
 Each fact keeps its owner. A receipt is a document draft (`id` is its
 connection id). Its review is the import event its purchase created, composed

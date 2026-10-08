@@ -218,6 +218,10 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
 
   return {
     mode: "fixture",
+    ensureSpace: async () => {
+      await delay();
+      return { id: "fixture-space", name: "Mi negocio" };
+    },
     workspace: async () => {
       await delay();
       return {

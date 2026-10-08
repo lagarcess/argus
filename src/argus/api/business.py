@@ -4,6 +4,8 @@ Default-off behind ``ARGUS_BUSINESS_PILOT_ENABLED`` and nested inside the
 document surface, since every Business receipt is a document draft. The flag is
 checked first, before authentication, so an off surface is a 404 to everyone.
 The scope always comes from ``resolve_business_scope``, never from the client.
+Until the person starts their space every Business route except the space
+routes answers 404 ``business_space_missing``.
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ from dataclasses import dataclass
 
 from fastapi import Depends, HTTPException, Request
 
+from argus.api.business_spaces import business_spaces, space_missing_problem
 from argus.api.dependencies import problem
 from argus.api.documents import (
     NO_STORE,
@@ -24,6 +27,7 @@ from argus.api.whatsapp import whatsapp_runtime
 from argus.domain.business.config import business_pilot_enabled
 from argus.domain.business.scope import BusinessScope, resolve_business_scope
 from argus.domain.business.service import BusinessService
+from argus.domain.business.spaces import SpaceStore
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.reconcile.service import ReconciliationService
@@ -46,6 +50,25 @@ def require_business_surface(request: Request) -> None:
 
 
 @dataclass(frozen=True)
+class BusinessPerson:
+    person_id: str
+    spaces: SpaceStore
+
+
+def require_business_person(
+    request: Request,
+    _surface: None = Depends(require_business_surface),  # noqa: B008
+    context: IngestionContext = Depends(require_ingestion_context),  # noqa: B008
+) -> BusinessPerson:
+    """The signed-in person and the space store, for the space routes."""
+
+    spaces = business_spaces()
+    if spaces is None:
+        raise unavailable_problem(request)
+    return BusinessPerson(context.user_id, spaces)
+
+
+@dataclass(frozen=True)
 class BusinessContext:
     scope: BusinessScope
     service: BusinessService
@@ -61,12 +84,13 @@ def _captured(person_id: str) -> frozenset[str]:
 def _context(
     request: Request, documents: DocumentsService, hub: IngestionHub, user_id: str
 ) -> BusinessContext:
-    if not isinstance(hub.sink, ReconciliationService):
+    spaces = business_spaces()
+    if not isinstance(hub.sink, ReconciliationService) or spaces is None:
         raise unavailable_problem(request)
-    return BusinessContext(
-        resolve_business_scope(user_id),
-        BusinessService(documents, hub.sink, _captured),
-    )
+    scope = resolve_business_scope(spaces, user_id)
+    if scope is None:
+        raise space_missing_problem(request)
+    return BusinessContext(scope, BusinessService(documents, hub.sink, _captured))
 
 
 def require_business(

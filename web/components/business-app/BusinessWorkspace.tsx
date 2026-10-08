@@ -23,6 +23,7 @@ import type {
   BusinessWorkspaceInfo,
   ReceiptSummary,
 } from "@/lib/business-api";
+import { normalizeEnabledLanguage } from "@/lib/language-features";
 import type { BusinessDataSource } from "./business-data";
 import { periodRange, type Period } from "./business-format";
 import { useBusinessActions, type BusinessActions } from "./business-actions";
@@ -116,7 +117,8 @@ export function BusinessWorkspaceProvider({
   source: BusinessDataSource;
   children: ReactNode;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = normalizeEnabledLanguage(i18n.language);
   const searchParams = useSearchParams();
   const [panel, setPanel] = useState<BusinessPanelState>(() =>
     panelFromSearch(new URLSearchParams(searchParams.toString())),
@@ -150,11 +152,16 @@ export function BusinessWorkspaceProvider({
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      source.workspace(),
-      source.overview(period.from, period.to),
-      source.receipts("inbox"),
-    ])
+    // Every Business read needs the space, so the first entry starts it.
+    source
+      .ensureSpace(language)
+      .then(() =>
+        Promise.all([
+          source.workspace(),
+          source.overview(period.from, period.to),
+          source.receipts("inbox"),
+        ]),
+      )
       .then(([workspace, overview, inbox]) => {
         if (!cancelled) setRecords({ workspace, overview, inbox, error: false });
       })
@@ -164,7 +171,7 @@ export function BusinessWorkspaceProvider({
     return () => {
       cancelled = true;
     };
-  }, [period.from, period.to, revision, source]);
+  }, [language, period.from, period.to, revision, source]);
 
   // The shell may replace the route while leaving a conversation; writing again
   // once that navigation lands keeps the panel in the address bar.

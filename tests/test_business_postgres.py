@@ -16,8 +16,9 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-from argus.domain.business.scope import resolve_business_scope
+from argus.domain.business.scope import BusinessScope, resolve_business_scope
 from argus.domain.business.service import BusinessService
+from argus.domain.business.spaces import PostgresSpaceStore
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
 from argus.domain.ingestion.documents.objects import owner_prefix
@@ -29,7 +30,6 @@ from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStor
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.reconcile.service import ReconciliationService
 from argus.domain.ingestion.reconcile.store_postgres import PostgresImportStore
-from argus.domain.owner_scope import PERSONAL
 from argus.domain.recording.money_service import MoneyService
 from argus.domain.recording.postgres_repository import (
     PostgresFinancialAccountRepository,
@@ -74,11 +74,12 @@ def rig() -> Iterator[dict]:
     )
     hub = IngestionHub(connections, box=None, sink=imports, clock=_now)
     documents = DocumentsService(hub, PostgresDocumentStore(pool, objects), ReceiptStub())
+    spaces = PostgresSpaceStore(pool)
     try:
         yield {
             "pool": pool,
-            "owner": resolve_business_scope(owner),
-            "other": resolve_business_scope(other),
+            "owner": _started(spaces, owner),
+            "other": _started(spaces, other),
             "service": BusinessService(documents, imports, lambda _: frozenset()),
         }
     finally:
@@ -89,6 +90,13 @@ def rig() -> Iterator[dict]:
                 "delete from auth.users where id = any(%s)", ([owner, other],)
             )
         pool.close()
+
+
+def _started(spaces: PostgresSpaceStore, person: str) -> BusinessScope:
+    spaces.create(person, "Mi negocio")
+    scope = resolve_business_scope(spaces, person)
+    assert scope is not None
+    return scope
 
 
 def _prepared(rig: dict) -> str:
@@ -104,7 +112,7 @@ def _prepared(rig: dict) -> str:
     )
     asyncio.run(
         service.documents.resume(
-            user_id=scope.person_id, connection_id=receipt.id, scope=PERSONAL
+            user_id=scope.person_id, connection_id=receipt.id, scope=scope.owner
         )
     )
     return receipt.id
