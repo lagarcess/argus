@@ -6,13 +6,14 @@ experience and assigned-work ownership. Check current PRs and release evidence
 for landing/deployment status. The historical ledger below stops at August 2,
 2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
-Last reconciled: 2026-10-08 (PR #905, #908, #909, #913, #914, #918, #920 Business landings; PR #904 + PR #901 Business pilot landing; Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
+Last reconciled: 2026-10-08 (PR #924 test-only landing; PR #905, #908, #909, #913, #914, #918, #920 Business landings; PR #904 + PR #901 Business pilot landing; Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
 through 2026-08-02)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
 
+- October 8, 2026: PR #924 merged as `cd3231baa`. It is test-only and fixes two failures found in the Consumer rehearsal. First, per-instance in-memory source buckets in `tests/document_sources_support.py`. Second, a hung jobs test whose sweepers kept advancing drafts. It adds `test_disconnect_during_preparation_leaves_no_object_and_no_row`. Production is unaffected; evidence is on #916.
 - October 8, 2026: [PR #920](https://github.com/lagarcess/argus/pull/920) merged as `f5a2007cd`.
   - A switch now stops only new intake. With document extraction or ingestion off, saved Personal documents and Business receipts stay readable and deletable, with Storage erased first. WhatsApp unlink is always available to the signed-in owner.
   - `ARGUS_BUSINESS_CHAT_ENABLED` (default off) keeps Business chat off until its tool restrictions and required tests pass.
