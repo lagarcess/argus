@@ -15,7 +15,9 @@ import EmptyChatGreeting from "./EmptyChatGreeting";
 import EmptyChatHeading from "./EmptyChatHeading";
 import StarterActions, {
   type StarterSelectionMetadata,
+  type WorkspaceStarterEntry,
 } from "./StarterActions";
+import type { WorkspaceComposer } from "./ChatWorkspace";
 import type { ChatMention } from "./types";
 import { useLandingStarterPrefill } from "./useLandingStarterPrefill";
 
@@ -37,6 +39,12 @@ type EmptyChatSurfaceProps = {
   ) => void | boolean | Promise<void | boolean>;
   onRetryGuestSubmission: () => void;
   onToast: (message: string) => void;
+  /** A workspace replaces the heading, the chips and the composer's control. */
+  workspace?: {
+    lead: ReactNode;
+    starterEntries: readonly WorkspaceStarterEntry[];
+    composer: WorkspaceComposer;
+  };
 };
 
 export default function EmptyChatSurface({
@@ -53,10 +61,12 @@ export default function EmptyChatSurface({
   onSend,
   onRetryGuestSubmission,
   onToast,
+  workspace,
 }: EmptyChatSurfaceProps) {
   const { t } = useTranslation();
   const { isBelowTablet } = useResponsiveLayout();
-  const draftText = useLandingStarterPrefill(canConsumeLandingStarter);
+  const landingDraftText = useLandingStarterPrefill(canConsumeLandingStarter && !workspace);
+  const draftText = workspace ? workspace.composer.draftText : landingDraftText;
   const disabled =
     isStreamingResponse ||
     isHydratingConversation ||
@@ -75,7 +85,9 @@ export default function EmptyChatSurface({
           settles the pills and the composer onto the bottom edge where a thumb
           rests. Above it, the surface keeps its centered composition. */}
       <div className="order-1 flex w-full flex-col items-center max-tablet:flex-1 max-tablet:justify-center">
-        {showGreeting ? (
+        {workspace ? (
+          workspace.lead
+        ) : showGreeting ? (
           // A guest always gets the neutral, nameless pool.
           <EmptyChatGreeting isGuest={isGuest} preferredName={preferredName} />
         ) : (
@@ -93,12 +105,15 @@ export default function EmptyChatSurface({
       >
         {composerNotice}
         <ChatInput
-          key={`new-conversation-${landingStarterSurfaceEpoch()}`}
+          key={workspace?.composer.draftKey ?? `new-conversation-${landingStarterSurfaceEpoch()}`}
           onSend={onSend}
           disabled={disabled}
-          placeholder={placeholder}
+          placeholder={workspace?.composer.placeholder ?? placeholder}
           onToast={onToast}
           draftText={draftText}
+          leadingControl={workspace?.composer.leadingControl}
+          onDraftChange={workspace?.composer.onDraftChange}
+          onSent={workspace?.composer.onSent}
         />
         {guestSubmissionPending && (
           <div
@@ -180,6 +195,7 @@ export default function EmptyChatSurface({
           disabled={disabled}
           onSelect={onSend}
           layout={isBelowTablet ? "scroll" : "wrap"}
+          entries={workspace?.starterEntries}
         />
       </div>
     </div>

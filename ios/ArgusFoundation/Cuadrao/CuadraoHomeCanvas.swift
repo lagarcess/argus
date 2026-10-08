@@ -46,7 +46,7 @@ struct CuadraoHomeCanvas: View {
                 (profilePath.isEmpty || selectedTab != .profile) && !(selectedTab == .assistant && chatEditing),
             compact: selectedTab == .home && navigationScroll.compact,
             avatar: profile.avatar, profileName: profile.name,
-            showProposal: { voiceProposal = .proposed }) { selection in
+            showProposal: { voiceProposal = .proposed }, add: { sheet = .add }) { selection in
             NavigationStack(path: $accountPath) {
                 CuadraoHomeLayout(order: CuadraoHomeSection.decode(homeOrder),
                     canCustomize: !data.active.isEmpty, spanish: spanish, customize: { sheet = .customize }) {

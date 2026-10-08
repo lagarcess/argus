@@ -9,6 +9,25 @@
 
 [PR #884](https://github.com/lagarcess/argus/pull/884) delivers the bilingual Business and Personal marketing preview under its default-off flag. The [delivery record](../reports/2026-10-07-cuadrao-website-integration.md) owns its evidence and merge verification. Public launch, Business inquiry delivery and Supabase early-access capture remain open in #880, #881 and #882. This website assignment does not change the mobile roadmap, enable a Business app or authorize deployment.
 
+## Business connected-flow and E0 design checkpoint
+
+Lucas approved the [connected Business flow](cuadrao-business-connected-flow-spec.md)
+and [offline E0 implementation plan](cuadrao-business-e0-implementation-plan.md),
+with task-by-task independent review. The [decision record](argus-decision-log.md#october-7-2026-business-connected-flow-and-offline-e0-plan)
+records the documentation-only publication grant and verified source hashes.
+This checkpoint publishes design; it claims no E0 implementation or proof.
+Lucas will coordinate the existing Business agent for execution.
+
+Business retains the isolated capture-to-expense work and connected period pilot.
+Its space contract remains with [#819](https://github.com/lagarcess/argus/issues/819)
+and the reviewed [#910 proposal](https://github.com/lagarcess/argus/pull/910).
+Consumer coordinates shared migration order and its release candidate through
+[#833](https://github.com/lagarcess/argus/issues/833). Marketing retains its separate
+launch through [#880](https://github.com/lagarcess/argus/issues/880).
+Offline E0 needs no shared migration or hosted service. Its P0 official-source
+and profile verification gate remains open. No lane priority or live fiscal
+route changes through this publication.
+
 ## Current mobile roadmap: October 4 founder lock
 
 The founder approved this execution update on October 4 after reviewing build
