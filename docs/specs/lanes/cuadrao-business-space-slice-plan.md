@@ -218,13 +218,25 @@ S3 imports the scoped signatures from S2, so S2 cannot be reverted while S3 stan
 
 Code deploys after the schema. The flag stays off until a separate enable decision.
 
-**Revert gate.** `scripts/ops/business_space_rows.sql` counts `owner_space_id is not null` on accounts, connections, import events and conversations, and counts `spaces`. Any revert of S1 or S2 records a zero result from the target environment first. With a nonzero count, the only path is a forward fix: reverting the readers would show Business rows in Personal.
+**Minimum compatible code version (founder, October 8).** Once a release writes new-format data in hosted (documents in private Storage, or any Business row), every running build must be at or above that release's minimum compatible code version. That includes any replacement or rollback build. It must keep:
+- the Storage read, write and deletion behavior;
+- the account-deletion steps;
+- the space isolation of every reader.
 
-| Revert | Meaning |
+The response to a problem is to disable new intake or Business access with flags, then fix forward. Schema changes are never reverted.
+
+The [compatibility rehearsal](https://github.com/lagarcess/argus/pull/914) proves why:
+- **Code that predates B1 can't handle Storage documents.** It can't read them, and its deletion leaves the file behind.
+- **Code that predates S2 can't keep Business data apart.** It shows Business rows in Personal.
+
+| Moment | Allowed response |
 | --- | --- |
-| S5, S4, S3 | Safe. Flag off hides Business. Rows keep their space |
-| S2 | Only with a zero gate result, and only after S3 is reverted |
-| S1 | Down migration only with a zero gate result |
+| Before new-format data exists in hosted | Any build, because nothing new-format is stored. Confirm with read-only counts, and with `scripts/ops/business_space_rows.sql` for Business. |
+| After the document surface is on in hosted | Document surface off, on a build at or above the Build 2 minimum. Then fix forward. |
+| After Business data exists in hosted | `ARGUS_BUSINESS_PILOT_ENABLED` off, and WhatsApp intake off, on a build at or above the activation minimum. Then fix forward. |
+| Schema | Never reverted. B1 would orphan stored files; B3 can't go while B4 stands; B4 would turn Business rows Personal or delete them. |
+
+The October 8 live read-only check found no financial, document, Storage, Business or WhatsApp data in production. So no minimum is in force yet. Each enable request names the release that becomes the minimum.
 
 | Risk | Mitigation |
 | --- | --- |
