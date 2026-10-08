@@ -7,6 +7,7 @@ and a store; only the Graph API and the reply transport are scripted.
 from __future__ import annotations
 
 import asyncio
+import copy
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -30,6 +31,7 @@ from argus.domain.ingestion.whatsapp.store import Settlement
 from tests.ingestion.whatsapp_support import (
     ALICE_PHONE,
     BOB_PHONE,
+    DOCUMENT_FIXTURES,
     PHONE_NUMBER_ID,
     RECEIPT_PDF,
     RECEIPT_PNG,
@@ -525,6 +527,75 @@ async def no_reply_outside_the_service_window(world: World) -> None:
     assert len(world.transport.sent) == replies + 1
 
 
+FORWARDED = (
+    # fixture, media bytes, media type, the filename the draft keeps
+    ("image_forwarded.json", "cord-test-0.jpg", "image/jpeg", "whatsapp-image"),
+    ("image_frequently_forwarded.json", "receipt-dop.png", "image/png", "whatsapp-image"),
+    (
+        "document_forwarded.json",
+        "statement-dop.pdf",
+        "application/pdf",
+        "factura-reenviada.pdf",
+    ),
+    ("image_with_caption.json", "cord-test-1.jpg", "image/jpeg", "whatsapp-image"),
+)
+
+
+async def forwarded_and_captioned_messages_capture_like_a_direct_send(
+    world: World,
+) -> None:
+    """Owners forward receipts from their own chats. A forward or a caption
+    changes nothing: the linked sender decides the owner, and only the media
+    id in the delivered message is fetched."""
+
+    await world.link(world.alice, ALICE_PHONE)
+    link_before = world.store.sender_link(sender_hash=world.keys.sender(ALICE_PHONE))
+    for name, source, media_type, filename in FORWARDED:
+        body = fixture(name)
+        message = body["entry"][0]["changes"][0]["value"]["messages"][0]
+        media_id = message[message["type"]]["id"]
+        world.graph.media[media_id] = Media(
+            (DOCUMENT_FIXTURES / source).read_bytes(), media_type
+        )
+        direct = copy.deepcopy(body)
+        direct_message = direct["entry"][0]["changes"][0]["value"]["messages"][0]
+        direct_message.pop("context", None)
+        direct_message[direct_message["type"]].pop("caption", None)
+        assert parse_delivery(
+            encode(body, world.clock.now), phone_number_id=PHONE_NUMBER_ID
+        ) == parse_delivery(
+            encode(direct, world.clock.now), phone_number_id=PHONE_NUMBER_ID
+        )
+        before = len(world.graph.requests)
+
+        await world.deliver(body)
+
+        record = world.record(message["id"])
+        assert (record.status, record.destination_owner_id) == ("captured", world.alice)
+        draft = world.documents.get(
+            user_id=world.alice, connection_id=record.connection_id
+        )
+        assert (draft.filename, draft.media_type, draft.status, draft.consent) == (
+            filename,
+            media_type,
+            "saved",
+            False,
+        )
+        fetched = world.graph.requests[before:]
+        assert [(r.method, r.url.host) for r in fetched] == [
+            ("GET", "graph.facebook.com"),
+            ("GET", "lookaside.fbsbx.com"),
+        ]
+        assert fetched[0].url.path == f"/v23.0/{media_id}"
+        assert dict(fetched[1].url.params) == {"mid": media_id}
+    assert len(world.captures(world.alice)) == len(FORWARDED)
+    assert world.captures(world.bob) == []
+    assert world.store.sender_link(sender_hash=world.keys.sender(ALICE_PHONE)) == (
+        link_before
+    )
+    assert RefusingExtractor.calls == 0
+
+
 CASES = (
     linked_image_is_saved_unqueued_and_replay_converges,
     document_message_is_captured,
@@ -541,4 +612,5 @@ CASES = (
     revoking_also_ends_unused_codes,
     no_reply_outside_the_service_window,
     same_bytes_in_a_new_message_get_the_duplicate_reply,
+    forwarded_and_captioned_messages_capture_like_a_direct_send,
 )

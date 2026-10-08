@@ -23,7 +23,15 @@ from tests.business.conftest import ALICE, BOB
 from tests.business.receipt_stub import ReceiptStub
 from tests.business.test_business_api import Owner
 from tests.ingestion.test_whatsapp_api import link_alice, post
-from tests.ingestion.whatsapp_support import ENV, RECEIPT_PNG, FakeGraph, Media, fixture
+from tests.ingestion.whatsapp_cases import FORWARDED
+from tests.ingestion.whatsapp_support import (
+    DOCUMENT_FIXTURES,
+    ENV,
+    RECEIPT_PNG,
+    FakeGraph,
+    Media,
+    fixture,
+)
 
 
 @pytest.fixture
@@ -51,6 +59,7 @@ def wa_biz(
         )
         stub = ReceiptStub()
         monkeypatch.setattr(documents_service(), "extractor", stub)
+        test_client.graph = graph
         yield test_client, stub
 
 
@@ -96,3 +105,24 @@ def test_whatsapp_receipt_is_reviewed_and_confirmed_like_an_upload(wa_biz) -> No
         for e in alice.get("/expenses", **window).json()["items"]
     ] == [(first["expense_id"], receipt_id)]
     assert bob.get(f"/receipts/{receipt_id}").status_code == 404
+
+
+def test_forwards_and_captions_reach_the_inbox_like_a_direct_send(wa_biz) -> None:  # noqa: ANN001
+    client, stub = wa_biz
+    alice = Owner(client, ALICE)
+    link_alice(client)
+    for name, source, media_type, _filename in FORWARDED:
+        body = fixture(name)
+        message = body["entry"][0]["changes"][0]["value"]["messages"][0]
+        client.graph.media[message[message["type"]]["id"]] = Media(
+            (DOCUMENT_FIXTURES / source).read_bytes(), media_type
+        )
+        assert post(client, body).status_code == 200
+    inbox = alice.get("/receipts", view="inbox").json()["items"]
+    assert sorted((r["channel"], r["status"], r["media_type"]) for r in inbox) == [
+        ("whatsapp", "saved", "application/pdf"),
+        ("whatsapp", "saved", "image/jpeg"),
+        ("whatsapp", "saved", "image/jpeg"),
+        ("whatsapp", "saved", "image/png"),
+    ]
+    assert stub.calls == []

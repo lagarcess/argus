@@ -8698,6 +8698,15 @@ the document surface above is on. While off, every route below answers 404
 owner's consent on the web. Spec and activation:
 [cuadrao-whatsapp-intake](specs/lanes/cuadrao-whatsapp-intake.md).
 
+Owners send or forward receipts from their own WhatsApp number to the one
+receiving number, and only those owner-initiated messages are processed. A
+forwarded message (`context.forwarded` or `context.frequently_forwarded`) or
+one with a caption is captured exactly like a direct send. Captions are never
+read. The adapter makes two kinds of request to Meta. It GETs the delivered
+media id from Graph, then the download URL Graph returns. Outbound replies are
+a third kind, and they are off by default. It never reads message history,
+contacts or profiles.
+
 The destination owner is read only through `resolve_intake_destination`,
 which takes it from `resolve_business_scope` (Business pilot below). Today that
 is the signed-in person; it is pending the Business boundary decision.
