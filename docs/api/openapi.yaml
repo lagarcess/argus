@@ -567,6 +567,487 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/business/accounts:
+    post:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBusinessAccount'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessAccount'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/business/expenses:
+    get:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExpensePage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExpenseInput'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessExpense'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/business/overview:
+    get:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: from
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      - name: to
+        in: query
+        required: true
+        schema:
+          type: string
+          format: date
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessOverview'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/business/receipts:
+    get:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: view
+        in: query
+        required: false
+        schema:
+          enum:
+          - inbox
+          - all
+          type: string
+          default: inbox
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptPage'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - financial-accounts
+      - business
+      description: The receipt's identity is its bytes, so a retry returns the same receipt.
+      parameters:
+      - name: X-Document-Filename
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: X-Extraction-Consent
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      requestBody:
+        required: true
+        content:
+          application/pdf:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+  /api/v1/business/receipts/{receipt_id}:
+    get:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: receipt_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/business/receipts/{receipt_id}/confirm:
+    post:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: receipt_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: Idempotency-Key
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/business/receipts/{receipt_id}/prepare:
+    post:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: receipt_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: X-Extraction-Consent
+        in: header
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptSummary'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/business/receipts/{receipt_id}/review:
+    patch:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: receipt_id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReceiptReviewBody'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceiptDetail'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/business/receipts/{receipt_id}/source:
+    get:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: receipt_id
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/business/updates:
+    get:
+      tags:
+      - financial-accounts
+      - business
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdatePage'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/business/workspace:
+    get:
+      tags:
+      - financial-accounts
+      - business
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessWorkspace'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/chat/starter-prompts:
     get:
       tags:
@@ -10171,6 +10652,157 @@ components:
       required:
       - success
       - deleted_count
+    BusinessAccount:
+      properties:
+        id:
+          type: string
+        nickname:
+          anyOf:
+          - type: string
+          - type: 'null'
+        type:
+          type: string
+        currency:
+          type: string
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - nickname
+      - type
+      - currency
+    BusinessExpense:
+      properties:
+        id:
+          type: string
+        merchant:
+          anyOf:
+          - type: string
+          - type: 'null'
+        amount:
+          type: string
+        currency:
+          type: string
+        category_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        account_id:
+          type: string
+        occurred_on:
+          type: string
+          format: date
+        receipt_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - merchant
+      - amount
+      - currency
+      - category_id
+      - account_id
+      - occurred_on
+      - receipt_id
+    BusinessOverview:
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        totals:
+          items:
+            $ref: '#/components/schemas/CurrencyTotal'
+          type: array
+        awaiting_review:
+          type: integer
+        needs_attention:
+          type: integer
+        last_received_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        last_confirmed_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - from
+      - to
+      - totals
+      - awaiting_review
+      - needs_attention
+      - last_received_at
+      - last_confirmed_at
+    BusinessUpdate:
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum:
+          - receipt_ready
+          - receipt_needs_attention
+          - expense_confirmed
+        occurred_at:
+          type: string
+          format: date-time
+        receipt_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        expense_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+        label:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - kind
+      - occurred_at
+      - receipt_id
+      - expense_id
+      - error_code
+      - label
+    BusinessWorkspace:
+      properties:
+        accounts:
+          items:
+            $ref: '#/components/schemas/BusinessAccount'
+          type: array
+        currencies:
+          items:
+            type: string
+          type: array
+        assistant_available:
+          type: boolean
+        receipt_limits:
+          $ref: '#/components/schemas/ReceiptLimits'
+      additionalProperties: false
+      type: object
+      required:
+      - accounts
+      - currencies
+      - assistant_available
+      - receipt_limits
     CallbackRequest:
       properties:
         code:
@@ -10778,6 +11410,15 @@ components:
       type: object
       required:
       - state
+    ConfirmBody:
+      properties:
+        version:
+          type: integer
+          minimum: 0.0
+      additionalProperties: false
+      type: object
+      required:
+      - version
     ConfirmationDirectEditRequest:
       properties:
         capital:
@@ -11242,6 +11883,29 @@ components:
       properties: {}
       additionalProperties: false
       type: object
+    CreateBusinessAccount:
+      properties:
+        nickname:
+          type: string
+          maxLength: 200
+          minLength: 1
+        type:
+          type: string
+          enum:
+          - cash
+          - checking
+          - savings
+          - credit_card
+        currency:
+          type: string
+          maxLength: 3
+          minLength: 3
+      additionalProperties: false
+      type: object
+      required:
+      - nickname
+      - type
+      - currency
     CreateFinancialAccountRequest:
       properties:
         type:
@@ -11415,6 +12079,20 @@ components:
       - unknown_accounts
       - recorded_spending_minor
       - as_of
+    CurrencyTotal:
+      properties:
+        currency:
+          type: string
+        amount:
+          type: string
+        count:
+          type: integer
+      additionalProperties: false
+      type: object
+      required:
+      - currency
+      - amount
+      - count
     DebtCreate:
       properties:
         debt_account_id:
@@ -12578,6 +13256,43 @@ components:
       required:
       - expectation
       - replayed
+    ExpenseInput:
+      properties:
+        account_id:
+          type: string
+          format: uuid
+        amount:
+          type: string
+          maxLength: 40
+          minLength: 1
+        occurred_on:
+          type: string
+          format: date
+        merchant:
+          anyOf:
+          - type: string
+            maxLength: 200
+          - type: 'null'
+        category_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - account_id
+      - amount
+      - occurred_on
+    ExpensePage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/BusinessExpense'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - items
     FeedbackRequest:
       properties:
         type:
@@ -17601,6 +18316,167 @@ components:
       required:
       - start
       - end
+    ReceiptDetail:
+      properties:
+        id:
+          type: string
+        channel:
+          type: string
+          enum:
+          - web
+          - whatsapp
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+        media_type:
+          type: string
+        size_bytes:
+          type: integer
+        received_at:
+          type: string
+          format: date-time
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - saved
+            - queued
+            - preparing
+            - review_ready
+            - needs_attention
+          - type: string
+            enum:
+            - confirmed
+            - dismissed
+        error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+        expense_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        merchant:
+          anyOf:
+          - type: string
+          - type: 'null'
+        occurred_on:
+          anyOf:
+          - type: string
+          - type: 'null'
+        amount:
+          anyOf:
+          - type: string
+          - type: 'null'
+        currency:
+          anyOf:
+          - type: string
+          - type: 'null'
+        category_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        version:
+          type: integer
+        evidence:
+          anyOf:
+          - $ref: '#/components/schemas/ReceiptEvidence'
+          - type: 'null'
+        missing_fields:
+          items:
+            type: string
+            enum:
+            - merchant
+            - occurred_on
+            - amount
+            - currency
+            - category_id
+            - account_id
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - channel
+      - filename
+      - media_type
+      - size_bytes
+      - received_at
+      - status
+      - error_code
+      - expense_id
+      - merchant
+      - occurred_on
+      - amount
+      - currency
+      - category_id
+      - account_id
+      - version
+      - evidence
+      - missing_fields
+    ReceiptEvidence:
+      properties:
+        merchant:
+          anyOf:
+          - type: string
+          - type: 'null'
+        occurred_on:
+          anyOf:
+          - type: string
+          - type: 'null'
+        total:
+          anyOf:
+          - type: string
+          - type: 'null'
+        currency:
+          anyOf:
+          - type: string
+          - type: 'null'
+        tax:
+          anyOf:
+          - type: string
+          - type: 'null'
+        tip:
+          anyOf:
+          - type: string
+          - type: 'null'
+        service:
+          anyOf:
+          - type: string
+          - type: 'null'
+        lines:
+          items:
+            $ref: '#/components/schemas/ReceiptEvidenceLine'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - merchant
+      - occurred_on
+      - total
+      - currency
+      - tax
+      - tip
+      - service
+      - lines
+    ReceiptEvidenceLine:
+      properties:
+        description:
+          type: string
+        amount:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - description
+      - amount
     ReceiptFigures:
       properties:
         total_return_pct:
@@ -17686,6 +18562,29 @@ components:
           - type: 'null'
       additionalProperties: false
       type: object
+    ReceiptLimits:
+      properties:
+        max_bytes:
+          type: integer
+        media_types:
+          items:
+            type: string
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - max_bytes
+      - media_types
+    ReceiptPage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ReceiptSummary'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - items
     ReceiptParameters:
       properties:
         strategy_type:
@@ -17734,6 +18633,30 @@ components:
           - type: 'null'
       additionalProperties: false
       type: object
+    ReceiptReviewBody:
+      properties:
+        version:
+          type: integer
+          minimum: 0.0
+        fields:
+          additionalProperties:
+            anyOf:
+            - type: string
+            - type: 'null'
+          propertyNames:
+            enum:
+            - merchant
+            - occurred_on
+            - amount
+            - currency
+            - category_id
+            - account_id
+          type: object
+      additionalProperties: false
+      type: object
+      required:
+      - version
+      - fields
     ReceiptRuleCondition:
       properties:
         left:
@@ -17892,6 +18815,89 @@ components:
           - type: 'null'
       additionalProperties: false
       type: object
+    ReceiptSummary:
+      properties:
+        id:
+          type: string
+        channel:
+          type: string
+          enum:
+          - web
+          - whatsapp
+        filename:
+          anyOf:
+          - type: string
+          - type: 'null'
+        media_type:
+          type: string
+        size_bytes:
+          type: integer
+        received_at:
+          type: string
+          format: date-time
+        status:
+          anyOf:
+          - type: string
+            enum:
+            - saved
+            - queued
+            - preparing
+            - review_ready
+            - needs_attention
+          - type: string
+            enum:
+            - confirmed
+            - dismissed
+        error_code:
+          anyOf:
+          - type: string
+          - type: 'null'
+        expense_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        merchant:
+          anyOf:
+          - type: string
+          - type: 'null'
+        occurred_on:
+          anyOf:
+          - type: string
+          - type: 'null'
+        amount:
+          anyOf:
+          - type: string
+          - type: 'null'
+        currency:
+          anyOf:
+          - type: string
+          - type: 'null'
+        category_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+        account_id:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - channel
+      - filename
+      - media_type
+      - size_bytes
+      - received_at
+      - status
+      - error_code
+      - expense_id
+      - merchant
+      - occurred_on
+      - amount
+      - currency
+      - category_id
+      - account_id
     RecentActivityResponse:
       properties:
         record_id:
@@ -19414,6 +20420,16 @@ components:
       required:
       - expected_version
       - permission
+    UpdatePage:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/BusinessUpdate'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - items
     UsageAllowance:
       properties:
         hour:

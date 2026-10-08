@@ -14,6 +14,7 @@ from argus.api.financial_accounts import (
     domain_problem,
     require_financial_accounts_context,
 )
+from argus.api.routers.business import router as business_router
 from argus.api.routers.financial_activities import router as money_router
 from argus.api.routers.financial_assets import router as asset_router
 from argus.api.routers.financial_connections import router as connections_router
@@ -172,3 +173,4 @@ router.include_router(documents_router)
 router.include_router(shortcuts_intake_router)
 router.include_router(whatsapp_webhook_router)
 router.include_router(whatsapp_link_router)
+router.include_router(business_router)
