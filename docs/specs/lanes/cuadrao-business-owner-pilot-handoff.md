@@ -28,8 +28,8 @@ Send the following to the Claude lane when assigning it. The scope is [PR #900](
 > the existing Argus chat picker and consumer iOS behavior. Adapt starter chips
 > to working pilot flows. Add a sidebar + Create menu for upload receipt and record
 > expense; New chat appears once, at the top of the sidebar. Keep Create
-> reachable on small screens. Reuse the same action owners across Create, starter chips and the composer. Inbox holds receipts
-> awaiting review. Updates holds real processing results and attention items.
+> reachable on small screens. Reuse the same action owners across Create,
+> starter chips and the composer. Inbox holds receipts awaiting review. Updates holds real processing results and attention items.
 > Assess #825 reuse; do not make a full notification system a pilot blocker or
 > show an inactive Updates entry. Show these choices in the first preview.
 > Business welcome/type-out copy is optional later polish.
