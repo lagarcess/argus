@@ -4,6 +4,7 @@ import type {
   BusinessAccount,
   BusinessExpense,
   BusinessOverview,
+  BusinessSearchResult,
   BusinessSpace,
   BusinessUpdate,
   BusinessWorkspaceInfo,
@@ -27,6 +28,7 @@ export type BusinessDataSource = Readonly<{
   receiptSource: (id: string) => Promise<Blob>;
   updates: () => Promise<BusinessUpdate[]>;
   expenses: (from: string, to: string) => Promise<BusinessExpense[]>;
+  search: (query: string) => Promise<BusinessSearchResult>;
   uploadReceipt: (file: File, consentToPrepare: boolean, key: string) => Promise<ReceiptSummary>;
   prepareReceipt: (id: string) => Promise<ReceiptSummary>;
   saveReview: (
@@ -52,6 +54,7 @@ export const liveBusinessDataSource: BusinessDataSource = {
   receiptSource: api.fetchBusinessReceiptSource,
   updates: api.listBusinessUpdates,
   expenses: api.listBusinessExpenses,
+  search: (query) => api.searchBusiness(query),
   uploadReceipt: api.uploadBusinessReceipt,
   prepareReceipt: api.prepareBusinessReceipt,
   saveReview: api.saveBusinessReceiptReview,
@@ -92,6 +95,7 @@ export function withBusinessSpace(
     receiptSource: after(source.receiptSource),
     updates: after(source.updates),
     expenses: after(source.expenses),
+    search: after(source.search),
     uploadReceipt: after(source.uploadReceipt),
     prepareReceipt: after(source.prepareReceipt),
     saveReview: after(source.saveReview),

@@ -34,11 +34,12 @@ import BusinessHome from "./BusinessHome";
 import ComposerAttachControl from "./ComposerAttachControl";
 import ReceiptIntakeDialog, { type IntakeTarget } from "./ReceiptIntakeDialog";
 import RecordExpenseDialog from "./RecordExpenseDialog";
+import { useBusinessSearch } from "./useBusinessSearch";
 
 export type BusinessPanelState =
   | { kind: "overview" }
   | { kind: "inbox" }
-  | { kind: "expenses" }
+  | { kind: "expenses"; expenseId?: string }
   | { kind: "updates" }
   | { kind: "receipt"; receiptId: string };
 
@@ -72,6 +73,7 @@ export function useBusiness(): BusinessContextValue {
   return value;
 }
 
+const NO_ACCOUNTS: never[] = [];
 const PANEL_KINDS = new Set(["overview", "inbox", "expenses", "updates"]);
 
 // Read from the route's search params, not window.location: on a client-side
@@ -212,6 +214,13 @@ export function BusinessWorkspaceProvider({
     [actions, attachedReceipt, bridge, openPanel, panel, period, records, reload, revision, source],
   );
 
+  const businessSearch = useBusinessSearch({
+    source,
+    accounts: records.workspace?.accounts ?? NO_ACCOUNTS,
+    openPanel,
+    setPeriod: setPeriodKey,
+  });
+
   const composerPlaceholder = records.workspace?.assistant_available
     ? t("business.composer.placeholder_ask", "Ask about your saved expenses")
     : t("business.composer.placeholder", "Write a message");
@@ -229,6 +238,7 @@ export function BusinessWorkspaceProvider({
       panel: () => <BusinessPanel />,
       starterEntries: () => actions.starterEntries,
       emptyChatLead: () => <BusinessHome variant="new_chat" />,
+      search: businessSearch,
       composer: (shell) => {
         const key = draftKeyFor(shell);
         return {
@@ -248,7 +258,7 @@ export function BusinessWorkspaceProvider({
       },
       onShellChange: (shell) => setBridge(shell),
     };
-  }, [actions.starterEntries, composerPlaceholder, draftRevision, initialView, panel.kind]);
+  }, [actions.starterEntries, composerPlaceholder, draftRevision, initialView, panel.kind, businessSearch]);
 
   return (
     <BusinessContext.Provider value={value}>

@@ -5,6 +5,7 @@ import type {
   ReceiptDetail,
   ReceiptReviewFields,
 } from "@/lib/business-api";
+import { normalizeSearchText } from "@/lib/search-text";
 import type { BusinessDataSource } from "./business-data";
 
 /**
@@ -197,7 +198,7 @@ function sampleReceiptImage(detail: ReceiptDetail): Blob {
 }
 
 /**
- * Lets a browser test have the next write fail with a backend error code, the
+ * Lets a browser test have the next write or search fail with a backend error code, the
  * way the live API answers, so each dialog's error mapping can be seen. The
  * preview only; the live source has no such switch.
  */
@@ -207,6 +208,17 @@ function injectedWriteError() {
   if (!code) return null;
   delete holder.__businessFixtureFailNextWrite;
   return Object.assign(new Error(code), { status: 422, code });
+}
+
+function fold(value: string): string {
+  return value.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/** Close to the API's rule, for sample data: every query word inside the record's text. */
+function matches(query: string, text: string): boolean {
+  const words = normalizeSearchText(fold(query)).split(" ").filter(Boolean);
+  const haystack = normalizeSearchText(fold(text));
+  return words.length > 0 && words.every((word) => haystack.includes(word));
 }
 
 const delay = (ms = 240) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -379,6 +391,25 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
         ...expenses,
       ];
       return replace({ ...current, status: "confirmed", expense_id: expenseId });
+    },
+    search: async (query) => {
+      await delay();
+      const injected = injectedWriteError();
+      if (injected) throw injected;
+      const found = expenses
+        .filter((item) => matches(query, [item.merchant, item.category_id].join(" ")))
+        .sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
+      const listed = new Set(found.map((item) => item.id));
+      return {
+        expenses: found.slice(0, 5),
+        receipts: receipts
+          .filter((item) => !listed.has(item.expense_id ?? ""))
+          .filter((item) => matches(query, [item.merchant, item.filename, item.amount].join(" ")))
+          .slice(0, 5),
+        accounts: ACCOUNTS.filter((item) =>
+          matches(query, [item.nickname, item.type, item.currency].join(" ")),
+        ).slice(0, 5),
+      };
     },
     recordExpense: async (input) => {
       await delay();
