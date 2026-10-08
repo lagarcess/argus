@@ -12,7 +12,7 @@ extension CuadraoAddAction {
         switch self {
         case .account: spanish ? "Cuenta" : "Account"
         case .transaction: spanish ? "Transacción" : "Transaction"
-        case .scan: spanish ? "Escanear o archivo" : "Scan or file"
+        case .scan: spanish ? "Escanear o subir archivo" : "Scan or upload file"
         case .group: spanish ? "Grupo" : "Group"
         case .plan: "Plan"
         case .invite: spanish ? "Invitar" : "Invite"
