@@ -139,7 +139,9 @@ shared money role with a local weight, design or hardcoded size.
 One source for all three lanes (iPhone, web, Business). Marketing owns the artwork;
 it lives in `marketing/brand/` and `marketing/app/icon.svg`, pinned at commit
 `73286f8cac6f8d335ad17980002590b0c0fefb60` (PR #906), with the full spec in
-`marketing/brand/README.md`. Take the SVGs as they are: do not redraw, approximate,
+`marketing/brand/README.md`. The lockup SVGs are pinned at commit
+`acf1b180a70eb8e40a792c5dc0838d024d0ab17f` (they gained an intrinsic width and height so
+the asset compiler does not store oversized bitmaps; paths unchanged). Take the SVGs as they are: do not redraw, approximate,
 re-colour or re-set them in a font.
 
 - **Wordmark.** Lowercase `cuadrao`, Space Grotesk 2.0.0, weight 700, letter-spacing
@@ -163,8 +165,12 @@ re-colour or re-set them in a font.
   backgrounds and accept that small shift rather than change their layout.
 - **One component.** `CuadraoBrand` draws the lockup everywhere in the app (welcome at
   268 pt wide through `CuadraoWelcomeLockup`, the invitation card and the chat empty
-  state at the compact 153 pt, which keeps the 32 pt height the old lockup had).
+  state at the compact 153 pt, which keeps the 32 pt height the old lockup had; the chat
+  empty state applies its existing 0.85 scale, so it shows about 130 pt wide).
   Never redraw it or set the wordmark as text.
+- **Large decorative mark.** Invitation pages keep their large mark (208 pt frame):
+  `CuadraoMark` in the asset catalog, `cuadrao-mark-light.svg` on light and
+  `cuadrao-mark-dark.svg` on dark (not the tiled icon), so it is the same size in both.
 - **App icon.** `icon.svg` rendered full-bleed at 1024 x 1024 with the tile corner
   radius 0 (iOS rounds it and rejects transparency). Dark and tinted variants are not
   designed yet; a new founder decision is needed first.

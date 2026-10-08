@@ -104,7 +104,8 @@ struct CuadraoCanvas: View {
     }
 }
 
-/// The welcome artwork: the approved Cuadrao mark at hero size, in the frame the provisional squares used.
+/// The large decorative mark on the invitation pages: the approved Cuadrao mark (tile-less; light-surface colours on
+/// light, Marketing's dark-surface mark on dark), in the 208 pt frame the provisional squares used.
 struct WelcomeSquares: View {
     var body: some View {
         Image("CuadraoMark")

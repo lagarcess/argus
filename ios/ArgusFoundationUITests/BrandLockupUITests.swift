@@ -2,7 +2,7 @@ import XCTest
 
 /// The invitation card and the chat empty state draw the same shared lockup as the welcome screen.
 final class BrandLockupUITests: XCTestCase {
-    func testInvitationCardShowsTheSharedLockupInLightAndDark() throws {
+    func testInvitationPageOpensAndCapturesLockupEvidenceInLightAndDark() throws {
         continueAfterFailure = false
         for dark in [false, true] {
             let app = XCUIApplication()
@@ -10,11 +10,11 @@ final class BrandLockupUITests: XCTestCase {
             app.launch()
             XCTAssertTrue(app.buttons["release.review.invites"].waitForExistence(timeout: 10))
             app.buttons["release.review.invites"].tap()
-            // The lockup is decorative on the invitation page (hidden from VoiceOver), so the screenshot is the evidence.
+            // The lockup is decorative on the invitation page (hidden from VoiceOver), so XCUI cannot see it: this test only opens
+            // the page and keeps the screenshot as the evidence. It does not assert the lockup.
             XCTAssertTrue(app.buttons["Enter code"].waitForExistence(timeout: 10))
             app.buttons["Enter code"].tap()
             XCTAssertTrue(app.textFields.firstMatch.waitForExistence(timeout: 10), "the invitation entry page opened")
-            XCTAssertFalse(app.staticTexts["CUADRAO"].exists, "no old uppercase text lockup")
             capture(app, "brand-invitation-\(dark ? "dark" : "light")")
             app.terminate()
         }
