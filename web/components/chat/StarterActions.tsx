@@ -19,6 +19,18 @@ type StarterActionsProps = {
    * fit, and only becomes a carousel once they do not.
    */
   layout?: "wrap" | "scroll";
+  /**
+   * A workspace's own chips. Each one runs its own action, which may open a
+   * flow or prepare an editable question; none of them sends on its own.
+   */
+  entries?: readonly WorkspaceStarterEntry[];
+};
+
+export type WorkspaceStarterEntry = {
+  key: string;
+  icon: LucideIcon | null;
+  label: string;
+  onSelect: () => void;
 };
 
 type StarterEntry = {
@@ -39,6 +51,7 @@ export default function StarterActions({
   onSelect,
   disabled = false,
   layout = "wrap",
+  entries: workspaceEntries,
 }: StarterActionsProps) {
   const { t } = useTranslation();
   // The trailing peek is a promise that more pills exist, so it may only appear
@@ -107,6 +120,14 @@ export default function StarterActions({
         },
       ];
 
+  const pills = workspaceEntries
+    ? workspaceEntries.map(({ key, icon, label, onSelect: select }) => ({ key, icon, label, select }))
+    : entries.map(({ key, icon, label, value, metadata }) => ({
+        key,
+        icon,
+        label,
+        select: () => onSelect(value, metadata),
+      }));
   const isScroll = layout === "scroll";
 
   return (
@@ -128,12 +149,12 @@ export default function StarterActions({
           : "mt-6 flex flex-wrap items-center justify-center gap-3"
       }
     >
-      {entries.map(({ key, icon: Icon, metadata, label, value }) => (
+      {pills.map(({ key, icon: Icon, label, select }) => (
         <button
           key={key}
           type="button"
           disabled={disabled}
-          onClick={() => onSelect(value, metadata)}
+          onClick={select}
           className={isScroll ? scrollPillClassName : wrapPillClassName}
         >
           {Icon ? (
