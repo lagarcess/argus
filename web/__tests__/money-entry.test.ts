@@ -454,8 +454,27 @@ describe("MoneyInput decisions", () => {
   test("on a comma-decimal device one comma with up to two digits after it is the decimal point", () => {
     expect(fallbackEdit("1,5", 3, COMMA_DEVICE)).toEqual({ kind: "accept", display: "1.5", caret: 3, problem: null });
     expect(fallbackEdit("12,", 3, COMMA_DEVICE)).toEqual({ kind: "accept", display: "12.", caret: 3, problem: null });
-    // Grouped in the field's own format, so rule (b) reads it as 1234, as the field shows it.
-    expect(fallbackEdit("1,234", 5, COMMA_DEVICE)).toEqual({ kind: "accept", display: "1,234", caret: 5, problem: null });
+  });
+
+  test("on a comma-decimal device a grouped value is grouping only when the field rendered it", () => {
+    // Undo back to the field's previous "1,234".
+    expect(fallbackEdit("1,234", 5, COMMA_DEVICE, ["1,234", "12,345"])).toEqual({
+      kind: "accept",
+      display: "1,234",
+      caret: 5,
+      problem: null,
+    });
+    // Autofill of a "1,234" the field never showed is not guessed.
+    expect(fallbackEdit("1,234", 5, COMMA_DEVICE, ["12,345"])).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+    expect(fallbackEdit("123,456", 7, COMMA_DEVICE)).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+    // A dot device keeps reading its own grouping without history.
+    expect(fallbackEdit("123,456", 7, DOP)).toEqual({ kind: "accept", display: "123,456", caret: 7, problem: null });
+  });
+
+  test("a leading-zero group is never the field's grouping", () => {
+    expect(fallbackEdit("01,234", 6, DOP)).toEqual({ kind: "reject", problem: { code: "grouping" } });
+    expect(fallbackEdit("01,234", 6, COMMA_DEVICE, ["01,234"])).toEqual({ kind: "reject", problem: { code: "grouping" } });
+    expect(fallbackEdit("0.5", 3, DOP)).toEqual({ kind: "accept", display: "0.5", caret: 3, problem: null });
   });
 
   test("the fallback caret follows normalization", () => {

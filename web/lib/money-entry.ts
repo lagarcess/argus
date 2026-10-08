@@ -338,30 +338,41 @@ export function textForParentValue(text: string, value: string | null, rules: Mo
   return value === readMoney(text, rules).value ? null : displayForValue(value, rules);
 }
 
-const FIELD_GROUPED = /^-?\d{1,3}(,\d{3})*(\.\d*)?$/;
+const FIELD_GROUPED = /^-?(0|[1-9]\d{0,2}(,\d{3})*)(\.\d*)?$/;
 const TYPED_DECIMAL_COMMA = /^-?\d*,\d{0,2}$/;
 
 /**
  * An edit the browser did not announce as cancellable (word deletion, undo, an
  * IME commit, autofill) arrives as the whole new value, read by one rule:
  * (a) no commas: plain digits and one optional point;
- * (b) grouped in the field's own format: the commas are grouping, so "1,234"
- *     is 1234 on every device, as the field itself would show it;
- * (c) otherwise, on a comma-decimal device, one comma with no point and at most
- *     two digits after it is the decimal point, as when typed;
+ * (b) grouped in the field's own format (first group nonzero): the commas are
+ *     grouping. On a comma-decimal device a typed comma is the decimal point,
+ *     so this holds only for an exact text the field itself already rendered
+ *     (`shown`, as undo and redo restore); any other grouped-looking value
+ *     there is refused as decimal_comma rather than guessed;
+ * (c) on a comma-decimal device, one comma with no point and at most two
+ *     digits after it is the decimal point, as when typed;
  * (d) anything else is refused with the paste rule's message for that shape.
  */
-export function fallbackEdit(raw: string, caret: number, rules: MoneyRules): MoneyEdit {
+export function fallbackEdit(
+  raw: string,
+  caret: number,
+  rules: MoneyRules,
+  shown: readonly string[] = [],
+): MoneyEdit {
   const text = raw.trim();
   if (!text) return { kind: "accept", display: "", caret: 0, problem: null };
+  const grouped = FIELD_GROUPED.test(text);
   let logical: string;
   let logicalCaret: number;
-  if (!text.includes(",") || FIELD_GROUPED.test(text)) {
+  if (!text.includes(",") || (grouped && (!rules.commaDecimal || shown.includes(text)))) {
     logical = ungroup(raw);
     logicalCaret = logicalIndex(raw, caret);
   } else if (rules.commaDecimal && TYPED_DECIMAL_COMMA.test(text)) {
     logical = raw.replace(",", ".");
     logicalCaret = caret;
+  } else if (rules.commaDecimal && grouped) {
+    return { kind: "reject", problem: { code: "decimal_comma" } };
   } else {
     const refused = parsePasted(raw, rules);
     return { kind: "reject", problem: "problem" in refused ? refused.problem : { code: "grouping" } };

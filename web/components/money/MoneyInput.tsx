@@ -73,6 +73,13 @@ export default function MoneyInput({
   const [text, setText] = useState(() => displayForValue(value, rules));
   const [problem, setProblem] = useState<MoneyProblem | null>(null);
   const [currencyNote, setCurrencyNote] = useState(false);
+  // Texts this field has rendered, so an undo or redo that restores one is
+  // recognized as the field's own grouping.
+  const rendered = useRef<string[]>([]);
+  useLayoutEffect(() => {
+    if (!text || rendered.current[rendered.current.length - 1] === text) return;
+    rendered.current = [...rendered.current.filter((item) => item !== text), text].slice(-20);
+  }, [text]);
 
   const [seenValue, setSeenValue] = useState(value);
   if (value !== seenValue) {
@@ -145,7 +152,7 @@ export default function MoneyInput({
 
   const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const raw = event.target.value;
-    const result = fallbackEdit(raw, event.target.selectionStart ?? raw.length, rules);
+    const result = fallbackEdit(raw, event.target.selectionStart ?? raw.length, rules, rendered.current);
     if (result.kind === "accept") commit(result.display, result.caret, null);
     else if (result.kind === "reject") setProblem(result.problem);
   };
