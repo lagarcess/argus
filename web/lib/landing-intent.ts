@@ -1,3 +1,4 @@
+import { readReturnPath, returnPathFor } from "./auth-return-path";
 import {
   readSessionStored,
   readStored,
@@ -385,7 +386,10 @@ export function pathWithSearch(pathname: string, search: string): string {
   const params = new URLSearchParams(
     search.startsWith("?") ? search.slice(1) : search,
   );
-  if (pathname === "/chat") params.delete("auth");
+  if (pathname === "/chat") {
+    params.delete("auth");
+    params.delete("return_to");
+  }
   const query = params.toString();
   return query ? `${pathname}?${query}` : pathname;
 }
@@ -395,6 +399,12 @@ export function currentChatPath(): string {
     "/chat",
     typeof window === "undefined" ? "" : window.location.search,
   );
+}
+
+/** Where to go after signing in: a listed return page, else chat. */
+export function postAuthPath(): string {
+  if (typeof window === "undefined") return currentChatPath();
+  return readReturnPath(window.location.search) ?? currentChatPath();
 }
 
 export function currentAuthLoginPath(): string {
@@ -420,6 +430,8 @@ export function authLoginPathFromSearch(
   if (sanitizeLandingPath(landingPath) === "/chat") {
     params.set("from_path", "/chat");
   }
+  const returnTo = returnPathFor(sanitizeLandingPath(landingPath), source);
+  if (returnTo) params.set("return_to", returnTo);
   params.set("auth", "login");
   return `/?${params.toString()}`;
 }

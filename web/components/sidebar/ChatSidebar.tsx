@@ -4,6 +4,8 @@ import type { LogoutOptions } from "@/lib/account-deletion-api";
 import { conversationPreviewText } from "@/lib/conversation-preview-display";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import type { ChatShellView } from "@/components/chat/ChatWorkspace";
 import {
   ChevronDown,
   History,
@@ -53,7 +55,7 @@ import { sidebarShortcutHintsVisible } from "@/lib/sidebar-shortcuts";
 
 export type SidebarMode = "expanded" | "collapsed" | "hover";
 
-type View = "chat" | "settings";
+type View = ChatShellView;
 
 type ConversationActivityReadOwner = Readonly<{
   hasEffectiveUnread: (conversationId: string) => boolean;
@@ -133,6 +135,15 @@ export type ChatSidebarProps = {
   onRequestClose?: () => void;
   /** Guest settings entry point, which lives at the drawer bottom. */
   guestSettings?: ReactNode;
+  /** A workspace's own destinations, between Search and Recents. */
+  primaryNav?: ReactNode;
+  /** A workspace's actions, pinned above the profile footer. */
+  footerActions?: ReactNode;
+  /**
+   * When set, the profile trigger and menu render into this header element
+   * instead of the footer. The sidebar stays the one owner of profile state.
+   */
+  profileSlot?: HTMLElement | null;
 };
 
 function historyConversationId(item: HistoryItem): string {
@@ -179,6 +190,9 @@ export default function ChatSidebar({
   variant = "rail",
   onRequestClose,
   guestSettings = null,
+  primaryNav = null,
+  footerActions = null,
+  profileSlot = null,
 }: ChatSidebarProps) {
   const { t, i18n } = useTranslation();
   const { selectPresentation, selectAggregatePresentation, selectOperationLabel } =
@@ -523,6 +537,8 @@ export default function ChatSidebar({
             iconSize={20}
           />
         )}
+
+        {primaryNav}
 
         {/* Recents Accordion */}
         <div className="mb-2 mt-2">
@@ -899,8 +915,51 @@ export default function ChatSidebar({
         </div>
       ) : null}
 
+      {footerActions ? (
+        <div
+          data-testid="sidebar-workspace-actions"
+          className="border-t border-black/5 p-[6px] dark:border-white/5"
+        >
+          {footerActions}
+        </div>
+      ) : null}
+
+      {showProfileMenu && profileSlot
+        ? createPortal(
+            <>
+              <ProfileMenu
+                isOpen={isProfileMenuOpen}
+                onClose={() => setIsProfileMenuOpen(false)}
+                onLogout={onLogout}
+                onFeedback={onFeedback}
+                onDeleteAllConversations={handleRequestDeleteAllConversations}
+                onHistoryMutated={onHistoryMutated}
+                onProfileUpdated={onProfileUpdated}
+                onOpenSidebarPreference={sidebarPreferenceHandler}
+                onOpenKeyboardShortcuts={onOpenKeyboardShortcuts}
+                anchorRef={profileButtonRef}
+                sidebarCollapsed={!isOpen}
+                placement="header"
+              />
+              <button
+                ref={profileButtonRef as React.RefObject<HTMLButtonElement>}
+                type="button"
+                data-testid="header-profile-trigger"
+                aria-label={t("common.settings")}
+                aria-haspopup="menu"
+                aria-expanded={isProfileMenuOpen}
+                onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white text-black/70 transition-colors hover:bg-black/5 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:border-white/10 dark:bg-[#1f2225] dark:text-white/70 dark:hover:bg-white/5"
+              >
+                <User className="h-[18px] w-[18px]" />
+              </button>
+            </>,
+            profileSlot,
+          )
+        : null}
+
       {/* Footer: Profile menu trigger */}
-      {showProfileMenu ? (
+      {showProfileMenu && !profileSlot ? (
         <div className="relative border-t border-black/5 p-[6px] dark:border-white/5">
           <ProfileMenu
             isOpen={isProfileMenuOpen}

@@ -1,0 +1,144 @@
+"use client";
+
+import { AlertCircle, ArrowRight, Inbox } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import StarterActions from "@/components/chat/StarterActions";
+import { useResponsiveLayout } from "@/components/layout/useResponsiveLayout";
+import { useBusiness } from "./BusinessWorkspace";
+import { formatDay, formatMoney, formatRelativeTime, type Period } from "./business-format";
+import { cardClass, LoadingRows } from "./business-ui";
+
+const PERIODS: Period["key"][] = ["this_month", "last_month", "last_30_days"];
+
+export default function BusinessOverviewPanel() {
+  const { t, i18n } = useTranslation();
+  const locale = i18n.resolvedLanguage ?? "en";
+  const { isBelowTablet } = useResponsiveLayout();
+  const { records, period, setPeriod, openPanel, actions } = useBusiness();
+  const overview = records.overview;
+  const periodLabel = (key: Period["key"]) =>
+    ({
+      this_month: t("business.period.this_month", "This month"),
+      last_month: t("business.period.last_month", "Last month"),
+      last_30_days: t("business.period.last_30_days", "Last 30 days"),
+    })[key];
+
+  return (
+    <section aria-labelledby="business-overview-title">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <h2 id="business-overview-title" className="font-display text-[26px] font-medium tracking-tight text-black dark:text-white">
+          {t("business.overview.title", "Your business")}
+        </h2>
+        <div role="radiogroup" aria-label={t("business.period.label", "Period")} className="flex gap-1 rounded-full bg-black/[0.04] p-1 dark:bg-white/[0.06]">
+          {PERIODS.map((key) => (
+            <button
+              key={key}
+              type="button"
+              role="radio"
+              aria-checked={period.key === key}
+              onClick={() => setPeriod(key)}
+              className={`min-h-9 rounded-full px-3.5 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 ${
+                period.key === key
+                  ? "bg-white text-black dark:bg-[#2a2d31] dark:text-white"
+                  : "text-black/55 hover:text-black dark:text-white/55 dark:hover:text-white"
+              }`}
+            >
+              {periodLabel(key)}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {records.error ? (
+        <div role="alert" className={`${cardClass} text-[14px] text-black/70 dark:text-white/70`}>
+          {t("business.overview.error", "We couldn't load your business records. Your saved receipts and expenses are safe. Try again.")}
+        </div>
+      ) : !overview ? (
+        <LoadingRows rows={3} />
+      ) : (
+        <div className="grid gap-3 tablet:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => openPanel({ kind: "inbox" })}
+            className={`${cardClass} group flex flex-col text-left transition-colors hover:border-black/15 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:hover:border-white/15`}
+          >
+            <span className="flex items-center gap-2 text-[13px] font-medium text-black/55 dark:text-white/55">
+              <Inbox className="h-4 w-4" />
+              {t("business.overview.in_inbox", "In your inbox")}
+            </span>
+            <span className="mt-3 font-display text-[34px] font-medium tabular-nums tracking-tight text-black dark:text-white">
+              {records.inbox?.length ?? 0}
+            </span>
+            <span className="mt-auto flex items-center gap-1 pt-3 text-[13px] text-black/55 group-hover:text-black dark:text-white/55 dark:group-hover:text-white">
+              {t("business.overview.open_inbox", "Open inbox")}
+              <ArrowRight className="h-3.5 w-3.5" />
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => openPanel({ kind: "expenses" })}
+            className={`${cardClass} group flex flex-col text-left transition-colors hover:border-black/15 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:hover:border-white/15`}
+          >
+            <span className="text-[13px] font-medium text-black/55 dark:text-white/55">
+              {t("business.overview.confirmed", "Saved expenses, {{period}}", { period: periodLabel(period.key).toLowerCase() })}
+            </span>
+            {overview.totals.length === 0 ? (
+              <span className="mt-3 text-[15px] text-black/60 dark:text-white/60">
+                {t("business.overview.no_expenses", "No expenses saved in this period yet.")}
+              </span>
+            ) : (
+              <ul className="mt-3 space-y-1">
+                {overview.totals.map((total) => (
+                  <li key={total.currency} className="flex items-baseline justify-between gap-3">
+                    <span className="font-display text-[24px] font-medium tabular-nums tracking-tight text-black dark:text-white">
+                      {formatMoney(total.amount, total.currency, locale)}
+                    </span>
+                    <span className="text-[13px] tabular-nums text-black/50 dark:text-white/50">
+                      {t("business.overview.expense_count", "{{count}} expenses", { count: total.count })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <span className="mt-auto pt-3 text-[12px] text-black/45 dark:text-white/45">
+              {t("business.overview.separate_currencies", "Each currency is totaled on its own. No conversion.")}
+            </span>
+          </button>
+
+          {overview.needs_attention > 0 ? (
+            <button
+              type="button"
+              onClick={() => openPanel({ kind: "inbox" })}
+              className={`${cardClass} flex items-center gap-3 text-left tablet:col-span-2 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25`}
+            >
+              <AlertCircle className="h-5 w-5 shrink-0 text-[#d66d75]" />
+              <span className="flex-1 text-[14px] text-black/75 dark:text-white/75">
+                {t("business.overview.attention", "{{count}} receipts need your attention", { count: overview.needs_attention })}
+              </span>
+              <ArrowRight className="h-4 w-4 text-black/40 dark:text-white/40" />
+            </button>
+          ) : null}
+
+          <p className="text-[12px] text-black/45 tablet:col-span-2 dark:text-white/45">
+            {t("business.overview.coverage", "Covers {{from}} to {{to}}. Last receipt {{received}}. Totals include saved expenses only, not receipts waiting for review.", {
+              from: formatDay(overview.from, locale),
+              to: formatDay(overview.to, locale),
+              received: overview.last_received_at
+                ? formatRelativeTime(overview.last_received_at, locale)
+                : t("business.overview.never", "none yet"),
+            })}
+          </p>
+        </div>
+      )}
+
+      <div className="mt-8">
+        <StarterActions
+          onSelect={() => undefined}
+          entries={actions.starterEntries}
+          layout={isBelowTablet ? "scroll" : "wrap"}
+        />
+      </div>
+    </section>
+  );
+}
