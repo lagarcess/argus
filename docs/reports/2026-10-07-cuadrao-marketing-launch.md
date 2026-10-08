@@ -13,7 +13,7 @@ Status record for [#880](https://github.com/lagarcess/argus/issues/880) and its 
 | Child | State |
 | --- | --- |
 | #887 independent package | `marketing/` builds from a clean frozen install with Bun 1.3.14 on Node 24.21.0, starts with an empty environment, and renders byte-identical screenshots to the legacy pages in Chromium and WebKit at 1440 and 390 pixels, in both languages. |
-| #888 identity and metadata | One route owner drives canonical, hreflang, sitemap, redirects and navigation. Provisional Cuadrao icons replace the inherited Argus icon. Founder review of the mark is pending. |
+| #888 identity and metadata | One route owner drives canonical, hreflang, sitemap, redirects and navigation. The Cuadrao icon ("Lean, calm") replaces the inherited Argus icon. The founder chose it on 2026-10-08. |
 | #881 Business inquiries | Implemented and covered by unit and browser tests against a recording mock. The destination is now configurable (`CUADRAO_INQUIRY_TO`, no default); real receipt waits for the founder to choose it. |
 | #882 Personal signups | Implemented. Table contract proven against real Postgres and PostgREST locally. Hosted storage, removal and notice are not yet proven. |
 | #889 transactional email | Plan and records procedure written. Nothing read or changed in Resend or Cloudflare yet. |
@@ -74,7 +74,7 @@ Disable first, then delete. Deleting first lets the next push recreate the branc
 
 - Nothing is deployed. No Render service exists, no DNS or Resend record was changed, no migration was applied, no test email was sent.
 - Render, Resend and Cloudflare state was not read: the Render CLI token is expired, the Claude in Chrome extension is not connected, and those dashboards need a signed-in session.
-- Spanish copy, the privacy text facts and the provisional icon await founder review.
+- Spanish copy, the privacy text facts and the operator wording await founder review; the icon is chosen.
 
 ## Copy awaiting founder review
 

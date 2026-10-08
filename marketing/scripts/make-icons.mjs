@@ -1,4 +1,4 @@
-// Renders the provisional Cuadrao mark (app/icon.svg) to the PNG and ICO files
+// Renders the Cuadrao mark (app/icon.svg, "Lean, calm") to the PNG and ICO files
 // browsers request by convention. Run after editing the SVG: node scripts/make-icons.mjs
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
