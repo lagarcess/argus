@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { installBreakpointFixture } from "./support/breakpoint-fixture";
 
 const PREVIEW = "/dev/business-preview";
@@ -25,6 +25,18 @@ async function openPreview(
     }, options.sidebarMode);
   }
   await page.goto(url);
+}
+
+/** The amount field's message region, the last id it is described by. */
+async function amountMessage(page: Page, input: Locator) {
+  const ids = ((await input.getAttribute("aria-describedby")) ?? "").split(" ");
+  return page.locator(`[id="${ids[ids.length - 1]}"]`);
+}
+
+async function openRecordExpense(page: Page) {
+  await page.getByTestId("business-create").click();
+  await page.getByRole("menuitem", { name: "Record expense" }).click();
+  return page.getByTestId("record-expense-amount");
 }
 
 const nav = (page: Page) => page.getByTestId("business-sidebar-nav");
@@ -156,7 +168,7 @@ test.describe("Business preview", () => {
     const total = page.getByTestId("receipt-review-amount");
     await expect(total).toHaveValue("3,450.00");
     await expect(total).toHaveAccessibleName("Total in DOP (RD$)");
-    const message = page.locator(`[id="${await total.getAttribute("aria-describedby")}"]`);
+    const message = await amountMessage(page, total);
 
     await total.click();
     await page.keyboard.press("End");
@@ -177,6 +189,100 @@ test.describe("Business preview", () => {
     await page.keyboard.press("ControlOrMeta+v");
     await expect(total).toHaveValue("1,250.50");
     await expect(message).toContainText("Use a point for decimals");
+  });
+
+  test("a bare $ pasted into a DOP field is refused as ambiguous", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openPreview(page, `${PREVIEW}?receipt=rcpt-ferreteria`);
+    const total = page.getByTestId("receipt-review-amount");
+    await expect(total).toHaveValue("3,450.00");
+    const message = await amountMessage(page, total);
+
+    await page.evaluate(() => navigator.clipboard.writeText("$1,250.00"));
+    await total.click();
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("ControlOrMeta+v");
+    await expect(total).toHaveValue("3,450.00");
+    await expect(message).toHaveText("$ could mean RD$ or US$. Enter the amount without a symbol, or with RD$ or US$.");
+  });
+
+  test("a currency change keeps the digits and says there is no conversion", async ({ page }) => {
+    await openPreview(page, `${PREVIEW}?receipt=rcpt-ferreteria`);
+    const total = page.getByTestId("receipt-review-amount");
+    await expect(total).toHaveValue("3,450.00");
+    const message = await amountMessage(page, total);
+
+    await page.locator("label", { hasText: "Currency" }).locator("select").selectOption("USD");
+    await expect(total).toHaveAccessibleName("Total in USD (US$)");
+    await expect(total).toHaveValue("3,450.00");
+    await expect(message).toHaveText("Same amount, no conversion.");
+
+    await total.click();
+    await page.keyboard.press("End");
+    await page.keyboard.press("Backspace");
+    await expect(message).toHaveText("");
+  });
+
+  test("Total announces Needed when the backend lists the amount as missing", async ({ page }) => {
+    await openPreview(page, `${PREVIEW}?receipt=rcpt-saved`);
+    const total = page.getByTestId("receipt-review-amount");
+    await expect(total).toHaveAccessibleDescription(/Needed/);
+    await total.click();
+    await page.keyboard.type("80");
+    await expect(total).not.toHaveAccessibleDescription(/Needed/);
+  });
+
+  test("an edit the browser does not let us cancel is read past the field's grouping", async ({ page }) => {
+    await openPreview(page, `${PREVIEW}?receipt=rcpt-ferreteria`);
+    const total = page.getByTestId("receipt-review-amount");
+    await expect(total).toHaveValue("3,450.00");
+    const message = await amountMessage(page, total);
+
+    await total.evaluate((input: HTMLInputElement) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+      setter.call(input, "3,4501");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await expect(total).toHaveValue("34,501");
+    await expect(message).toHaveText("");
+  });
+
+  test("the review maps the backend's amount_out_of_range onto its Total", async ({ page }) => {
+    await openPreview(page, `${PREVIEW}?receipt=rcpt-ferreteria`);
+    const total = page.getByTestId("receipt-review-amount");
+    await expect(total).toHaveValue("3,450.00");
+    await page.locator("label", { hasText: "Paid from" }).locator("select").selectOption("acct-ops");
+
+    await page.evaluate(() => {
+      (globalThis as { __businessFixtureFailNextWrite?: string }).__businessFixtureFailNextWrite = "amount_out_of_range";
+    });
+    await page.getByRole("button", { name: "Confirm expense" }).click();
+
+    await expect(await amountMessage(page, total)).toHaveText("This amount is too large to record.");
+    await expect(total).toHaveAttribute("aria-invalid", "true");
+    await expect(panelHeading(page, "Review receipt")).toBeVisible();
+  });
+
+  test("Record expense guards the length and maps the backend's amount codes onto its Total", async ({ page }) => {
+    await openPreview(page);
+    const total = await openRecordExpense(page);
+    const message = await amountMessage(page, total);
+    await total.click();
+    await page.keyboard.type("9999999999999999");
+    await expect(total).toHaveValue("999,999,999,999,999");
+    await expect(message).toHaveText("Use at most 15 digits before the decimal point.");
+
+    for (const [code, text] of [
+      ["amount_out_of_range", "This amount is too large to record."],
+      ["amount_precision", "DOP allows up to 2 decimals."],
+    ]) {
+      await page.evaluate((next) => {
+        (globalThis as { __businessFixtureFailNextWrite?: string }).__businessFixtureFailNextWrite = next;
+      }, code);
+      await page.getByRole("button", { name: "Save expense" }).click();
+      await expect(message).toHaveText(text);
+      await expect(page.getByRole("dialog", { name: "Record expense" })).toBeVisible();
+    }
   });
 
   test("Record expense ignores a typed comma on a dot-decimal device", async ({ page }) => {
@@ -215,6 +321,18 @@ test.describe("Business preview on a comma-decimal device", () => {
     await page.keyboard.type("12,50");
     await expect(total).toHaveValue("12.50");
     await expect(page.getByRole("button", { name: "Save expense" })).toBeEnabled();
+  });
+
+  test("a pasted 1,250 is refused rather than read two ways", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openPreview(page);
+    const total = await openRecordExpense(page);
+
+    await page.evaluate(() => navigator.clipboard.writeText("1,250"));
+    await total.click();
+    await page.keyboard.press("ControlOrMeta+v");
+    await expect(total).toHaveValue("");
+    await expect(await amountMessage(page, total)).toHaveText("Use a point for decimals, as in 1,250.50.");
   });
 });
 
