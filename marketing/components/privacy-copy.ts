@@ -54,7 +54,7 @@ const es: PrivacyCopy = {
       title: "Cuánto tiempo los conservamos",
       paragraphs: [
         "Tu mensaje se conserva en nuestro correo mientras haga falta para responderte y dar seguimiento a la conversación.",
-        "Tu registro de acceso anticipado permanece hasta que pidas retirarlo. Al retirarlo borramos tu correo y conservamos una huella técnica de la dirección, sin la dirección misma, junto con el idioma y las fechas del registro y del retiro, para no volver a registrarte ni escribirte.",
+        "Tu registro de acceso anticipado permanece hasta que pidas retirarlo. Al retirarlo borramos tu correo y conservamos una huella técnica de la dirección, sin la dirección misma, junto con el idioma y las fechas del registro, del aviso y del retiro, para no volver a registrarte ni escribirte.",
         "Los registros técnicos de la conexión los conserva el proveedor de alojamiento según sus propias reglas.",
       ],
     },
@@ -109,7 +109,7 @@ const en: PrivacyCopy = {
       title: "How long we keep it",
       paragraphs: [
         "Your message is kept in our email for as long as it is needed to reply and follow up.",
-        "Your early-access signup stays until you ask to remove it. When you remove it we delete your email and keep a technical fingerprint of the address, not the address itself, along with the language and the signup and removal dates, so we do not register or email you again.",
+        "Your early-access signup stays until you ask to remove it. When you remove it we delete your email and keep a technical fingerprint of the address, not the address itself, along with the language and the signup, notice and removal dates, so we do not register or email you again.",
         "Technical connection records are kept by the hosting provider under its own rules.",
       ],
     },
