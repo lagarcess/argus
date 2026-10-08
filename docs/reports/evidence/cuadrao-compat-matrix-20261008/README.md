@@ -22,6 +22,21 @@ Applied on top of C1 with the real applier (`ARGUS_COMPAT_TAIL`), then the same 
 
 The one failure is the same scipy import trap in every run. Build 2 skips 21 more tests than Build 1: they need a running local Storage service, which a plain database does not have, so Storage behavior itself (bucket limits, object delete on disconnect and on account deletion) is **not** exercised here; Business proved it against a local Storage stack (#905, #914 evidence). The rehearsal databases get the `storage` schema from the local container, as hosted always has it.
 
+## After all four Business steps (B1 to B4), final integration code `f5a2007cd6f8e169a27cb1e6e3827ccbaa1bfb9a`
+
+C1 plus `20261008100000`, `20261008110000`, `20261008130000` and `20261008140000`, each through the real applier, then the same suites (`results_tail_b1_b4.json`; the "build2" row in that file is the final integration code, not the earlier Build 2 candidate):
+
+| Code | Result on C1 + B1 to B4 |
+| --- | --- |
+| Previous production code (`main` `a9286b21`) | 379 passed, 27 skipped, 1 failed |
+| Build 1 (`cad1cbe1e`) | 720 passed, 31 skipped, 3 failed |
+| Final integration (`f5a2007cd`) | 771 passed, 84 skipped, 2 failed |
+
+Failures, all read:
+- `test_asset_rollup_pair_symbol_normalization_matches_memory_contract` fails in every row: the local `scipy` import trap (#852).
+- Build 1 also fails `test_account_deletion_fk_census_postgres.py::test_sweep_names_every_user_reference_and_the_census_document_matches_it` and `test_client_grants_postgres.py::test_every_relation_is_listed_exactly_once`. Both compare Build 1's own documented table lists with the live schema and fail because B2 to B4 added tables (`spaces`, `whatsapp_*`, and user-referencing rows keyed by `owner_space_id`). They are currency checks, not a broken behavior, and the final code's versions of them pass. They are one more reason Build 1 code is not the runtime once B2 to B4 are applied: the minimum compatible code version is Build 2 or later.
+- Final integration also fails `test_document_jobs_postgres.py::test_two_running_instances_recover_a_dead_worker_without_restart` (`needs_attention` instead of `review_ready`). It passes when run alone on the same database and fails again in a full-suite run on a fresh copy, so it is order-dependent in this local macOS run. The same commit's CI is green on Linux. Cause not found; reported to Business.
+
 ## What it shows
 
 - **Deploy order.** Build 1 code needs C1 first. On today's schema, or after C0 only, it fails on the missing tables. C1 must be applied and verified before Build 1 deploys.
