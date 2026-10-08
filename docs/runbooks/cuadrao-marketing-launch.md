@@ -130,10 +130,10 @@ Then the checks it cannot make:
 
 **Do not add forwarding, Cloudflare Email Routing, or any apex MX, SPF or DKIM change.** Email Routing would replace the iCloud MX records and take over the founder's mail. Everything below adds records only under `notify.cuadrao.ai`, which does not touch the apex.
 
-**`notify.cuadrao.ai` change set. Steps 1 to 3 are done (2026-10-08, founder-approved); steps 4 to 6 wait for the Render step:**
+**`notify.cuadrao.ai` change set. Steps 1 and 2 are done (2026-10-08, founder-approved) and Resend shows the domain Verified; step 3 (DMARC) is not added; the sending key in step 4 and steps 5 and 6 wait for the Render step:**
 
 1. Resend: create the domain `notify.cuadrao.ai` in region `us-east-1` (the same as the root domain), open and click tracking off. This is a hosted write.
-2. Cloudflare DNS: add exactly the records Resend returns, all DNS only and all under `*.notify.cuadrao.ai`. Expect the same shape as the root domain: a DKIM TXT at `resend._domainkey.notify` and CNAMEs at `send.notify` and `rsend.notify` to Resend's forge hosts. Copy Resend's values verbatim; do not invent them. The apex records stay as they are.
+2. Cloudflare DNS: add exactly the records Resend returns, all DNS only and all under `*.notify.cuadrao.ai`. Resend returned four records, which differ from the root domain's: a DKIM TXT at `resend._domainkey.notify`, an MX (priority 10) and an SPF TXT at `send.notify`, and a CNAME at `rsend.notify` to Resend's forge host. Copy Resend's values verbatim; do not invent them. The apex records stay as they are.
 3. DMARC: add `_dmarc.notify.cuadrao.ai` as a TXT `v=DMARC1; p=none` (optionally with a report address the founder owns). There is no apex DMARC today, and this record covers only the subdomain.
 4. Wait for Resend to show the domain Verified. Create a Resend key limited to sending from `notify.cuadrao.ai` and have the founder type it into Render with `CUADRAO_INQUIRY_FROM=Cuadrao <website@notify.cuadrao.ai>`.
 5. Send one test inquiry to `hola@cuadrao.ai` from a founder-approved address and read the received headers for SPF, DKIM and DMARC pass, and that it reached the iCloud inbox rather than junk.

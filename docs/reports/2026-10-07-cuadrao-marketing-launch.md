@@ -6,6 +6,10 @@ Status record for [#880](https://github.com/lagarcess/argus/issues/880) and its 
 
 PR [#895](https://github.com/lagarcess/argus/pull/895) merged into `codex/private-alpha-next` as `fbb6bb447` (squash, PR head `d0447a7da`); integration then stood at `5def72db1` after #899 and #894. The merged diff equals the PR diff, `marketing/` and the signup migration are byte-identical to the PR head, `web/` equals its pre-website state, and #895 shares no file with #899 or #894. Nothing is promoted, deployed, applied or sent; the signup migration is in the repository only. The issue comments on #880 record the landing in full.
 
+PR [#903](https://github.com/lagarcess/argus/pull/903) merged as `1ffb53548` (squash, PR head `32ad2c207`, merged 2026-10-08 19:25 UTC; integration parent `f5a2007cd` after #920). It carries the read-only origin verifier, the claim-then-send availability notices and the launch record. CI was green at the head, the independent review at that head was clean with no blocking finding, and the merged tree equals the PR head on every path it touches (its 10 files; none shared with #920). Nothing is promoted, deployed, applied or sent.
+
+Review findings, none blocking, are settled in [#923](https://github.com/lagarcess/argus/pull/923) (open): the run stops after the first unknown send so an outage cannot claim the whole list; a refusal whose claim cannot be released is named separately; hand-sending an uncertain claim says to check Resend by key first and to run one notice at a time; the verifier checks a redirect's host; and the runbook, storage proof and evidence README are reconciled. Until #923 lands, no availability notice is run, and none can be before Personal signups are published.
+
 ## Lineage
 
 - Lane base: `93571e593e1677561e1dd38f63b6475574942e2d` (`origin/codex/private-alpha-next`, fetched 2026-10-07).
