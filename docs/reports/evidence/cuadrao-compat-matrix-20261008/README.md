@@ -10,6 +10,18 @@ Local, synthetic, nothing hosted. Throwaway databases on the Supabase CLI's loca
 | **S1** after C0 (website migration alone) | 379 passed, 27 skipped, 1 failed | 420 passed, 216 failed, 304 errors (still needs C1) |
 | **S2** after C1 (consumer files, plus the unrecorded `20260505000001`) | 379 passed, 27 skipped, 1 failed | **722 passed, 31 skipped, 1 failed, 0 errors** |
 
+## After the first Business step (B1, `20261008100000`), Build 2 candidate `64833f6d284d60562829c0545dc413d5324c9d5a`
+
+Applied on top of C1 with the real applier (`ARGUS_COMPAT_TAIL`), then the same suites:
+
+| Code | Result on C1 + B1 |
+| --- | --- |
+| Previous production code (`main` `a9286b21`) | 379 passed, 27 skipped, 1 failed |
+| Build 1 (`cad1cbe1e`) | 722 passed, 31 skipped, 1 failed, 0 errors |
+| Build 2 (`64833f6d2`) | 727 passed, 52 skipped, 1 failed, 0 errors |
+
+The one failure is the same scipy import trap in every run. Build 2 skips 21 more tests than Build 1: they need a running local Storage service, which a plain database does not have, so Storage behavior itself (bucket limits, object delete on disconnect and on account deletion) is **not** exercised here; Business proved it against a local Storage stack (#905, #914 evidence). The rehearsal databases get the `storage` schema from the local container, as hosted always has it.
+
 ## What it shows
 
 - **Deploy order.** Build 1 code needs C1 first. On today's schema, or after C0 only, it fails on the missing tables. C1 must be applied and verified before Build 1 deploys.

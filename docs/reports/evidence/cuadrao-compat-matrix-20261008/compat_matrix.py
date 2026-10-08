@@ -78,12 +78,14 @@ def clone(source: str, target: str) -> None:
         admin.execute(f"create database {target} template {source}")
 
 
-def apply(database: str, versions: list[str], *extra: str) -> None:
+def apply(
+    database: str, versions: list[str], *extra: str, candidate: str | None = None
+) -> None:
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
         json.dump(versions, handle)
     env = {**os.environ, "ARGUS_APPLY_DATABASE_URL": rehearse.url(database)}
     subprocess.run(
-        [sys.executable, str(ROOT / "scripts/ops/apply_approved_migrations.py"), "--candidate-sha", CANDIDATE,
+        [sys.executable, str(ROOT / "scripts/ops/apply_approved_migrations.py"), "--candidate-sha", candidate or CANDIDATE,
          "--approved-file", handle.name, "--allow-host", "127.0.0.1", "--allow-database", database, "--execute", *extra],
         check=True, env=env, cwd=ROOT, stdout=subprocess.DEVNULL,
     )  # fmt: skip
@@ -150,7 +152,56 @@ def run_tests(code_root: Path, schema: str, label: str) -> dict[str, object]:
     }
 
 
+def add_storage_schema(database: str) -> None:
+    """Hosted Supabase always has the storage schema; the throwaway databases get it from the local container."""
+
+    container = rehearse.CONTAINER
+    dump = subprocess.check_output(
+        [
+            "docker",
+            "exec",
+            container,
+            "pg_dump",
+            "-U",
+            "postgres",
+            "-s",
+            "-n",
+            "storage",
+            "postgres",
+        ]
+    )
+    subprocess.run(
+        ["docker", "exec", "-i", container, "psql", "-U", "postgres", "-d", database, "-q"],
+        input=dump, check=True, capture_output=True,
+    )  # fmt: skip
+
+
+def tail_main() -> int:
+    """After the freeze: the Business tail applied on top of C1, tested with Build 1 and Build 2 code."""
+
+    build2_root = Path(os.environ["ARGUS_COMPAT_BUILD2_ROOT"])
+    build2_sha = os.environ["ARGUS_COMPAT_BUILD2_SHA"]
+    tail = os.environ["ARGUS_COMPAT_TAIL"].split(",")
+    clone("compat_s2", "compat_s3")
+    add_storage_schema("compat_s3")
+    apply("compat_s3", tail, candidate=build2_sha)
+    results = []
+    for label, root in (
+        ("previous_main", OLD_ROOT),
+        ("build1", ROOT),
+        ("build2", build2_root),
+    ):
+        outcome = run_tests(root, "compat_s3", f"{label}__compat_s3")
+        outcome["code"] = label
+        print(json.dumps(outcome), flush=True)
+        results.append(outcome)
+    (HERE / "results_tail.json").write_text(json.dumps(results, indent=2))
+    return 0
+
+
 def main() -> int:
+    if os.environ.get("ARGUS_COMPAT_TAIL"):
+        return tail_main()
     build_schemas()
     results = []
     for code_label, code_root in (("previous_main", OLD_ROOT), ("candidate", ROOT)):
