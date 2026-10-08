@@ -49,26 +49,44 @@ Through the connected Render and Resend tools and public DNS lookups. Nothing wa
 - **Lifetime.** A non-persistent branch is removed when its PR is closed or merged, and preview branches auto-pause after inactivity.
 - **Outcome.** The branch was removed after #895 merged (a non-persistent branch goes with its PR); no one in this lane deleted it. Automatic previews are not part of the agreed spending plan and no paid upgrade is authorized, but the toggle cannot be changed on Free, so the plan is to watch rather than disable (below). The earlier "disable and delete" steps were withdrawn.
 
-### Automatic Supabase behavior (founder dashboard readback, then evidence)
+### Supabase GitHub integration (resolved 2026-10-08)
 
-The founder read the integration page directly. Supabase stays on the Free plan and no paid upgrade is authorized.
+The founder disabled the project's Supabase GitHub integration. Supabase stays on the Free plan and no paid upgrade is authorized.
 
 | Behavior | State | How known |
 | --- | --- | --- |
-| Deploy to production from `main` | **Off** | Founder, in the dashboard. Consistent with the API: the production branch record has no Git branch. |
-| Automatic branching | **Cannot be changed on Free.** The control is disabled behind a Pro upgrade and the branch limit reads 0 | Founder, in the dashboard |
+| Deploy to production from `main` | **Off** | Founder, in the dashboard; the production branch record has no Git branch |
+| Preview branching | **Gone with the integration** | Behavior, below |
 
-**An unexplained mismatch, to be investigated rather than worked around.** A preview branch was created for PR 895 seven seconds after it opened (17:27:22Z, 2026-10-07) although the limit now reads 0 and the organization reports the Free plan. It has since been removed. Whether branching was enabled earlier and the entitlement later lapsed, or the limit is read differently, is not known from here. The cost exposure of that one branch is unconfirmed (the connector quoted `0.01344` USD per branch-hour; the usage page's "Branching Compute Hours" would settle it).
+**Verified by behavior** (the API cannot show the connection itself): the branch list holds only the production `main` record; a probe commit pushed to a draft PR at 02:03:02 UTC carried 18 GitHub Actions checks and no Supabase check, where the previous head of the same PR had one; #905 (reopened), #908 and #909 (new PRs that change `supabase/migrations`) produced no preview, no Supabase check and no Supabase comment, read 30 seconds after each opened.
 
-**Standing check, no setting to change.** After the first Business PR that changes `supabase/migrations`, read the project's branch list (read-only Management API). If only the production `main` record is listed, the control is inert on Free and migration PRs are safe. If a preview appears, treat it as a mismatch to investigate (what created it, which entitlement allows it, what it costs) before further migration PRs, and do not ask for a toggle that does not exist. Deleting such a branch, or any other hosted change, still needs the founder's go.
+**Historic cost note, still open.** Two preview branches existed while the integration was on: the one for #895 (until it merged) and the one for #905 (about two minutes). Whether either was billed is unconfirmed; the connector quoted `0.01344` USD per branch-hour, and the usage page's "Branching Compute Hours" would settle it. The mismatch (previews created although the dashboard showed a branch limit of 0) is no longer live and was not explained.
 
-**Effect on CI.** `Supabase Preview` is not a required check anywhere (integration requires no checks; `main` requires only `ci`; there are no rulesets). A skipped or absent Preview check cannot block a merge. The repository's own `guest-release-gates` already replays every migration on a disposable local Supabase stack on the pinned and latest CLI and runs all `test_*_postgres.py` proofs, which is the coverage the founder's merge decision rests on.
+**Effect on CI.** `Supabase Preview` was never a required check, and it no longer runs. The repository's `guest-release-gates` job replays every migration on a disposable local Supabase stack on the pinned and latest CLI, and runs every `test_*_postgres.py` proof; that is the coverage the merge decision rests on.
+
+## `notify.cuadrao.ai` and the Cloudflare zone (2026-10-08)
+
+With the founder's approval, `notify.cuadrao.ai` was created in Resend (domain `520a3906-baaf-4e70-bd3e-eff49448a9e8`, region `us-east-1`, sending on, receiving off, open and click tracking off, TLS opportunistic). Resend returned records that differ from the root domain's, so they were copied exactly:
+
+| Type | Name | Content | Priority |
+| --- | --- | --- | --- |
+| TXT | `resend._domainkey.notify` | DKIM key beginning `p=MIGfMA0GCSqG`, ending `kTSD4EQIDAQAB` | |
+| MX | `send.notify` | `feedback-smtp.us-east-1.amazonses.com` | 10 |
+| TXT | `send.notify` | `v=spf1 include:amazonses.com ~all` | |
+| CNAME | `rsend.notify` | `send.forge.rmta.net` (DNS only) | |
+
+The founder added the DKIM record by hand and, through a zone-scoped, day-long Cloudflare token he created, the other three were added by a script that first ran as a dry run, refused to write unless the DKIM matched Resend's value exactly, and read the zone back. The zone had 9 records before and 12 after; **0 of the 9 existing records changed**. The iCloud mail records (two MX, SPF, the Apple domain TXT, the `sig1._domainkey` CNAME) and Resend's root-domain records are untouched. The token has since been deleted. Resend reports the domain **Verified** with all four records verified. No email has been sent. The sending key is created by the founder, limited to this domain, and never passes through the agent.
+
+## Migration identity (for the approval record)
+
+`supabase/migrations/20260920000000_cuadrao_early_access_signups.sql`: file SHA-256 `ea2a2a010d31f1c05222561d5f90fa024df2fac46a466107c7bdf3138d11aad0`; 5 statements; statement-array SHA-256 (the gate's `_statements_sha256`) `cafee0efce903bcdbdde9f2d1e200254a1f2a2486e26b8413d8d044e7ad4fbca`. The applier's run digest for this single-version run (`versions_digest(["20260920000000"])`) is `090e86fa74fb104a0d3984653624cf72fd65faa8ac7bb2a930ed937c73fb0f8f`; it hashes the version list, not the file. The migration is applied alone and first (C0); the consumer's `20260505000001` repair runs in its own batch and is not part of this release.
 
 ## Not yet true
 
-- Nothing is deployed. No Render service exists, no DNS or Resend record was changed, no migration was applied, no test email was sent.
-- Render, Resend and Cloudflare state was not read: the Render CLI token is expired, the Claude in Chrome extension is not connected, and those dashboards need a signed-in session.
-- Spanish copy, the privacy text facts and the provisional icon await founder review.
+- Nothing is deployed. No Render service exists, no migration was applied, no email was sent, and nothing was promoted to `main`.
+- The only hosted changes so far are the `notify.cuadrao.ai` Resend domain and its four DNS records (above), and the founder's disabling of the Supabase GitHub integration.
+- Spanish copy, the privacy text (draft PR #906) and the provisional icon await founder approval.
+- Hosted acceptance (real inquiry receipt, signup, removal, public domain) has not happened.
 
 ## Copy awaiting founder review
 
@@ -96,4 +114,4 @@ The privacy text states facts only the founder can confirm: the project is "en p
 
 ## Founder inputs and approvals needed
 
-Listed with the exact request in the PR. In short: Option B promotion exception, a signed-in way for read-only inspection of Render, Resend and Cloudflare (or the founder reads them back), the existing Supabase project reactivated, approved test addresses, the copy and privacy facts above, and review of the provisional icon.
+The concrete approval request, in deployment order, is posted on #880. In short: merge #903 and #906 (copy and icon approved), the website-only promotion to `main`, applying `20260920000000` alone through the consumer's reviewed applier, creating the Render service and its cost, the first inquiry and signup tests with two founder-supplied addresses, and publication.

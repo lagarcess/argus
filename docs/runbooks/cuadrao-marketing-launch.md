@@ -48,7 +48,7 @@ The practical consequence: the signup table can go to production alone and early
 
 ### Before any promotion
 
-1. Supabase "Deploy to production" is off (founder confirmed in the dashboard, 2026-10-07). Automatic branching cannot be changed on the Free plan; the branch list is checked after the first migration PR and any preview is investigated (launch record, "Automatic Supabase behavior").
+1. The Supabase GitHub integration is disabled (founder, 2026-10-08): production deploy is off and preview branching no longer runs, confirmed by behavior on three migration PRs (launch record, "Supabase GitHub integration").
 2. No paid upgrade or hosted migration is implied by anything in this runbook.
 3. Supabase stays on the Free plan; nothing here depends on a plan change.
 4. CI is terminal and green on the exact candidate, and the signup migration is not applied by promotion: the consumer's applier is the only production path.
@@ -130,7 +130,7 @@ Then the checks it cannot make:
 
 **Do not add forwarding, Cloudflare Email Routing, or any apex MX, SPF or DKIM change.** Email Routing would replace the iCloud MX records and take over the founder's mail. Everything below adds records only under `notify.cuadrao.ai`, which does not touch the apex.
 
-**Prepared change set for `notify.cuadrao.ai` (needs the founder's named approval; nothing below has been done):**
+**`notify.cuadrao.ai` change set. Steps 1 to 3 are done (2026-10-08, founder-approved); steps 4 to 6 wait for the Render step:**
 
 1. Resend: create the domain `notify.cuadrao.ai` in region `us-east-1` (the same as the root domain), open and click tracking off. This is a hosted write.
 2. Cloudflare DNS: add exactly the records Resend returns, all DNS only and all under `*.notify.cuadrao.ai`. Expect the same shape as the root domain: a DKIM TXT at `resend._domainkey.notify` and CNAMEs at `send.notify` and `rsend.notify` to Resend's forge hosts. Copy Resend's values verbatim; do not invent them. The apex records stay as they are.
