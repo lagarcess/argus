@@ -37,13 +37,11 @@ describe("window limiter", () => {
     expect(limiter.check("a")).toBe(1);
   });
 
-  test("drops a key's stored value once its window has passed, even if the key never returns", () => {
-    let now = 1_000_000;
-    const limiter = new WindowLimiter(5, 10_000, () => now);
+  test("a timer drops a key's stored value after its window, with no further submission", async () => {
+    const limiter = new WindowLimiter(5, 20);
     limiter.check("visitor@example.invalid");
     expect(limiter.tracked).toBe(1);
-    now += 25_000;
-    limiter.check("someone-else");
-    expect(limiter.tracked).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(limiter.tracked).toBe(0);
   });
 });
