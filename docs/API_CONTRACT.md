@@ -3466,6 +3466,37 @@ What remains is inert compatibility state only:
 
 # 11. Conversations
 
+**Chat surfaces.** A person has two chat histories: Personal (`/chat`) and
+Business (`/biz`). The client names a `surface`, `personal` (the default) or
+`business`, and never a space. The server resolves `business` to the person's
+own space through `resolve_business_scope`. Without
+`ARGUS_BUSINESS_PILOT_ENABLED` it answers 404 `business_unavailable`, and before
+the person starts their space it answers 404 `business_space_missing`, like the
+Business routes. A conversation stores its side in `owner_space_id` (null is
+Personal), so every conversation written before Business existed is Personal.
+`GET /conversations`, `POST /conversations`, `DELETE /conversations`,
+`GET /history` and `GET /search` take the surface and return or change only
+that side's conversations, with the Business flag on or off. A request without
+`surface` is exactly the Personal request it was before. Reads by conversation
+id (messages, activity, `PATCH`, `DELETE /conversations/{id}`) stay owner-scoped
+and serve both sides. A continued computed answer keeps its source's side; a
+fork of a public receipt is Personal.
+
+Personal artifacts never attach to a Business conversation. The decision,
+computation re-run, evidence decision, sharing (`public-excerpt*`) and receipt
+fork routes answer 404 `not_found` ("Conversation not found.") for a Business
+conversation, or for evidence a Business conversation produced. A Business
+chat turn recalls no saved memory, and `POST /memory/candidates` and
+`POST /memory/candidates/saved-decision` answer 400 `invalid_memory_request`
+when a source is a Business conversation, one of its messages, or evidence it
+produced.
+
+## `GET /conversations`
+
+**Query Params:**
+- `limit`, `cursor`, `archived`, `deleted`
+- `surface=personal|business` (Optional; default `personal`)
+
 **Response:**
 ```json
 {
@@ -3499,10 +3530,12 @@ Create new chat thread.
 ```json
 {
   "title": null,
-  "language": "es"
+  "language": "es",
+  "surface": "business"
 }
 ```
 *Note: `language` is optional; if omitted, backend resolves from user profile or fallback.*
+*Note: `surface` is optional (`personal` by default); `business` creates the chat in the person's Business space.*
 *Note: If title is not provided, backend may use a system placeholder until AI-generated title is available.*
 
 **Response:**
@@ -3517,9 +3550,11 @@ Create new chat thread.
 
 ## `DELETE /conversations`
 
-Soft delete all non-deleted conversations owned by the authenticated user,
-including active and archived conversations. Already-deleted conversations are
-ignored so repeated calls are safe and return `deleted_count: 0`.
+Soft delete all non-deleted conversations owned by the authenticated user on
+one surface (`?surface=personal|business`, default `personal`), including
+active and archived conversations. Deleting all in `/chat` leaves Business
+chats alone, and the reverse. Already-deleted conversations are ignored so
+repeated calls are safe and return `deleted_count: 0`.
 
 **Response:**
 ```json
@@ -6056,6 +6091,9 @@ Mixed recent activity feed.
 - `asset_class=equity|crypto|currency_pair` (Optional filter)
 - `archived=false` (Optional; archived conversations are excluded by default)
 - `deleted=false` (Optional; soft-deleted items are excluded by default)
+- `surface=personal|business` (Optional; default `personal`). Business returns
+  only Business chats and the runs of Business chats; strategies, collections
+  and runs without a conversation are Personal.
 
 **Response:**
 ```json
@@ -6139,6 +6177,11 @@ the `/search` contract.
   canonical `archived` state so an already-open Recents surface can remove a
   conversation archived elsewhere without hiding archived conversations from
   ordinary Omnisearch.
+- `surface=personal|business`: optional, default `personal`. Every
+  conversation, message, run, idea, evidence and decision match, the asset row
+  and computed answers come only from that side's conversations. The `/biz`
+  client never asks for ledger groups, because Business chats hold no saved
+  decisions.
 
 **Response:**
 ```json
