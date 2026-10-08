@@ -84,14 +84,21 @@ class HostedApproval:
     expires_at: datetime
 
 
-def versions_digest(approved: Sequence[str], unrecorded: Sequence[str] = ()) -> str:
-    """One digest for the exact run: what is recorded and what runs without a ledger row."""
+def versions_digest(
+    approved: Sequence[str],
+    unrecorded: Sequence[str] = (),
+    mid_file_commit: Sequence[str] = (),
+) -> str:
+    """One digest for the exact run: what is recorded, what runs without a ledger row, and
+    which files are allowed to commit in several transactions."""
 
     text = (
         "recorded:"
         + ",".join(sorted(approved))
         + "|unrecorded:"
         + ",".join(sorted(unrecorded))
+        + "|mid-file-commit:"
+        + ",".join(sorted(mid_file_commit))
     )
     return hashlib.sha256(text.encode()).hexdigest()
 
@@ -102,6 +109,7 @@ def parse_hosted_approval(
     approved: Sequence[str],
     unrecorded: Sequence[str],
     now: datetime,
+    mid_file_commit: Sequence[str] = (),
 ) -> HostedApproval:
     """Validate a hosted approval record against this exact run, or refuse."""
 
@@ -126,8 +134,14 @@ def parse_hosted_approval(
         raise ApplyError("the hosted approval record must list at least one host")
     if _REF.fullmatch(raw["project_ref"]) is None:
         raise ApplyError("the hosted approval project ref is not a Supabase project ref")
-    if not all(_is_hosted(host) for host in hosts):
-        raise ApplyError("the hosted approval hosts must be Supabase host names")
+    direct = f"db.{raw['project_ref']}.supabase.co"
+    if not all(
+        _plain_host(host) == direct or _plain_host(host).endswith(".pooler.supabase.com")
+        for host in hosts
+    ):
+        raise ApplyError(
+            "the hosted approval hosts must be the project's direct host or a Supabase pooler host"
+        )
     if (
         _SHA.fullmatch(raw["candidate_sha"]) is None
         or raw["candidate_sha"] != candidate_sha
@@ -135,7 +149,7 @@ def parse_hosted_approval(
         raise ApplyError(
             "the hosted approval was issued for a different candidate commit"
         )
-    if raw["versions_sha256"] != versions_digest(approved, unrecorded):
+    if raw["versions_sha256"] != versions_digest(approved, unrecorded, mid_file_commit):
         raise ApplyError(
             "the hosted approval was issued for a different list of versions"
         )
@@ -166,15 +180,34 @@ def read_committed_record(root: Path, path: str, candidate_sha: str) -> str:
             ["git", *args], cwd=root, capture_output=True, text=True, check=False
         )
 
-    if git("ls-files", "--error-unmatch", "--", path).returncode != 0:
+    parts = Path(path).parts
+    if (
+        Path(path).is_absolute()
+        or ".." in parts
+        or tuple(parts[:2]) != ("docs", "release-manifests")
+    ):
+        raise ApplyError(
+            "the hosted approval record must be a path under docs/release-manifests/"
+        )
+    staged = git("ls-files", "-s", "--", path)
+    if staged.returncode != 0 or not staged.stdout.strip():
         raise ApplyError("the hosted approval record is not tracked by git")
+    if staged.stdout.split()[0] == "120000":
+        raise ApplyError(
+            "the hosted approval record must be a regular file, not a symlink"
+        )
     if git("diff", "--quiet", "HEAD", "--", path).returncode != 0:
         raise ApplyError("the hosted approval record has uncommitted changes")
-    if git("merge-base", "--is-ancestor", candidate_sha, "HEAD").returncode != 0:
+    if candidate_sha == git("rev-parse", "HEAD").stdout.strip() or (
+        git("merge-base", "--is-ancestor", candidate_sha, "HEAD").returncode != 0
+    ):
         raise ApplyError(
             "the hosted approval record is not committed on top of the candidate"
         )
-    return (root / path).read_text()
+    blob = git("show", f"HEAD:{path}")
+    if blob.returncode != 0:
+        raise ApplyError("the hosted approval record could not be read from HEAD")
+    return blob.stdout
 
 
 class ApplyError(RuntimeError):
@@ -230,10 +263,13 @@ def check_target(
             raise ApplyError("target host is not named by the hosted approval record")
         if not {_plain_host(value) for value in allow_hosts} <= set(hosted.hosts):
             raise ApplyError("an allowed host is not named by the hosted approval record")
-        if hosted.project_ref not in host and not (parts.username or "").endswith(
-            "." + hosted.project_ref
-        ):
+        direct = f"db.{hosted.project_ref}.supabase.co"
+        if host != direct and (parts.username or "") != f"postgres.{hosted.project_ref}":
             raise ApplyError("the target does not carry the approved project ref")
+        if (parts.port or 5432) != 5432:
+            raise ApplyError(
+                "a hosted target must use port 5432 (a transaction pooler breaks the run lock)"
+            )
         if parts.path.lstrip("/") != hosted.database:
             raise ApplyError(
                 "target database is not the one the hosted approval record names"
@@ -473,6 +509,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="repository path of the committed hosted approval record (hosted targets only)",
     )
     parser.add_argument(
+        "--ssl-root-cert",
+        help="CA bundle used to verify the hosted server (hosted targets only, verify-full)",
+    )
+    parser.add_argument(
         "--hosted-confirm",
         help="the approval record's id, repeated; required to execute on a hosted target",
     )
@@ -495,7 +535,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         hosted = parse_hosted_approval(
             read_committed_record(Path.cwd(), args.hosted_approval, args.candidate_sha),
             args.candidate_sha, approved, args.unrecorded, datetime.now(timezone.utc),
+            args.allow_mid_file_commit,
         )  # fmt: skip
+        if not args.ssl_root_cert or not Path(args.ssl_root_cert).is_file():
+            raise ApplyError(
+                "a hosted target needs --ssl-root-cert pointing at the CA bundle"
+            )
         if args.execute and args.hosted_confirm != hosted.id:
             raise ApplyError(
                 "--hosted-confirm must repeat the hosted approval record's id to execute"
@@ -505,8 +550,13 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     import psycopg
 
-    sslmode = "require" if hosted else "prefer"  # prefer is libpq's own default
-    with psycopg.connect(url, autocommit=True, sslmode=sslmode) as connection:
+    if hosted:
+        connection_context = psycopg.connect(
+            url, autocommit=True, sslmode="verify-full", sslrootcert=args.ssl_root_cert
+        )
+    else:
+        connection_context = psycopg.connect(url, autocommit=True)
+    with connection_context as connection:
         verify_connection(connection, args.allow_host, args.allow_database, hosted)
         locked = connection.execute(
             "select pg_try_advisory_lock(%s)", (_ADVISORY_LOCK_KEY,)

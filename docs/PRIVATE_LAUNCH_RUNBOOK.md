@@ -980,25 +980,34 @@ After a stop, everything printed as committed stays applied; recorded files show
 in the ledger, but `--unrecorded` steps leave no trace, so take each reported one
 out of the retry command.
 
-**Hosted targets.** Pass `--hosted-approval <path>` with a JSON record committed
-under `docs/release-manifests/` on top of the candidate commit. It has exactly
-these keys: `id`, `project_ref`, `hosts`, `database`, `candidate_sha`,
+**Hosted targets.** Pass `--hosted-approval <path>` with a JSON record under
+`docs/release-manifests/` (the tool refuses any other path), committed on top of
+the candidate commit, and `--ssl-root-cert <CA bundle>`. It has exactly these
+keys: `id`, `project_ref`, `hosts`, `database`, `candidate_sha`,
 `versions_sha256`, `issued_at`, `expires_at`, `approved_by`,
 `approval_reference`. The tool refuses unless all of these hold:
 
-- the file is tracked, unmodified, and committed after `--candidate-sha`;
+- the file is a regular tracked file (not a symlink), unmodified, and committed
+  after `--candidate-sha`; it is read from the committed blob;
 - `candidate_sha` equals `--candidate-sha`;
-- `versions_sha256` equals the digest of this exact run (the recorded versions
-  and the `--unrecorded` ones, sorted), so a changed list needs a new record;
+- `versions_sha256` equals the digest of this exact run: the recorded versions,
+  the `--unrecorded` ones and the `--allow-mid-file-commit` ones, each sorted.
+  A different batch, or a retry with a different list after a stop, needs a new
+  record;
 - the record is valid now and for at most three days (ISO 8601 with a time zone);
-- the host is named in `hosts`, carries the project ref (in the host name, or as
-  the pooler user `postgres.<ref>`), and the database matches;
-- the connection itself reaches a named host and database, with TLS required.
+- every `hosts` entry is the project's direct host `db.<ref>.supabase.co` or a
+  Supabase pooler host; the target is one of them, uses port 5432 (a
+  transaction pooler breaks the run lock), carries the project ref (direct host,
+  or the pooler user `postgres.<ref>` exactly), and the database matches;
+- the connection reaches a named host and database, and the server certificate
+  is verified against `--ssl-root-cert` (verify-full, as the gate does).
 
 `--execute` also needs `--hosted-confirm <id>` repeating the record's id. The
 record is the founder's approval made reviewable. It does not authorize
 anything by existing; the founder approves the run before it is committed. A
-record never applies to a target that is not hosted.
+record never applies to a target that is not hosted. For a hosted target the
+resolved address is not on any list; the verified certificate replaces that
+check.
 
 ```bash
 ARGUS_APPLY_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/rehearsal \

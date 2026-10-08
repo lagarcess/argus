@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
@@ -625,103 +626,133 @@ def test_the_record_must_be_tracked_clean_and_on_top_of_the_candidate(
     tmp_path: Path,
 ) -> None:
     root, sha = _repo(tmp_path)
-    record = root / "approval.json"
+    path = "docs/release-manifests/approval.json"
+    record = root / path
+    record.parent.mkdir(parents=True)
     record.write_text("{}")
     with pytest.raises(applier.ApplyError, match="not tracked"):
-        applier.read_committed_record(root, "approval.json", sha)
-    _git(root, "add", "approval.json")
+        applier.read_committed_record(root, path, sha)
+    _git(root, "add", path)
+    with pytest.raises(applier.ApplyError, match="uncommitted"):
+        applier.read_committed_record(root, path, sha)
     _git(root, "commit", "-q", "-m", "approval")
-    assert applier.read_committed_record(root, "approval.json", sha) == "{}"
+    assert applier.read_committed_record(root, path, sha) == "{}"
     record.write_text('{"edited": true}')
     with pytest.raises(applier.ApplyError, match="uncommitted"):
-        applier.read_committed_record(root, "approval.json", sha)
+        applier.read_committed_record(root, path, sha)
     record.write_text("{}")
+    other = subprocess.run(
+        ["git", "commit-tree", "HEAD^{tree}", "-m", "unrelated"], cwd=root, check=True,
+        capture_output=True, text=True, env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.test",
+        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.test"},
+    ).stdout.strip()  # fmt: skip
     with pytest.raises(applier.ApplyError, match="on top of the candidate"):
-        applier.read_committed_record(root, "approval.json", "c" * 40)
+        applier.read_committed_record(root, path, other)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    with pytest.raises(applier.ApplyError, match="on top of the candidate"):
+        applier.read_committed_record(root, path, head)
 
 
-class _HostedServer(_Server):
-    def __init__(self, ledger: list[str]) -> None:
-        super().__init__(ledger)
-        self.info = SimpleNamespace(host=DIRECT, hostaddr="3.4.5.6")
-
-    def execute(self, sql: str, params: object = None) -> _Cursor:
-        if "current_database" in sql:
-            self.statements.append(sql)
-            return _Cursor([("postgres",)])
-        return super().execute(sql, params)
-
-
-def _run_hosted(
-    monkeypatch: pytest.MonkeyPatch,
+def test_the_record_is_read_from_the_commit_not_the_working_tree_and_never_a_symlink(
     tmp_path: Path,
-    server: _Server,
-    record: str,
-    *extra: str,
-) -> int:
-    approved = tmp_path / "approved.json"
-    approved.write_text(json.dumps(["20260925120000"]))
-    monkeypatch.setenv(
-        "ARGUS_APPLY_DATABASE_URL", f"postgresql://postgres:p@{DIRECT}:5432/postgres"
+) -> None:
+    root, sha = _repo(tmp_path)
+    outside = tmp_path.parent / "outside-record.json"
+    outside.write_text("{}")
+    link = root / "docs/release-manifests/linked.json"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(outside)
+    _git(root, "add", ".")
+    _git(root, "commit", "-q", "-m", "linked record")
+    with pytest.raises(applier.ApplyError, match="symlink"):
+        applier.read_committed_record(root, "docs/release-manifests/linked.json", sha)
+
+
+@pytest.mark.parametrize(
+    "path", ["approval.json", "docs/other/approval.json", "../approval.json", "/etc/passwd",
+             "docs/release-manifests/../../approval.json"],
+)  # fmt: skip
+def test_the_record_path_must_sit_under_release_manifests(
+    tmp_path: Path, path: str
+) -> None:
+    root, sha = _repo(tmp_path)
+    with pytest.raises(applier.ApplyError, match="under docs/release-manifests"):
+        applier.read_committed_record(root, path, sha)
+
+
+def test_a_hosted_target_must_use_port_5432() -> None:
+    with pytest.raises(applier.ApplyError, match="port 5432"):
+        applier.check_target(
+            f"postgresql://postgres.{REF}:p@{POOLER}:6543/postgres", [POOLER], ["postgres"],
+            environ={}, hosted=_approval(),
+        )  # fmt: skip
+
+
+def test_a_record_cannot_name_another_projects_direct_host() -> None:
+    with pytest.raises(applier.ApplyError, match="direct host"):
+        _approval(hosts=["db.zzzzzzzzzzzzzzzzzzzz.supabase.co"])
+
+
+def test_the_pooler_user_must_be_exactly_postgres_dot_the_ref() -> None:
+    for user in (f"postgres.x{REF}", f"postgres.{REF}x", REF, "postgres"):
+        with pytest.raises(applier.ApplyError):
+            applier.check_target(
+                f"postgresql://{user}:p@{POOLER}:5432/postgres", [POOLER], ["postgres"],
+                environ={}, hosted=_approval(),
+            )  # fmt: skip
+
+
+def test_the_digest_covers_which_files_may_commit_in_several_transactions() -> None:
+    assert applier.versions_digest(VERSIONS) != applier.versions_digest(
+        VERSIONS, (), ["20261003120001"]
     )
-    for name in applier._REFUSED_ENVIRONMENT:
-        monkeypatch.delenv(name, raising=False)
-    seen: dict[str, object] = {}
 
-    def connect(*_a: object, **options: object) -> _Server:
-        seen.update(options)
-        return server
 
-    monkeypatch.setattr("psycopg.connect", connect)
-    monkeypatch.setattr(applier.gate, "read_candidate_migrations", lambda *_a: CANDIDATES)
+def test_a_hosted_run_needs_the_ca_bundle(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    record = _record(versions_sha256=applier.versions_digest(["20260925120000"]))
     monkeypatch.setattr(applier, "read_committed_record", lambda *_a: record)
     monkeypatch.setattr(
         applier,
         "datetime",
         SimpleNamespace(now=lambda _tz: NOW, fromisoformat=datetime.fromisoformat),
     )
-    result = applier.main(
-        ["--candidate-sha", SHA, "--approved-file", str(approved), "--allow-host", DIRECT,
-         "--allow-database", "postgres", "--hosted-approval", "approval.json", *extra]
-    )  # fmt: skip
-    assert seen["sslmode"] == "require", "a hosted connection requires TLS"
-    return result
+    approved = tmp_path / "approved.json"
+    approved.write_text(json.dumps(["20260925120000"]))
+    monkeypatch.setenv(
+        "ARGUS_APPLY_DATABASE_URL", f"postgresql://postgres:p@{DIRECT}:5432/postgres"
+    )
+    with pytest.raises(applier.ApplyError, match="ssl-root-cert"):
+        applier.main(
+            ["--candidate-sha", SHA, "--approved-file", str(approved), "--allow-host", DIRECT,
+             "--allow-database", "postgres", "--hosted-approval", "docs/release-manifests/a.json"]
+        )  # fmt: skip
 
 
-def test_a_hosted_dry_run_needs_only_the_record(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    record = _record(versions_sha256=applier.versions_digest(["20260925120000"]))
-    assert _run_hosted(monkeypatch, tmp_path, _HostedServer(APPLIED), record) == 0
-    assert "dry run" in capsys.readouterr().out
-
-
-def test_a_hosted_execute_needs_the_records_id_repeated(
+def test_a_local_run_leaves_the_ssl_mode_to_libpq(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    record = _record(versions_sha256=applier.versions_digest(["20260925120000"]))
-    with pytest.raises(applier.ApplyError, match="--hosted-confirm"):
-        _run_hosted(monkeypatch, tmp_path, _HostedServer(APPLIED), record, "--execute")
-    with pytest.raises(applier.ApplyError, match="--hosted-confirm"):
-        _run_hosted(
-            monkeypatch,
-            tmp_path,
-            _HostedServer(APPLIED),
-            record,
-            "--execute",
-            "--hosted-confirm",
-            "other",
-        )
-    server = _HostedServer(APPLIED)
-    assert (
-        _run_hosted(
-            monkeypatch,
-            tmp_path,
-            server,
-            record,
-            "--execute",
-            "--hosted-confirm",
-            "apply-2026-10-20",
-        )
-        == 0
+    seen: dict[str, object] = {}
+    server = _Server(APPLIED)
+
+    def connect(*_a: object, **options: object) -> _Server:
+        seen.update(options)
+        return server
+
+    approved = tmp_path / "approved.json"
+    approved.write_text(json.dumps(["20260925120000"]))
+    monkeypatch.setenv(
+        "ARGUS_APPLY_DATABASE_URL", "postgresql://u:p@127.0.0.1:5432/rehearsal"
     )
+    for name in applier._REFUSED_ENVIRONMENT:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr("psycopg.connect", connect)
+    monkeypatch.setattr(applier.gate, "read_candidate_migrations", lambda *_a: CANDIDATES)
+    applier.main(
+        ["--candidate-sha", "x" * 40, "--approved-file", str(approved),
+         "--allow-host", "127.0.0.1", "--allow-database", "rehearsal"]
+    )  # fmt: skip
+    assert "sslmode" not in seen and "sslrootcert" not in seen
