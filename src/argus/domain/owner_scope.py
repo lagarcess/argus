@@ -2,14 +2,16 @@
 
 A root row (account, source connection, import event, conversation) stores
 ``owner_space_id``. Null is Personal; a Business row stores its space id. The
-predicate text lives only in ``sql_predicate`` and the in-memory twins use
-``holds``, so the null rule has one owner. Every scoped reader and writer takes
+rule lives only here: ``sql_predicate``, ``sql_named_predicate`` and
+``sql_named_join_predicate`` for SQL, ``postgrest_scoped`` for PostgREST, and
+``holds`` for the in-memory twins. Every scoped reader and writer takes
 ``scope`` as a required keyword: a caller states which side it means.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -50,3 +52,36 @@ def sql_predicate(scope: OwnerScope, column: str) -> tuple[str, tuple[str, ...]]
     if isinstance(scope, BusinessSpace):
         return f"{column} = %s", (scope.space_id,)
     return f"{column} is null", ()
+
+
+SCOPE_PARAMETER = "owner_space_id"
+
+
+def sql_named_predicate(scope: OwnerScope, column: str) -> str:
+    """The same rule for SQL that binds by name; bind ``SCOPE_PARAMETER`` to ``space_id``.
+
+    Use it where the rows are found by scanning the owner's rows: ``is null``
+    keeps the owner's indexes usable.
+    """
+
+    if isinstance(scope, BusinessSpace):
+        return f"{column} = %({SCOPE_PARAMETER})s::uuid"
+    return f"{column} is null"
+
+
+def sql_named_join_predicate(column: str) -> str:
+    """One text for both sides, for rows already reached by id through a join.
+
+    Bind ``SCOPE_PARAMETER`` to ``space_id``. Postgres cannot use an index for
+    ``is not distinct from``, so it is only for rows the join already found.
+    """
+
+    return f"{column} is not distinct from %({SCOPE_PARAMETER})s::uuid"
+
+
+def postgrest_scoped(query: Any, scope: OwnerScope, column: str) -> Any:
+    """The same rule as a PostgREST filter on ``query``."""
+
+    if isinstance(scope, BusinessSpace):
+        return query.eq(column, scope.space_id)
+    return query.is_(column, "null")

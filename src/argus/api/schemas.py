@@ -255,9 +255,15 @@ class ProfilePatch(BaseModel):
     currency_override: TenderCurrencyCode = None
 
 
+ConversationSurface = Literal["personal", "business"]
+
+
 class ConversationCreate(BaseModel):
     title: str | None = None
     language: Language | None = None
+    #: Which chats the new conversation joins. The server resolves Business to
+    #: the person's own space; the client never names a space.
+    surface: ConversationSurface = "personal"
 
 
 class ConversationPatch(BaseModel):

@@ -66,7 +66,7 @@ from argus.api.chat.guest_compute_ceiling import (
 from argus.api.chat.measurement_events import (
     schedule_runtime_measurement_events_after_stream,
 )
-from argus.api.chat.memory_recall import memory_recalls_for_turn_async
+from argus.api.chat.memory_recall import annotate_memory_recalls
 from argus.api.chat.recovery import (
     RuntimeFallbackContext,
     checkpoint_has_pending_confirmation,
@@ -1232,15 +1232,15 @@ async def chat_stream(
                         if live_retry is not None:
                             runtime_result["retry_last_turn"] = live_retry
                     else:
-                        memory_recalls = await memory_recalls_for_turn_async(
+                        await annotate_memory_recalls(
+                            metadata,
+                            runtime_result,
                             user=user,
                             account=turn_account,
+                            conversation_id=conversation.id,
                             user_message=display_message,
                             memory_opt_out=payload.memory_opt_out,
                         )
-                        if memory_recalls:
-                            metadata["memory_recalls"] = memory_recalls
-                            runtime_result["memory_recalls"] = memory_recalls
                         assistant_message = lifecycle_hooks.complete(
                             content=persisted_text or "",
                             metadata=metadata,

@@ -12,6 +12,12 @@ from argus.api.chat.legacy_onboarding_markers import (
     legacy_onboarding_sql_filters,
 )
 from argus.api.schemas import SearchAssetRollup
+from argus.domain.owner_scope import (
+    SCOPE_PARAMETER,
+    OwnerScope,
+    space_id,
+    sql_named_join_predicate,
+)
 from argus.domain.search_sql_text import (
     normalizer_expression,
     symbol_index_expression,
@@ -24,6 +30,9 @@ from argus.domain.search_text import (
 )
 
 _SEARCH_ACQUIRE_TIMEOUT_SECONDS = 2.0
+# Every public.conversations read keeps one side: Personal or one Business space.
+_CONVERSATION_IN_SCOPE_TEXT = sql_named_join_predicate("conversation.owner_space_id")
+_CONVERSATION_IN_SCOPE = sql.SQL(_CONVERSATION_IN_SCOPE_TEXT)
 _CONVERSATION_MATCH_OVERSAMPLE = 10
 _MAX_CONVERSATION_MATCHES_PER_SOURCE = 1_010
 _DECISION_STATES = ("promising", "watching", "rejected", "revisit_later")
@@ -605,6 +614,7 @@ def _conversation_match_ctes(
             join public.conversations as conversation
               on conversation.id = source_winner.conversation_id
              and conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
              and (
                  not input.guest_scope
@@ -616,6 +626,7 @@ def _conversation_match_ctes(
             )
             """
         ).format(
+            conversation_in_scope=_CONVERSATION_IN_SCOPE,
             source_sql=source_sql,
             cursor_predicate=cursor_predicate,
             window_order_sql=window_order_sql,
@@ -682,6 +693,7 @@ def _conversation_match_ctes(
         from input
         join public.conversations as conversation
           on conversation.user_id = input.user_id
+         and {conversation_in_scope}
          and conversation.deleted_at is null
          and (
              not input.guest_scope
@@ -700,6 +712,7 @@ def _conversation_match_ctes(
         )
         """
     ).format(
+        conversation_in_scope=_CONVERSATION_IN_SCOPE,
         matched_text_sql=conversation_matched_text,
         chat_title_predicate=chat_title_predicate,
         chat_preview_predicate=chat_preview_predicate,
@@ -723,6 +736,7 @@ def _conversation_match_ctes(
         join public.conversations as conversation
           on conversation.id = message.conversation_id
          and conversation.user_id = input.user_id
+         and {conversation_in_scope}
          and conversation.deleted_at is null
          and (
              not input.guest_scope
@@ -734,6 +748,7 @@ def _conversation_match_ctes(
           and ({message_predicate})
         """
     ).format(
+        conversation_in_scope=_CONVERSATION_IN_SCOPE,
         message_predicate=message_predicate,
         decision_filter=_CONVERSATION_DECISION_FILTER,
     )
@@ -753,6 +768,7 @@ def _conversation_match_ctes(
         join public.conversations as conversation
           on conversation.id = run.conversation_id
          and conversation.user_id = input.user_id
+         and {conversation_in_scope}
          and conversation.deleted_at is null
          and (
              not input.guest_scope
@@ -770,6 +786,7 @@ def _conversation_match_ctes(
           )
         """
     ).format(
+        conversation_in_scope=_CONVERSATION_IN_SCOPE,
         matched_text_sql=run_matched_text,
         run_predicate=run_predicate,
         run_symbol_predicate=run_symbol_predicate,
@@ -790,6 +807,7 @@ def _conversation_match_ctes(
         join public.conversations as conversation
           on conversation.id = idea.source_conversation_id
          and conversation.user_id = input.user_id
+         and {conversation_in_scope}
          and conversation.deleted_at is null
          and (
              not input.guest_scope
@@ -801,6 +819,7 @@ def _conversation_match_ctes(
           and ({idea_predicate})
         """
     ).format(
+        conversation_in_scope=_CONVERSATION_IN_SCOPE,
         matched_text_sql=idea_matched_text,
         idea_predicate=idea_predicate,
         decision_filter=_CONVERSATION_DECISION_FILTER,
@@ -820,6 +839,7 @@ def _conversation_match_ctes(
         join public.conversations as conversation
           on conversation.id = evidence.source_conversation_id
          and conversation.user_id = input.user_id
+         and {conversation_in_scope}
          and conversation.deleted_at is null
          and (
              not input.guest_scope
@@ -831,6 +851,7 @@ def _conversation_match_ctes(
           and ({evidence_predicate})
         """
     ).format(
+        conversation_in_scope=_CONVERSATION_IN_SCOPE,
         matched_text_sql=evidence_matched_text,
         evidence_predicate=evidence_predicate,
         decision_filter=_CONVERSATION_DECISION_FILTER,
@@ -853,6 +874,7 @@ def _conversation_match_ctes(
             join public.conversations as conversation
               on conversation.id = decision.source_conversation_id
              and conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
              and (
                  not input.guest_scope
@@ -860,7 +882,10 @@ def _conversation_match_ctes(
              )
              {decision_filter}
             """
-        ).format(decision_filter=_CONVERSATION_DECISION_FILTER),
+        ).format(
+            decision_filter=_CONVERSATION_DECISION_FILTER,
+            conversation_in_scope=_CONVERSATION_IN_SCOPE,
+        ),
         all_tokens=decision_all_tokens,
     )
     decision_candidates = (
@@ -1011,11 +1036,13 @@ def _conversation_match_ctes(
             join public.conversations as conversation
               on conversation.id = winning.conversation_id
              and conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
             cross join lateral ({activity_query}) as activity
         )
         """
     ).format(
+        conversation_in_scope=_CONVERSATION_IN_SCOPE,
         match_window_ctes=match_window_ctes,
         exact_rank_sql=conversation_exact_rank,
         symbol_rank_sql=conversation_symbol_rank,
@@ -1052,6 +1079,7 @@ def _asset_symbol_candidate_branch(slot: int) -> sql.Composed:
             join public.conversations as conversation
               on conversation.id = run.conversation_id
              and conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
              and (
                  not input.guest_scope
@@ -1070,6 +1098,7 @@ def _asset_symbol_candidate_branch(slot: int) -> sql.Composed:
         )
         """
     ).format(
+        conversation_in_scope=_CONVERSATION_IN_SCOPE,
         normalized_symbol=normalized_symbol,
         raw_symbol=raw_symbol,
     )
@@ -1150,6 +1179,7 @@ def _asset_rollup_ctes() -> sql.Composed:
             join public.conversations as conversation
               on conversation.id = run.conversation_id
              and conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
              and (
                  not input.guest_scope
@@ -1230,6 +1260,7 @@ def _asset_rollup_ctes() -> sql.Composed:
         )
         """
     ).format(
+        conversation_in_scope=_CONVERSATION_IN_SCOPE,
         candidate_branches=candidate_branches,
         matching_slot_predicates=matching_slot_predicates,
     )
@@ -1456,9 +1487,10 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
                     join public.conversations as conversation
                       on conversation.id = decision.source_conversation_id
                      and conversation.user_id = input.user_id
+                     and {conversation_in_scope}
                      and conversation.deleted_at is null
                     """
-                ),
+                ).format(conversation_in_scope=_CONVERSATION_IN_SCOPE),
                 all_tokens=decision_all_tokens,
             )
         )
@@ -1473,6 +1505,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
             from input
             join public.conversations as conversation
               on conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
             where (
                 input.normalized_query = ''
@@ -1497,6 +1530,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
             join public.conversations as conversation
               on conversation.id = message.conversation_id
              and conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
             where input.text_search_enabled
               and input.normalized_query <> ''
@@ -1512,6 +1546,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
             join public.conversations as conversation
               on conversation.id = run.conversation_id
              and conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
             where input.normalized_query <> ''
               and (
@@ -1532,6 +1567,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
             join public.conversations as conversation
               on conversation.id = idea.source_conversation_id
              and conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
             where input.text_search_enabled
               and input.normalized_query <> ''
@@ -1546,6 +1582,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
             join public.conversations as conversation
               on conversation.id = evidence.source_conversation_id
              and conversation.user_id = input.user_id
+             and {conversation_in_scope}
              and conversation.deleted_at is null
             where input.text_search_enabled
               and input.normalized_query <> ''
@@ -1573,6 +1610,7 @@ def _conversation_ledger_sql(*, has_anchor: bool) -> sql.Composed:
         group by decision_state
         """
     ).format(
+        conversation_in_scope=_CONVERSATION_IN_SCOPE,
         input_cte=_CONVERSATION_LEDGER_INPUT_CTE,
         decision_matches=decision_matches,
         chat_title_predicate=token_predicate(
@@ -1931,18 +1969,25 @@ cross join lateral (
     ) as source_activity
 ) as activity
 where conversation.user_id = %(user_id)s
+  and __CONVERSATION_IN_SCOPE__
   and conversation.deleted_at is null
   and conversation.id = any(%(conversation_ids)s::uuid[])
 order by array_position(%(conversation_ids)s::uuid[], conversation.id)
 """
 # The decision block derives its joins and text from the attachment
 # declaration; a plain replace keeps the jsonb braces in the template intact.
-_CONVERSATION_HYDRATION_SQL = _CONVERSATION_HYDRATION_TEMPLATE.replace(
-    "__DECISION_ATTACHMENT_JOINS__",
-    _decision_attachment_joins(user_expression="%(user_id)s"),
-).replace(
-    "__DECISION_ATTACHMENT_TEXT__",
-    _decision_attachment_text(),
+_CONVERSATION_HYDRATION_SQL = (
+    _CONVERSATION_HYDRATION_TEMPLATE.replace(
+        "__CONVERSATION_IN_SCOPE__", _CONVERSATION_IN_SCOPE_TEXT
+    )
+    .replace(
+        "__DECISION_ATTACHMENT_JOINS__",
+        _decision_attachment_joins(user_expression="%(user_id)s"),
+    )
+    .replace(
+        "__DECISION_ATTACHMENT_TEXT__",
+        _decision_attachment_text(),
+    )
 )
 
 
@@ -1954,6 +1999,7 @@ class PostgresSearchReader:
         self,
         *,
         user_id: str,
+        scope: OwnerScope,
         query: str,
         source_limit: int,
         cursor_updated_at: datetime | None = None,
@@ -2037,6 +2083,7 @@ class PostgresSearchReader:
         legacy_skip_message, legacy_goal_pattern = legacy_onboarding_sql_filters()
         params: dict[str, Any] = {
             "user_id": owner_id,
+            SCOPE_PARAMETER: space_id(scope),
             "normalized_query": normalized_query,
             # PostgreSQL text cannot represent NUL. Normalized matching remains
             # exact, while raw symbol equality must be false for such a query
@@ -2080,6 +2127,7 @@ class PostgresSearchReader:
                     grouped = _hydrate_conversation_recall(
                         cursor=cursor,
                         owner_id=owner_id,
+                        scope=scope,
                         grouped=grouped,
                         guest_conversation_id=(workspace_id if guest_scope else None),
                     )
@@ -2130,6 +2178,7 @@ class PostgresSearchReader:
                     grouped = _hydrate_conversation_recall(
                         cursor=cursor,
                         owner_id=owner_id,
+                        scope=scope,
                         grouped=grouped,
                         guest_conversation_id=(workspace_id if guest_scope else None),
                     )
@@ -2164,6 +2213,7 @@ def _hydrate_conversation_recall(
     *,
     cursor: Any,
     owner_id: UUID,
+    scope: OwnerScope,
     grouped: dict[str, list[dict[str, Any]]],
     guest_conversation_id: UUID | None,
 ) -> dict[str, list[dict[str, Any]]]:
@@ -2181,7 +2231,11 @@ def _hydrate_conversation_recall(
     if not unique_ids:
         return {group: [] for group in _CONVERSATION_ROW_GROUPS}
 
-    params = {"user_id": owner_id, "conversation_ids": unique_ids}
+    params = {
+        "user_id": owner_id,
+        SCOPE_PARAMETER: space_id(scope),
+        "conversation_ids": unique_ids,
+    }
     hydrated: dict[str, list[dict[str, Any]]] = {
         group: [] for group in _CONVERSATION_ROW_GROUPS
     }

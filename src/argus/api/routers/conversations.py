@@ -23,6 +23,7 @@ from argus.api.client_capabilities import (
 )
 from argus.api.conversation_activity import conversation_activity_service
 from argus.api.conversation_previews import conversation_previews
+from argus.api.conversation_surface import memory_conversation_in_scope, surface_scope
 from argus.api.decision_message_reads import owned_message_decisions
 from argus.api.dependencies import (
     current_user,
@@ -51,6 +52,7 @@ from argus.api.schemas import (
     ConversationCreate,
     ConversationPatch,
     ConversationResponse,
+    ConversationSurface,
     Message,
     PaginatedConversations,
     PaginatedMessages,
@@ -64,6 +66,7 @@ from argus.domain.backtest_message_projection import (
     hydrate_backtest_job_action_messages,
     represented_backtest_job_request_ids,
 )
+from argus.domain.owner_scope import PERSONAL
 from argus.domain.postgres_run_dossier_reader import RunDossierCursorError
 from argus.domain.run_dossiers import project_run_dossier
 from argus.domain.store import utcnow
@@ -172,6 +175,7 @@ def create_conversation(
     request: Request,
     user: User = Depends(current_user),  # noqa: B008
 ) -> ConversationResponse:
+    scope = surface_scope(request, user_id=user.id, surface=payload.surface)
     title = payload.title or "New idea"
     title_source = "user_renamed" if payload.title else "system_default"
     language = payload.language or user.language
@@ -221,6 +225,7 @@ def create_conversation(
                 title=title,
                 title_source=title_source,
                 language=language,
+                scope=scope,
             )
         except Exception as exc:
             if not dev_memory_fallback_enabled():
@@ -233,6 +238,7 @@ def create_conversation(
                 title=title,
                 title_source=title_source,
                 language=language,
+                scope=scope,
                 user_id=user.id,
             )
     else:
@@ -240,6 +246,7 @@ def create_conversation(
             title=title,
             title_source=title_source,
             language=language,
+            scope=scope,
             user_id=user.id,
         )
     return ConversationResponse(
@@ -292,8 +299,10 @@ def list_conversations(
     cursor: str | None = Query(None),
     archived: bool | None = Query(None),
     deleted: bool = Query(False),
+    surface: ConversationSurface = Query("personal"),  # noqa: B008
     user: User = Depends(current_user),  # noqa: B008
 ) -> PaginatedConversations:
+    scope = surface_scope(request, user_id=user.id, surface=surface)
     cursor_updated_at: datetime | None = None
     cursor_id: str | None = None
     if cursor:
@@ -307,6 +316,7 @@ def list_conversations(
         try:
             items = api_state.supabase_gateway.list_conversations(
                 user_id=user.id,
+                scope=scope,
                 limit=limit,
                 archived=archived,
                 deleted=deleted,
@@ -322,7 +332,7 @@ def list_conversations(
                 conversation.id,
                 user.id,
                 allow_unowned=True,
-            ):
+            ) or not memory_conversation_in_scope(conversation.id, scope):
                 continue
             if deleted:
                 if conversation.deleted_at is None:
@@ -382,8 +392,10 @@ def list_conversations(
 @router.delete("/conversations", response_model=BulkConversationDeleteResponse)
 def delete_all_conversations(
     request: Request,
+    surface: ConversationSurface = Query("personal"),  # noqa: B008
     user: User = Depends(current_user),  # noqa: B008
 ) -> BulkConversationDeleteResponse:
+    scope = surface_scope(request, user_id=user.id, surface=surface)
     require_account_capability(
         request,
         "can_manage_conversation",
@@ -393,6 +405,7 @@ def delete_all_conversations(
     if api_state.supabase_gateway is not None:
         deleted_count = api_state.supabase_gateway.soft_delete_all_conversations(
             user_id=user.id,
+            scope=scope,
         )
     else:
         now = utcnow()
@@ -402,7 +415,7 @@ def delete_all_conversations(
                 conversation_id,
                 user.id,
                 allow_unowned=False,
-            ):
+            ) or not memory_conversation_in_scope(conversation_id, scope):
                 continue
             if conversation.deleted_at is not None:
                 continue
@@ -413,8 +426,9 @@ def delete_all_conversations(
         # Supabase revokes inside the same statement, through the deleted_at
         # trigger. Repeating it here would add a request after the delete already
         # committed, and a timeout on that request would report 500 for work that
-        # durably succeeded.
-        revoke_all_receipts(user_id=user.id)
+        # durably succeeded. Receipts come only from Personal conversations.
+        if scope == PERSONAL:
+            revoke_all_receipts(user_id=user.id)
     return BulkConversationDeleteResponse(success=True, deleted_count=deleted_count)
 
 

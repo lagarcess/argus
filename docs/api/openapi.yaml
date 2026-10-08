@@ -1351,6 +1351,15 @@ paths:
         schema:
           type: boolean
           default: false
+      - name: surface
+        in: query
+        required: false
+        schema:
+          enum:
+          - personal
+          - business
+          type: string
+          default: personal
       responses:
         '200':
           description: Successful Response
@@ -1405,6 +1414,16 @@ paths:
     delete:
       tags:
       - conversations
+      parameters:
+      - name: surface
+        in: query
+        required: false
+        schema:
+          enum:
+          - personal
+          - business
+          type: string
+          default: personal
       responses:
         '200':
           description: Successful Response
@@ -1412,6 +1431,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BulkConversationDeleteResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '503':
           $ref: '#/components/responses/AuthSessionVerificationUnavailable'
         '500':
@@ -5863,6 +5888,15 @@ paths:
         schema:
           type: boolean
           default: false
+      - name: surface
+        in: query
+        required: false
+        schema:
+          enum:
+          - personal
+          - business
+          type: string
+          default: personal
       responses:
         '200':
           description: Successful Response
@@ -8919,6 +8953,15 @@ paths:
             minItems: 1
             maxItems: 50
           - type: 'null'
+      - name: surface
+        in: query
+        required: false
+        schema:
+          enum:
+          - personal
+          - business
+          type: string
+          default: personal
       - name: X-Argus-Client-Capabilities
         in: header
         required: false
@@ -11947,6 +11990,12 @@ components:
             - en
             - es-419
           - type: 'null'
+        surface:
+          type: string
+          enum:
+          - personal
+          - business
+          default: personal
       type: object
     ConversationOperation:
       properties:
