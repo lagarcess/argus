@@ -1009,6 +1009,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/business/search:
+    get:
+      tags:
+      - financial-accounts
+      - business
+      parameters:
+      - name: q
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 512
+      - name: limit
+        in: query
+        required: false
+        schema:
+          type: integer
+          maximum: 20
+          minimum: 1
+          default: 5
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessSearch'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/business/space:
     get:
       tags:
@@ -10840,6 +10882,27 @@ components:
       - needs_attention
       - last_received_at
       - last_confirmed_at
+    BusinessSearch:
+      properties:
+        expenses:
+          items:
+            $ref: '#/components/schemas/BusinessExpense'
+          type: array
+        receipts:
+          items:
+            $ref: '#/components/schemas/ReceiptSummary'
+          type: array
+        accounts:
+          items:
+            $ref: '#/components/schemas/BusinessAccount'
+          type: array
+      additionalProperties: false
+      type: object
+      required:
+      - expenses
+      - receipts
+      - accounts
+      description: Each list is capped at the request's ``limit``; nothing is paged.
     BusinessSpaceInfo:
       properties:
         id:
