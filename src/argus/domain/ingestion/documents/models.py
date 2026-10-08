@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -69,6 +69,10 @@ class ReceiptDetails(_Frozen):
     service: str | None = Field(default=None, max_length=80)
     tip: str | None = Field(default=None, max_length=80)
     total: str | None = Field(default=None, max_length=80)
+
+
+# A receipt whose rows do not reduce to one purchase at its total.
+RECEIPT_PURCHASE_AMBIGUOUS: Final = "receipt_purchase_ambiguous"
 
 
 class ProjectionIssue(_Frozen):
