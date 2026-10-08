@@ -42,6 +42,16 @@ The product is for business owners. It is not an accountant's workstation.
 One owner operates each pilot business. No employee submissions, associate
 accounts, approver hierarchy or household sharing is included. Private Business
 records must remain separate from the same person's Personal and Household data.
+The founder chose separate Personal and Business spaces on October 8; the
+[space slice plan](https://github.com/lagarcess/argus/pull/910) is the detailed
+isolation contract.
+
+This pilot is stage B1 of the
+[connected-flow spec](../cuadrao-business-connected-flow-spec.md) (#912), which
+owns the wider Business roadmap: the offline fiscal engine (E0), the connected
+period pilot with invoices, collections and the accountant package (B2), and
+separately authorized live fiscal processing (L). This pilot implements none of
+those. E0 starts after this slice is finished.
 
 ## Preserve the agreed experience
 
@@ -75,8 +85,9 @@ are outside this slice.
 ## Create menu, Inbox and Updates
 
 Founder clarification on October 7 adds a Slack-inspired **+ Create** control.
-Place it near the bottom of the desktop sidebar. Open a short menu with upload
-receipt, record expense and new chat. Expose only working actions. On small
+It sits on the sidebar row grid, sized like the other rows. Its short menu holds
+upload receipt and record expense. New chat appears once, at the top of the
+sidebar, not in Create. Expose only working actions. On small
 screens, keep Create reachable through responsive navigation without requiring
 a desktop sidebar. Show both layouts in the first preview.
 
@@ -183,6 +194,11 @@ an implementation requirement here.
 
 Use Meta's official Cloud API. During development use its test business number
 and approved testers, including the founder's personal WhatsApp as a sender.
+Founder decision, October 8: Cuadrao has one receiving number. Each owner links
+the personal number they already use to their Business space with a verified
+code. Owners do not buy a number or register their own WhatsApp API account.
+Only receipts the owner sends are processed; their other conversations are
+never read.
 Do not migrate the founder's personal number into a business sender. The company
 number is pending. Confirm test resources in the actual Meta account before
 claiming availability. Do not buy a number or subscribe to another provider.
@@ -224,7 +240,7 @@ The assessment must name owners for these concepts before implementation:
 
 | Concept | Required contract |
 | --- | --- |
-| Business context | Explicit owner/business/account authorization, independent of visual navigation and consumer household grants. Assess #819 before choosing schema. |
+| Business context | Explicit owner/business/account authorization, independent of visual navigation and consumer household grants. Decided October 8: one Business space per owner, compatible with #819, per the [space slice plan](https://github.com/lagarcess/argus/pull/910). |
 | Intake delivery | Source channel, provider delivery identity where applicable, owner, Business destination and linked document identity. |
 | Retained source | Private object reference, MIME type, size and fingerprint, authorized retrieval and deletion. |
 | Document draft | Existing durable identity, preparation status, version, consent, extracted evidence and editable proposal. |
