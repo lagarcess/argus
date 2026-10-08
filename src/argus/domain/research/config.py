@@ -126,12 +126,15 @@ SCENARIO_RETRIEVAL_INSTRUCTIONS = (
 )
 
 
+def research_rail_switched_on() -> bool:
+    """The default-off kill switch itself; the founder flips it at promotion."""
+    return os.getenv("ARGUS_RESEARCH_RAIL_ENABLED", "").strip().lower() in TRUE_VALUES
+
+
 def research_rail_enabled() -> bool:
-    """Default-off kill switch; the founder flips it at promotion. A Business
-    chat's turn never researches, whatever the switch says."""
-    if os.getenv("ARGUS_RESEARCH_RAIL_ENABLED", "").strip().lower() not in TRUE_VALUES:
-        return False
-    return surface_allows("research")
+    """Whether this turn may research: the switch is on and the turn is not in
+    a Business chat."""
+    return research_rail_switched_on() and surface_allows("research")
 
 
 class RetrievalLocation(BaseModel):

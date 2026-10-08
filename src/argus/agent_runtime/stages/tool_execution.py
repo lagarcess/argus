@@ -102,7 +102,7 @@ async def execute_tool_calls_async(
         if turn_surface() == "personal":
             return _rejected_batch("unknown_tool")
         record_surface_gate("tool_call", surface=turn_surface(), tools=undeclared)
-        return surface_tool_refusal(language)
+        return surface_tool_refusal(language, functions=tuple(undeclared))
 
     patch: dict[str, Any] = {
         "tool_calls": [],
@@ -256,9 +256,16 @@ def _with_cards(
 
 
 def surface_tool_refusal(
-    language: str | None, *, decision: InterpretDecision | None = None
+    language: str | None,
+    *,
+    functions: tuple[str, ...],
+    decision: InterpretDecision | None = None,
 ) -> StageResult:
-    """The turn's chat does not declare the tool: say so, with no card or call."""
+    """The turn's chat does not declare the function: say so, with no card or
+    call, and point to Personal chat only when it runs that function now."""
+    from argus.domain.capability_registry import personal_chat_runs
+
+    destination = {"personal_chat": "available"} if personal_chat_runs(functions) else {}
     return StageResult(
         outcome="ready_to_respond",
         decision=decision,
@@ -270,7 +277,10 @@ def surface_tool_refusal(
                 "business_chat_tool_unavailable", language=language
             ),
             **recovery_state_stage_patch(
-                "business_chat_tool_unavailable", language=language, retryable=False
+                "business_chat_tool_unavailable",
+                language=language,
+                retryable=False,
+                **destination,
             ),
         },
     )

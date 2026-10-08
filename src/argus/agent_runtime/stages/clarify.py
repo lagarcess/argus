@@ -86,7 +86,7 @@ async def clarify_stage_async(
     if state.intent in _BACKTEST_INTENTS and not surface_declares(
         turn_surface(), "backtest", gate="backtest_clarification"
     ):
-        return surface_tool_refusal(language)
+        return surface_tool_refusal(language, functions=("backtest",))
     coverage_recovery = coverage_recovery_from_status(state.optional_parameter_status)
     unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
     ambiguous_fields = _ambiguous_fields(state.optional_parameter_status)

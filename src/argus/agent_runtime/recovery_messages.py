@@ -49,8 +49,7 @@ RecoveryMessageCode = Literal[
 
 RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
     "business_chat_tool_unavailable": (
-        "That isn't available in your business chat. You can do it from your "
-        "personal chat."
+        "This feature isn't available in your business chat."
     ),
     "interpreter_unavailable": (
         "I saved your message, but I could not reliably understand your question. "
@@ -230,6 +229,16 @@ DURABLE_RETRY_RECOVERY_CODES: frozenset[RecoveryMessageCode] = frozenset(
 )
 
 
+# Persisted copy in the turn's language, for codes whose persisted text the
+# founder approved in both languages. web/public/locales holds the same copy.
+PERSISTED_LOCALIZED_MESSAGES: dict[RecoveryMessageCode, dict[str, str]] = {
+    "business_chat_tool_unavailable": {
+        "es-419": "Esta función no está disponible en el chat de tu negocio.",
+        "en": "This feature isn't available in your business chat.",
+    },
+}
+
+
 class RecoveryText(str):
     code: RecoveryMessageCode
     retryable: bool
@@ -260,13 +269,16 @@ def recovery_message(
     """Compatibility text for persisted messages.
 
     Localized UI surfaces must render from the recovery code and params instead.
-    The language parameter remains accepted for existing callers, but it does not
-    decide prose.
+    A code listed in PERSISTED_LOCALIZED_MESSAGES persists in the turn's
+    language; every other code persists its English fallback.
     """
 
-    _ = language
+    from argus.agent_runtime.presentation_i18n import runtime_locale
+
     fallback_params = _fallback_params(code=code, params=params)
-    text = RECOVERY_FALLBACK_MESSAGES[code].format(**fallback_params)
+    localized = PERSISTED_LOCALIZED_MESSAGES.get(code, {})
+    template = localized.get(runtime_locale(language), RECOVERY_FALLBACK_MESSAGES[code])
+    text = template.format(**fallback_params)
     return RecoveryText(
         text,
         code=code,

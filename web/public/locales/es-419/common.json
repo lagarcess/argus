@@ -355,6 +355,9 @@
     "error_open_conversation": "No se pudo abrir esta conversación.",
     "error_backtest": "No pude terminar ese turno. Inténtalo otra vez o inicia un chat nuevo si esta conversación venía de una sesión local anterior.",
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
+    "recovery_links": {
+      "personal_chat": "Abrir mi chat personal"
+    },
     "recovery": {
       "interpreter_unavailable": "Guardé tu mensaje, pero no pude entender tu pregunta con suficiente claridad. Intenta de nuevo en un momento.",
       "interpreter_unavailable_not_retryable": "Guardé tu mensaje, pero no pude entender tu pregunta con suficiente claridad. Intenta reformularla para que pueda ayudarte.",
@@ -388,7 +391,7 @@
       "artifact_action_retry_inactive": "Ese reintento ya no está conectado a una ejecución fallida activa. Usa la acción de reintento más reciente o confirma la configuración que quieres ejecutar.",
       "execution_data_unavailable": "La configuración sigue aquí, pero no pude obtener {{dataLabel}} para esa simulación en este momento. Inténtalo de nuevo, cambia las fechas o elige otro activo compatible.",
       "backtest_capacity_exceeded": "Argus ya está corriendo todas las pruebas que puede en este momento, así que esta no se inició. Nada falló y nada se perdió: tu configuración quedó tal como la dejaste. Vuelve a ejecutarla en unos minutos.",
-      "business_chat_tool_unavailable": "Eso no está disponible en el chat de tu negocio. Puedes hacerlo desde tu chat personal.",
+      "business_chat_tool_unavailable": "Esta función no está disponible en el chat de tu negocio.",
       "guest_compute_claim_unavailable": "Argus no pudo iniciar este turno. Inténtalo de nuevo en un momento.",
       "registered_compute_claim_unavailable": "Argus no pudo iniciar este turno. Inténtalo de nuevo en un momento.",
       "daily_cap_reached": "Llegaste al límite de preguntas de hoy. Se reinicia a las {{time}}.",

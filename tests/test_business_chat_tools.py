@@ -200,10 +200,23 @@ def test_a_personal_turn_beside_it_keeps_every_tool(
     assert _gate_names(gates) == ["research"]
 
 
+@pytest.mark.parametrize(
+    ("tool", "rail", "link"),
+    [
+        ("time_value", "false", {"personal_chat": "available"}),
+        ("fast_quote", "true", {"personal_chat": "available"}),
+        ("fast_quote", "false", None),
+    ],
+)
 def test_the_execute_stage_refuses_a_call_outside_the_business_catalog(
+    monkeypatch: pytest.MonkeyPatch,
     gates: list[dict[str, Any]],
+    tool: str,
+    rail: str,
+    link: dict[str, str] | None,
 ) -> None:
-    calls = [ToolCall(tool_name="time_value", call_id="call-1", arguments={})]
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", rail)
+    calls = [ToolCall(tool_name=tool, call_id="call-1", arguments={})]
     state = RunState.new(current_user_message="calculate", recent_thread_history=[])
     state.tool_calls = calls
 
@@ -213,15 +226,16 @@ def test_the_execute_stage_refuses_a_call_outside_the_business_catalog(
         )
 
     assert result.outcome == "ready_to_respond"
+    assert result.patch["assistant_response"] == (
+        "Esta función no está disponible en el chat de tu negocio."
+    )
     assert result.patch["recovery"] == {
         "code": "business_chat_tool_unavailable",
         "retryable": False,
+        **({"params": link} if link else {}),
     }
     assert result.patch["tool_call_records"] == []
-    assert [(g["surface_gate"], g.get("tools")) for g in gates] == [
-        ("tool_catalog", None),
-        ("tool_call", ["time_value"]),
-    ]
+    assert ("tool_call", [tool]) in [(g["surface_gate"], g.get("tools")) for g in gates]
 
 
 def test_a_business_backtest_draft_gets_no_clarifying_question(
@@ -300,10 +314,19 @@ def _install_runtime(
     monkeypatch.setattr(app.state, "agent_runtime_workflow", workflow, raising=False)
 
 
-def _turn(client: TestClient, conversation_id: str, message: str) -> dict[str, Any]:  # noqa: F811
+def _turn(
+    client: TestClient,  # noqa: F811
+    conversation_id: str,
+    message: str,
+    language: str | None = None,
+) -> dict[str, Any]:
     response = client.post(
         "/api/v1/chat/stream",
-        json={"conversation_id": conversation_id, "message": message},
+        json={
+            "conversation_id": conversation_id,
+            "message": message,
+            **({"language": language} if language else {}),
+        },
         headers=_as(ALICE),
     )
     assert response.status_code == 200, response.text
@@ -354,6 +377,7 @@ def test_a_business_turn_gets_no_backtest_card_where_personal_does(
     assert refused["recovery"] == {
         "code": "business_chat_tool_unavailable",
         "retryable": False,
+        "params": {"personal_chat": "available"},
     }
     assert not refused.get("confirmation")
     assert offered["stage_outcome"] == "await_approval"
@@ -529,12 +553,19 @@ def test_a_business_turn_logs_the_memory_recall_it_skips(
     assert _gate_names(gates) == ["memory_recall"]
 
 
+@pytest.mark.parametrize(
+    ("search", "link"), [("true", {"personal_chat": "available"}), ("false", None)]
+)
 def test_a_business_turn_runs_no_asset_discovery(
     client: TestClient,  # noqa: F811
     monkeypatch: pytest.MonkeyPatch,
     gates: list[dict[str, Any]],
+    search: str,
+    link: dict[str, str] | None,
 ) -> None:
     from argus.agent_runtime.discovery import composer
+
+    monkeypatch.setenv("ARGUS_GROUNDED_DISCOVERY_ENABLED", search)
 
     searched: list[object] = []
 
@@ -565,8 +596,47 @@ def test_a_business_turn_runs_no_asset_discovery(
     personal = _create(client, ALICE, "Household ledger")
 
     refused = _turn(client, business, "¿Qué empresas parecidas a Tesla puedo mirar?")
-    assert refused["recovery"]["code"] == "business_chat_tool_unavailable"
+    assert refused["recovery"] == {
+        "code": "business_chat_tool_unavailable",
+        "retryable": False,
+        **({"params": link} if link else {}),
+    }
     assert searched == []
     assert _gate_names(gates) == ["asset_discovery"]
     _turn(client, personal, "Companies like Tesla?")
     assert len(searched) == 1
+
+
+def test_the_old_pointer_to_personal_chat_is_gone_from_backend_copy() -> None:
+    from pathlib import Path
+
+    source = Path(__file__).resolve().parents[1] / "src"
+    texts = [path.read_text(encoding="utf-8") for path in source.rglob("*.py")]
+    assert not [text for text in texts if "from your personal chat" in text]
+    assert not [text for text in texts if "desde tu chat personal" in text]
+
+
+@pytest.mark.parametrize(
+    ("language", "persisted"),
+    [
+        ("es-419", "Esta función no está disponible en el chat de tu negocio."),
+        ("en", "This feature isn't available in your business chat."),
+    ],
+)
+def test_the_refusal_persists_in_the_turns_language(
+    client: TestClient,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+    language: str,
+    persisted: str,
+) -> None:
+    _install_runtime(monkeypatch, BACKTEST)
+    _start_space(ALICE)
+    business = _create(client, ALICE, "Shop ledger", surface="business")
+
+    _turn(client, business, "Compra y mantén Apple con $10,000", language=language)
+
+    messages = client.get(
+        f"/api/v1/conversations/{business}/messages", headers=_as(ALICE)
+    ).json()["items"]
+    assert messages[-1]["role"] == "assistant"
+    assert messages[-1]["content"] == persisted

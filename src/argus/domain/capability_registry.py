@@ -13,6 +13,8 @@ See `docs/specs/private-alpha-next-p2.1a-capability-registry-impl.md`.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from argus.domain.chat_surface import ChatSurface, SurfaceGate, record_surface_gate
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.domain.strategy_template_contract import (  # noqa: F401
@@ -104,6 +106,24 @@ def get_tool_catalog(
             "tool_catalog", surface=surface, withheld=len(declarations) - len(declared)
         )
     return ToolCatalog(declared)
+
+
+def personal_chat_runs(functions: Iterable[str]) -> bool:
+    """Whether the person's Personal chat runs every one of these right now:
+    the catalog tools under today's switches, and asset discovery while its
+    search is on. A Business refusal links to Personal chat only then."""
+    from argus.domain.research.config import research_rail_switched_on
+    from argus.domain.research.search import discovery_search_config
+
+    catalog = get_tool_catalog(
+        surface="personal", include_unavailable=research_rail_switched_on()
+    )
+    return all(
+        discovery_search_config().enabled
+        if function == "asset_discovery"
+        else catalog.get(function) is not None
+        for function in functions
+    )
 
 
 def surface_declares(surface: ChatSurface, tool_name: str, *, gate: SurfaceGate) -> bool:

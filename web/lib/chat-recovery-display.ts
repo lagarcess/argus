@@ -145,6 +145,20 @@ const QUIET_NOTICE_RECOVERY_CODES = new Set([
   "research_lookup_unavailable",
 ]);
 
+/**
+ * A Business refusal links to Personal chat only when the backend says the
+ * Personal chat runs that function right now (`params.personal_chat`).
+ */
+export function offersPersonalChat(
+  display: RecoveryDisplay | null | undefined,
+): boolean {
+  return (
+    display?.kind === "recovery_code" &&
+    display.code === "business_chat_tool_unavailable" &&
+    display.values?.personal_chat === "available"
+  );
+}
+
 /** Whether a reply renders as the quiet failure notice (failure-treatment.ts). */
 export function wearsQuietFailureNotice(
   display: RecoveryDisplay | null | undefined,

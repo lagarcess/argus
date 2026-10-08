@@ -84,7 +84,9 @@ async def discovery_stage_result_if_applicable(
     ):
         return None
     if not surface_allows("asset_discovery"):
-        return surface_tool_refusal(language, decision=decision)
+        return surface_tool_refusal(
+            language, functions=("asset_discovery",), decision=decision
+        )
     return await discovery_operation_result(
         decision=decision,
         request=decision.asset_discovery,

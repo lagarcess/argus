@@ -59,7 +59,7 @@ def confirm_stage(
 ) -> StageResult:
     logger.debug("Confirm stage started")
     if not surface_declares(turn_surface(), "backtest", gate="backtest_confirmation"):
-        return surface_tool_refusal(language)
+        return surface_tool_refusal(language, functions=("backtest",))
     strategy = _strategy_payload(state.candidate_strategy_draft)
     strategy = _strategy_with_runtime_language(strategy, language=language)
     strategy = _strategy_with_explicit_date_intent(strategy)
