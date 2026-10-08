@@ -2,13 +2,17 @@
 
 Status record for [#880](https://github.com/lagarcess/argus/issues/880) and its children. The [launch runbook](../runbooks/cuadrao-marketing-launch.md) owns settings and procedure, the [forms contract](../specs/cuadrao-marketing-forms-contract.md) owns the endpoints and data, and the [evidence folder](evidence/cuadrao-marketing-launch/README.md) holds the proof. This page only says where the launch stands. It authorizes nothing.
 
+## Landing
+
+PR [#895](https://github.com/lagarcess/argus/pull/895) merged into `codex/private-alpha-next` as `fbb6bb447` (squash, PR head `d0447a7da`); integration then stood at `5def72db1` after #899 and #894. The merged diff equals the PR diff, `marketing/` and the signup migration are byte-identical to the PR head, `web/` equals its pre-website state, and #895 shares no file with #899 or #894. Nothing is promoted, deployed, applied or sent; the signup migration is in the repository only. The issue comments on #880 record the landing in full.
+
 ## Lineage
 
 - Lane base: `93571e593e1677561e1dd38f63b6475574942e2d` (`origin/codex/private-alpha-next`, fetched 2026-10-07).
 - Worker branch: `codex/cuadrao-marketing-launch`.
 - Candidate, reconciliation and CI state are filled in at READY (see the PR).
 
-## Prepared in this PR
+## Landed in #895
 
 | Child | State |
 | --- | --- |
