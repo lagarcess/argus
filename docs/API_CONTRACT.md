@@ -8532,7 +8532,8 @@ cannot be read, including a non-integer or out-of-range max-bytes value (0,
 negative, or above the 10 MiB cap), also leaves it off, with one warning per
 process. While the document surface is off, intake stops: upload, `prepare`,
 `resume` and `PATCH .../proposal` answer 404 `financial_connections_unavailable`
-with `Cache-Control: no-store` and no extraction runs. What the owner already
+with `Cache-Control: no-store` and no extraction runs; with preparation jobs on,
+a queued draft waits, unchanged, until extraction is back. What the owner already
 saved stays theirs: list, `GET /financial-documents/{connection_id}`, its
 `/source` and disconnect keep working. They also keep working while
 `ARGUS_INGESTION_ENABLED` is off, as long as financial accounts are on; then

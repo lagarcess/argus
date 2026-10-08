@@ -4,12 +4,15 @@ Turning document extraction or ingestion off stops new intake only: the owner
 can still list, open, download and disconnect what they already saved.
 """
 
+import asyncio
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from argus.api import state as api_state
-from argus.api.document_jobs import document_jobs
+from argus.api.document_jobs import document_jobs, sweep_forever
 from argus.api.documents import documents_service
 from argus.api.ingestion import ingestion_hub
 from argus.api.main import app
@@ -48,9 +51,9 @@ def _code(response) -> tuple[int, str]:
 
 def test_extraction_off_keeps_reading_and_removal_and_refuses_intake(
     client,
-    extraction,
+    extraction,  # noqa: F811
     identities,
-    monkeypatch,  # noqa: F811
+    monkeypatch,
 ):
     alice = identities[ALICE]["id"]
     document = _saved(client)
@@ -88,9 +91,9 @@ def test_extraction_off_keeps_reading_and_removal_and_refuses_intake(
 
 def test_ingestion_off_still_reads_and_removes_only_a_document(
     client,
-    extraction,
+    extraction,  # noqa: F811
     identities,
-    monkeypatch,  # noqa: F811
+    monkeypatch,
 ):
     alice = identities[ALICE]["id"]
     document = _saved(client)
@@ -152,3 +155,20 @@ def test_ingestion_off_at_start_serves_reading_and_removal_only(
         )
         assert _code(missing) == (404, "financial_connection_not_found")
         assert client.get(DOCUMENTS).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_the_preparation_sweep_waits_while_extraction_is_off(monkeypatch):
+    """A queued draft is neither dispatched nor failed while extraction is off."""
+
+    sweeps: list[str] = []
+
+    class Jobs:
+        def sweep(self) -> None:
+            sweeps.append(os.environ["ARGUS_DOCUMENT_EXTRACTION_ENABLED"])
+
+    for flag in ("false", "true"):
+        monkeypatch.setenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED", flag)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(sweep_forever(Jobs(), 0.01), 0.1)
+    assert set(sweeps) == {"true"}

@@ -16,7 +16,10 @@ import asyncio
 from loguru import logger
 
 from argus.api import state as api_state
-from argus.domain.ingestion.documents.config import DocumentJobSettings
+from argus.domain.ingestion.documents.config import (
+    DocumentJobSettings,
+    load_document_extraction_settings,
+)
 from argus.domain.ingestion.documents.jobs import (
     Dispatch,
     PreparationJobs,
@@ -67,9 +70,13 @@ def render_dispatcher(task_id: str) -> Dispatch:
 
 
 async def sweep_forever(jobs: PreparationJobs, interval: float) -> None:
+    """Waits while extraction is off: a queued draft is then neither sent to
+    the model nor failed, and resumes when extraction is back."""
+
     while True:
         try:
-            await asyncio.to_thread(jobs.sweep)
+            if load_document_extraction_settings().enabled:
+                await asyncio.to_thread(jobs.sweep)
         except Exception as error:
             logger.warning(
                 "Document preparation sweep failed",

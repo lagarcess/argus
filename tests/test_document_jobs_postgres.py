@@ -384,9 +384,12 @@ def test_concurrent_sweepers_dispatch_each_attempt_once(
 
 @pytest.mark.asyncio
 async def test_two_running_instances_recover_a_dead_worker_without_restart(
-    pool: ConnectionPool, users: dict[str, str]
+    pool: ConnectionPool, users: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from argus.api.document_jobs import InProcessDispatcher, sweep_forever
+
+    # The sweep waits while extraction is off.
+    monkeypatch.setenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED", "true")
 
     loop = asyncio.get_running_loop()
     clock, extractor, owner = Clock(), Extractor(), users["owner"]
