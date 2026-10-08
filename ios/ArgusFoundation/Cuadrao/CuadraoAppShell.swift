@@ -13,9 +13,10 @@ struct CuadraoAppShell<Content: View>: View {
     let avatar: CuadraoAvatarSelection
     let profileName: String
     var showProposal: (() -> Void)? = nil
-    let add: () -> Void
+    var addItems: [CuadraoAddItem] = []
     @ViewBuilder let content: (Binding<CuadraoTab>) -> Content
     @State private var pendingTab: CuadraoTab?
+    @State private var addOpen = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -25,11 +26,20 @@ struct CuadraoAppShell<Content: View>: View {
                     if chat.voiceContextOwner == nil && selection != .assistant && chat.voice.active && chat.voice.presentation != .expanded {
                         CuadraoVoiceBar(voice: chat.voice, spanish: spanish)
                     }
+                    if addOpen && showsNavigation && !addItems.isEmpty {
+                        CuadraoAddTray(items: addItems, spanish: spanish) { item in
+                            closeAdd()
+                            item.perform()
+                        }
+                        .padding(.bottom, 8)
+                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
+                    }
                     if showsNavigation {
                         ZStack {
                             if chat.voiceMessage.state != .recording {
                                 CuadraoNavigationBar(selection: tabSelection, compact: compact, spanish: spanish,
-                                    avatar: avatar, profileName: profileName, add: add)
+                                    avatar: avatar, profileName: profileName,
+                                    addOpen: addOpen, add: toggleAdd)
                                     .padding(.horizontal, 20)
                                     .frame(height: 64, alignment: .bottom)
                                     .padding(.bottom, 8)
@@ -67,9 +77,19 @@ struct CuadraoAppShell<Content: View>: View {
             .environment(\.cuadraoChat, chat)
     }
 
+    private func toggleAdd() {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { addOpen.toggle() }
+    }
+
+    private func closeAdd() {
+        guard addOpen else { return }
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { addOpen = false }
+    }
+
     private var tabSelection: Binding<CuadraoTab> {
         Binding(get: { selection }, set: { next in
             if next == .assistant && !CuadraoFirstRelease.hasAssistant { return }
+            closeAdd()
             if selection == .assistant && next != .assistant && chat.hasTemporaryContent {
                 pendingTab = next
             } else {

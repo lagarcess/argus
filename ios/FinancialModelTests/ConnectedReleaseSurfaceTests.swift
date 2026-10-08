@@ -20,6 +20,31 @@ final class ConnectedReleaseSurfaceTests: XCTestCase {
         XCTAssertFalse(slots.contains(.add))
     }
 
+    func testSlidingMapsAFingerToTheSlotUnderIt() {
+        XCTAssertEqual(CuadraoNavigationSlot.index(forX: 0, width: 300, count: 5), 0)
+        XCTAssertEqual(CuadraoNavigationSlot.index(forX: 119, width: 300, count: 5), 1)
+        XCTAssertEqual(CuadraoNavigationSlot.index(forX: 150, width: 300, count: 5), 2)
+        XCTAssertEqual(CuadraoNavigationSlot.index(forX: 299, width: 300, count: 5), 4)
+        XCTAssertEqual(CuadraoNavigationSlot.index(forX: -20, width: 300, count: 5), 0)
+        XCTAssertEqual(CuadraoNavigationSlot.index(forX: 900, width: 300, count: 5), 4)
+        XCTAssertEqual(CuadraoNavigationSlot.index(forX: 10, width: 0, count: 5), 0)
+    }
+
+    func testTheTrayOffersOnlyWhatIsRealInThisBuild() {
+        XCTAssertEqual(
+            CuadraoAddAction.available(receiptsConnected: false, householdsAvailable: false, inHousehold: false),
+            [.account, .transaction, .plan]
+        )
+        XCTAssertEqual(
+            CuadraoAddAction.available(receiptsConnected: false, householdsAvailable: true, inHousehold: false),
+            [.account, .transaction, .group, .plan]
+        )
+        XCTAssertEqual(
+            CuadraoAddAction.available(receiptsConnected: true, householdsAvailable: true, inHousehold: true),
+            [.account, .transaction, .scan, .group, .plan, .invite]
+        )
+    }
+
     func testAddWithNoAccountStartsTheFirstAccount() throws {
         guard case .createAccount = ConnectedAddMovement.target(for: [], loaded: true) else { return XCTFail("expected createAccount") }
     }

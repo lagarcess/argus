@@ -17,6 +17,7 @@ struct ConnectedCuadraoShell: View {
     @State private var searchDetail = false
     @State private var choosingAddAccount = false
     @State private var addNotice: AddNotice?
+    @State private var creatingPlan = false
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
@@ -45,7 +46,7 @@ struct ConnectedCuadraoShell: View {
     private func shell(allowsHouseholdNavigation: Bool) -> some View {
         CuadraoAppShell(selection: $tab, chat: chat, spanish: spanish,
             showsNavigation: showsNavigation && allowsHouseholdNavigation, compact: tab == .home && navigationScroll.compact,
-            avatar: avatar, profileName: auth.profile?.displayName ?? "", add: addMovement) { _ in
+            avatar: avatar, profileName: auth.profile?.displayName ?? "", addItems: addItems) { _ in
             ForEach(CuadraoTab.allCases.filter { $0 != .assistant || CuadraoFirstRelease.hasAssistant }) { item in
                 tabContent(item)
                     .toolbar(.hidden, for: .tabBar)
@@ -89,6 +90,9 @@ struct ConnectedCuadraoShell: View {
                     auth.financialLoop?.record(account)
                 }.accessibilityIdentifier("nav.add.account." + account.id.uuidString)
             }
+        }
+        .sheet(isPresented: $creatingPlan) {
+            if let loop = auth.financialLoop { ConnectedPlanEditor(loop: loop, seed: .create(kind: nil)) }
         }
         .alert(addNotice.map { LocalizedStringKey($0.title) } ?? "", isPresented: Binding(get: { addNotice != nil }, set: { if !$0 { addNotice = nil } }),
                presenting: addNotice) { _ in
@@ -163,7 +167,52 @@ struct ConnectedCuadraoShell: View {
         return ConnectedAccountOrder.applying(auth.profile.map { ConnectedAccountOrder.load(for: $0.id) } ?? [], to: live)
     }
 
-    /// The navigation "+" records a movement from any tab, through the same rule as Home's Activity "+".
+    /// The rows of the + tray. A row appears only when the thing behind it is real in this build.
+    private var addItems: [CuadraoAddItem] {
+        let household = auth.household
+        return CuadraoAddAction.available(
+            receiptsConnected: false,
+            householdsAvailable: household?.isAvailable == true,
+            inHousehold: household?.active == true
+        ).compactMap { action in
+            switch action {
+            case .account: CuadraoAddItem(action: action, perform: addAccount)
+            case .transaction: CuadraoAddItem(action: action, perform: addMovement)
+            case .plan: CuadraoAddItem(action: action, perform: addPlan)
+            case .group, .invite: CuadraoAddItem(action: action) { household?.showManagement = true }
+            case .scan: nil
+            }
+        }
+    }
+
+    private func addAccount() {
+        guard let accounts = auth.accounts else {
+            addNotice = AddNotice(title: "accounts.loading", message: nil)
+            return
+        }
+        Task {
+            if !accounts.hasLoaded { await accounts.load() }
+            guard accounts.hasLoaded else {
+                addNotice = AddNotice(title: accounts.errorKey ?? "accounts.loading", message: nil)
+                return
+            }
+            accounts.create()
+        }
+    }
+
+    private func addPlan() {
+        guard let loop = auth.financialLoop else {
+            addNotice = AddNotice(title: "accounts.loading", message: nil)
+            return
+        }
+        guard loop.pendingConfirmation == nil else {
+            addNotice = AddNotice(title: loop.pendingTitle, message: "loop.pending.body")
+            return
+        }
+        creatingPlan = true
+    }
+
+    /// The "Transaction" row records a movement from any tab, through the same rule as Home's Activity "+".
     /// When it cannot act (accounts not ready, or a write waiting for confirmation) it says why in an
     /// alert, because the personal Home that explains it is not on screen in every mode.
     private func addMovement() {
