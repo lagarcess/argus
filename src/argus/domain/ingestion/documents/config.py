@@ -18,6 +18,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from argus.api.financial_accounts import TRUE_VALUES
 
+# What an upload may be; preparation reads each of these.
+ACCEPTED_MEDIA_TYPES = ("application/pdf", "image/jpeg", "image/png")
 _MAX_BYTES = 10 * 1024 * 1024
 _MAX_PAGES = 8
 _RECOGNIZED_OFF = frozenset({"0", "false", "no", "off"})
@@ -25,7 +27,7 @@ _warned_flags: set[str] = set()
 _warned_invalid = False
 
 
-def _enabled_flag(value: object) -> bool:
+def enabled_flag(value: object) -> bool:
     if isinstance(value, bool):
         return value
     if value is None:
@@ -37,7 +39,7 @@ class DocumentExtractionSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="ARGUS_DOCUMENT_EXTRACTION_", extra="ignore"
     )
-    enabled: Annotated[bool, BeforeValidator(_enabled_flag)] = False
+    enabled: Annotated[bool, BeforeValidator(enabled_flag)] = False
     max_bytes: int = Field(default=_MAX_BYTES, ge=1, le=_MAX_BYTES)
     max_pages: int = Field(default=_MAX_PAGES, ge=1, le=_MAX_PAGES)
 
@@ -86,7 +88,7 @@ class DocumentJobSettings(BaseSettings):
     """Durable preparation jobs (#823). Off keeps FastAPI background tasks."""
 
     model_config = SettingsConfigDict(env_prefix="ARGUS_DOCUMENT_JOBS_", extra="ignore")
-    enabled: Annotated[bool, BeforeValidator(_enabled_flag)] = False
+    enabled: Annotated[bool, BeforeValidator(enabled_flag)] = False
     workflow_task: str = ""
     sweep_seconds: float = Field(default=30.0, gt=0, le=3600)
 
