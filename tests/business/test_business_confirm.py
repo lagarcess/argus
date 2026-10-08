@@ -8,6 +8,7 @@ from argus.api.ingestion import ingestion_hub
 from argus.domain.business.scope import resolve_business_scope
 from argus.domain.business.service import BusinessService
 from argus.domain.ingestion.reconcile.service import ReconciliationService
+from argus.domain.owner_scope import PERSONAL
 from argus.domain.recording.money_service import MoneyService
 
 from tests.business.receipt_stub import PURCHASE
@@ -90,6 +91,7 @@ def test_a_same_key_confirm_inside_another_records_one_expense(
         event_id=event_id,
         version=alice.detail(receipt_id)["version"],
         changes={"account_id": account},
+        scope=PERSONAL,
     )["version"]
     assert alice.detail(receipt_id)["missing_fields"] == []
     accept = ReconciliationService.accept_reviewed
@@ -106,7 +108,9 @@ def test_a_same_key_confirm_inside_another_records_one_expense(
     assert inner[0].status == outer.status == "confirmed"
     assert inner[0].review.expense_id == outer.review.expense_id
     assert _expense_ids(alice) == [outer.review.expense_id]
-    [activity] = ingestion_hub().sink.money.purchases(user_id=scope.person_id)["items"]
+    [activity] = ingestion_hub().sink.money.purchases(
+        user_id=scope.person_id, scope=PERSONAL
+    )["items"]
     assert activity["kind"] == "expense"
 
 
@@ -121,6 +125,7 @@ def test_a_replayed_key_that_is_not_an_expense_is_a_conflict(
         user_id=_person(alice),
         request=_income(account),
         idempotency_key="exp-1",
+        scope=PERSONAL,
     )
     assert recorded["activity"]["kind"] == "income"
 

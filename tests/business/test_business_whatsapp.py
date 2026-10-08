@@ -17,6 +17,7 @@ from argus.api.whatsapp import (
 )
 from argus.domain.business.scope import BusinessScope, resolve_business_scope
 from argus.domain.ingestion.whatsapp.store import InMemoryWhatsAppStore
+from argus.domain.owner_scope import PERSONAL
 from fastapi.testclient import TestClient
 
 from tests.business.conftest import ALICE, BOB
@@ -64,7 +65,7 @@ def wa_biz(
 
 
 def test_scope_is_the_person_until_the_boundary_is_approved() -> None:
-    assert resolve_business_scope("person-1") == BusinessScope("person-1", None)
+    assert resolve_business_scope("person-1") == BusinessScope("person-1", PERSONAL)
     assert resolve_intake_destination("person-1") == "person-1"
 
 

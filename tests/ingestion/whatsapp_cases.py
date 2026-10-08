@@ -27,6 +27,7 @@ from argus.domain.ingestion.whatsapp.intake import (
 from argus.domain.ingestion.whatsapp.media import GraphMedia
 from argus.domain.ingestion.whatsapp.payload import parse_delivery
 from argus.domain.ingestion.whatsapp.store import Settlement
+from argus.domain.owner_scope import PERSONAL
 
 from tests.ingestion.whatsapp_support import (
     ALICE_PHONE,
@@ -89,7 +90,7 @@ class World:
     def captures(self, owner: str) -> list[str]:
         return [
             row.id
-            for row in self.documents.hub.connections.list(user_id=owner)
+            for row in self.documents.hub.connections.list(user_id=owner, scope=PERSONAL)
             if row.source == "statement"
         ]
 
@@ -145,7 +146,9 @@ async def linked_image_is_saved_unqueued_and_replay_converges(world: World) -> N
     await world.deliver(body)
 
     [connection_id] = world.captures(world.alice)
-    draft = world.documents.get(user_id=world.alice, connection_id=connection_id)
+    draft = world.documents.get(
+        user_id=world.alice, connection_id=connection_id, scope=PERSONAL
+    )
     assert (draft.status, draft.consent) == ("saved", False)
     record = world.record("wamid.CASE-IMAGE")
     assert (record.status, record.connection_id, record.destination_owner_id) == (
@@ -181,7 +184,9 @@ async def document_message_is_captured(world: World) -> None:
         )
     )
     [connection_id] = world.captures(world.alice)
-    draft = world.documents.get(user_id=world.alice, connection_id=connection_id)
+    draft = world.documents.get(
+        user_id=world.alice, connection_id=connection_id, scope=PERSONAL
+    )
     assert (draft.filename, draft.media_type, draft.status) == (
         "factura.pdf",
         "application/pdf",
@@ -573,7 +578,7 @@ async def forwarded_and_captioned_messages_capture_like_a_direct_send(
         record = world.record(message["id"])
         assert (record.status, record.destination_owner_id) == ("captured", world.alice)
         draft = world.documents.get(
-            user_id=world.alice, connection_id=record.connection_id
+            user_id=world.alice, connection_id=record.connection_id, scope=PERSONAL
         )
         assert (draft.filename, draft.media_type, draft.status, draft.consent) == (
             filename,

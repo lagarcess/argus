@@ -31,6 +31,7 @@ from argus.domain.ingestion.documents.service import (
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.reconcile.store_postgres import PostgresImportStore
+from argus.domain.owner_scope import PERSONAL
 from argus.domain.recording.postgres_repository import (
     PostgresFinancialAccountRepository,
 )
@@ -157,6 +158,7 @@ async def _upload(service: DocumentsService, user: str, *, consent: bool = False
         filename="statement.pdf",
         media_type="application/pdf",
         consent=consent,
+        scope=PERSONAL,
     )
 
 
@@ -176,7 +178,9 @@ async def test_upload_stores_the_object_and_no_bytes(rig: dict) -> None:
     assert _paths(rig["pool"], owner_prefix(owner)) == [path]
     assert rig["objects"].get(path) == PDF
     assert (
-        rig["service"].source_bytes(user_id=owner, connection_id=outcome.connection_id)
+        rig["service"].source_bytes(
+            user_id=owner, connection_id=outcome.connection_id, scope=PERSONAL
+        )
         == PDF
     )
 
@@ -197,9 +201,16 @@ async def test_only_the_owner_reads_the_source(rig: dict) -> None:
     owner, other, service = rig["owner"], rig["other"], rig["service"]
     outcome = await _upload(service, owner)
     with pytest.raises(ConnectionNotFound):
-        service.source_bytes(user_id=other, connection_id=outcome.connection_id)
+        service.source_bytes(
+            user_id=other, connection_id=outcome.connection_id, scope=PERSONAL
+        )
     assert rig["store"].source(user_id=other, connection_id=outcome.connection_id) is None
-    assert service.source_bytes(user_id=owner, connection_id=outcome.connection_id) == PDF
+    assert (
+        service.source_bytes(
+            user_id=owner, connection_id=outcome.connection_id, scope=PERSONAL
+        )
+        == PDF
+    )
 
 
 @pytest.mark.asyncio
@@ -210,7 +221,9 @@ async def test_disconnect_removes_the_object_and_keeps_confirmed_activity(
     assert isinstance(world, World)
     captured = await _upload(rig["service"], owner, consent=True)
     connection_id = captured.connection_id
-    prepared = await rig["service"].resume(user_id=owner, connection_id=connection_id)
+    prepared = await rig["service"].resume(
+        user_id=owner, connection_id=connection_id, scope=PERSONAL
+    )
     assert prepared.candidate_count == 1
     event = only(world)
     event = world.recon.resolve(
@@ -218,10 +231,11 @@ async def test_disconnect_removes_the_object_and_keeps_confirmed_activity(
         event_id=event["id"],
         version=event["version"],
         changes={"account_id": new_account(world)},
+        scope=PERSONAL,
     )
     accept(world, event)
 
-    rig["hub"].disconnect(user_id=owner, connection_id=connection_id)
+    rig["hub"].disconnect(user_id=owner, connection_id=connection_id, scope=PERSONAL)
 
     assert _paths(rig["pool"], owner_prefix(owner)) == []
     assert _row(rig["pool"], connection_id) is None
@@ -240,19 +254,19 @@ async def test_a_crash_after_the_object_write_leaves_no_row(rig: dict) -> None:
     )
     with pytest.raises(SystemExit):
         await _upload(crashing, owner)
-    [connection] = rig["hub"].connections.list(user_id=owner)
+    [connection] = rig["hub"].connections.list(user_id=owner, scope=PERSONAL)
     orphan = f"{owner}/{connection.id}/{DIGEST}"
     assert _row(pool, connection.id) is None
     assert _paths(pool, owner_prefix(owner)) == [orphan]
     with pytest.raises(DocumentServiceError, match="document_source_unavailable"):
-        rig["service"].get(user_id=owner, connection_id=connection.id)
+        rig["service"].get(user_id=owner, connection_id=connection.id, scope=PERSONAL)
 
     retried = await _upload(rig["service"], owner)
     assert (retried.connection_id, retried.replayed) == (connection.id, True)
     assert _row(pool, connection.id)[2] == orphan
     assert _paths(pool, owner_prefix(owner)) == [orphan]
 
-    rig["hub"].disconnect(user_id=owner, connection_id=connection.id)
+    rig["hub"].disconnect(user_id=owner, connection_id=connection.id, scope=PERSONAL)
     assert _paths(pool, owner_prefix(owner)) == []
 
 
@@ -266,8 +280,8 @@ async def test_disconnect_takes_an_orphan_that_was_never_retried(rig: dict) -> N
     )
     with pytest.raises(SystemExit):
         await _upload(crashing, owner)
-    [connection] = rig["hub"].connections.list(user_id=owner)
-    rig["hub"].disconnect(user_id=owner, connection_id=connection.id)
+    [connection] = rig["hub"].connections.list(user_id=owner, scope=PERSONAL)
+    rig["hub"].disconnect(user_id=owner, connection_id=connection.id, scope=PERSONAL)
     assert _paths(pool, owner_prefix(owner)) == []
 
 
@@ -289,12 +303,12 @@ async def test_a_failed_object_delete_keeps_the_row_for_the_retry(rig: dict) -> 
         StatementExtractor(),
     )
     with pytest.raises(ConnectionError):
-        hub.disconnect(user_id=owner, connection_id=outcome.connection_id)
+        hub.disconnect(user_id=owner, connection_id=outcome.connection_id, scope=PERSONAL)
     assert _row(pool, outcome.connection_id) is not None
     assert len(_paths(pool, owner_prefix(owner))) == 1
 
     hub.register(rig["service"])
-    hub.disconnect(user_id=owner, connection_id=outcome.connection_id)
+    hub.disconnect(user_id=owner, connection_id=outcome.connection_id, scope=PERSONAL)
     assert _row(pool, outcome.connection_id) is None
     assert _paths(pool, owner_prefix(owner)) == []
 
@@ -302,7 +316,12 @@ async def test_a_failed_object_delete_keeps_the_row_for_the_retry(rig: dict) -> 
 def test_rows_from_before_the_move_are_still_served_and_erased(rig: dict) -> None:
     owner, pool, store = rig["owner"], rig["pool"], rig["store"]
     connection = rig["hub"].connections.create(
-        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=NOW
+        user_id=owner,
+        source="statement",
+        external_ref=str(uuid4()),
+        label=None,
+        now=NOW,
+        scope=PERSONAL,
     )
     draft = DocumentDraft(
         connection_id=connection.id,
@@ -323,7 +342,7 @@ def test_rows_from_before_the_move_are_still_served_and_erased(rig: dict) -> Non
     assert store.capture(user_id=owner, draft=draft, content=PDF)
     assert _row(pool, connection.id)[:3] == (PDF, None, None)
     assert _paths(pool, owner_prefix(owner)) == []
-    rig["hub"].disconnect(user_id=owner, connection_id=connection.id)
+    rig["hub"].disconnect(user_id=owner, connection_id=connection.id, scope=PERSONAL)
     assert _row(pool, connection.id) is None
 
 
@@ -392,13 +411,20 @@ async def test_a_lost_object_is_reported_and_an_identical_upload_restores_it(
     connection_id = outcome.connection_id
     rig["objects"].delete(f"{owner}/{connection_id}/")
     with pytest.raises(DocumentServiceError, match="document_source_unavailable"):
-        service.source_bytes(user_id=owner, connection_id=connection_id)
-    assert not service.get(user_id=owner, connection_id=connection_id).source_available
+        service.source_bytes(user_id=owner, connection_id=connection_id, scope=PERSONAL)
+    assert not service.get(
+        user_id=owner, connection_id=connection_id, scope=PERSONAL
+    ).source_available
 
     again = await _upload(service, owner)
     assert (again.connection_id, again.replayed) == (connection_id, True)
-    assert service.get(user_id=owner, connection_id=connection_id).source_available
-    assert service.source_bytes(user_id=owner, connection_id=connection_id) == PDF
+    assert service.get(
+        user_id=owner, connection_id=connection_id, scope=PERSONAL
+    ).source_available
+    assert (
+        service.source_bytes(user_id=owner, connection_id=connection_id, scope=PERSONAL)
+        == PDF
+    )
     assert _paths(rig["pool"], owner_prefix(owner)) == [
         f"{owner}/{connection_id}/{DIGEST}"
     ]
@@ -424,12 +450,14 @@ async def test_a_storage_outage_is_retryable_in_upload_and_preparation(
         StatementExtractor(),
     )
     with pytest.raises(DocumentServiceError) as raised:
-        await down.resume(user_id=owner, connection_id=captured.connection_id)
+        await down.resume(
+            user_id=owner, connection_id=captured.connection_id, scope=PERSONAL
+        )
     assert (raised.value.code, raised.value.retryable) == (
         "document_storage_unavailable",
         True,
     )
-    draft = down.get(user_id=owner, connection_id=captured.connection_id)
+    draft = down.get(user_id=owner, connection_id=captured.connection_id, scope=PERSONAL)
     assert (draft.status, draft.error_code, draft.source_available) == (
         "needs_attention",
         "document_storage_unavailable",
@@ -441,6 +469,7 @@ async def test_a_storage_outage_is_retryable_in_upload_and_preparation(
             content=b"%PDF-1.4 another",
             filename="b.pdf",
             media_type="application/pdf",
+            scope=PERSONAL,
         )
     assert (raised.value.code, raised.value.retryable) == (
         "document_storage_unavailable",

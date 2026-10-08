@@ -29,6 +29,7 @@ from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStor
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.reconcile.service import ReconciliationService
 from argus.domain.ingestion.reconcile.store_postgres import PostgresImportStore
+from argus.domain.owner_scope import PERSONAL
 from argus.domain.recording.money_service import MoneyService
 from argus.domain.recording.postgres_repository import (
     PostgresFinancialAccountRepository,
@@ -102,7 +103,9 @@ def _prepared(rig: dict) -> str:
         )
     )
     asyncio.run(
-        service.documents.resume(user_id=scope.person_id, connection_id=receipt.id)
+        service.documents.resume(
+            user_id=scope.person_id, connection_id=receipt.id, scope=PERSONAL
+        )
     )
     return receipt.id
 

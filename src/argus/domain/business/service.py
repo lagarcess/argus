@@ -95,7 +95,9 @@ class BusinessService:
                 "type": stored.account.type,
                 "currency": stored.account.currency,
             }
-            for stored in self.accounts.list_accounts(user_id=scope.person_id)
+            for stored in self.accounts.list_accounts(
+                user_id=scope.person_id, scope=scope.owner
+            )
             if stored.account.type in EXPENSE_ACCOUNT_TYPES
             and not stored.account.archived
         ]
@@ -104,7 +106,10 @@ class BusinessService:
         self, scope: BusinessScope, request: CreateFinancialAccountRequest, key: str
     ) -> tuple[dict[str, Any], bool]:
         result = self.accounts.create(
-            user_id=scope.person_id, idempotency_key=key, request=request
+            user_id=scope.person_id,
+            idempotency_key=key,
+            request=request,
+            scope=scope.owner,
         )
         account = result.stored.account
         return (
@@ -120,39 +125,41 @@ class BusinessService:
     # --- Receipts --------------------------------------------------------
     def receipts(self, scope: BusinessScope) -> list[Receipt]:
         person = scope.person_id
-        events = self.imports.list(user_id=person, states=RECEIPT_EVENT_STATES)
+        events = self.imports.list(
+            user_id=person, states=RECEIPT_EVENT_STATES, scope=scope.owner
+        )
         whatsapp = self.captured(person)
         found = []
-        for connection in self.documents.hub.connections.list(user_id=person):
+        for connection in self.documents.hub.connections.list(
+            user_id=person, scope=scope.owner
+        ):
             if connection.source != "statement" or connection.status == "disconnected":
                 continue
             try:
-                found.append(self._compose(person, connection.id, events, whatsapp))
+                found.append(self._compose(scope, connection.id, events, whatsapp))
             except DocumentServiceError as error:
                 if error.code != "document_source_unavailable":
                     raise
         return sorted(found, key=lambda item: item.draft.created_at, reverse=True)
 
     def receipt(self, scope: BusinessScope, receipt_id: str) -> Receipt:
-        person = scope.person_id
-        draft = self.documents.get(user_id=person, connection_id=receipt_id)
-        events = self.imports.list(user_id=person, states=RECEIPT_EVENT_STATES)
-        return compose(
-            draft,
-            self.documents.store.get(user_id=person, connection_id=receipt_id),
-            events,
-            "whatsapp" if receipt_id in self.captured(person) else "web",
+        events = self.imports.list(
+            user_id=scope.person_id, states=RECEIPT_EVENT_STATES, scope=scope.owner
         )
+        return self._compose(scope, receipt_id, events, self.captured(scope.person_id))
 
     def _compose(
         self,
-        person: str,
+        scope: BusinessScope,
         receipt_id: str,
         events: list[dict[str, Any]],
         whatsapp: frozenset[str],
     ) -> Receipt:
+        person = scope.person_id
         return compose(
-            self.documents.get(user_id=person, connection_id=receipt_id),
+            self.documents.get(
+                user_id=person, connection_id=receipt_id, scope=scope.owner
+            ),
             self.documents.store.get(user_id=person, connection_id=receipt_id),
             events,
             "whatsapp" if receipt_id in whatsapp else "web",
@@ -173,6 +180,7 @@ class BusinessService:
             filename=filename,
             media_type=media_type,
             consent=consent,
+            scope=scope.owner,
         )
         return self.receipt(scope, outcome.connection_id)
 
@@ -180,13 +188,18 @@ class BusinessService:
         """The owner chose AI preparation for a saved receipt."""
 
         self.documents.queue(
-            user_id=scope.person_id, connection_id=receipt_id, consent=True
+            user_id=scope.person_id,
+            connection_id=receipt_id,
+            consent=True,
+            scope=scope.owner,
         )
 
     def source(self, scope: BusinessScope, receipt_id: str) -> tuple[str, bytes]:
-        draft = self.documents.get(user_id=scope.person_id, connection_id=receipt_id)
+        draft = self.documents.get(
+            user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
+        )
         content = self.documents.source_bytes(
-            user_id=scope.person_id, connection_id=receipt_id
+            user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
         )
         return draft.media_type, content
 
@@ -201,7 +214,9 @@ class BusinessService:
             return version
         if version != current.version:
             raise StaleEvent()
-        await self.documents.enter(user_id=scope.person_id, connection_id=receipt_id)
+        await self.documents.enter(
+            user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
+        )
         return (await asyncio.to_thread(self.receipt, scope, receipt_id)).version
 
     def review(
@@ -220,6 +235,7 @@ class BusinessService:
                 event_id=event_id,
                 version=version,
                 changes={_RESOLUTION[name]: value for name, value in fields.items()},
+                scope=scope.owner,
             )
         except ReconcileError as error:
             raise _renamed(error) from None
@@ -245,6 +261,7 @@ class BusinessService:
                 version=version,
                 idempotency_key=key,
                 kind="expense",
+                scope=scope.owner,
             )
         except ReconcileError as error:
             if error.code != "import_already_accepted":
@@ -257,7 +274,7 @@ class BusinessService:
     ) -> list[dict[str, Any]]:
         activities = self._activities(scope)
         ids = [item["activity_id"] for item in ledger.expense_activities(activities)]
-        with self.imports.store.transaction(scope.person_id) as tx:
+        with self.imports.store.transaction(scope.person_id, scope=scope.owner) as tx:
             receipt_of = receipt_ids(tx, self.documents.store, scope.person_id, ids)
         return [
             _wire(item) for item in ledger.expenses(activities, receipt_of, start, end)
@@ -280,7 +297,10 @@ class BusinessService:
             category_id=entered["category_id"],
         )
         activity = self.imports.money.write_entered(
-            user_id=scope.person_id, request=request, idempotency_key=key
+            user_id=scope.person_id,
+            request=request,
+            idempotency_key=key,
+            scope=scope.owner,
         )["activity"]
         recorded = ledger.expenses([activity], {}, date.min, date.max)
         if len(recorded) != 1:
@@ -309,7 +329,9 @@ class BusinessService:
         return [r for r in self.receipts(scope) if r.status not in CLOSED]
 
     def _activities(self, scope: BusinessScope) -> list[dict[str, Any]]:
-        return current_activities(self.accounts.list_accounts(user_id=scope.person_id))
+        return current_activities(
+            self.accounts.list_accounts(user_id=scope.person_id, scope=scope.owner)
+        )
 
 
 def _wire(expense: dict[str, Any]) -> dict[str, Any]:

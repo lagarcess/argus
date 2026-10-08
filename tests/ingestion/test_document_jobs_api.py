@@ -13,6 +13,7 @@ import pytest
 from argus.api.document_jobs import document_jobs
 from argus.api.documents import documents_service
 from argus.domain.ingestion.documents.jobs import DISPATCH_WINDOW, MAX_ATTEMPTS
+from argus.domain.owner_scope import PERSONAL
 
 from tests.ingestion.conftest import ALICE, bearer
 
@@ -342,7 +343,7 @@ def test_flag_off_prepares_through_background_tasks_only(flag_off_client, monkey
     connection = upload(flag_off_client)
 
     user = service.store.owner(connection_id=connection)
-    assert calls == [{"user_id": user, "connection_id": connection}]
+    assert calls == [{"user_id": user, "connection_id": connection, "scope": PERSONAL}]
     assert document(flag_off_client, connection)["status"] == "review_ready"
     assert service.store.job(user_id=user, connection_id=connection) is None
     assert provider.calls == 1

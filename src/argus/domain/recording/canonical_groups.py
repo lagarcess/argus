@@ -6,6 +6,8 @@ from typing import Any
 
 from psycopg import Connection
 
+from argus.domain.owner_scope import OwnerScope, sql_predicate
+
 from .errors import AccountNotFound
 from .loop import ExpenseRecord, ExpenseRevision
 from .money_postgres import load_owner
@@ -192,21 +194,40 @@ def owner_closure(connection: Connection, owner_ids: Collection[str]) -> list[st
 
 
 def load(
-    repository: Any, connection: Connection, owner_ids: Collection[str]
+    repository: Any,
+    connection: Connection,
+    owner_ids: Collection[str],
+    *,
+    scope: OwnerScope,
 ) -> ResolvedGroups:
+    """Groups of ``scope``. A group with a leg on an account outside it belongs
+    to the other side and is left out, so neither side resolves the other's."""
+
     owners = owner_closure(connection, owner_ids)
     records = [
-        stored for owner in owners for stored in load_owner(repository, connection, owner)
+        stored
+        for owner in owners
+        for stored in load_owner(repository, connection, owner, scope=scope)
     ]
+    in_scope, params = sql_predicate(scope, "a.owner_space_id")
     rows = connection.execute(
-        """select g.id,g.user_id,g.current_revision,m.activity_revision,
+        f"""select g.id,g.user_id,g.current_revision,m.activity_revision,
         m.record_id,m.record_revision,m.role,m.record_owner_id
         from public.financial_activity_groups g
         left join public.financial_activity_memberships m
         on m.activity_id=g.id and m.user_id=g.user_id
         where g.user_id=any(%s::uuid[])
+        and not exists (
+            select 1 from public.financial_activity_memberships o
+            join public.financial_records r
+            on r.id=o.record_id and r.user_id=coalesce(o.record_owner_id,o.user_id)
+            join public.financial_accounts a
+            on a.id=r.account_id and a.user_id=r.user_id
+            where o.activity_id=g.id and o.user_id=g.user_id
+            and not coalesce(({in_scope}), false)
+        )
         order by g.id,m.activity_revision,m.role""",
-        (owners,),
+        (owners, *params),
     ).fetchall()
     headers = {}
     memberships = []

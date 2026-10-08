@@ -28,6 +28,7 @@ from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.sink import SubmitResult
+from argus.domain.owner_scope import PERSONAL
 from psycopg_pool import ConnectionPool
 
 from tests import test_financial_accounts_postgres as shared
@@ -67,7 +68,12 @@ def test_advance_names_one_current_attempt_and_respects_the_lease(
     store = PostgresDocumentStore(pool, source_objects())
     owner, other = users["owner"], users["other"]
     row = repo.create(
-        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+        user_id=owner,
+        source="statement",
+        external_ref=str(uuid4()),
+        label=None,
+        now=now,
+        scope=PERSONAL,
     )
     assert store.capture(user_id=owner, draft=draft(row.id, now), content=b"%PDF-x")
     first = PreparationJob(attempt=1, attempt_id="a1", draft_version=1, dispatched_at=now)
@@ -243,12 +249,17 @@ async def capture(service: DocumentsService, owner: str) -> str:
         filename="receipt.pdf",
         media_type="application/pdf",
         consent=True,
+        scope=PERSONAL,
     )
     return captured.connection_id
 
 
 def forget(service: DocumentsService, owner: str, connection: str) -> None:
-    service.forget(service.hub.connections.get(user_id=owner, connection_id=connection))
+    service.forget(
+        service.hub.connections.get(
+            user_id=owner, connection_id=connection, scope=PERSONAL
+        )
+    )
 
 
 @pytest.mark.asyncio
@@ -279,9 +290,9 @@ async def test_kill_before_the_marker_recovers_with_one_provider_call(
     store.release.set()
     assert await dead == "document_lease_lost"
 
-    assert api.service.get(user_id=owner, connection_id=connection).status == (
-        "review_ready"
-    )
+    assert api.service.get(
+        user_id=owner, connection_id=connection, scope=PERSONAL
+    ).status == ("review_ready")
     assert extractor.calls == 1
     api.sink.submit.assert_called_once()
     assert connection not in api.jobs.sweep().redispatched
@@ -306,7 +317,7 @@ async def test_kill_after_the_marker_settles_until_a_consented_retry(
     report = api.jobs.sweep()
     assert connection in report.outcome_unknown
     assert connection not in report.redispatched
-    settled = api.service.get(user_id=owner, connection_id=connection)
+    settled = api.service.get(user_id=owner, connection_id=connection, scope=PERSONAL)
     assert (settled.status, settled.error_code) == (
         "needs_attention",
         "document_preparation_outcome_unknown",
@@ -315,7 +326,9 @@ async def test_kill_after_the_marker_settles_until_a_consented_retry(
     assert api.attempts(connection) == [first]
     assert extractor.calls == 1
 
-    api.service.queue(user_id=owner, connection_id=connection, consent=True)
+    api.service.queue(
+        user_id=owner, connection_id=connection, consent=True, scope=PERSONAL
+    )
     api.jobs.start(user_id=owner, connection_id=connection)
     [_, retried] = api.attempts(connection)
     assert await run_attempt(api.service, connection, retried) == "prepared"
@@ -404,7 +417,9 @@ async def test_two_running_instances_recover_a_dead_worker_without_restart(
 
         clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
         for _ in range(500):
-            draft = apis[0].service.get(user_id=owner, connection_id=connection)
+            draft = apis[0].service.get(
+                user_id=owner, connection_id=connection, scope=PERSONAL
+            )
             if draft.status == "review_ready":
                 break
             await asyncio.sleep(0.01)
@@ -471,6 +486,7 @@ def test_workflow_worker_prepares_the_dispatched_attempt(
             filename="receipt.pdf",
             media_type="application/pdf",
             consent=True,
+            scope=PERSONAL,
         )
     )
 
@@ -478,9 +494,9 @@ def test_workflow_worker_prepares_the_dispatched_attempt(
 
     assert [outcome["outcome"] for outcome in outcomes] == ["prepared"]
     assert Prepared.calls == 1
-    assert api.get(user_id=owner, connection_id=captured.connection_id).status == (
-        "review_ready"
-    )
+    assert api.get(
+        user_id=owner, connection_id=captured.connection_id, scope=PERSONAL
+    ).status == ("review_ready")
     with pool.connection() as connection:
         events = connection.execute(
             "select count(distinct event_id) from public.financial_import_observations "
@@ -499,5 +515,7 @@ def test_workflow_worker_prepares_the_dispatched_attempt(
     if not isinstance(objects, InMemorySourceObjects):
         assert paths == [prefix + legacy[1]], "stored at {user}/{connection}/{sha256}"
     api.forget(
-        api.hub.connections.get(user_id=owner, connection_id=captured.connection_id)
+        api.hub.connections.get(
+            user_id=owner, connection_id=captured.connection_id, scope=PERSONAL
+        )
     )

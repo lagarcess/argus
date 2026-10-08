@@ -187,6 +187,7 @@ async def upload_receipt(
                 context.scope.person_id,
                 receipt.id,
                 background_tasks,
+                scope=context.scope.owner,
             )
     except Exception as error:
         raise _problem(request, error) from None
@@ -261,6 +262,7 @@ async def prepare_receipt(
             context.scope.person_id,
             receipt_id,
             background_tasks,
+            scope=context.scope.owner,
         )
         return context.service.receipt(context.scope, receipt_id).summary()
     except Exception as error:

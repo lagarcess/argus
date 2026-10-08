@@ -103,6 +103,7 @@ class DocumentsDestination:
                 filename=filename,
                 media_type=media_type,
                 consent=False,
+                scope=resolve_business_scope(owner_id).owner,
             )
         except DocumentExtractionError as error:
             raise CaptureRejected(

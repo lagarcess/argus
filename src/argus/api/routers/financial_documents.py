@@ -19,6 +19,7 @@ from argus.api.documents import (
 from argus.domain.ingestion.documents.config import SOURCE_MEDIA_TYPES
 from argus.domain.ingestion.documents.models import DraftProposal, DraftStatus
 from argus.domain.ingestion.documents.service import DocumentServiceError
+from argus.domain.owner_scope import PERSONAL
 
 router = APIRouter(prefix="/financial-documents", tags=["financial-documents"])
 
@@ -75,10 +76,15 @@ async def upload_document(
             media_type=media_type,
             consent=consent == "true",
             proposal=destination,
+            scope=PERSONAL,
         )
         if outcome.status == "queued":
             await dispatch_preparation(
-                context.service, context.user_id, outcome.connection_id, background_tasks
+                context.service,
+                context.user_id,
+                outcome.connection_id,
+                background_tasks,
+                scope=PERSONAL,
             )
         return asdict(outcome)
     except Exception as error:
@@ -99,9 +105,14 @@ async def resume_document(
             user_id=context.user_id,
             connection_id=connection_id,
             consent=consent == "true",
+            scope=PERSONAL,
         )
         await dispatch_preparation(
-            context.service, context.user_id, connection_id, background_tasks
+            context.service,
+            context.user_id,
+            connection_id,
+            background_tasks,
+            scope=PERSONAL,
         )
         return asdict(outcome)
     except Exception as error:
@@ -109,7 +120,9 @@ async def resume_document(
 
 
 def _draft(context: DocumentContext, connection_id: str) -> dict[str, object]:
-    draft = context.service.get(user_id=context.user_id, connection_id=connection_id)
+    draft = context.service.get(
+        user_id=context.user_id, connection_id=connection_id, scope=PERSONAL
+    )
     batch = context.service.store.get(
         user_id=context.user_id, connection_id=connection_id
     )
@@ -132,12 +145,16 @@ def list_documents(
     response.headers["Cache-Control"] = "no-store"
     try:
         items = []
-        for connection in context.service.hub.connections.list(user_id=context.user_id):
+        for connection in context.service.hub.connections.list(
+            user_id=context.user_id, scope=PERSONAL
+        ):
             if connection.source == "statement" and connection.status != "disconnected":
                 try:
                     items.append(
                         context.service.get(
-                            user_id=context.user_id, connection_id=connection.id
+                            user_id=context.user_id,
+                            connection_id=connection.id,
+                            scope=PERSONAL,
                         ).model_dump(mode="json")
                     )
                 except DocumentServiceError as error:
@@ -172,9 +189,11 @@ def get_source(
     context: DocumentContext = Depends(require_document_context),  # noqa: B008
 ) -> Response:
     try:
-        draft = context.service.get(user_id=context.user_id, connection_id=connection_id)
+        draft = context.service.get(
+            user_id=context.user_id, connection_id=connection_id, scope=PERSONAL
+        )
         content = context.service.source_bytes(
-            user_id=context.user_id, connection_id=connection_id
+            user_id=context.user_id, connection_id=connection_id, scope=PERSONAL
         )
         suffix = SOURCE_MEDIA_TYPES[draft.media_type]
         return Response(
@@ -211,6 +230,7 @@ def update_proposal(
             connection_id=connection_id,
             version=body.version,
             proposal=body.proposal,
+            scope=PERSONAL,
         )
         return _draft(context, connection_id)
     except Exception as error:

@@ -19,6 +19,7 @@ from argus.domain.ingestion.documents.service import (
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.sink import SubmitResult
+from argus.domain.owner_scope import PERSONAL
 from faker import Faker
 
 fake = Faker()
@@ -61,8 +62,11 @@ async def upload(service: DocumentsService, user: str) -> DocumentOutcome:
         filename="statement.pdf",
         media_type="application/pdf",
         consent=True,
+        scope=PERSONAL,
     )
-    return await service.resume(user_id=user, connection_id=captured.connection_id)
+    return await service.resume(
+        user_id=user, connection_id=captured.connection_id, scope=PERSONAL
+    )
 
 
 @pytest.mark.asyncio
@@ -78,7 +82,9 @@ async def test_same_document_replays_without_extracting_again(rig: Rig) -> None:
     assert sink.submit.call_count == 2
     assert sink.submit.call_args_list[0] == sink.submit.call_args_list[1]
     assert (
-        hub.connections.get(user_id=user, connection_id=first.connection_id).lease_holder
+        hub.connections.get(
+            user_id=user, connection_id=first.connection_id, scope=PERSONAL
+        ).lease_holder
         is None
     )
 
@@ -91,7 +97,9 @@ async def test_identical_files_are_isolated_by_owner(rig: Rig) -> None:
     assert first.connection_id != second.connection_id
     assert extractor.extract.await_count == 2
     with pytest.raises(ConnectionNotFound):
-        await service.resume(user_id=other, connection_id=first.connection_id)
+        await service.resume(
+            user_id=other, connection_id=first.connection_id, scope=PERSONAL
+        )
 
 
 @pytest.mark.asyncio
@@ -101,10 +109,10 @@ async def test_sink_failure_resumes_saved_batch_without_provider(rig: Rig) -> No
     sink.submit.side_effect = RuntimeError("storage unavailable")
     with pytest.raises(DocumentServiceError, match="document_delivery_failed"):
         await upload(service, user)
-    row = hub.connections.list(user_id=user)[0]
+    row = hub.connections.list(user_id=user, scope=PERSONAL)[0]
     assert row.status == "error"
     sink.submit.side_effect = None
-    result = await service.resume(user_id=user, connection_id=row.id)
+    result = await service.resume(user_id=user, connection_id=row.id, scope=PERSONAL)
     assert result.replayed
     assert extractor.extract.await_count == 1
 
@@ -115,10 +123,12 @@ async def test_disconnect_removes_saved_content_and_blocks_resume(rig: Rig) -> N
     sink.forget_connection.return_value = 1
     user = fake.uuid4()
     first = await upload(service, user)
-    hub.disconnect(user_id=user, connection_id=first.connection_id)
+    hub.disconnect(user_id=user, connection_id=first.connection_id, scope=PERSONAL)
     assert service.store.get(user_id=user, connection_id=first.connection_id) is None
     with pytest.raises(DocumentServiceError, match="document_disconnected"):
-        await service.resume(user_id=user, connection_id=first.connection_id)
+        await service.resume(
+            user_id=user, connection_id=first.connection_id, scope=PERSONAL
+        )
 
 
 @pytest.mark.asyncio
@@ -131,9 +141,10 @@ async def test_resume_without_checkpoint_requires_reupload(rig: Rig) -> None:
         external_ref=fake.uuid4(),
         label=None,
         now=hub.clock(),
+        scope=PERSONAL,
     )
     with pytest.raises(DocumentServiceError, match="document_source_unavailable"):
-        await service.resume(user_id=user, connection_id=row.id)
+        await service.resume(user_id=user, connection_id=row.id, scope=PERSONAL)
     extractor.extract.assert_not_awaited()
 
 
@@ -153,7 +164,7 @@ async def test_expired_worker_cannot_save_or_deliver(rig: Rig) -> None:
     with pytest.raises(DocumentServiceError, match="document_lease_lost"):
         await upload(service, user)
     sink.submit.assert_not_called()
-    row = hub.connections.list(user_id=user)[0]
+    row = hub.connections.list(user_id=user, scope=PERSONAL)[0]
     assert service.store.get(user_id=user, connection_id=row.id) is None
 
 
@@ -165,14 +176,16 @@ async def test_disconnect_during_extraction_never_recreates_content(rig: Rig) ->
 
     async def disconnect(**kwargs: Any) -> ExtractionBatch:
         batch = await original(**kwargs)
-        hub.disconnect(user_id=user, connection_id=kwargs["connection_id"])
+        hub.disconnect(
+            user_id=user, connection_id=kwargs["connection_id"], scope=PERSONAL
+        )
         return batch
 
     extractor.extract.side_effect = disconnect
     with pytest.raises(DocumentServiceError, match="document_lease_lost"):
         await upload(service, user)
     sink.submit.assert_not_called()
-    row = hub.connections.list(user_id=user)[0]
+    row = hub.connections.list(user_id=user, scope=PERSONAL)[0]
     assert service.store.get(user_id=user, connection_id=row.id) is None
 
 
@@ -257,5 +270,5 @@ async def test_invalid_candidate_batch_never_reaches_checkpoint_or_sink(
     with pytest.raises(DocumentServiceError):
         await upload(service, user)
     sink.submit.assert_not_called()
-    row = hub.connections.list(user_id=user)[0]
+    row = hub.connections.list(user_id=user, scope=PERSONAL)[0]
     assert service.store.get(user_id=user, connection_id=row.id) is None

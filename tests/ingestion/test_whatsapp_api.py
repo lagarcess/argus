@@ -18,6 +18,7 @@ from argus.api.whatsapp import (
 )
 from argus.domain.ingestion.whatsapp.replies import CloudApiTransport
 from argus.domain.ingestion.whatsapp.store import InMemoryWhatsAppStore
+from argus.domain.owner_scope import PERSONAL
 from fastapi.testclient import TestClient
 from loguru import logger
 
@@ -140,7 +141,7 @@ def test_bad_signature_is_401_before_parsing(
     }
     assert graph.requests == []
     alice = identities[ALICE]["id"]
-    assert documents_service().hub.connections.list(user_id=alice) == []
+    assert documents_service().hub.connections.list(user_id=alice, scope=PERSONAL) == []
 
 
 def test_signed_garbage_is_400(wa_client: TestClient) -> None:
@@ -179,7 +180,7 @@ def test_link_capture_status_and_revoke_over_http(
     assert post(wa_client, fixture("image_message.json")).status_code == 200
     assert post(wa_client, fixture("image_message.json")).status_code == 200
     owner = identities[ALICE]["id"]
-    [connection] = documents_service().hub.connections.list(user_id=owner)
+    [connection] = documents_service().hub.connections.list(user_id=owner, scope=PERSONAL)
     document = wa_client.get(
         f"/api/v1/financial-documents/{connection.id}", headers=bearer(ALICE)
     ).json()
@@ -218,7 +219,9 @@ def test_unfinished_delivery_answers_503_and_redelivery_resumes(
     assert post(wa_client, fixture("image_message.json")).status_code == 200
     assert post(wa_client, fixture("image_message.json")).status_code == 200
     owner = identities[ALICE]["id"]
-    assert len(documents_service().hub.connections.list(user_id=owner)) == 1
+    assert (
+        len(documents_service().hub.connections.list(user_id=owner, scope=PERSONAL)) == 1
+    )
     assert len(calls) == 2
 
 

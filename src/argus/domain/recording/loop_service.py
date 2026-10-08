@@ -18,6 +18,7 @@ from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
 from argus.domain.backtest_admission import canonical_hash
+from argus.domain.owner_scope import PERSONAL
 from argus.domain.recording.accounts import signed_to_owner
 from argus.domain.recording.currency import (
     MAX_MINOR_UNITS,
@@ -128,7 +129,7 @@ class FinancialLoopService:
     def _current(
         self, user_id: str, account_id: str, expected_version: int
     ) -> StoredAccount:
-        stored = self.accounts.get(user_id=user_id, account_id=account_id)
+        stored = self.accounts.get(user_id=user_id, account_id=account_id, scope=PERSONAL)
         if stored.account.version != expected_version:
             raise StaleVersion()
         return stored
@@ -186,7 +187,9 @@ class FinancialLoopService:
         request: CheckRequest,
         idempotency_key: str,
     ) -> OperationResult:
-        account_id = self.accounts.get(user_id=user_id, account_id=account_id).account.id
+        account_id = self.accounts.get(
+            user_id=user_id, account_id=account_id, scope=PERSONAL
+        ).account.id
 
         def plan(stored: StoredAccount) -> Mutation:
             mutation, preview = self._check(stored, request)
@@ -200,6 +203,7 @@ class FinancialLoopService:
             identity_hash=token("check", account_id, None, request),
             expected_version=request.expected_version,
             planner=plan,
+            scope=PERSONAL,
         )
 
     def _check(
@@ -296,7 +300,9 @@ class FinancialLoopService:
         request: LoopOpeningRequest,
         idempotency_key: str,
     ) -> OperationResult:
-        account_id = self.accounts.get(user_id=user_id, account_id=account_id).account.id
+        account_id = self.accounts.get(
+            user_id=user_id, account_id=account_id, scope=PERSONAL
+        ).account.id
 
         def plan(stored: StoredAccount) -> Mutation:
             mutation, preview = self._opening(stored, request)
@@ -310,6 +316,7 @@ class FinancialLoopService:
             identity_hash=token("opening", account_id, None, request),
             expected_version=request.expected_version,
             planner=plan,
+            scope=PERSONAL,
         )
 
     def _opening(

@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from argus.domain.backtest_admission import canonical_hash
+from argus.domain.owner_scope import OwnerScope
 from argus.domain.recording.accounts import (
     UNSET,
     AccountEdit,
@@ -63,6 +64,7 @@ class FinancialAccountService:
         user_id: str,
         idempotency_key: str,
         request: CreateFinancialAccountRequest,
+        scope: OwnerScope,
     ) -> CreateResult:
         account = NewAccount(
             type=validate_type(request.type),
@@ -107,19 +109,22 @@ class FinancialAccountService:
             identity_hash=identity,
             account=account,
             opening=opening,
+            scope=scope,
         )
 
-    def list_accounts(self, *, user_id: str) -> list[StoredAccount]:
-        return self._repository.list_accounts(user_id=user_id)
+    def list_accounts(self, *, user_id: str, scope: OwnerScope) -> list[StoredAccount]:
+        return self._repository.list_accounts(user_id=user_id, scope=scope)
 
-    def get(self, *, user_id: str, account_id: str) -> StoredAccount:
+    def get(self, *, user_id: str, account_id: str, scope: OwnerScope) -> StoredAccount:
         try:
             # A malformed id names nothing the caller can own; same answer as
             # another user's account, so probes learn nothing from the shape.
             account_id = str(UUID(account_id))
         except ValueError:
             raise AccountNotFound() from None
-        stored = self._repository.get_account(user_id=user_id, account_id=account_id)
+        stored = self._repository.get_account(
+            user_id=user_id, account_id=account_id, scope=scope
+        )
         if stored is None:
             raise AccountNotFound()
         return stored
@@ -130,8 +135,9 @@ class FinancialAccountService:
         user_id: str,
         account_id: str,
         request: EditFinancialAccountRequest,
+        scope: OwnerScope,
     ) -> StoredAccount:
-        stored = self.get(user_id=user_id, account_id=account_id)
+        stored = self.get(user_id=user_id, account_id=account_id, scope=scope)
         if request.expected_version != stored.account.version:
             raise StaleVersion()
         edit = AccountEdit(
@@ -154,6 +160,7 @@ class FinancialAccountService:
             account_id=stored.account.id,
             expected_version=request.expected_version,
             changes=changes,
+            scope=scope,
         )
 
     def write_opening(
@@ -162,8 +169,9 @@ class FinancialAccountService:
         user_id: str,
         account_id: str,
         request: WriteOpeningRequest,
+        scope: OwnerScope,
     ) -> StoredAccount:
-        stored = self.get(user_id=user_id, account_id=account_id)
+        stored = self.get(user_id=user_id, account_id=account_id, scope=scope)
         if stored.expenses or stored.checks:
             raise RecordingInputError(
                 "preview_required",
@@ -195,4 +203,5 @@ class FinancialAccountService:
             # metadata that version names; storage refuses if the account moved.
             expected_version=request.expected_version,
             write=write,
+            scope=scope,
         )

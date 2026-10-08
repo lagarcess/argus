@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from uuid import uuid4
 
 import pytest
+from argus.domain.owner_scope import PERSONAL
 
 from tests import test_financial_accounts_postgres as shared
 
@@ -320,6 +321,7 @@ def test_the_current_python_caller_still_creates_personal_accounts(
             identity_hash=identity,
             account=shared.CHECKING,
             opening=shared._opening(1_250_000),
+            scope=PERSONAL,
         )
 
     first = create("sha256:a")

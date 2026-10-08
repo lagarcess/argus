@@ -9,6 +9,7 @@ from argus.domain.ingestion.connections_postgres import PostgresConnectionReposi
 from argus.domain.ingestion.contract import ImportCandidate, SourceRef
 from argus.domain.ingestion.documents.models import ExtractionBatch
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
+from argus.domain.owner_scope import PERSONAL
 from psycopg_pool import ConnectionPool
 
 from tests import test_financial_accounts_postgres as shared
@@ -38,6 +39,7 @@ def test_checkpoint_is_immutable_and_owner_scoped(
         external_ref=str(uuid4()),
         label=None,
         now=now,
+        scope=PERSONAL,
     )
     holder = str(uuid4())
     assert repo.lease(connection_id=row.id, holder=holder, now=now)
@@ -109,6 +111,7 @@ def test_capture_survives_new_store_handles_and_disconnect_hides_source(
         external_ref=str(uuid4()),
         label="Document",
         now=now,
+        scope=PERSONAL,
     )
     draft = DocumentDraft(
         connection_id=connection.id,
@@ -164,7 +167,12 @@ def test_bucket_and_reference_check_use_the_python_limits(
         ).fetchone() == (SOURCE_MAX_BYTES, list(SOURCE_MEDIA_TYPES))
     owner, now = users["owner"], datetime.now(timezone.utc)
     connection = PostgresConnectionRepository(pool).create(
-        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+        user_id=owner,
+        source="statement",
+        external_ref=str(uuid4()),
+        label=None,
+        now=now,
+        scope=PERSONAL,
     )
     digest = "c" * 64
 
