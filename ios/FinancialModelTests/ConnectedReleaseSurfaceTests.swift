@@ -37,11 +37,11 @@ final class ConnectedReleaseSurfaceTests: XCTestCase {
         )
         XCTAssertEqual(
             CuadraoAddAction.available(receiptsConnected: false, householdsAvailable: true, inHousehold: false),
-            [.account, .transaction, .group, .plan]
+            [.account, .transaction, .plan, .group]
         )
         XCTAssertEqual(
             CuadraoAddAction.available(receiptsConnected: true, householdsAvailable: true, inHousehold: true),
-            [.account, .transaction, .scan, .group, .plan, .invite]
+            [.account, .transaction, .plan, .group, .invite, .scanCamera, .choosePhoto, .chooseFile]
         )
     }
 
