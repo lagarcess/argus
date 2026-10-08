@@ -6,12 +6,19 @@ experience and assigned-work ownership. Check current PRs and release evidence
 for landing/deployment status. The historical ledger below stops at August 2,
 2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
-Last reconciled: 2026-10-08 (PR #905, #908, #909, #913, #914, #918 Business landings; PR #904 + PR #901 Business pilot landing; Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
+Last reconciled: 2026-10-08 (PR #905, #908, #909, #913, #914, #918, #920 Business landings; PR #904 + PR #901 Business pilot landing; Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
 through 2026-08-02)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
+
+- October 8, 2026: [PR #920](https://github.com/lagarcess/argus/pull/920) merged as `f5a2007cd`.
+  - A switch now stops only new intake. With document extraction or ingestion off, saved Personal documents and Business receipts stay readable and deletable, with Storage erased first. WhatsApp unlink is always available to the signed-in owner.
+  - `ARGUS_BUSINESS_CHAT_ENABLED` (default off) keeps Business chat off until its tool restrictions and required tests pass.
+  - Before merge: exact-head CI green, clean, and an independent review that said ship.
+  - The founder approved the Business search and receipt-state copy on October 8. The "AI result unknown" text was replaced by the founder's wording in the PR that carries this note.
+  - No migration, deployment or activation.
 
 - October 8, 2026: after Consumer recorded the Build 2 candidate `64833f6d2` on [#833](https://github.com/lagarcess/argus/issues/833), the rest of the Business queue merged, in order. Each had green exact-head CI, contained integration and had no open review threads:
   - [PR #908](https://github.com/lagarcess/argus/pull/908) as `56f50b2f6`: durable document preparation jobs, migration `20261008110000` (B2).
