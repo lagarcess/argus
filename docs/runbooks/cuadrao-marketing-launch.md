@@ -48,8 +48,8 @@ The practical consequence: the signup table can go to production alone and early
 
 ### Before any promotion
 
-1. Automatic Supabase preview branching is off and the PR 895 branch is removed (launch record, "Disable automatic previews"). On 2026-10-07 it was on.
-2. Automatic production migrations from `main` are off. The evidence says they are not wired (launch record); confirm the integration's deploy-to-production setting in the dashboard once.
+1. Supabase "Deploy to production" is off (founder confirmed in the dashboard, 2026-10-07). Automatic branching cannot be changed on the Free plan; the branch list is checked after the first migration PR and any preview is investigated (launch record, "Automatic Supabase behavior").
+2. No paid upgrade or hosted migration is implied by anything in this runbook.
 3. Supabase stays on the Free plan; nothing here depends on a plan change.
 4. CI is terminal and green on the exact candidate, and the signup migration is not applied by promotion: the consumer's applier is the only production path.
 
