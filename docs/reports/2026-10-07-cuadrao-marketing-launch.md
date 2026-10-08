@@ -112,7 +112,7 @@ Spanish first, English follows. Only strings whose meaning changed with real del
 | Contact, too many attempts | Hiciste varios intentos seguidos. Espera unos minutos e inténtalo de nuevo. | You made several attempts in a row. Wait a few minutes and try again. |
 | Contact, field problem from the server | Revisa los campos marcados e inténtalo de nuevo. | Check the marked fields and try again. |
 | Contact, no JavaScript | Activa JavaScript para enviar este formulario o escríbenos a hola@cuadrao.ai. | Enable JavaScript to send this form or email us at hola@cuadrao.ai. |
-| Contact, under the form | Usamos tu nombre, correo y mensaje solo para responderte. Política de privacidad | We use your name, email and message only to reply to you. Privacy policy |
+| Contact, under the form | Usamos tu nombre, correo y mensaje para responderte. Política de privacidad | We use your name, email and message to reply to you. Privacy policy |
 | Personal, under the form | Usaremos tu correo solo para avisarte sobre el acceso anticipado a Cuadrao. Para retirar tu registro, escríbenos a hola@cuadrao.ai. Política de privacidad. | We'll use your email only to tell you about Cuadrao early access. To remove your signup, email hola@cuadrao.ai. Privacy policy. |
 | Personal, too many attempts | Hiciste varios intentos seguidos. Espera unos minutos e inténtalo de nuevo. | You made several attempts in a row. Wait a few minutes and try again. |
 | Footer link (new) | Privacidad | Privacy |
