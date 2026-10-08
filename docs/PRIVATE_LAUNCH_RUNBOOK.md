@@ -948,6 +948,45 @@ Do not copy production deletion credentials into CI. Record the command target,
 timestamp, final summary line, and selected or purged counts in operator
 evidence.
 
+### Applying an approved migration list (non-hosted targets only)
+
+`scripts/ops/apply_approved_migrations.py` applies an explicit, ordered list of
+migration versions to a named database and records each ledger row the way
+`production_migration_gate.py` reads it (the file's own version and name,
+statements split by the gate's splitter). Use it where the Supabase CLI cannot:
+production's ledger holds history the CLI would try to re-run or rewrite.
+Versions at or below the gate's reconciliation threshold are never recorded; a
+listed `--unrecorded` version runs without a ledger row.
+
+Each file runs as one transaction. A file wrapped in `begin` and `commit` runs
+as one transaction with the wrapper dropped from what runs and kept in the
+ledger row. A file that commits inside itself runs as separate transactions only
+when its version is passed with `--allow-mid-file-commit`; each committed
+transaction is printed, and the ledger row joins the last one. `rollback` and
+`savepoint` are refused, and so is a file with no runnable statement. Each
+transaction sets `--lock-timeout` (default `5s`, at least 1) so a file that
+cannot get its locks fails and rolls back. One run holds an advisory lock,
+taken before the ledger is read.
+
+It refuses any hosted Supabase host in any spelling (case, trailing dot, encoded
+dots), on the URL, on every `--allow-host` and on the connected host. The target
+URL comes from an environment variable (default `ARGUS_APPLY_DATABASE_URL`),
+never the command line. The host and database must be named with `--allow-host`
+and `--allow-database`; a DNS name also needs its resolved address on the list.
+An IP literal that happens to be a hosted database cannot be caught by name, so
+never allow-list one. The default run only prints the plan; `--execute` applies
+it. A hosted target needs a separate reviewed change and the founder's approval
+record. After a stop, everything printed as committed stays applied; recorded
+files show in the ledger, but `--unrecorded` steps leave no trace, so take each
+reported one out of the retry command.
+
+```bash
+ARGUS_APPLY_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/rehearsal \
+poetry run python scripts/ops/apply_approved_migrations.py \
+  --candidate-sha "$(git rev-parse HEAD)" --approved-file approved.json \
+  --allow-host 127.0.0.1 --allow-database rehearsal            # plan only
+```
+
 ## Runtime Tuning Flags
 
 These are optional runtime knobs (not secrets). Defaults are safe for

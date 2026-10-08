@@ -94,6 +94,12 @@ enum CuadraoFirstRelease {
     static var showsConversationBulkActions: Bool { !hidesUnfinished }
     /// Business and custom spaces are designed but have no backend, so Release hides them.
     static var showsExtraSpaces: Bool { !hidesUnfinished }
+    /// The assistant answers from sample data until it is connected, so Release has no assistant tab
+    /// and its third navigation slot is the add-movement action. The design Preview keeps its assistant.
+    static var hasAssistant: Bool { !hidesUnfinished || CuadraoDesignPreview.isActive }
+    /// The Updates bell and receipt capture are designed, but nothing feeds them yet.
+    static var showsUpdates: Bool { !hidesUnfinished || CuadraoDesignPreview.isActive }
+    static var showsReceiptCapture: Bool { !hidesUnfinished || CuadraoDesignPreview.isActive }
     static func shows(_ route: CanvasProfileRoute) -> Bool {
         if route == .voice { return CuadraoDesignPreview.voiceSelection }
         return !(hidesUnfinished && unfinishedProfileRoutes.contains(route))
