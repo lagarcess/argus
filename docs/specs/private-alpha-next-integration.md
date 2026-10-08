@@ -6,12 +6,14 @@ experience and assigned-work ownership. Check current PRs and release evidence
 for landing/deployment status. The historical ledger below stops at August 2,
 2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
-Last reconciled: 2026-10-06 (Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
+Last reconciled: 2026-10-07 (PR #904 + PR #901 Business pilot landing; Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
 through 2026-08-02)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
+
+- October 7, 2026: Cuadrao Business owner pilot, first two landings under [#900](https://github.com/lagarcess/argus/pull/900). [PR #904](https://github.com/lagarcess/argus/pull/904) squash-merged as `ee4acd50e` from head `43ad4a70b`: one receipt review read from the draft, its evidence and its import event, with no migration. [PR #901](https://github.com/lagarcess/argus/pull/901) squash-merged as `d2d0c6d38` from head `72f7f07c8`: the Business screens inside the chat shell at `/biz`, behind `NEXT_PUBLIC_BUSINESS_PILOT_ENABLED` (default false, now in `web/.env.local.example`), plus the guarded money input. With the flag off, `/chat` matched integration byte for byte in en and es-419 on desktop and phone. Exact-head CI was green on both and neither had open review threads. No linked issue closes. Storage (#905), preparation jobs (#908) and WhatsApp intake (#909) carry migrations and stay unmerged until the consumer freeze is posted. No deployment, hosted migration, Business activation or paid provider call.
 
 - October 7, 2026: [PR #884](https://github.com/lagarcess/argus/pull/884) delivers the default-off Cuadrao Business and Personal marketing preview. The [website delivery record](../reports/2026-10-07-cuadrao-website-integration.md) links exact-head evidence and launch follow-ups #880–#882. No public activation, hosted persistence, financial-runtime or native-app change.
 
