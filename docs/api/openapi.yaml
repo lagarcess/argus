@@ -944,6 +944,7 @@ paths:
       tags:
       - financial-accounts
       - business
+      description: A receipt nobody has read is entered by hand here, from version 0.
       parameters:
       - name: receipt_id
         in: path

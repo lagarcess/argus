@@ -8775,19 +8775,28 @@ accept path recorded.
 - GET `/api/v1/business/receipts/{id}` returns a `ReceiptDetail`. `version` is
   the import event's version, and `0` while there is no purchase to review.
   `evidence` is what the receipt says, and corrections never change it.
-  `missing_fields` lists the review fields still needed. A prepared receipt with
-  no single purchase is `needs_attention`, with the blocker as `error_code`.
+  `missing_fields` lists the review fields still needed. A receipt nobody has
+  read lists `account_id`, `amount`, `currency` and `occurred_on`. A prepared
+  receipt with no single purchase is `needs_attention`, with the blocker as
+  `error_code`.
 - GET `/api/v1/business/receipts/{id}/source` returns the stored original
   (#778) as an attachment, with `X-Content-Type-Options: nosniff`. It is
   readable by the owner only.
 - POST `/api/v1/business/receipts/{id}/prepare` requires
   `X-Extraction-Consent: true`, else 422
-  `document_extraction_consent_required`. It queues preparation through the
+  `document_extraction_consent_required`. A receipt entered by hand is 409
+  `document_entered_by_owner`, here and on `/financial-documents`. It queues preparation through the
   #823 job dispatch when jobs are on, and through a background task otherwise.
 - PATCH `/api/v1/business/receipts/{id}/review` takes `{version, fields}`. Each
   field maps onto the import's resolution. `merchant` is the recorded note, and
   `null` falls back to the evidence merchant. A stale `version` is 409
-  `stale_version`. A receipt with no purchase is 409 `receipt_not_prepared`.
+  `stale_version`. A receipt nobody has read, saved without consent or after
+  preparation failed, is entered by hand from `version: 0`. The document
+  records one purchase observation, marked entered by the owner and with
+  nothing read, through the same intake as extracted candidates. The fields
+  become its resolution, its `evidence` stays null, and no model is called.
+  Unknown fields stay unknown until the owner supplies them. Confirm then uses
+  the same accept path, and `receipt_ids` links the expense to the receipt.
 - POST `/api/v1/business/receipts/{id}/confirm` (`Idempotency-Key` required)
   takes `{version}` and records the receipt as one expense through the import
   accept path. Confirm changes nothing before it claims the import. A
@@ -8815,5 +8824,4 @@ accept path recorded.
   first. Nothing is stored for them.
 
 Another person's receipt id answers 404 `receipt_not_found` on every receipt
-route. A receipt with no AI preparation has no purchase to review yet, so its
-fields cannot be saved by hand. That manual path waits on a product decision.
+route. 

@@ -21,7 +21,10 @@ from argus.domain.business.service import BusinessService
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
 from argus.domain.ingestion.documents.objects import owner_prefix
-from argus.domain.ingestion.documents.service import DocumentsService
+from argus.domain.ingestion.documents.service import (
+    DocumentServiceError,
+    DocumentsService,
+)
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.reconcile.service import ReconciliationService
@@ -190,3 +193,54 @@ def test_source_is_the_stored_object_and_only_its_owner_reads_it(rig: dict) -> N
         service.source(rig["other"], receipt_id)
     with pytest.raises(ConnectionNotFound):
         service.receipt(rig["other"], receipt_id)
+
+
+def test_a_receipt_entered_by_hand_is_saved_once_and_linked(rig: dict) -> None:
+    service, scope = rig["service"], rig["owner"]
+    receipt = asyncio.run(
+        service.upload(
+            scope,
+            content=RECEIPT,
+            filename="whatsapp-image",
+            media_type="image/png",
+            consent=False,
+        )
+    )
+    account, _ = service.create_account(
+        scope,
+        CreateFinancialAccountRequest(type="cash", currency="DOP", nickname="Caja"),
+        "acct",
+    )
+    version = asyncio.run(service.start_entry(scope, receipt.id, 0))
+    entered = service.review(
+        scope,
+        receipt.id,
+        version,
+        {
+            "merchant": "Colmado Don Pedro",
+            "occurred_on": "2026-10-07",
+            "amount": "706.10",
+            "currency": "DOP",
+            "account_id": account["id"],
+        },
+    )
+    assert (entered.missing_fields, entered.detail()["evidence"]) == ([], None)
+    first = service.confirm(scope, receipt.id, entered.version, "by-hand")
+    second = service.confirm(scope, receipt.id, entered.version, "other-tab")
+    assert first.review.expense_id == second.review.expense_id
+    [expense] = service.expenses(scope, *OCTOBER)
+    assert (expense["receipt_id"], expense["amount"], expense["merchant"]) == (
+        receipt.id,
+        "706.10",
+        "Colmado Don Pedro",
+    )
+    with pytest.raises(DocumentServiceError) as refused:
+        service.queue(scope, receipt.id)
+    assert refused.value.code == "document_entered_by_owner"
+    with rig["pool"].connection() as connection:
+        events = connection.execute(
+            "select count(*) from public.financial_import_events where user_id = %s",
+            (scope.person_id,),
+        ).fetchone()[0]
+    assert (events, _written(rig)) == (1, 1)
+    assert service.source(scope, receipt.id) == ("image/png", RECEIPT)

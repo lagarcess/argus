@@ -13,6 +13,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 from argus.domain.ingestion.documents.models import DocumentDraft, ExtractionBatch
+from argus.domain.ingestion.documents.service import entered_by_owner
 from argus.domain.ingestion.receipt_review import (
     ReceiptReview,
     ReceiptStatus,
@@ -32,6 +33,8 @@ AWAITING_REVIEW: frozenset[ReceiptStatus] = frozenset(
     {"saved", "queued", "preparing", "review_ready"}
 )
 CLOSED: frozenset[ReceiptStatus] = frozenset({"confirmed", "dismissed"})
+# What a receipt nobody has read needs before the owner can save it by hand.
+UNREAD_NEEDS = ("account_id", "amount", "currency", "occurred_on")
 _UPDATE_KINDS: Mapping[str, str] = {
     "review_ready": "receipt_ready",
     "needs_attention": "receipt_needs_attention",
@@ -44,6 +47,7 @@ class Receipt:
     draft: DocumentDraft
     review: ReceiptReview
     channel: Channel
+    entered_by_owner: bool = False
 
     @property
     def id(self) -> str:
@@ -69,7 +73,21 @@ class Receipt:
         return self.review.event_version or 0
 
     @property
+    def enterable(self) -> bool:
+        """The owner may fill it in by hand: never read and not being read, or
+        entered by hand before its purchase reached review."""
+
+        if self.entered_by_owner:
+            return self.review.blocker == "no_purchase_found"
+        return self.review.blocker == "not_prepared" and self.draft.status not in (
+            "queued",
+            "preparing",
+        )
+
+    @property
     def missing_fields(self) -> list[str]:
+        if self.enterable:
+            return list(UNREAD_NEEDS)
         return [name for name in self.review.missing if name in REVIEW_FIELDS]
 
     def summary(self) -> dict[str, Any]:
@@ -90,7 +108,7 @@ class Receipt:
         return {
             **self.summary(),
             "version": self.version,
-            "evidence": evidence(self.review),
+            "evidence": None if self.entered_by_owner else evidence(self.review),
             "missing_fields": self.missing_fields,
         }
 
@@ -120,7 +138,9 @@ def compose(
     events: Iterable[Mapping[str, Any]],
     channel: Channel,
 ) -> Receipt:
-    return Receipt(draft, receipt_review(draft, batch, events), channel)
+    return Receipt(
+        draft, receipt_review(draft, batch, events), channel, entered_by_owner(batch)
+    )
 
 
 def evidence(review: ReceiptReview) -> dict[str, Any] | None:

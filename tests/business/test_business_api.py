@@ -233,7 +233,7 @@ def test_saved_receipt_prepares_only_with_consent(
     assert (receipt["version"], receipt["evidence"], receipt["missing_fields"]) == (
         0,
         None,
-        [],
+        ["account_id", "amount", "currency", "occurred_on"],
     )
     refused = alice.post(f"/receipts/{uploaded['id']}/prepare")
     assert (refused.status_code, refused.json()["code"]) == (
@@ -241,11 +241,6 @@ def test_saved_receipt_prepares_only_with_consent(
         "document_extraction_consent_required",
     )
     assert stub.calls == []
-    not_ready = alice.review(uploaded["id"], 0, merchant="A mano")
-    assert (not_ready.status_code, not_ready.json()["code"]) == (
-        409,
-        "receipt_not_prepared",
-    )
     queued = alice.post(
         f"/receipts/{uploaded['id']}/prepare", **{"X-Extraction-Consent": "true"}
     )

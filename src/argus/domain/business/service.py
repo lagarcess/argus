@@ -7,6 +7,7 @@ activity. Every method takes a ``BusinessScope`` from ``resolve_business_scope``
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable, Mapping
 from datetime import date, datetime, time
 from typing import Any
@@ -30,7 +31,7 @@ from argus.domain.ingestion.documents.service import (
     DocumentsService,
 )
 from argus.domain.ingestion.receipt_review import RECEIPT_EVENT_STATES, receipt_ids
-from argus.domain.ingestion.reconcile.model import ReconcileError
+from argus.domain.ingestion.reconcile.model import ReconcileError, StaleEvent
 from argus.domain.ingestion.reconcile.recording import DEFAULT_ZONE
 from argus.domain.ingestion.reconcile.service import ReconciliationService
 from argus.domain.recording.errors import IdempotencyConflict
@@ -188,6 +189,20 @@ class BusinessService:
             user_id=scope.person_id, connection_id=receipt_id
         )
         return draft.media_type, content
+
+    async def start_entry(
+        self, scope: BusinessScope, receipt_id: str, version: int
+    ) -> int:
+        """The version a review applies to; for a receipt nobody has read, first
+        record its one purchase as entered by the owner, then that version."""
+
+        current = await asyncio.to_thread(self.receipt, scope, receipt_id)
+        if not current.enterable:
+            return version
+        if version != current.version:
+            raise StaleEvent()
+        await self.documents.enter(user_id=scope.person_id, connection_id=receipt_id)
+        return (await asyncio.to_thread(self.receipt, scope, receipt_id)).version
 
     def review(
         self,

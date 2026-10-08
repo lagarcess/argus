@@ -19,6 +19,7 @@ from fastapi import (
     Request,
     Response,
 )
+from fastapi.concurrency import run_in_threadpool
 
 from argus.api.business import (
     BusinessContext,
@@ -267,16 +268,21 @@ async def prepare_receipt(
 
 
 @router.patch("/receipts/{receipt_id}/review", response_model=ReceiptDetail)
-def review_receipt(
+async def review_receipt(
     request: Request,
     receipt_id: str,
     body: ReceiptReviewBody,
     context: BusinessContext = Depends(require_business),  # noqa: B008
 ) -> dict[str, Any]:
+    """A receipt nobody has read is entered by hand here, from version 0."""
+
+    service, scope = context.service, context.scope
     try:
-        return context.service.review(
-            context.scope, receipt_id, body.version, body.fields
-        ).detail()
+        version = await service.start_entry(scope, receipt_id, body.version)
+        reviewed = await run_in_threadpool(
+            service.review, scope, receipt_id, version, body.fields
+        )
+        return reviewed.detail()
     except Exception as error:
         raise _problem(request, error) from None
 
