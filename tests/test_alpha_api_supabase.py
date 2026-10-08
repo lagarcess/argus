@@ -4219,6 +4219,7 @@ def test_message_first_middle_final_and_empty_pages(mock_gateway):
     assert final_page.json() == {
         "items": [messages[4].model_dump(mode="json")],
         "next_cursor": None,
+        "surface": "personal",
     }
 
     empty_page = client.get(
@@ -4226,7 +4227,7 @@ def test_message_first_middle_final_and_empty_pages(mock_gateway):
         headers={"Authorization": "Bearer test-token"},
     )
     assert empty_page.status_code == 200
-    assert empty_page.json() == {"items": [], "next_cursor": None}
+    assert empty_page.json() == {"items": [], "next_cursor": None, "surface": "personal"}
 
     calls = mock_gateway.list_messages.call_args_list
     assert calls[0].kwargs == {

@@ -295,7 +295,7 @@ def test_conversation_messages_and_patch_follow_contract() -> None:
 
     messages = client.get(f"/api/v1/conversations/{conversation['id']}/messages")
     assert messages.status_code == 200
-    assert messages.json() == {"items": [], "next_cursor": None}
+    assert messages.json() == {"items": [], "next_cursor": None, "surface": "personal"}
 
     patched = client.patch(
         f"/api/v1/conversations/{conversation['id']}",
