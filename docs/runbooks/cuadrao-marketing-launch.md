@@ -85,7 +85,7 @@ Set at creation. One owner each; nothing is inherited from an Argus group.
 | `NEXT_TELEMETRY_DISABLED` | `1` | no | this runbook |
 | `RESEND_API_KEY` | key restricted to sending from `notify.cuadrao.ai` | yes | Resend |
 | `CUADRAO_INQUIRY_FROM` | `Cuadrao <website@notify.cuadrao.ai>` | no | #889 |
-| `CUADRAO_INQUIRY_TO` | the mailbox the founder chooses for inquiries; set only after that mailbox is confirmed to receive mail | no | the founder |
+| `CUADRAO_INQUIRY_TO` | `hola@cuadrao.ai` (the founder's choice, 2026-10-08) | no | the founder |
 | `SUPABASE_URL` | existing project URL | no | Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | service-role key of the existing project | yes | Supabase |
 | `CUADRAO_SITE_INDEXING` | unset on the `onrender.com` address; `public` only at cutover | no | #891 |
@@ -101,7 +101,7 @@ Not part of this launch. If chosen later, switch Auto-Deploy to "After CI Checks
 1. Candidate merged to `main` through the approved path; exact SHA and CI recorded.
 2. The signup migration is applied as part of the consumer lane's ordered batch (above) by the founder with the reviewed applier, after a recorded gate report and backup, and `public.cuadrao_early_access_signups` reads back with RLS on, no `anon`, `authenticated` or `service_role` delete, and a ledger row. A repository migration file is not production proof.
 2a. Supabase stays on the Free plan; no plan change is a precondition. Known limit: a Free project pauses when it is inactive, and while it is paused the Personal form answers its truthful unavailable state (503) and keeps the visitor's email. The operator restores the project from the Supabase dashboard. A restore is the only recovery, so check the project's state as part of hosted acceptance and before any announcement. The Business inquiry does not use Supabase.
-3. `notify.cuadrao.ai` verified in Resend (Section 6), the founder has chosen the inquiry mailbox and set `CUADRAO_INQUIRY_TO`, and one approved test message is received at that mailbox.
+3. `notify.cuadrao.ai` verified in Resend (Section 6), `CUADRAO_INQUIRY_TO=hola@cuadrao.ai` set, and one approved test message received at `hola@cuadrao.ai` (an iCloud custom-domain address; the founder confirms it exists).
 4. The founder has typed the three provider values into the Render form, and the complete form has been read back to them before Create.
 5. Rollback target named (Section 8). The first deploy has no earlier artifact, so a rollback cannot be exercised until a second deploy exists.
 
@@ -126,16 +126,20 @@ Then the checks it cannot make:
 
 ## 6. Email (#889)
 
-Read, then prepare, then apply only after approval. Do not change root MX, SPF or DKIM for `cuadrao.ai`, and never add a second SPF record.
+**Current provider, read 2026-10-08 from public DNS:** `cuadrao.ai` receives mail through **iCloud Mail** (apex MX `mx01` and `mx02.mail.icloud.com`, SPF `include:icloud.com`). Resend already sends from the root domain through CNAMEs `send` and `rsend` and a DKIM TXT at `resend._domainkey`. The founder chose `CUADRAO_INQUIRY_TO=hola@cuadrao.ai`, so inquiries arrive in the existing iCloud mailbox.
 
-1. Read Cloudflare DNS and Email Routing for `cuadrao.ai` and Resend's domain list. Save a sanitized before-state. On 2026-10-07 public DNS showed no apex records and no published Resend records although Resend listed `cuadrao.ai` as verified, and `hola@cuadrao.ai` had no MX route (see the launch record). Resolve that contradiction first; it may be a zone that is not active.
-2. Add `notify.cuadrao.ai` to Resend. Resend returns the exact records (SPF `include`, DKIM key, return-path MX). Copy them verbatim; do not invent values.
-3. Add a DMARC record for `_dmarc.notify.cuadrao.ai` (start at `p=none` with a report address the founder owns) unless one already covers the subdomain.
-4. Apply only the named records after approval; wait for Resend to show Verified; send one test message to a founder-approved address; read the received headers for SPF, DKIM and DMARC pass.
-5. The inquiry mailbox must actually receive mail. Verified sending does not prove a mailbox exists, so the test message is the proof. The public address `hola@cuadrao.ai` is shown on the pages and receives removal requests, so it needs a working route before publication whether or not it is also the inquiry mailbox.
-6. Rollback removes only the added `notify` records.
+**Do not add forwarding, Cloudflare Email Routing, or any apex MX, SPF or DKIM change.** Email Routing would replace the iCloud MX records and take over the founder's mail. Everything below adds records only under `notify.cuadrao.ai`, which does not touch the apex.
 
-Confirmation email for signups is not selected for launch (forms contract). The availability notice is sent through the operator tool, from a sender the founder chooses at that time.
+**Prepared change set for `notify.cuadrao.ai` (needs the founder's named approval; nothing below has been done):**
+
+1. Resend: create the domain `notify.cuadrao.ai` in region `us-east-1` (the same as the root domain), open and click tracking off. This is a hosted write.
+2. Cloudflare DNS: add exactly the records Resend returns, all DNS only and all under `*.notify.cuadrao.ai`. Expect the same shape as the root domain: a DKIM TXT at `resend._domainkey.notify` and CNAMEs at `send.notify` and `rsend.notify` to Resend's forge hosts. Copy Resend's values verbatim; do not invent them. The apex records stay as they are.
+3. DMARC: add `_dmarc.notify.cuadrao.ai` as a TXT `v=DMARC1; p=none` (optionally with a report address the founder owns). There is no apex DMARC today, and this record covers only the subdomain.
+4. Wait for Resend to show the domain Verified. Create a Resend key limited to sending from `notify.cuadrao.ai` and have the founder type it into Render with `CUADRAO_INQUIRY_FROM=Cuadrao <website@notify.cuadrao.ai>`.
+5. Send one test inquiry to `hola@cuadrao.ai` from a founder-approved address and read the received headers for SPF, DKIM and DMARC pass, and that it reached the iCloud inbox rather than junk.
+6. Rollback removes only the added `*.notify` records and the Resend domain. The root domain, its Resend records and the iCloud setup are untouched throughout.
+
+`news.cuadrao.ai` stays deferred until promotional sends are needed. Confirmation email for signups is not selected for launch (forms contract). The availability notice is sent through the operator tool from a sender the founder chooses at that time.
 
 ## 7. Domain cutover (#891)
 
