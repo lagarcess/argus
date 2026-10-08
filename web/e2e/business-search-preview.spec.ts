@@ -116,3 +116,42 @@ test.describe("Business search in the omnisearch", () => {
     await expect(page.getByText("Prueba con el nombre de un comercio o de un archivo.")).toBeVisible();
   });
 });
+
+test.describe("Business chats in the omnisearch", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  test("reads only Business chats and offers no decision filters or preview pane", async ({ page }) => {
+    const chatReads: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (/\/api\/v1\/(conversations|history|search)$/.test(url.pathname)) {
+        chatReads.push(`${request.method()} ${url.pathname}${url.search}`);
+      }
+    });
+    await openPreview(page);
+    // Answer like the server: decision filters only when they are asked for.
+    await page.route("**/api/v1/search?**", (route) => {
+      const asked = new URL(route.request().url()).searchParams.get("include_ledger_groups");
+      const ledger_groups = asked === "true"
+        ? ["promising", "watching", "rejected", "revisit_later"].map((decision_state) => ({ decision_state, count: 1 }))
+        : null;
+      return route.fulfill({ json: { items: [], next_cursor: null, ledger_groups } });
+    });
+    const input = await openSearch(page, "Search expenses, receipts and chats");
+    await input.fill("ledger");
+    await expect(page.getByText("No results found")).toBeVisible();
+
+    for (const name of ["Promising", "Watching", "Rejected", "Revisit later"]) {
+      await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
+    }
+    await expect(page.getByRole("region", { name: "Preview" })).toHaveCount(0);
+    await expect(page.getByText("Select a result to preview its details.")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^(Expand|Collapse)$/ })).toHaveCount(0);
+
+    const reads = chatReads.filter((read) => read.startsWith("GET"));
+    expect(reads.some((read) => read.includes("/api/v1/search?"))).toBe(true);
+    expect(reads.some((read) => read.includes("/api/v1/conversations?"))).toBe(true);
+    expect(reads.filter((read) => !read.includes("surface=business"))).toEqual([]);
+    expect(reads.filter((read) => read.includes("include_ledger_groups"))).toEqual([]);
+  });
+});

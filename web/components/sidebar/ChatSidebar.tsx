@@ -5,7 +5,7 @@ import { conversationPreviewText } from "@/lib/conversation-preview-display";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { ChatShellView } from "@/components/chat/ChatWorkspace";
+import { useConversationSurface, type ChatShellView } from "@/components/chat/ChatWorkspace";
 import {
   ChevronDown,
   History,
@@ -195,6 +195,7 @@ export default function ChatSidebar({
   profileSlot = null,
 }: ChatSidebarProps) {
   const { t, i18n } = useTranslation();
+  const surface = useConversationSurface();
   const { selectPresentation, selectAggregatePresentation, selectOperationLabel } =
     useConversationActivityPresentation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -421,7 +422,7 @@ export default function ChatSidebar({
     if (isDeletingAllConversations) return;
     setIsDeletingAllConversations(true);
     try {
-      const response = await deleteAllConversations();
+      const response = await deleteAllConversations(surface);
       setIsDeleteAllDialogOpen(false);
       if (response.deleted_count > 0) {
         onAllConversationsDeleted?.();
@@ -450,6 +451,7 @@ export default function ChatSidebar({
     onAllConversationsDeleted,
     onHistoryMutated,
     onToast,
+    surface,
     t,
   ]);
 

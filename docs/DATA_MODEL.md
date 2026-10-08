@@ -530,6 +530,8 @@ Represents an isolated chat thread. Each conversation represents a single invest
 - `archived`: `boolean` (Default: `false`)
 - `deleted_at`: `timestamptz` (Nullable, for soft delete)
 - `last_message_preview`: `text` (Nullable)
+- `owner_space_id`: `uuid` (Nullable; with `user_id`, references
+  `spaces(id, created_by)` ON DELETE CASCADE)
 - `created_at`: `timestamptz`
 - `updated_at`: `timestamptz`
 
@@ -538,6 +540,15 @@ Represents an isolated chat thread. Each conversation represents a single invest
 
 ### Notes
 - Conversations use **soft delete** behavior.
+- `owner_space_id` null is a Personal (`/chat`) conversation; a Business
+  (`/biz`) conversation stores its space. Every conversation written before
+  Business existed is Personal, with no backfill. The rule lives in
+  `argus.domain.owner_scope`. Recents, History, search (one fragment on every
+  `public.conversations` read in `postgres_search_reader.py`), computed answers
+  and delete-all filter by it; reads by conversation id stay owner-scoped.
+- A continued computed answer keeps its source's space; a public receipt fork
+  is Personal. Decisions, evidence decisions, shared receipts and memory never
+  attach to a Business conversation.
 - AI-generated titles should be created once sufficient context is established.
 - `language` can be stored at the thread level for continuity, but the user profile remains the primary source.
 - `last_message_preview` remains a private compatibility/search projection of

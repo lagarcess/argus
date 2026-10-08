@@ -506,7 +506,7 @@ export default function ChatInterface() {
       try {
         await loadHistoryPage(null, false);
         if (!targetConversationId) return;
-        const { items } = await listConversations({ limit: 50 });
+        const { items } = await listConversations({ limit: 50, surface: workspace?.conversationSurface });
         const conversation = items.find(
           (item) => item.id === targetConversationId,
         );
@@ -1109,7 +1109,7 @@ export default function ChatInterface() {
 
     if (shouldCreateNewRouteConversation || (!targetConversationId && !action?.type)) {
       try {
-        const { conversation } = await createConversation(i18n.language, ownedRequest);
+        const { conversation } = await createConversation(i18n.language, ownedRequest, workspace?.conversationSurface);
         if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
         targetConversationId = conversation.id;
         shouldResetMessagesForNewConversation = shouldCreateNewRouteConversation || messages.length === 0;
@@ -1624,7 +1624,7 @@ export default function ChatInterface() {
           try {
             const retryWasVisible = canApplyVisibleStreamUpdate();
             if (retryWasVisible) clearActiveConversationPointer();
-            const { conversation } = await createConversation(i18n.language, ownedRequest);
+            const { conversation } = await createConversation(i18n.language, ownedRequest, workspace?.conversationSurface);
             if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return;
             if (!moveRequestToConversation(conversation.id)) return;
             if (retryWasVisible) {
