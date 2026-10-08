@@ -329,6 +329,12 @@ class AccountDeletionService:
             )
             raise AccountDeletionIncomplete("third_party_pending", list(pending))
         self._settle_late_writes(user_id, subject)
+        # An upload authenticated before the lock can still write after the
+        # first erase; capture refuses it, and this second erase takes the rest.
+        late = self._erase_sources(user_id, subject, run)
+        if late is not None:
+            self._track_pending(subject, {"storage": late})
+            raise AccountDeletionIncomplete("third_party_pending", ["storage"])
         counts = self._delete_auth_user(user_id, run["id"], run["claim"])
         return DeletionOutcome(status="done", counts=counts, run_id=run["id"])
 
@@ -973,7 +979,16 @@ class AccountDeletionService:
             )
         for step, started in sorted(since.items()):
             waited = now - datetime.fromisoformat(started)
-            if waited >= ESCALATE_AFTER:
+            if waited >= ESCALATE_AFTER and step == "storage":
+                # Our own Storage: nothing to force, it has to be fixed.
+                logger.error(
+                    "Account deletion cannot erase document sources; fix Storage",
+                    metric="account_deletion.storage_failing",
+                    step=step,
+                    error=pending[step],
+                    pending_days=waited.days,
+                )
+            elif waited >= ESCALATE_AFTER:
                 logger.error(
                     "Account deletion step needs an operator",
                     metric="account_deletion.needs_operator",

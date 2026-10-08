@@ -3412,10 +3412,16 @@ draft and preparation while accepted financial activity follows existing retenti
 Capture writes the object first, then locks the live owner connection and
 commits the draft and its reference before background dispatch. A crash in
 between leaves an unreferenced object, never a row pointing at nothing; an
-identical retry rewrites the same path and adopts it. Disconnect deletes the
+identical retry rewrites the same path and adopts it, and also restores an
+object that went missing (the draft says `source_available=false` until then).
+Capture refuses a person whose account deletion run is in flight and removes the
+object it wrote. `SOURCE_MAX_BYTES` and `SOURCE_MEDIA_TYPES` in
+`argus.domain.ingestion.documents.config` are the code's single copy of the
+bucket's limits; a real-Postgres test holds the bucket to them. Disconnect deletes the
 connection's prefix (orphans included) before the row, so a failed delete keeps
 the row and the idempotent disconnect retry finishes it. Account deletion
-deletes the person's prefix as a third-party step before the auth delete. No
+deletes the person's prefix as its `storage` step, and once more right before
+the auth delete. No
 path deletes confirmed financial activity. Draft updates compare versions, and preparation completion
 checks the connection lease. Duplicate capture cannot replace a source or reset
 an attempt. A persisted in-flight state prevents automatic retry after uncertain

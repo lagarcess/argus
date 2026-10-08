@@ -11,11 +11,12 @@ from argus.api.documents import (
     NO_STORE,
     DocumentContext,
     dispatch_preparation,
+    document_filename,
     document_problem,
     read_document_upload,
     require_document_context,
 )
-from argus.domain.ingestion.documents.config import ACCEPTED_MEDIA_TYPES
+from argus.domain.ingestion.documents.config import SOURCE_MEDIA_TYPES
 from argus.domain.ingestion.documents.models import DraftProposal, DraftStatus
 from argus.domain.ingestion.documents.service import DocumentServiceError
 
@@ -38,7 +39,7 @@ class DocumentResponse(BaseModel):
             "required": True,
             "content": {
                 media: {"schema": {"type": "string", "format": "binary"}}
-                for media in ACCEPTED_MEDIA_TYPES
+                for media in SOURCE_MEDIA_TYPES
             },
         }
     },
@@ -70,7 +71,7 @@ async def upload_document(
         outcome = await context.service.upload(
             user_id=context.user_id,
             content=content,
-            filename=filename or "document",
+            filename=document_filename(filename),
             media_type=media_type,
             consent=consent == "true",
             proposal=destination,
@@ -175,9 +176,7 @@ def get_source(
         content = context.service.source_bytes(
             user_id=context.user_id, connection_id=connection_id
         )
-        suffix = {"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg"}[
-            draft.media_type
-        ]
+        suffix = SOURCE_MEDIA_TYPES[draft.media_type]
         return Response(
             content,
             media_type=draft.media_type,

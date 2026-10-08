@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from urllib.parse import unquote
 
 from fastapi import BackgroundTasks, Depends, HTTPException, Request
 from loguru import logger
@@ -24,7 +25,7 @@ from argus.api.ingestion import (
 from argus.api.rate_limits import SlidingWindowLimiter
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.documents.config import (
-    ACCEPTED_MEDIA_TYPES,
+    SOURCE_MEDIA_TYPES,
     load_document_extraction_settings,
     load_document_job_settings,
 )
@@ -35,7 +36,6 @@ from argus.domain.ingestion.documents.service import (
     DocumentsService,
 )
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
-from argus.domain.ingestion.gmail.attachments import MAX_ATTACHMENT_BYTES
 from argus.domain.ingestion.hub import IngestionHub
 
 NO_STORE = {"Cache-Control": "no-store"}
@@ -139,7 +139,7 @@ async def read_document_upload(request: Request) -> tuple[str, bytes]:
     """The media type and bounded raw bytes of an upload request body."""
 
     media_type = request.headers.get("content-type", "").split(";", 1)[0].strip()
-    if media_type not in ACCEPTED_MEDIA_TYPES:
+    if media_type not in SOURCE_MEDIA_TYPES:
         raise problem(
             request,
             status_code=415,
@@ -148,19 +148,31 @@ async def read_document_upload(request: Request) -> tuple[str, bytes]:
             detail="Upload a PDF, JPEG or PNG file.",
             headers=NO_STORE,
         )
+    limit = load_document_extraction_settings().max_bytes
     content = bytearray()
     async for chunk in request.stream():
-        if len(content) + len(chunk) > MAX_ATTACHMENT_BYTES:
+        if len(content) + len(chunk) > limit:
             raise problem(
                 request,
                 status_code=413,
                 code="document_too_large",
                 title="Document too large",
-                detail="Upload a document of at most 10 MiB.",
+                detail=f"Upload a document of at most {limit / 1048576:g} MiB.",
                 headers=NO_STORE,
             )
         content.extend(chunk)
     return media_type, bytes(content)
+
+
+def document_filename(header: str | None) -> str:
+    """``X-Document-Filename`` is percent-encoded UTF-8 (``encodeURIComponent``).
+    Raw UTF-8, which the server reads as latin-1, is recovered; bytes that are
+    not UTF-8 become replacement characters rather than mojibake."""
+
+    if not header:
+        return "document"
+    text = header.encode("latin-1").decode("utf-8", errors="replace")
+    return unquote(text, errors="replace")
 
 
 async def dispatch_preparation(

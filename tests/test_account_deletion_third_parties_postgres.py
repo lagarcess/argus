@@ -25,6 +25,7 @@ from argus.domain.ingestion.connections_postgres import PostgresConnectionReposi
 from argus.domain.ingestion.documents.models import DocumentDraft
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 from argus.domain.ingestion.secrets import SecretBox
+from loguru import logger
 from psycopg_pool import ConnectionPool
 
 from tests import apple_sign_in_support as apple_support
@@ -480,6 +481,27 @@ def test_document_sources_are_erased_before_the_account_delete(lane, world):  # 
         assert admin.deleted == []
         run_id = _run_id(a)
         assert _run(run_id)[4]["last_error"] == {"storage": "storage_delete_failed"}
+        # A week later: our own Storage gets its own alert, and no operator
+        # can force the step closed.
+        lines: list[str] = []
+        sink = logger.add(lambda message: lines.append(str(message)), level="ERROR")
+        week = _service(
+            lane,
+            SqlAuthAdmin(),
+            source_objects=_StorageDown(),
+            clock=lambda: NOW + timedelta(days=7, minutes=1),
+        )
+        try:
+            with pytest.raises(AccountDeletionIncomplete):
+                week.delete_account(user_id=a)
+        finally:
+            logger.remove(sink)
+        assert any("fix Storage" in line for line in lines)
+        assert not any("needs an operator" in line for line in lines)
+        with pytest.raises(ValueError, match="step must be one of"):
+            week.force_complete_step(
+                user_id=a, step="storage", reason="down", operator="ops", confirm=True
+            )
 
         done = _service(lane, SqlAuthAdmin(), source_objects=objects).delete_account(
             user_id=a
@@ -492,3 +514,39 @@ def test_document_sources_are_erased_before_the_account_delete(lane, world):  # 
     finally:
         objects.delete(f"{a}/")
         objects.delete(f"{b}/")
+
+
+class _LateUpload:
+    """Storage that sees an upload, authenticated before the lock, land
+    right after the run's first erase."""
+
+    bucket = "financial-document-sources"
+
+    def __init__(self, objects, late: str) -> None:  # noqa: ANN001
+        self._objects, self._late, self.erases = objects, late, 0
+
+    def delete(self, prefix: str) -> None:
+        self._objects.delete(prefix)
+        self.erases += 1
+        if self.erases == 1:
+            self._objects.put(self._late, b"%PDF-late", "application/pdf")
+
+
+@pytest.mark.skipif(not LOCAL_STORAGE, reason="Local Supabase Storage required")
+def test_a_source_written_after_the_first_erase_is_gone_before_the_auth_delete(
+    lane,  # noqa: ANN001, F811
+    world,  # noqa: ANN001, F811
+) -> None:
+    a = world["a"]
+    objects = source_objects()
+    late = _LateUpload(objects, f"{a}/{uuid4()}/{'d' * 64}")
+    try:
+        admin = SqlAuthAdmin()
+        done = _service(lane, admin, source_objects=late).delete_account(user_id=a)
+        world["placeholders"] += admin.created
+        assert done.status == "done"
+        assert late.erases == 2
+        with psycopg.connect(DSN) as c:
+            assert stored_paths(c, f"{a}/") == []
+    finally:
+        objects.delete(f"{a}/")

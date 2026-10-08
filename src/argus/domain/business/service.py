@@ -22,7 +22,7 @@ from argus.domain.business.receipts import (
 )
 from argus.domain.business.scope import BusinessScope
 from argus.domain.ingestion.documents.config import (
-    ACCEPTED_MEDIA_TYPES,
+    SOURCE_MEDIA_TYPES,
     load_document_extraction_settings,
 )
 from argus.domain.ingestion.documents.service import (
@@ -81,7 +81,7 @@ class BusinessService:
             "assistant_available": False,
             "receipt_limits": {
                 "max_bytes": load_document_extraction_settings().max_bytes,
-                "media_types": list(ACCEPTED_MEDIA_TYPES),
+                "media_types": list(SOURCE_MEDIA_TYPES),
             },
         }
 

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from datetime import date
 from typing import Any, Literal
-from urllib.parse import unquote
 
 from fastapi import (
     APIRouter,
@@ -46,13 +45,14 @@ from argus.api.dependencies import problem
 from argus.api.documents import (
     NO_STORE,
     dispatch_preparation,
+    document_filename,
     document_problem,
     read_document_upload,
 )
 from argus.api.financial_accounts import domain_problem
 from argus.domain.business.service import BusinessError
 from argus.domain.ingestion.connections import ConnectionNotFound
-from argus.domain.ingestion.documents.config import ACCEPTED_MEDIA_TYPES
+from argus.domain.ingestion.documents.config import SOURCE_MEDIA_TYPES
 from argus.domain.ingestion.documents.models import DocumentExtractionError
 from argus.domain.ingestion.documents.service import DocumentServiceError
 from argus.domain.ingestion.reconcile.model import (
@@ -155,7 +155,7 @@ def create_account(
             "required": True,
             "content": {
                 media: {"schema": {"type": "string", "format": "binary"}}
-                for media in ACCEPTED_MEDIA_TYPES
+                for media in SOURCE_MEDIA_TYPES
             },
         }
     },
@@ -176,7 +176,7 @@ async def upload_receipt(
         receipt = await context.service.upload(
             context.scope,
             content=content,
-            filename=unquote(filename or "") or "receipt",
+            filename=document_filename(filename),
             media_type=media_type,
             consent=consent == "true",
         )
@@ -232,14 +232,13 @@ def get_receipt_source(
         media_type, content = context.service.source(context.scope, receipt_id)
     except Exception as error:
         raise _problem(request, error) from None
-    suffix = {"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg"}
     return Response(
         content,
         media_type=media_type,
         headers={
             **NO_STORE,
             "X-Content-Type-Options": "nosniff",
-            "Content-Disposition": f'attachment; filename="receipt.{suffix[media_type]}"',
+            "Content-Disposition": f'attachment; filename="receipt.{SOURCE_MEDIA_TYPES[media_type]}"',
         },
     )
 

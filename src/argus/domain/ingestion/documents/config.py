@@ -18,9 +18,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from argus.api.financial_accounts import TRUE_VALUES
 
-# What an upload may be; preparation reads each of these.
-ACCEPTED_MEDIA_TYPES = ("application/pdf", "image/jpeg", "image/png")
-_MAX_BYTES = 10 * 1024 * 1024
+# The bucket in 20261008100000 repeats both, checked by a real-Postgres test.
+SOURCE_MAX_BYTES = 10 * 1024 * 1024
+# Each accepted source type and the suffix its download is named with.
+SOURCE_MEDIA_TYPES = {"application/pdf": "pdf", "image/jpeg": "jpg", "image/png": "png"}
 _MAX_PAGES = 8
 _RECOGNIZED_OFF = frozenset({"0", "false", "no", "off"})
 _warned_flags: set[str] = set()
@@ -40,14 +41,14 @@ class DocumentExtractionSettings(BaseSettings):
         env_prefix="ARGUS_DOCUMENT_EXTRACTION_", extra="ignore"
     )
     enabled: Annotated[bool, BeforeValidator(enabled_flag)] = False
-    max_bytes: int = Field(default=_MAX_BYTES, ge=1, le=_MAX_BYTES)
+    max_bytes: int = Field(default=SOURCE_MAX_BYTES, ge=1, le=SOURCE_MAX_BYTES)
     max_pages: int = Field(default=_MAX_PAGES, ge=1, le=_MAX_PAGES)
 
 
 def _disabled_document_extraction_settings() -> DocumentExtractionSettings:
     return DocumentExtractionSettings.model_construct(
         enabled=False,
-        max_bytes=_MAX_BYTES,
+        max_bytes=SOURCE_MAX_BYTES,
         max_pages=_MAX_PAGES,
     )
 
