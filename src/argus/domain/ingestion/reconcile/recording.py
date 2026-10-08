@@ -308,7 +308,7 @@ class Recording:
 
     def _draft(self, user_id: str, detail: dict[str, Any]) -> dict[str, Any]:
         facts, resolution = detail["facts"], detail["resolution"]
-        missing = [f for f in detail["unresolved"] if f != "direction"]
+        missing = missing_fields(detail)
         if missing:
             raise ReconcileError("import_unresolved", "Complete: " + ", ".join(missing))
         account_id = facts["account_id"]
@@ -333,7 +333,7 @@ class Recording:
             "amount": facts["amount"],
             "occurred_at": _start_of_day(facts["occurred_on"], zone),
             "time_zone": zone,
-            "note": resolution.get("note") or _merchant(detail),
+            "note": recorded_note(detail),
         }
         if kind in DESTINATION_ELIGIBILITY:
             other = counterpart(facts["direction"])
@@ -395,7 +395,17 @@ def _code(error: Exception) -> str:
     }.get(type(error), "validation_error")
 
 
-def _merchant(detail: dict[str, Any]) -> str | None:
+def missing_fields(detail: dict[str, Any]) -> list[str]:
+    """What the person must still supply before ``accept`` can record it."""
+
+    return [f for f in detail["unresolved"] if f != "direction"]
+
+
+def recorded_note(detail: dict[str, Any]) -> str | None:
+    """The activity note ``accept`` records: the person's note, else the merchant."""
+
+    if detail["resolution"].get("note"):
+        return detail["resolution"]["note"]
     for observation in detail["observations"]:
         if observation["live"] and observation["merchant"]:
             return observation["merchant"][:200]
