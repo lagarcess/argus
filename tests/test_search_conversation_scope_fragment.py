@@ -16,6 +16,7 @@ from argus.domain.owner_scope import sql_named_join_predicate
 
 SOURCE = Path(reader.__file__).read_text(encoding="utf-8")
 OCCURRENCE = re.compile(r"\b(join|from) public\.conversations as (\w+)")
+ANY_READ = re.compile(r"public\.conversations\b")
 # A join condition ends where the next join, where clause or template begins.
 JOIN_END = re.compile(
     r"\n\s*(?:join |left join |cross join |where |\"\"\"|\)|select )",
@@ -40,7 +41,11 @@ def test_the_fragment_is_the_owner_scope_rule() -> None:
 
 def test_every_conversations_read_names_the_fragment() -> None:
     occurrences = _occurrences()
-    assert len(occurrences) == 17
+    # Every read, in any spelling, must be one the checks below understand.
+    code = "\n".join(
+        line for line in SOURCE.splitlines() if not line.lstrip().startswith("#")
+    )
+    assert len(ANY_READ.findall(code)) == len(occurrences) == 17
     assert {alias for _, _, alias in occurrences} == {"conversation"}
     missing = []
     for match in OCCURRENCE.finditer(SOURCE):

@@ -529,3 +529,42 @@ def test_no_computed_answer_action_writes_personalization_memory(client) -> None
         assert store.list_records(RegisteredMemoryOwner(owner_id=owner)) == ()
     finally:
         configure_memory_service(None)
+
+
+def test_a_continued_business_answer_stays_in_business(client, monkeypatch) -> None:
+    from argus.api.business_spaces import business_spaces, configure_business_spaces
+    from argus.domain.business.spaces import InMemorySpaceStore
+
+    monkeypatch.setenv("ARGUS_BUSINESS_PILOT_ENABLED", "true")
+    previous = business_spaces()
+    spaces = InMemorySpaceStore()
+    configure_business_spaces(spaces)
+    try:
+        person = client.get("/api/v1/me").json()["user"]["id"]
+        spaces.create(person, "Mi negocio")
+        source = client.post(
+            "/api/v1/conversations", json={"title": "Shop", "surface": "business"}
+        ).json()["conversation"]["id"]
+        message_id = _answer(
+            client, source, "price_multiple", _multiple(150), "Apple at 150?"
+        )
+
+        response = client.post(
+            f"/api/v1/conversations/{source}/messages/{message_id}/continue"
+        )
+
+        assert response.status_code == 200, response.text
+        continued = response.json()["conversation"]["id"]
+
+        def listed(surface: str) -> list[str]:
+            return [
+                item["id"]
+                for item in client.get(
+                    "/api/v1/conversations", params={"surface": surface}
+                ).json()["items"]
+            ]
+
+        assert sorted(listed("business")) == sorted([source, continued])
+        assert continued not in listed("personal")
+    finally:
+        configure_business_spaces(previous)

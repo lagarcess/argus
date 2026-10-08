@@ -52,14 +52,16 @@ def memory_recalls_for_turn(
     service = memory_service()
     if service is None:
         return None
-    scope = conversation_scope(user_id=account.user_id, conversation_id=conversation_id)
-    if scope != PERSONAL:
-        return None
     subject = MemorySubject(
         owner_id=account.user_id,
         kind=MemoryAccountKind.REGISTERED,
     )
     try:
+        scope = conversation_scope(
+            user_id=account.user_id, conversation_id=conversation_id
+        )
+        if scope != PERSONAL:
+            return None
         retrieved = service.retrieve(
             subject,
             query,

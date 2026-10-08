@@ -10,6 +10,7 @@ any flag state. Needs the local Supabase proof variables and
 
 from __future__ import annotations
 
+import json
 import os
 from collections.abc import Iterator
 from contextlib import suppress
@@ -268,3 +269,43 @@ def test_artifact_routes_answer_404_for_a_business_conversation(rig: Rig) -> Non
 
     assert decision(business) == (404, "Conversation not found.")
     assert decision(personal)[1] != "Conversation not found."
+
+
+def test_a_run_in_a_business_chat_stays_on_the_business_surface(rig: Rig) -> None:
+    alice = rig.alice
+    with psycopg.connect(DSN) as connection:
+        row = connection.execute(
+            """
+            insert into public.backtest_runs (
+                user_id, conversation_id, status, asset_class, symbols,
+                allocation_method, benchmark_symbol, config_snapshot, metrics,
+                conversation_result_card
+            )
+            values (
+                %s, %s, 'completed', 'equity', array['NVDA'], 'equal_weight', 'SPY',
+                '{}'::jsonb, '{}'::jsonb, %s::jsonb
+            )
+            returning id
+            """,
+            (
+                alice.id,
+                alice.business[0],
+                json.dumps({"title": "NVDA test", "rows": [{"value": "+12%"}]}),
+            ),
+        ).fetchone()
+    assert row is not None
+    run_id = str(row[0])
+
+    def history_runs(surface: str) -> list[str]:
+        response = rig.client.get(
+            "/api/v1/history", params={"surface": surface}, headers=alice.headers
+        )
+        return [item["id"] for item in response.json()["items"] if item["type"] == "run"]
+
+    def symbol_hits(surface: str) -> list[str]:
+        return _ids(rig, alice, "/api/v1/search", q="NVDA", surface=surface)
+
+    assert history_runs("business") == [run_id]
+    assert history_runs("personal") == []
+    assert symbol_hits("business") == alice.business
+    assert symbol_hits("personal") == []

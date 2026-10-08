@@ -235,3 +235,28 @@ def test_recall_errors_degrade_to_no_annotation(
         )
         is None
     )
+
+
+def test_a_failed_side_lookup_degrades_to_no_annotation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.chat import memory_recall
+
+    def _unreachable(**_: object) -> object:
+        raise ConnectionError("database unavailable")
+
+    _memory_mode(monkeypatch)
+    monkeypatch.setenv("ARGUS_ENABLE_PERSONALIZATION_MEMORY", "true")
+    monkeypatch.setattr(memory_recall, "conversation_scope", _unreachable)
+    configure_memory_service(_seeded_service())
+
+    assert (
+        memory_recalls_for_turn(
+            conversation_id=_personal_conversation_id(),
+            user=_user(),
+            account=registered_account_context(REGISTERED_USER_ID),
+            user_message="what did I decide about ETH?",
+            memory_opt_out=False,
+        )
+        is None
+    )

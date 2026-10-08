@@ -265,23 +265,6 @@ def test_artifact_routes_answer_404_for_a_business_conversation(
     assert (404, "Conversation not found.") not in answers("personal", personal)
 
 
-def test_a_continued_answer_keeps_its_source_side(client: TestClient) -> None:
-    from argus.api.chat.computed_answers import _new_conversation
-    from argus.api.conversation_surface import conversation_scope
-    from argus.domain.owner_scope import BusinessSpace
-
-    space_id = _start_space(ALICE)
-    business = _create(client, ALICE, "Shop ledger", surface="business")
-    source_scope = conversation_scope(user_id=ALICE, conversation_id=business)
-    assert source_scope == BusinessSpace(space_id)
-
-    continued = _new_conversation(_user_object(ALICE), source_scope)
-    assert conversation_scope(user_id=ALICE, conversation_id=continued.id) == (
-        BusinessSpace(space_id)
-    )
-    assert continued.id in _surfaces(client, ALICE)["business"]["recents"]
-
-
 def _user_object(person: str) -> User:
     return User(
         id=person,
