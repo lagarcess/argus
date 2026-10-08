@@ -133,6 +133,16 @@ export type BusinessUpdate = {
   label: string | null;
 };
 
+/**
+ * Business records matching a query, each list capped by `limit`. A receipt
+ * whose expense also matched is only under its expense, as `receipt_id`.
+ */
+export type BusinessSearchResult = {
+  expenses: BusinessExpense[];
+  receipts: ReceiptSummary[];
+  accounts: BusinessAccount[];
+};
+
 export type ExpenseInput = {
   account_id: string;
   amount: DecimalString;
@@ -185,6 +195,11 @@ export async function getBusinessReceipt(id: string): Promise<ReceiptDetail> {
 export async function listBusinessUpdates(): Promise<BusinessUpdate[]> {
   const page = await apiFetch<{ items: BusinessUpdate[] }>("/business/updates");
   return page.items;
+}
+
+export async function searchBusiness(q: string, limit = 5): Promise<BusinessSearchResult> {
+  const query = new URLSearchParams({ q, limit: String(limit) });
+  return apiFetch(`/business/search?${query}`);
 }
 
 export async function listBusinessExpenses(

@@ -14,8 +14,10 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
+from argus.domain import financial_search
 from argus.domain.business.scope import BusinessScope, resolve_business_scope
 from argus.domain.business.service import BusinessService
 from argus.domain.business.spaces import PostgresSpaceStore
@@ -30,6 +32,8 @@ from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStor
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.reconcile.service import ReconciliationService
 from argus.domain.ingestion.reconcile.store_postgres import PostgresImportStore
+from argus.domain.owner_scope import PERSONAL
+from argus.domain.recording.money_schemas import MoneyRequest
 from argus.domain.recording.money_service import MoneyService
 from argus.domain.recording.postgres_repository import (
     PostgresFinancialAccountRepository,
@@ -324,3 +328,55 @@ def test_entry_by_hand_after_a_read_records_one_expense_across_tabs_and_a_restar
             (scope.person_id,),
         ).fetchall()
     assert (states, _written(rig)) == ([("accepted", 1), ("dismissed", 2)], 1)
+
+
+def test_search_finds_the_business_expense_and_its_source_never_personal(
+    rig: dict,
+) -> None:
+    service, scope = rig["service"], rig["owner"]
+    accounts = service.accounts
+    personal = accounts.create(
+        user_id=scope.person_id,
+        idempotency_key="personal-acct",
+        request=CreateFinancialAccountRequest(
+            type="checking", currency="DOP", nickname="Casa"
+        ),
+        scope=PERSONAL,
+    ).stored.account
+    zone = "America/Santo_Domingo"
+    personal_expense = service.imports.money.write_entered(
+        user_id=scope.person_id,
+        request=MoneyRequest(
+            kind="expense",
+            account_id=personal.id,
+            amount="99.00",
+            occurred_at=datetime(2026, 10, 6, 9, 0, tzinfo=ZoneInfo(zone)),
+            time_zone=zone,
+            note="Ferretería La Esquina",
+        ),
+        idempotency_key="personal-expense",
+        scope=PERSONAL,
+    )["activity"]["activity_id"]
+    receipt_id, version = _reviewed(rig)
+    expense_id = service.confirm(scope, receipt_id, version, "k").review.expense_id
+
+    found = service.search(scope, "ferreteria", 5)
+
+    assert [(e["id"], e["receipt_id"]) for e in found["expenses"]] == [
+        (expense_id, receipt_id)
+    ]
+    assert (found["receipts"], found["accounts"]) == ([], [])
+    assert service.source(scope, receipt_id) == ("image/png", RECEIPT)
+    assert [r["id"] for r in service.search(scope, "recibo", 5)["receipts"]] == [
+        receipt_id
+    ]
+    assert [a["nickname"] for a in service.search(scope, "ops", 5)["accounts"]] == ["Ops"]
+    assert service.search(rig["other"], "ferreteria", 5) == {
+        "expenses": [],
+        "receipts": [],
+        "accounts": [],
+    }
+    personal_hits = financial_search.search(
+        accounts, scope.person_id, q="ferreteria"
+    ).items
+    assert [hit.activity.activity_id for hit in personal_hits] == [personal_expense]

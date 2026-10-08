@@ -2337,6 +2337,14 @@
     "composer_receipt": {
       "saved": "Guardado en la Bandeja",
       "dismiss": "Descartar"
+    },
+    "search": {
+      "placeholder": "Buscar gastos, recibos y chats",
+      "no_results_hint": "Prueba con el nombre de un comercio o de un archivo.",
+      "region": "Registros del negocio",
+      "loading": "Buscando en tu negocio",
+      "failed": "No pudimos buscar en tu negocio.",
+      "receipts": "Recibos"
     }
   },
   "money": {

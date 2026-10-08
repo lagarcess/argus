@@ -8,7 +8,7 @@ Default-off. Each person's Business records live in their own space (see
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import (
     APIRouter,
@@ -34,6 +34,7 @@ from argus.api.business_schemas import (
     BusinessAccount,
     BusinessExpense,
     BusinessOverview,
+    BusinessSearch,
     BusinessSpaceInfo,
     BusinessWorkspace,
     ConfirmBody,
@@ -388,6 +389,19 @@ def record_expense(
     entered = {**body.model_dump(), "account_id": str(body.account_id)}
     try:
         return context.service.record_expense(context.scope, entered, key)
+    except Exception as error:
+        raise _problem(request, error) from None
+
+
+@router.get("/search", response_model=BusinessSearch)
+def search(
+    request: Request,
+    q: Annotated[str, Query(min_length=1, max_length=512)],
+    limit: Annotated[int, Query(ge=1, le=20)] = 5,
+    context: BusinessContext = Depends(require_business),  # noqa: B008
+) -> dict[str, Any]:
+    try:
+        return context.service.search(context.scope, q, limit)
     except Exception as error:
         raise _problem(request, error) from None
 

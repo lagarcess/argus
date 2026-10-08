@@ -184,3 +184,11 @@ class BusinessUpdate(_Wire):
 
 class UpdatePage(_Wire):
     items: list[BusinessUpdate]
+
+
+class BusinessSearch(_Wire):
+    """Each list is capped at the request's ``limit``; nothing is paged."""
+
+    expenses: list[BusinessExpense]
+    receipts: list[ReceiptSummary]
+    accounts: list[BusinessAccount]

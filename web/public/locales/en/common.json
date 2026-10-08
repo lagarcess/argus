@@ -2337,6 +2337,14 @@
     "composer_receipt": {
       "saved": "Saved to Inbox",
       "dismiss": "Dismiss"
+    },
+    "search": {
+      "placeholder": "Search expenses, receipts and chats",
+      "no_results_hint": "Try a merchant or a file name.",
+      "region": "Business records",
+      "loading": "Searching your business",
+      "failed": "We couldn't search your business.",
+      "receipts": "Receipts"
     }
   },
   "money": {

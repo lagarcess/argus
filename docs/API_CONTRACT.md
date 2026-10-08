@@ -7432,6 +7432,9 @@ most one automatic stale-cursor restart before showing Retry. Response pages are
 bounded; database loading currently reuses the full owner snapshot and is not
 claimed to be bounded database work.
 
+This route reads only Personal records. The same matching, given a Business
+space as its scope, serves `GET /api/v1/business/search` (Business pilot below).
+
 `GET /api/v1/financial-plan/expectations/{expectation_id}` returns the existing
 `Expectation` projection, including archived or out-of-forecast-window records.
 Missing and other-owner IDs both return the existing financial-record 404.
@@ -8879,6 +8882,18 @@ accept path recorded.
   (`receipt_ready`, `receipt_needs_attention`, `expense_confirmed`), newest
   first, each with the receipt's `error_code` and `attention`. Nothing is
   stored for them.
+- GET `/api/v1/business/search?q&limit` returns `{expenses: BusinessExpense[],
+  receipts: ReceiptSummary[], accounts: BusinessAccount[]}`. `q` is 1 to 512
+  characters and `limit` is 1 to 20 (default 5), applied to each list. Nothing
+  is paged and there is no index of its own. Expenses and accounts are the
+  space's hits from the canonical financial search (`financial_search.hits`
+  with the Business scope) and match as `/financial-search` matches: an
+  expense on its note (the merchant), kind and category, an account on its
+  nickname, type and currency. A Business space has no plans, so no plan hits.
+  Receipts match by the same rule on the reviewed merchant, the filename and
+  the reviewed amount as written. Expenses and receipts are newest first. A
+  receipt whose expense is also a hit is left out, because the expense's
+  `receipt_id` opens it and its source.
 
 Another person's receipt id answers 404 `receipt_not_found` on every receipt
 route. 

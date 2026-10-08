@@ -13,12 +13,14 @@ from datetime import date, datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from argus.domain import financial_search
 from argus.domain.business import ledger
 from argus.domain.business.receipts import (
     AWAITING_REVIEW,
     CLOSED,
     Receipt,
     compose,
+    review_fields,
     updates,
 )
 from argus.domain.business.scope import BusinessScope
@@ -327,13 +329,61 @@ class BusinessService:
     def expenses(
         self, scope: BusinessScope, start: date, end: date
     ) -> list[dict[str, Any]]:
-        activities = self._activities(scope)
+        return self._expenses(scope, self._activities(scope), start, end)
+
+    def _expenses(
+        self,
+        scope: BusinessScope,
+        activities: list[dict[str, Any]],
+        start: date,
+        end: date,
+    ) -> list[dict[str, Any]]:
         ids = [item["activity_id"] for item in ledger.expense_activities(activities)]
         with self.imports.store.transaction(scope.person_id, scope=scope.owner) as tx:
             receipt_of = receipt_ids(tx, self.documents.store, scope.person_id, ids)
         return [
             _wire(item) for item in ledger.expenses(activities, receipt_of, start, end)
         ]
+
+    def search(self, scope: BusinessScope, q: str, limit: int) -> dict[str, Any]:
+        """Expenses and accounts through the canonical financial search, plus
+        receipts matched by the same rule on merchant, filename and amount.
+
+        A receipt whose expense is already a hit is left out: the expense opens it.
+        """
+
+        query = financial_search.query_text(q)
+        found = financial_search.hits(
+            self.accounts, scope.person_id, scope=scope.owner, query=query
+        )
+        activities = [
+            hit.activity.model_dump()
+            for hit in found
+            if isinstance(hit, financial_search.ActivityHit)
+        ]
+        expenses = self._expenses(scope, activities, date.min, date.max)
+        listed = {expense["id"] for expense in expenses}
+        receipts = [
+            receipt.summary()
+            for receipt in self.receipts(scope)
+            if receipt.review.expense_id not in listed
+            and financial_search.matches(query, _receipt_text(receipt))
+        ]
+        accounts = [
+            {
+                "id": hit.account.id,
+                "nickname": hit.account.nickname,
+                "type": hit.account.type,
+                "currency": hit.account.currency,
+            }
+            for hit in found
+            if isinstance(hit, financial_search.AccountHit)
+        ]
+        return {
+            "expenses": expenses[:limit],
+            "receipts": receipts[:limit],
+            "accounts": accounts[:limit],
+        }
 
     def record_expense(
         self, scope: BusinessScope, entered: Mapping[str, Any], key: str
@@ -387,6 +437,13 @@ class BusinessService:
         return current_activities(
             self.accounts.list_accounts(user_id=scope.person_id, scope=scope.owner)
         )
+
+
+def _receipt_text(receipt: Receipt) -> str:
+    fields = review_fields(receipt.review)
+    return " ".join(
+        filter(None, [fields["merchant"], receipt.draft.filename, fields["amount"]])
+    )
 
 
 def _wire(expense: dict[str, Any]) -> dict[str, Any]:

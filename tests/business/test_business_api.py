@@ -136,13 +136,14 @@ def test_flag_off_every_route_is_404_before_auth(client: TestClient, monkeypatch
         client.post(f"{BASE}/expenses", json={}),
         client.get(f"{BASE}/overview"),
         client.get(f"{BASE}/updates"),
+        client.get(f"{BASE}/search", params={"q": "x"}),
         client.get(f"{BASE}/space"),
         client.post(f"{BASE}/space", json={}),
         client.patch(f"{BASE}/space", json={"name": "x"}),
     ]
     assert [(r.status_code, r.json()["code"]) for r in calls] == [
         (404, "business_unavailable")
-    ] * 16
+    ] * 17
     assert {r.headers["Cache-Control"] for r in calls} == {"no-store"}
 
 
@@ -178,12 +179,13 @@ def test_every_route_waits_for_the_space_and_starting_it_is_idempotent(
         alice.get("/expenses", **{"from": "2026-10-01", "to": "2026-10-31"}),
         alice.get("/overview", **{"from": "2026-10-01", "to": "2026-10-31"}),
         alice.get("/updates"),
+        alice.get("/search", q="ferreteria"),
         alice.get("/space"),
         biz.patch(f"{BASE}/space", json={"name": "Taller"}, headers=alice.auth),
     ]
     assert [(r.status_code, r.json()["code"]) for r in before] == [
         (404, "business_space_missing")
-    ] * 8
+    ] * 9
     first = alice.start()
     assert first.status_code == 201
     assert first.json()["name"] == "Mi negocio"
