@@ -165,14 +165,16 @@ async def read_document_upload(request: Request) -> tuple[str, bytes]:
 
 
 def document_filename(header: str | None) -> str:
-    """``X-Document-Filename`` is percent-encoded UTF-8 (``encodeURIComponent``).
-    Raw UTF-8, which the server reads as latin-1, is recovered; bytes that are
-    not UTF-8 become replacement characters rather than mojibake."""
+    """``X-Document-Filename`` is percent-encoded UTF-8 (``encodeURIComponent``),
+    which is pure ASCII. Anything else is raw UTF-8, read by the server as
+    latin-1: it is recovered and never percent-decoded, and bytes that are not
+    UTF-8 become replacement characters rather than mojibake."""
 
     if not header:
         return "document"
-    text = header.encode("latin-1").decode("utf-8", errors="replace")
-    return unquote(text, errors="replace")
+    if header.isascii():
+        return unquote(header, errors="replace")
+    return header.encode("latin-1").decode("utf-8", errors="replace")
 
 
 async def dispatch_preparation(

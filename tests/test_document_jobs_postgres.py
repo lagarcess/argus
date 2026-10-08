@@ -501,3 +501,131 @@ def test_workflow_worker_prepares_the_dispatched_attempt(
     api.forget(
         api.hub.connections.get(user_id=owner, connection_id=captured.connection_id)
     )
+
+
+def test_redispatch_refuses_a_marker_or_a_finished_draft_that_landed_after_the_snapshot(
+    pool: ConnectionPool, users: dict[str, str]
+) -> None:
+    from argus.domain.ingestion.connections import DEFAULT_LEASE
+
+    now = datetime.now(timezone.utc)
+    repo = PostgresConnectionRepository(pool)
+    store = PostgresDocumentStore(pool, source_objects())
+    owner = users["owner"]
+    row = repo.create(
+        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+    )
+    assert store.capture(user_id=owner, draft=draft(row.id, now), content=b"%PDF-x")
+    first = PreparationJob(attempt=1, attempt_id="a1", draft_version=1, dispatched_at=now)
+    assert store.advance(
+        user_id=owner, connection_id=row.id, now=now, expected_attempt_id=None, job=first
+    )
+    assert repo.lease(connection_id=row.id, holder="worker", now=now)
+    preparing = draft(row.id, now, version=2, status="preparing")
+    assert store.update(
+        user_id=owner, draft=preparing, expected_version=1, holder="worker"
+    )
+    snapshot = store.job(user_id=owner, connection_id=row.id)
+    assert snapshot.provider_call_started_at is None
+
+    marked_at = now + timedelta(minutes=4)
+    assert store.mark_provider_call(
+        user_id=owner,
+        connection_id=row.id,
+        attempt_id="a1",
+        holder="worker",
+        now=marked_at,
+    )
+    lease = repo.get(user_id=owner, connection_id=row.id).lease_until
+    assert lease == marked_at + DEFAULT_LEASE, "the marker renews the lease"
+
+    later = lease + timedelta(seconds=1)
+    second = first.model_copy(
+        update={
+            "attempt": 2,
+            "attempt_id": "a2",
+            "draft_version": 3,
+            "dispatched_at": later,
+        }
+    )
+    assert not store.advance(
+        user_id=owner,
+        connection_id=row.id,
+        now=later,
+        expected_attempt_id=snapshot.attempt_id,
+        job=second,
+        draft=draft(row.id, later, version=3),
+        unmarked=True,
+    ), "a marker committed after the sweep's snapshot blocks the re-dispatch"
+    assert store.job(user_id=owner, connection_id=row.id).attempt_id == "a1"
+
+    finished = draft(row.id, later, version=3, status="review_ready")
+    assert store.update(user_id=owner, draft=finished, expected_version=2)
+    stale = second.model_copy(update={"draft_version": 1})
+    assert not store.advance(
+        user_id=owner,
+        connection_id=row.id,
+        now=later,
+        expected_attempt_id="a1",
+        job=stale,
+    ), "a draft that moved past the attempt's version is not re-dispatched"
+    assert store.advance(
+        user_id=owner,
+        connection_id=row.id,
+        now=later,
+        expected_attempt_id="a1",
+        job=second,
+    ), "the current version may still be replayed"
+    repo.disconnect(user_id=owner, connection_id=row.id, now=later)
+    store.forget(user_id=owner, connection_id=row.id)
+
+
+def test_only_the_named_attempt_claims_and_records_it(
+    pool: ConnectionPool, users: dict[str, str]
+) -> None:
+    now = datetime.now(timezone.utc)
+    repo = PostgresConnectionRepository(pool)
+    store = PostgresDocumentStore(pool, source_objects())
+    owner = users["owner"]
+    row = repo.create(
+        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+    )
+    assert store.capture(user_id=owner, draft=draft(row.id, now), content=b"%PDF-x")
+    job = PreparationJob(attempt=1, attempt_id="a1", draft_version=1, dispatched_at=now)
+    assert store.advance(
+        user_id=owner, connection_id=row.id, now=now, expected_attempt_id=None, job=job
+    )
+    assert repo.lease(connection_id=row.id, holder="worker", now=now)
+    preparing = draft(row.id, now, version=2, status="preparing")
+
+    assert not store.update(
+        user_id=owner, draft=preparing, expected_version=1, holder="worker", claim="a0"
+    ), "a claim for another attempt changes nothing"
+    assert store.draft(user_id=owner, connection_id=row.id).version == 1
+    assert store.update(
+        user_id=owner, draft=preparing, expected_version=1, holder="worker", claim="a1"
+    )
+    assert store.job(user_id=owner, connection_id=row.id).claimed is True
+
+    other = repo.create(
+        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+    )
+    assert store.capture(user_id=owner, draft=draft(other.id, now), content=b"%PDF-y")
+    assert store.advance(
+        user_id=owner,
+        connection_id=other.id,
+        now=now,
+        expected_attempt_id=None,
+        job=job.model_copy(update={"attempt_id": "b1"}),
+    )
+    assert repo.lease(connection_id=other.id, holder="flag-off", now=now)
+    assert store.update(
+        user_id=owner,
+        draft=draft(other.id, now, version=2, status="preparing"),
+        expected_version=1,
+        holder="flag-off",
+    )
+    assert store.job(user_id=owner, connection_id=other.id).claimed is False
+    for connection in (row.id, other.id):
+        repo.disconnect(user_id=owner, connection_id=connection, now=now)
+        store.forget(user_id=owner, connection_id=connection)

@@ -8522,13 +8522,17 @@ its provider call started. The expired-attempt rule above still holds: an
 attempt is never billed again automatically. A sweep in the API settles an
 attempt whose worker died as follows:
 
-- No provider-call record: the provider was never reached, so the sweep
+- No provider-call record, and the draft's claim names the current attempt
+  (or nothing claimed it yet): the provider was never reached, so the sweep
   re-dispatches it automatically, at most three attempts per explicit
   preparation. The draft may return to `queued` meanwhile. Past the bound it
   becomes `needs_attention` with `document_preparation_interrupted`.
-- A provider-call record and no saved preparation: the outcome is unknown.
-  The draft becomes `needs_attention` with
-  `document_preparation_outcome_unknown` and nothing is re-dispatched.
+- A saved preparation exists: the sweep replays its delivery automatically.
+  That makes no provider call and needs no consent.
+- Any other dead `preparing` draft (a provider-call record, or a claim that
+  does not name the current attempt): the outcome is unknown. The draft becomes
+  `needs_attention` with `document_preparation_outcome_unknown` and nothing is
+  re-dispatched.
 - A reported provider failure keeps its own code and is not retried.
 
 Only the owner's `/prepare` or `/resume` with `X-Extraction-Consent: true`
