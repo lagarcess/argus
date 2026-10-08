@@ -16,17 +16,25 @@ from argus.domain.ingestion.connections import (
     DuplicateConnection,
     SourceConnection,
 )
-from argus.domain.ingestion.contract import SourceKind
+from argus.domain.ingestion.contract import ImportCandidate, SourceKind, SourceRef
 from argus.domain.ingestion.documents.models import (
     DocumentDraft,
     DraftProposal,
     DraftStatus,
     ExtractionBatch,
+    ReceiptDetails,
 )
 from argus.domain.ingestion.documents.objects import SourceStorageUnavailable
 from argus.domain.ingestion.documents.preparation import validate_source
 from argus.domain.ingestion.documents.store import DocumentStore
 from argus.domain.ingestion.hub import IngestionHub
+
+# Marks a batch the owner entered by hand: one purchase, nothing read.
+ENTERED_BY_OWNER = {"entered_by": "owner"}
+
+
+def entered_by_owner(batch: ExtractionBatch | None) -> bool:
+    return batch is not None and batch.metadata.get("entered_by") == "owner"
 
 
 def lease_live(connection: SourceConnection, now: datetime) -> bool:
@@ -264,6 +272,9 @@ class DocumentsService:
         if draft.status == "preparing":
             raise DocumentServiceError("document_busy", retryable=True)
         batch = self.store.get(user_id=user_id, connection_id=connection_id)
+        if entered_by_owner(batch):
+            # Preparing now would read a second purchase from the same receipt.
+            raise DocumentServiceError("document_entered_by_owner")
         if batch is None:
             if not consent:
                 raise DocumentServiceError("document_extraction_consent_required")
@@ -273,6 +284,61 @@ class DocumentsService:
         return self.outcome(
             user_id=user_id, connection_id=connection_id, replayed=batch is not None
         )
+
+    async def enter(self, *, user_id: str, connection_id: str) -> DocumentOutcome:
+        """The owner records this receipt by hand instead of preparing it.
+
+        Saves one purchase observation with nothing read, marked entered by the
+        owner, and delivers it to review like extracted candidates; the owner's
+        values then become that import's resolution. No extractor is called.
+        Repeating it delivers the same observation again, so an interrupted
+        entry is finished. A prepared or queued document is refused.
+        """
+
+        draft = self.get(user_id=user_id, connection_id=connection_id)
+        batch = self.store.get(user_id=user_id, connection_id=connection_id)
+        if batch is None:
+            if draft.status in ("queued", "preparing"):
+                raise DocumentServiceError("document_busy", retryable=True)
+            holder = str(uuid.uuid4())
+            repo = self.hub.connections
+            if not repo.lease(
+                connection_id=connection_id, holder=holder, now=self.hub.clock()
+            ):
+                raise DocumentServiceError("document_busy", retryable=True)
+            try:
+                now = self.hub.clock()
+                purchase = ImportCandidate(
+                    source=SourceRef(
+                        source="statement",
+                        connection_id=connection_id,
+                        external_id=f"{draft.sha256}:entered-by-owner",
+                        observed_at=now,
+                    ),
+                    evidence="transaction",
+                    direction="outflow",
+                    kind_hint="expense",
+                    uncertain=frozenset({"amount", "currency", "occurred_on"}),
+                )
+                entered = ExtractionBatch(
+                    candidates=(purchase,),
+                    receipt=ReceiptDetails(),
+                    metadata=dict(ENTERED_BY_OWNER),
+                )
+                if not self.store.save(
+                    user_id=user_id,
+                    connection_id=connection_id,
+                    holder=holder,
+                    now=now,
+                    batch=entered,
+                ):
+                    raise DocumentServiceError("document_lease_lost", retryable=True)
+            finally:
+                repo.release(connection_id=connection_id, holder=holder)
+            batch = self.store.get(user_id=user_id, connection_id=connection_id)
+        if not entered_by_owner(batch):
+            raise DocumentServiceError("document_already_prepared")
+        return await self.resume(user_id=user_id, connection_id=connection_id)
 
     async def background_prepare(self, *, user_id: str, connection_id: str) -> None:
         try:
@@ -328,7 +394,7 @@ class DocumentsService:
                     error_code=None,
                 )
                 content = await asyncio.to_thread(
-                    self.source_bytes, user_id=user_id, connection_id=connection_id
+                    self._read_source, user_id, connection_id
                 )
                 # Committed before the provider can be reached: without it an
                 # attempt provably never called the provider and may be retried.

@@ -1,0 +1,154 @@
+"""Wire shapes for ``/api/v1/business``, matching ``web/lib/business-api.ts``."""
+
+from __future__ import annotations
+
+from datetime import date, datetime
+from typing import Literal
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from argus.domain.ingestion.receipt_review import ReceiptStatus
+
+ExpenseAccountType = Literal["cash", "checking", "savings", "credit_card"]
+
+
+class _Wire(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+
+class BusinessAccount(_Wire):
+    id: str
+    nickname: str | None
+    type: str
+    currency: str
+
+
+class ReceiptLimits(_Wire):
+    max_bytes: int
+    media_types: list[str]
+
+
+class BusinessWorkspace(_Wire):
+    accounts: list[BusinessAccount]
+    currencies: list[str]
+    assistant_available: bool
+    receipt_limits: ReceiptLimits
+
+
+class CreateBusinessAccount(_Wire):
+    nickname: str = Field(min_length=1, max_length=200)
+    type: ExpenseAccountType
+    currency: str = Field(min_length=3, max_length=3)
+
+
+class ReceiptSummary(_Wire):
+    id: str
+    channel: Literal["web", "whatsapp"]
+    filename: str | None
+    media_type: str
+    size_bytes: int
+    received_at: datetime
+    status: ReceiptStatus
+    error_code: str | None
+    expense_id: str | None
+    merchant: str | None
+    occurred_on: str | None
+    amount: str | None
+    currency: str | None
+    category_id: str | None
+    account_id: str | None
+
+
+class ReceiptEvidenceLine(_Wire):
+    description: str
+    amount: str | None
+
+
+class ReceiptEvidence(_Wire):
+    merchant: str | None
+    occurred_on: str | None
+    total: str | None
+    currency: str | None
+    tax: str | None
+    tip: str | None
+    service: str | None
+    lines: list[ReceiptEvidenceLine]
+
+
+ReviewField = Literal[
+    "merchant", "occurred_on", "amount", "currency", "category_id", "account_id"
+]
+
+
+class ReceiptDetail(ReceiptSummary):
+    version: int
+    evidence: ReceiptEvidence | None
+    missing_fields: list[ReviewField]
+
+
+class ReceiptPage(_Wire):
+    items: list[ReceiptSummary]
+
+
+class ReceiptReviewBody(_Wire):
+    version: int = Field(ge=0)
+    fields: dict[ReviewField, str | None]
+
+
+class ConfirmBody(_Wire):
+    version: int = Field(ge=0)
+
+
+class BusinessExpense(_Wire):
+    id: str
+    merchant: str | None
+    amount: str
+    currency: str
+    category_id: str | None
+    account_id: str
+    occurred_on: date
+    receipt_id: str | None
+
+
+class ExpensePage(_Wire):
+    items: list[BusinessExpense]
+
+
+class ExpenseInput(_Wire):
+    account_id: UUID
+    amount: str = Field(min_length=1, max_length=40)
+    occurred_on: date
+    merchant: str | None = Field(default=None, max_length=200)
+    category_id: str | None = None
+
+
+class CurrencyTotal(_Wire):
+    currency: str
+    amount: str
+    count: int
+
+
+class BusinessOverview(_Wire):
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    from_: date = Field(alias="from")
+    to: date
+    totals: list[CurrencyTotal]
+    awaiting_review: int
+    needs_attention: int
+    last_received_at: datetime | None
+    last_confirmed_at: datetime | None
+
+
+class BusinessUpdate(_Wire):
+    id: str
+    kind: Literal["receipt_ready", "receipt_needs_attention", "expense_confirmed"]
+    occurred_at: datetime
+    receipt_id: str | None
+    expense_id: str | None
+    error_code: str | None
+    label: str | None
+
+
+class UpdatePage(_Wire):
+    items: list[BusinessUpdate]

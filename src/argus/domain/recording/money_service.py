@@ -70,6 +70,38 @@ class MoneyService:
             "replayed": replayed,
         }
 
+    def write_entered(
+        self, *, user_id: str, request: MoneyRequest, idempotency_key: str
+    ) -> dict[str, Any]:
+        """Record a new activity exactly as the person entered it.
+
+        For a form with no preview step. It is planned under the account lock
+        and refused when a balance question needs an answer. The idempotency
+        identity is the entered request, so a retry replays the first write
+        even though that write moved the account versions a preview would name.
+        """
+
+        from argus.domain.recording.money_storage import transact
+
+        def planner(accounts: list[StoredAccount]) -> MoneyPlan:
+            self.require_personal(accounts, request, None)
+            result = plan(accounts, request, None, self.accounts._clock())
+            if not result.preview["ready"]:
+                raise RecordingInputError(
+                    "balance_coverage_required", "Review each balance question."
+                )
+            return result
+
+        records, aid, revision, _, replayed = transact(
+            self.repository,
+            user_id,
+            idempotency_key,
+            request_identity(request, None),
+            planner,
+            self.accounts._clock(),
+        )
+        return {"activity": activity(records, aid, revision), "replayed": replayed}
+
     def prepare(
         self,
         accounts: list[StoredAccount],

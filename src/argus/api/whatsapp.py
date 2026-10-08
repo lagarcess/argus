@@ -19,6 +19,7 @@ from argus.api import state as api_state
 from argus.api.dependencies import problem
 from argus.api.documents import documents_service
 from argus.api.ingestion import IngestionContext, ingestion_hub, require_ingestion_context
+from argus.domain.business.scope import resolve_business_scope
 from argus.domain.ingestion.documents.config import load_document_extraction_settings
 from argus.domain.ingestion.documents.models import DocumentExtractionError
 from argus.domain.ingestion.documents.service import (
@@ -66,14 +67,13 @@ if not any(isinstance(f, _RedactWebhookQuery) for f in _access_logger.filters):
 def resolve_intake_destination(user_id: str) -> str:
     """The owner id WhatsApp receipts for this signed-in person land under.
 
-    PENDING the Business boundary decision
-    (docs/specs/lanes/cuadrao-business-boundary-proposal.md). Until it is
-    approved the destination is the person. Under option A this becomes the
-    business principal resolved through an active owner membership. Every
-    WhatsApp route reads the destination here and nowhere else.
+    Read from the Business scope, so intake and the Business routes always
+    agree on one owner. Isolation is pending the founder-approved boundary
+    (docs/specs/lanes/cuadrao-business-boundary-proposal.md); until then the
+    scope is the person. Every WhatsApp route reads the destination here.
     """
 
-    return user_id
+    return resolve_business_scope(user_id).person_id
 
 
 _REJECTED_CAPTURE = {

@@ -104,6 +104,10 @@ class WhatsAppStore(Protocol):
         """End the active link and every unused code for this destination."""
         ...
 
+    def captured_connections(self, *, destination_owner_id: str) -> frozenset[str]:
+        """Documents this destination received through WhatsApp."""
+        ...
+
 
 @dataclass
 class _Code:
@@ -187,6 +191,16 @@ class InMemoryWhatsAppStore:
 
     def inbound(self, provider_message_key: bytes) -> InboundRecord | None:
         return self._inbound.get(provider_message_key)
+
+    def captured_connections(self, *, destination_owner_id: str) -> frozenset[str]:
+        with self._lock:
+            return frozenset(
+                record.connection_id
+                for record in self._inbound.values()
+                if record.status == "captured"
+                and record.connection_id is not None
+                and record.destination_owner_id == destination_owner_id
+            )
 
     def issue_code(
         self,

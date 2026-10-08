@@ -73,9 +73,9 @@ export function useBusiness(): BusinessContextValue {
 
 const PANEL_KINDS = new Set(["overview", "inbox", "expenses", "updates"]);
 
-function panelFromUrl(): BusinessPanelState {
-  if (typeof window === "undefined") return { kind: "overview" };
-  const params = new URL(window.location.href).searchParams;
+// Read from the route's search params, not window.location: on a client-side
+// navigation (the sign-in return path) this renders before the address bar moves.
+function panelFromSearch(params: URLSearchParams): BusinessPanelState {
   const receiptId = params.get("receipt");
   if (receiptId) return { kind: "receipt", receiptId };
   const view = params.get("view");
@@ -85,9 +85,7 @@ function panelFromUrl(): BusinessPanelState {
   return { kind: "overview" };
 }
 
-function initialShellView(): ChatShellView {
-  if (typeof window === "undefined") return "workspace";
-  const params = new URL(window.location.href).searchParams;
+function shellViewFromSearch(params: URLSearchParams): ChatShellView {
   return params.has("conversation") || params.get("view") === "chat" ? "chat" : "workspace";
 }
 
@@ -119,8 +117,13 @@ export function BusinessWorkspaceProvider({
   children: ReactNode;
 }) {
   const { t } = useTranslation();
-  const [panel, setPanel] = useState<BusinessPanelState>(panelFromUrl);
-  const [initialView] = useState<ChatShellView>(initialShellView);
+  const searchParams = useSearchParams();
+  const [panel, setPanel] = useState<BusinessPanelState>(() =>
+    panelFromSearch(new URLSearchParams(searchParams.toString())),
+  );
+  const [initialView] = useState<ChatShellView>(() =>
+    shellViewFromSearch(new URLSearchParams(searchParams.toString())),
+  );
   const [periodKey, setPeriodKey] = useState<Period["key"]>("this_month");
   const period = useMemo(() => periodRange(periodKey), [periodKey]);
   const [records, setRecords] = useState<Records>({
@@ -165,7 +168,7 @@ export function BusinessWorkspaceProvider({
 
   // The shell may replace the route while leaving a conversation; writing again
   // once that navigation lands keeps the panel in the address bar.
-  const search = useSearchParams().toString();
+  const search = searchParams.toString();
   useEffect(() => {
     if (bridge) writePanelToUrl(bridge.currentView, panel);
   }, [bridge, panel, search]);

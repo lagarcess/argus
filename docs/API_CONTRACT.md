@@ -8702,8 +8702,18 @@ the document surface above is on. While off, every route below answers 404
 owner's consent on the web. Spec and activation:
 [cuadrao-whatsapp-intake](specs/lanes/cuadrao-whatsapp-intake.md).
 
-The destination owner is the signed-in person today, read only through
-`resolve_intake_destination`. It is pending the Business boundary decision.
+Owners send or forward receipts from their own WhatsApp number to the one
+receiving number, and only those owner-initiated messages are processed. A
+forwarded message (`context.forwarded` or `context.frequently_forwarded`) or
+one with a caption is captured exactly like a direct send. Captions are never
+read. The adapter makes two kinds of request to Meta. It GETs the delivered
+media id from Graph, then the download URL Graph returns. Outbound replies are
+a third kind, and they are off by default. It never reads message history,
+contacts or profiles.
+
+The destination owner is read only through `resolve_intake_destination`,
+which takes it from `resolve_business_scope` (Business pilot below). Today that
+is the signed-in person; it is pending the Business boundary decision.
 
 - GET `/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…`
   answers 200 `text/plain` with the challenge when the verify token matches,
@@ -8739,3 +8749,95 @@ link's `reply_language`, or Spanish for a sender with no active link. A new mess
 whose bytes the owner's inbox already holds gets the duplicate reply. A message whose WhatsApp
 timestamp is more than 24 hours old is still captured but gets no reply, so
 nothing is sent outside the service window.
+
+### Business pilot (default-off, isolation pending)
+
+Off unless `ARGUS_BUSINESS_PILOT_ENABLED` is true and the document surface
+above is on. While the flag is off every route below answers 404
+`business_unavailable` before authentication. Every response is
+`Cache-Control: no-store`. The routes are registered-only and match
+`web/lib/business-api.ts`.
+
+**Isolation is pending.** Each route takes its scope from
+`resolve_business_scope(person)`, never from the client. Until the
+founder-approved boundary
+([proposal](specs/lanes/cuadrao-business-boundary-proposal.md), #819) the scope
+is the person with `space_id: null`, so Business reads and writes the same
+accounts, documents, imports and expenses as Personal.
+
+Each fact keeps its owner. A receipt is a document draft (`id` is its
+connection id). Its review is the import event its purchase created, composed
+by `receipt_review`. Its expense is the canonical activity that the import
+accept path recorded.
+
+- GET `/api/v1/business/workspace` returns `{accounts, currencies,
+  assistant_available: false, receipt_limits: {max_bytes, media_types}}`.
+  `accounts` lists unarchived cash, checking, savings and credit card accounts.
+  `currencies` lists their currencies. The limits come from the document
+  settings.
+- POST `/api/v1/business/accounts` (`Idempotency-Key` required) takes
+  `{nickname, type, currency}` and answers 201, or 200 with the same account on
+  an exact replay.
+- POST `/api/v1/business/receipts` takes raw bytes. It uses the same media
+  types, size limit, `X-Extraction-Consent` and rate limits as
+  `/financial-documents`. It also requires `Idempotency-Key`, and
+  `X-Document-Filename` is URL-encoded. A receipt's identity is its bytes, so
+  a retry returns the same receipt. It answers a `ReceiptSummary` that is
+  `queued` with consent and `saved` without it.
+- GET `/api/v1/business/receipts?view=inbox|all` returns `{items:
+  ReceiptSummary[]}`, newest first. `inbox` leaves out `confirmed` and
+  `dismissed`. `channel` is `whatsapp` for a document that WhatsApp intake
+  captured for the scope's destination, else `web`.
+- GET `/api/v1/business/receipts/{id}` returns a `ReceiptDetail`. `version` is
+  the import event's version, and `0` while there is no purchase to review.
+  `evidence` is what the receipt says, and corrections never change it.
+  `missing_fields` lists the review fields still needed. A receipt nobody has
+  read lists `account_id`, `amount`, `currency` and `occurred_on`. A prepared
+  receipt with no single purchase is `needs_attention`, with the blocker as
+  `error_code`.
+- GET `/api/v1/business/receipts/{id}/source` returns the stored original
+  (#778) as an attachment, with `X-Content-Type-Options: nosniff`. It is
+  readable by the owner only.
+- POST `/api/v1/business/receipts/{id}/prepare` requires
+  `X-Extraction-Consent: true`, else 422
+  `document_extraction_consent_required`. A receipt entered by hand is 409
+  `document_entered_by_owner`, here and on `/financial-documents`. It queues preparation through the
+  #823 job dispatch when jobs are on, and through a background task otherwise.
+- PATCH `/api/v1/business/receipts/{id}/review` takes `{version, fields}`. Each
+  field maps onto the import's resolution. `merchant` is the recorded note, and
+  `null` falls back to the evidence merchant. A stale `version` is 409
+  `stale_version`. A receipt nobody has read, saved without consent or after
+  preparation failed, is entered by hand from `version: 0`. The document
+  records one purchase observation, marked entered by the owner and with
+  nothing read, through the same intake as extracted candidates. The fields
+  become its resolution, its `evidence` stays null, and no model is called.
+  Unknown fields stay unknown until the owner supplies them. Confirm then uses
+  the same accept path, and `receipt_ids` links the expense to the receipt.
+- POST `/api/v1/business/receipts/{id}/confirm` (`Idempotency-Key` required)
+  takes `{version}` and records the receipt as one expense through the import
+  accept path. Confirm changes nothing before it claims the import. A
+  `version` other than the open import's is 409 `stale_version`, checked
+  before any other refusal. It also refuses with 422 `missing_fields`,
+  `currency_mismatch` or a money code such as `amount_precision`. A replay, a
+  second key or a concurrent confirm returns the same confirmed receipt with
+  the same `expense_id`. An acceptance that another key claimed but did not
+  finish is finished first, and one expense is recorded.
+- GET `/api/v1/business/expenses?from&to` returns `{items: BusinessExpense[]}`.
+  These are expense activities whose local date falls in `[from, to]`, newest
+  first. `receipt_id` names the receipt when the expense came from exactly one.
+- POST `/api/v1/business/expenses` (`Idempotency-Key` required) takes
+  `{account_id, amount, occurred_on, merchant, category_id}` and records one
+  expense through `MoneyService`, in the account's currency. A retry with the
+  same key and body returns the same expense. The same key with a different
+  body, or a key whose recorded activity is not an expense, is 409
+  `idempotency_conflict`.
+- GET `/api/v1/business/overview?from&to` returns per-currency `totals`
+  `{currency, amount, count}`, with no conversion. It also returns
+  `awaiting_review`, `needs_attention`, `last_received_at` and
+  `last_confirmed_at`.
+- GET `/api/v1/business/updates` returns `{items}` derived from receipt states
+  (`receipt_ready`, `receipt_needs_attention`, `expense_confirmed`), newest
+  first. Nothing is stored for them.
+
+Another person's receipt id answers 404 `receipt_not_found` on every receipt
+route. 

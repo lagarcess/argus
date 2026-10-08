@@ -7,3 +7,10 @@ connectivity to WhatsApp.
 
 Tests sign each body with a test app secret and override `from`, `id` and the
 text body where a case needs a different sender, message or link code.
+
+`image_forwarded.json`, `image_frequently_forwarded.json` and
+`document_forwarded.json` carry Meta's `context.forwarded` and
+`context.frequently_forwarded` markers on a message the owner forwarded to
+the receiving number. `image_with_caption.json` has a caption that names
+another number and looks like a link code. Intake must treat all four exactly
+like a direct send from the linked sender.
