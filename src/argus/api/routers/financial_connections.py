@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Request
 
+from argus.api.documents import require_connection_removal
 from argus.api.ingestion import (
     IngestionContext,
     connection_problem,
@@ -36,9 +37,11 @@ def list_financial_connections(
 def disconnect_financial_connection(
     request: Request,
     connection_id: str,
-    context: IngestionContext = Depends(require_ingestion_context),  # noqa: B008
+    context: IngestionContext = Depends(require_connection_removal),  # noqa: B008
 ) -> DisconnectResponse:
-    """Idempotent: disconnecting an ended connection returns it unchanged."""
+    """Idempotent: disconnecting an ended connection returns it unchanged.
+
+    With ingestion off only a saved document can be disconnected."""
 
     try:
         outcome = context.hub.disconnect(

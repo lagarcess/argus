@@ -3965,7 +3965,10 @@ paths:
       tags:
       - financial-accounts
       - financial-connections
-      description: 'Idempotent: disconnecting an ended connection returns it unchanged.'
+      description: 'Idempotent: disconnecting an ended connection returns it unchanged.
+
+
+        With ingestion off only a saved document can be disconnected.'
       parameters:
       - name: connection_id
         in: path

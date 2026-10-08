@@ -8242,6 +8242,10 @@ re-authorization or disconnect. Credentials, cursors and sync leases are never r
   unreviewed drafts from that connection are removed; confirmed activity stays.
   Repeating the call returns the ended connection with `not_applicable` and `0`.
   Another person's or an unknown id answers 404 `financial_connection_not_found`.
+  While `ARGUS_INGESTION_ENABLED` is off this route still disconnects a saved
+  document (`statement`) and erases its stored original, so a person can
+  always delete one. Any other source answers 404
+  `financial_connections_unavailable`, since no connector runs to revoke it.
 
 ### Plaid connector (default-off)
 
@@ -8510,11 +8514,15 @@ accepts the same true values as the other default-off surfaces (`1`, `true`,
 unrecognized value leaves the document surface off. A document setting that
 cannot be read, including a non-integer or out-of-range max-bytes value (0,
 negative, or above the 10 MiB cap), also leaves it off, with one warning per
-process. While the document surface is off, every `/api/v1/financial-documents`
-route answers 404 `financial_connections_unavailable` with
-`Cache-Control: no-store` and no extraction runs. Plaid,
-Gmail, Shortcuts, disconnect, and `GET /api/v1/financial-connections` keep
-their own gates.
+process. While the document surface is off, intake stops: upload, `prepare`,
+`resume` and `PATCH .../proposal` answer 404 `financial_connections_unavailable`
+with `Cache-Control: no-store` and no extraction runs. What the owner already
+saved stays theirs: list, `GET /financial-documents/{connection_id}`, its
+`/source` and disconnect keep working. They also keep working while
+`ARGUS_INGESTION_ENABLED` is off, as long as financial accounts are on; then
+no preparation job starts and no model can be called. Without financial
+accounts every route answers 404 `financial_connections_unavailable`. Plaid,
+Gmail, Shortcuts and `GET /api/v1/financial-connections` keep their own gates.
 
 Capture responds with `{connection_id,status,replayed,candidate_count}`. Every
 upload answer, success or problem, is `Cache-Control: no-store`. The stored

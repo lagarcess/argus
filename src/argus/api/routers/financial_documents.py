@@ -15,6 +15,7 @@ from argus.api.documents import (
     document_problem,
     read_document_upload,
     require_document_context,
+    require_saved_document_context,
 )
 from argus.domain.ingestion.documents.config import SOURCE_MEDIA_TYPES
 from argus.domain.ingestion.documents.models import DraftProposal, DraftStatus
@@ -140,7 +141,7 @@ def list_documents(
     response: Response,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
-    context: DocumentContext = Depends(require_document_context),  # noqa: B008
+    context: DocumentContext = Depends(require_saved_document_context),  # noqa: B008
 ) -> dict[str, object]:
     response.headers["Cache-Control"] = "no-store"
     try:
@@ -173,7 +174,7 @@ def get_document(
     request: Request,
     response: Response,
     connection_id: str,
-    context: DocumentContext = Depends(require_document_context),  # noqa: B008
+    context: DocumentContext = Depends(require_saved_document_context),  # noqa: B008
 ) -> dict[str, object]:
     response.headers["Cache-Control"] = "no-store"
     try:
@@ -186,7 +187,7 @@ def get_document(
 def get_source(
     request: Request,
     connection_id: str,
-    context: DocumentContext = Depends(require_document_context),  # noqa: B008
+    context: DocumentContext = Depends(require_saved_document_context),  # noqa: B008
 ) -> Response:
     try:
         draft = context.service.get(
