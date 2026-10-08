@@ -163,7 +163,7 @@ test.describe("Business preview", () => {
   test("an unknown AI outcome offers a consented retry beside entry by hand", async ({ page }) => {
     await openPreview(page, `${PREVIEW}?receipt=rcpt-unknown`);
     const attention = page.getByTestId("receipt-attention");
-    await expect(attention).toContainText("We don't know if the AI finished reading this receipt");
+    await expect(attention).toContainText("We couldn't recover the AI reading result");
     await expect(attention).toContainText("Trying again sends this receipt to our AI provider.");
     await expect(page.getByRole("button", { name: "Prepare with AI" })).toHaveCount(0);
     await expect(page.getByLabel("Merchant")).toBeEnabled();
