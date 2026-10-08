@@ -310,3 +310,23 @@ def test_a_run_in_a_business_chat_stays_on_the_business_surface(rig: Rig) -> Non
     assert history_runs("personal") == []
     assert symbol_hits("business") == alice.business
     assert symbol_hits("personal") == []
+
+
+def test_market_interest_counts_only_personal_runs(rig: Rig) -> None:
+    alice = rig.alice
+
+    def run(conversation_id: str | None) -> None:
+        with psycopg.connect(DSN) as connection:
+            connection.execute(
+                "insert into public.backtest_runs (user_id, conversation_id, status, "
+                "asset_class, symbols, benchmark_symbol, config_snapshot) values "
+                "(%s, %s, 'completed', 'equity', %s, 'SPY', '{}'::jsonb)",
+                (alice.id, conversation_id, ["AAPL"]),
+            )
+
+    run(alice.business[0])
+    assert api_state.supabase_gateway is not None
+    assert api_state.supabase_gateway.count_completed_runs(user_id=alice.id) == 0
+    run(alice.personal[0])
+    run(None)
+    assert api_state.supabase_gateway.count_completed_runs(user_id=alice.id) == 2
