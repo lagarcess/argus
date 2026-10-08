@@ -82,7 +82,9 @@ enum CanvasProfileRoute: Hashable {
 /// them unless launched with `--cuadrao-release-gates`, which previews the release set.
 enum CuadraoFirstRelease {
     static let unfinishedProfileRoutes: Set<CanvasProfileRoute> = [
-        .personalization, .security, .shared, .removed, .memory, .usage, .advanced
+        .personalization, .security, .shared, .removed, .memory, .usage, .advanced,
+        // The free tier has no AI chats and no stored files yet, so these pages would only say "Nothing saved".
+        .files, .conversations
     ]
     #if DEBUG
     static let hidesUnfinished = ProcessInfo.processInfo.arguments.contains("--cuadrao-release-gates")
