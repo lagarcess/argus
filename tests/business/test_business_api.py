@@ -271,11 +271,19 @@ def test_workspace_lists_expense_accounts_and_document_limits(alice: Owner) -> N
         ],
         "currencies": ["DOP", "USD"],
         "assistant_available": False,
+        "chat_available": False,
         "receipt_limits": {
             "max_bytes": 10485760,
             "media_types": ["application/pdf", "image/jpeg", "image/png"],
         },
     }
+
+
+def test_workspace_says_whether_business_chat_is_on(alice: Owner, monkeypatch) -> None:  # noqa: ANN001
+    monkeypatch.setenv("ARGUS_BUSINESS_CHAT_ENABLED", "true")
+    assert alice.get("/workspace").json()["chat_available"] is True
+    monkeypatch.setenv("ARGUS_BUSINESS_CHAT_ENABLED", "false")
+    assert alice.get("/workspace").json()["chat_available"] is False
 
 
 def test_create_account_needs_a_key_and_replays(alice: Owner) -> None:

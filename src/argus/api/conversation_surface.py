@@ -7,6 +7,11 @@ Business routes. A stored conversation's side comes from its ``owner_space_id``
 through ``conversation_scope``. Personal artifacts (decisions, evidence,
 receipts, memory) never attach to a Business conversation:
 ``require_personal_conversation`` answers 404 for one.
+
+Business chat has its own flag inside the pilot. While it is off no Business
+conversation is created and nothing writes a turn into one
+(``refuse_closed_chat``, ``require_open_business_chat``); reading and deleting
+existing ones still works.
 """
 
 from __future__ import annotations
@@ -20,9 +25,21 @@ from argus.api.business import unavailable_problem
 from argus.api.business_spaces import business_spaces, space_missing_problem
 from argus.api.dependencies import current_user, problem
 from argus.api.schemas import ConversationSurface, User
-from argus.domain.business.config import business_pilot_enabled
+from argus.domain.business.config import business_chat_enabled, business_pilot_enabled
 from argus.domain.business.scope import resolve_business_scope
 from argus.domain.owner_scope import PERSONAL, OwnerScope, holds, scope_of
+
+
+def refuse_closed_chat(request: Request, surface: ConversationSurface) -> None:
+    if surface == "business" and not business_chat_enabled():
+        raise problem(
+            request,
+            status_code=404,
+            code="business_chat_unavailable",
+            title="Not Found",
+            detail="Business chat is not available.",
+            headers={"Cache-Control": "no-store"},
+        )
 
 
 def surface_scope(
@@ -92,6 +109,20 @@ def require_personal_conversation(
 
     if is_business_conversation(user_id=user.id, conversation_id=conversation_id):
         raise conversation_not_found(request)
+
+
+def require_open_business_chat(
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
+) -> None:
+    """No turn or card action on a Business conversation while Business chat
+    is off; a Personal one reaches the route unchanged. The id is read from the
+    path so each route keeps its own parameter type."""
+
+    if not business_chat_enabled() and is_business_conversation(
+        user_id=user.id, conversation_id=str(request.path_params["conversation_id"])
+    ):
+        refuse_closed_chat(request, "business")
 
 
 def _uuid_text(value: str) -> str | None:

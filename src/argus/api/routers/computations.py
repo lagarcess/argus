@@ -23,7 +23,7 @@ from argus.api.computation_contract import (
     ComputedAnswerList,
     ContinuedResultResponse,
 )
-from argus.api.conversation_surface import surface_scope
+from argus.api.conversation_surface import require_open_business_chat, surface_scope
 from argus.api.dependencies import current_user, problem, require_account_capability
 from argus.api.schemas import ConversationSurface, User
 
@@ -83,6 +83,7 @@ def compare_computed_answers_route(
 @router.post(
     "/conversations/{conversation_id}/messages/{message_id}/continue",
     response_model=ContinuedResultResponse,
+    dependencies=[Depends(require_open_business_chat)],
 )
 def continue_computed_answer_route(
     conversation_id: str,
@@ -108,6 +109,7 @@ def continue_computed_answer_route(
 @router.post(
     "/conversations/{conversation_id}/messages/{message_id}/computation/refresh",
     response_model=ComputationRefreshResponse,
+    dependencies=[Depends(require_open_business_chat)],
 )
 async def refresh_computed_answer_route(
     conversation_id: str,

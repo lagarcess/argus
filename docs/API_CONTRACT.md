@@ -3497,6 +3497,22 @@ chat turn recalls no saved memory, and `POST /memory/candidates` and
 when a source is a Business conversation, one of its messages, or evidence it
 produced.
 
+**Business chat.** `ARGUS_BUSINESS_CHAT_ENABLED` is a default-off flag nested
+inside `ARGUS_BUSINESS_PILOT_ENABLED`; Business chat stays off until Business
+turns have their own tool restrictions. While it is off (or the pilot is off),
+`POST /conversations` with `surface: business` and every turn or card action on
+a Business conversation answer 404 `business_chat_unavailable` with
+`Cache-Control: no-store`, before any model or provider work:
+`POST /chat/stream`, `POST /backtests/run` with its `conversation_id`, and the
+`continue`, `computation/refresh`, `tool-results/{id}/recompute`,
+`confirmations/{id}/peer-assets` and `confirmations/{id}/direct-edit` routes.
+The pilot flag is checked first, so creating with the pilot off still answers
+`business_unavailable`. Reading, renaming and deleting existing Business
+conversations keep working, so their owner can see and delete them. Every
+`POST` under `/conversations/{conversation_id}` must declare its side, Business
+chat or Personal only; `tests/test_business_chat_flag.py` enforces this.
+`GET /business/workspace` reports the flag as `chat_available`.
+
 ## `GET /conversations`
 
 **Query Params:**
@@ -8852,10 +8868,12 @@ by `receipt_review`. Its expense is the canonical activity that the import
 accept path recorded.
 
 - GET `/api/v1/business/workspace` returns `{accounts, currencies,
-  assistant_available: false, receipt_limits: {max_bytes, media_types}}`.
-  `accounts` lists unarchived cash, checking, savings and credit card accounts.
-  `currencies` lists their currencies. The limits come from the document
-  settings.
+  assistant_available: false, chat_available, receipt_limits: {max_bytes,
+  media_types}}`. `accounts` lists unarchived cash, checking, savings and credit
+  card accounts. `currencies` lists their currencies. The limits come from the
+  document settings. `chat_available` is true only while
+  `ARGUS_BUSINESS_CHAT_ENABLED` is on; while it is false `/biz` shows no
+  composer, no New chat and no Business Recents.
 - POST `/api/v1/business/accounts` (`Idempotency-Key` required) takes
   `{nickname, type, currency}` and answers 201, or 200 with the same account on
   an exact replay.

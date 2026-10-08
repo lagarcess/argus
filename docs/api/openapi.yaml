@@ -11038,6 +11038,8 @@ components:
           type: array
         assistant_available:
           type: boolean
+        chat_available:
+          type: boolean
         receipt_limits:
           $ref: '#/components/schemas/ReceiptLimits'
       additionalProperties: false
@@ -11046,6 +11048,7 @@ components:
       - accounts
       - currencies
       - assistant_available
+      - chat_available
       - receipt_limits
     CallbackRequest:
       properties:
