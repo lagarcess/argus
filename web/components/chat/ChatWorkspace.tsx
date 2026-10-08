@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import type { ConversationSurface } from "@/lib/conversation-surface-api";
 import type { WorkspaceStarterEntry } from "./StarterActions";
 
 /**
@@ -71,6 +72,8 @@ export type WorkspaceSearch = Readonly<{
 
 export type ChatWorkspace = Readonly<{
   id: string;
+  /** Whose chats the shell lists, creates, searches and deletes. */
+  conversationSurface: ConversationSurface;
   initialView: ChatShellView;
   profileInHeader: boolean;
   /** Whether the current panel keeps the composer at its bottom edge. */
@@ -92,4 +95,9 @@ export const ChatWorkspaceProvider = ChatWorkspaceContext.Provider;
 
 export function useChatWorkspace(): ChatWorkspace | null {
   return useContext(ChatWorkspaceContext);
+}
+
+/** Personal outside a workspace, so /chat keeps its own history. */
+export function useConversationSurface(): ConversationSurface {
+  return useContext(ChatWorkspaceContext)?.conversationSurface ?? "personal";
 }

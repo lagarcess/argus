@@ -228,6 +228,7 @@ export function BusinessWorkspaceProvider({
     const draftKeyFor = (shell: ChatShellBridge) => shell.conversationId ?? "new";
     return {
       id: "business",
+      conversationSurface: "business",
       initialView,
       profileInHeader: true,
       panelHasComposer: panel.kind === "overview",

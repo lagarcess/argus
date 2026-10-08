@@ -48,8 +48,10 @@ import {
   apiFetch,
   unauthenticatedApiFetch,
 } from "./argus-api-transport";
+import { appendSurface, surfaceQuery, type ConversationSurface } from "./conversation-surface-api";
 
 export { apiFetch, unauthenticatedApiFetch } from "./argus-api-transport";
+export type { ConversationSurface } from "./conversation-surface-api";
 
 // ─── Shared primitive types ──────────────────────────────────────────────────
 
@@ -721,11 +723,12 @@ export async function logoutFromApi() {
   );
 }
 
-export async function createConversation(language?: string | null, options: AccountRequestOptions = {}) {
-  const payload: { title: null; language?: ApiLanguage } = { title: null };
+export async function createConversation(language?: string | null, options: AccountRequestOptions = {}, surface?: ConversationSurface) {
+  const payload: { title: null; language?: ApiLanguage; surface?: "business" } = { title: null };
   if (language) {
     payload.language = normalizeApiLanguage(language);
   }
+  if (surface === "business") payload.surface = surface;
 
   return apiFetch<{ conversation: Conversation }>("/conversations", {
     ...options,
@@ -742,13 +745,15 @@ export async function listConversations(
     cursor?: string;
     archived?: boolean;
     deleted?: boolean;
+    surface?: ConversationSurface;
   } = {},
 ) {
-  const { limit = 20, cursor, archived, deleted } = params;
+  const { limit = 20, cursor, archived, deleted, surface } = params;
   const searchParams = new URLSearchParams({ limit: String(limit) });
   if (cursor) searchParams.append("cursor", cursor);
   if (archived !== undefined) searchParams.append("archived", String(archived));
   if (deleted !== undefined) searchParams.append("deleted", String(deleted));
+  appendSurface(searchParams, surface);
 
   return apiFetch<{ items: Conversation[]; next_cursor: string | null }>(
     `/conversations?${searchParams.toString()}`,
@@ -883,67 +888,18 @@ export async function deleteConversation(conversationId: string) {
   });
 }
 
-export async function deleteAllConversations() {
+export async function deleteAllConversations(surface?: ConversationSurface) {
   return apiFetch<{ success: boolean; deleted_count: number }>(
-    "/conversations",
+    `/conversations${surfaceQuery(surface)}`,
     {
       method: "DELETE",
     },
   );
 }
 
-// ─── History ──────────────────────────────────────────────────────────────────
+// ─── History and search ───────────────────────────────────────────────────────
 
-export async function listHistory(
-  params: {
-    limit?: number;
-    cursor?: string;
-    archived?: boolean;
-    deleted?: boolean;
-  } = {},
-) {
-  const { limit = 20, cursor, archived, deleted } = params;
-  const searchParams = new URLSearchParams({ limit: String(limit) });
-  if (cursor) searchParams.append("cursor", cursor);
-  if (archived !== undefined) searchParams.append("archived", String(archived));
-  if (deleted !== undefined) searchParams.append("deleted", String(deleted));
-
-  return apiFetch<{ items: HistoryItem[]; next_cursor: string | null }>(
-    `/history?${searchParams.toString()}`,
-  );
-}
-
-export async function searchGlobal(params: {
-  q: string;
-  limit?: number;
-  cursor?: string;
-  decisionState?: DecisionState | null;
-  includeLedgerGroups?: boolean;
-  conversationIds?: string[];
-}) {
-  const {
-    q,
-    limit = 20,
-    cursor,
-    decisionState,
-    includeLedgerGroups = false,
-    conversationIds,
-  } = params;
-  const searchParams = new URLSearchParams({
-    q,
-    limit: String(limit),
-  });
-  if (cursor) searchParams.append("cursor", cursor);
-  if (decisionState) searchParams.append("decision_state", decisionState);
-  if (includeLedgerGroups) {
-    searchParams.append("include_ledger_groups", "true");
-  }
-  for (const id of conversationIds ?? [])
-    searchParams.append("conversation_id", id);
-  return apiFetch<SearchResponse>(
-    `/search?${searchParams.toString()}`,
-  );
-}
+export { listHistory, searchGlobal } from "./conversation-surface-api";
 
 export async function createEvidenceDecision(
   artifactId: string,
