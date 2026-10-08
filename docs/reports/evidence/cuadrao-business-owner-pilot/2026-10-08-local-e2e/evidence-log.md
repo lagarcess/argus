@@ -2,7 +2,7 @@
 
 Label: **local services, stub extractor, replayed WhatsApp fixtures; not provider or hosted proof.**
 
-Run: 2026-10-08T01:05:11.591Z. API http://127.0.0.1:8621 (uvicorn, Supabase persistence on the local lane stack), web http://localhost:3621 (next dev). Real local Supabase Auth. Owner ids are shown as A and B.
+Run: 2026-10-08T01:37:45.141Z. API http://127.0.0.1:8621 (uvicorn, Supabase persistence on the local lane stack), web http://localhost:3621 (next dev). Real local Supabase Auth. Code: branch claude/business-pilot-flow at 568cff0cf. Owner ids are shown as A and B.
 
 Files: `business-owner-pilot-journey.mp4` is the Playwright recording of owner A's browser (34 s, 1280x800, converted from the WebM with ffmpeg). The receipts are synthetic images marked SAMPLE DATA. The stub extractor returns a fixed read per receipt digest, so no model and no provider was called. WhatsApp deliveries are signed replays of the repo fixtures, with media served from local files. No message went to Meta, and outbound replies were off.
 
@@ -46,25 +46,25 @@ HTTP:
 - `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/workspace -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
-- `browser: GET /api/v1/business/workspace -> 200`
 - `browser: GET /api/v1/business/receipts -> 200`
+- `browser: GET /api/v1/business/workspace -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
 
 ## b. Upload with AI consent
 
-Uploaded ferreteria-oct.png (31335 bytes) with the consent box checked. The stub prepared it: status review_ready, merchant "FERRETERIA LA ESQUINA SRL", amount 3450 DOP, missing ["account_id"].
+Uploaded ferreteria-oct.png (31634 bytes) with the consent box checked. The stub prepared it: status review_ready, merchant "FERRETERIA LA ESQUINA SRL", amount 3450 DOP, missing ["account_id"].
 
 HTTP:
 
 - `browser: POST /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/workspace -> 200`
-- `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/receipts -> 200`
+- `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
 - `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
-- `api: GET /business/receipts/fcb71dfd-125d-4520-8dcb-206996647aa0 -> 200`
+- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2 -> 200`
 
 DB rows (owner A):
 
@@ -107,7 +107,7 @@ HTTP:
 - `browser: GET /api/v1/business/workspace -> 200`
 - `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
-- `api: GET /business/receipts/fcb71dfd-125d-4520-8dcb-206996647aa0 -> 200`
+- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2 -> 200`
 
 DB rows (owner A):
 
@@ -153,7 +153,7 @@ HTTP:
 - PASS: overview total after reload
 ## f. Download the original
 
-Downloaded from the review screen: sha256 fbaa4ee381172ce5…, uploaded sha256 fbaa4ee381172ce5…. API source: 200, 31335 bytes.
+Downloaded from the review screen: sha256 a2bbcf7db98b33c3…, uploaded sha256 a2bbcf7db98b33c3…. API source: 200, 31634 bytes.
 
 HTTP:
 
@@ -167,7 +167,7 @@ HTTP:
 - `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
-- `api: GET /business/receipts/fcb71dfd-125d-4520-8dcb-206996647aa0/source -> 200`
+- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/source -> 200`
 
 - PASS: downloaded bytes match the upload
 ## g. WhatsApp delivery
@@ -246,7 +246,7 @@ HTTP:
 - `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
-- `api: GET /business/receipts/5df82147-2dd5-4095-9f33-1ac5a43b9c33 -> 200`
+- `api: GET /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75 -> 200`
 
 - PASS: WhatsApp receipt prepared after consent
 ## i. Replay and double-click
@@ -261,10 +261,10 @@ HTTP:
 - `browser: GET /api/v1/business/workspace -> 200`
 - `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
-- `api: GET /business/receipts/5df82147-2dd5-4095-9f33-1ac5a43b9c33 -> 200`
-- `api: POST /business/receipts/5df82147-2dd5-4095-9f33-1ac5a43b9c33/confirm -> 200`
-- `api: POST /business/receipts/5df82147-2dd5-4095-9f33-1ac5a43b9c33/confirm -> 200`
-- `api: POST /business/receipts/fcb71dfd-125d-4520-8dcb-206996647aa0/confirm -> 200`
+- `api: GET /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75 -> 200`
+- `api: POST /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/confirm -> 200`
+- `api: POST /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/confirm -> 200`
+- `api: POST /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/confirm -> 200`
 
 DB rows (owner A):
 
@@ -292,14 +292,14 @@ As owner B, A's two receipts on detail, source, review and confirm: [404,404,404
 
 HTTP:
 
-- `api: GET /business/receipts/fcb71dfd-125d-4520-8dcb-206996647aa0 -> 404`
-- `api: GET /business/receipts/fcb71dfd-125d-4520-8dcb-206996647aa0/source -> 404`
-- `api: PATCH /business/receipts/fcb71dfd-125d-4520-8dcb-206996647aa0/review -> 404`
-- `api: POST /business/receipts/fcb71dfd-125d-4520-8dcb-206996647aa0/confirm -> 404`
-- `api: GET /business/receipts/5df82147-2dd5-4095-9f33-1ac5a43b9c33 -> 404`
-- `api: GET /business/receipts/5df82147-2dd5-4095-9f33-1ac5a43b9c33/source -> 404`
-- `api: PATCH /business/receipts/5df82147-2dd5-4095-9f33-1ac5a43b9c33/review -> 404`
-- `api: POST /business/receipts/5df82147-2dd5-4095-9f33-1ac5a43b9c33/confirm -> 404`
+- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2 -> 404`
+- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/source -> 404`
+- `api: PATCH /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/review -> 404`
+- `api: POST /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/confirm -> 404`
+- `api: GET /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75 -> 404`
+- `api: GET /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/source -> 404`
+- `api: PATCH /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/review -> 404`
+- `api: POST /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/confirm -> 404`
 - `api: GET /business/expenses -> 200`
 - `api: GET /business/receipts -> 200`
 
