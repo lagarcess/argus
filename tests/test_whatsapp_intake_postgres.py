@@ -32,9 +32,7 @@ def _world(pool: ConnectionPool, users: dict[str, str]) -> cases.World:
     clock = cases.Clock()
     connections = PostgresConnectionRepository(pool)
     hub = IngestionHub(connections, box=None, sink=None, clock=clock)
-    documents = DocumentsService(
-        hub, PostgresDocumentStore(pool, source_objects()), RefusingExtractor()
-    )
+    documents = DocumentsService(hub, PostgresDocumentStore(pool, source_objects()), RefusingExtractor())
     return cases.build_world(
         documents=documents,
         store=PostgresWhatsAppStore(pool),
