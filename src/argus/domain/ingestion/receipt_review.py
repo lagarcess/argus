@@ -46,7 +46,7 @@ class ReceiptFields:
     """The proposal the person reviews.
 
     ``note`` is what ``accept`` records as the activity note: the person's
-    note, else the merchant the receipt shows. ``amount`` is the normalized
+    note, else the merchant on the first live observation of the event. ``amount`` is the normalized
     decimal string import events carry, so compare it by value.
     """
 
