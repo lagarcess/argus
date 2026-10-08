@@ -180,7 +180,7 @@ struct ConnectedCuadraoShell: View {
             case .transaction: CuadraoAddItem(action: action, perform: addMovement)
             case .plan: CuadraoAddItem(action: action, perform: addPlan)
             case .group, .invite: CuadraoAddItem(action: action) { household?.showManagement = true }
-            case .scan: nil
+            case .scanCamera, .choosePhoto, .chooseFile: nil
             }
         }
     }

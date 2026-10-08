@@ -31,6 +31,7 @@ extension FinancialLoopUITests {
         let tray = app.descendants(matching: .any)["add.tray"]
         XCTAssertTrue(tray.exists)
         XCTAssertLessThan(tray.frame.height, 3 * 70 + 40, "the tray hugs its three rows")
+        XCTAssertLessThanOrEqual(tray.frame.maxY, add.frame.minY, "the card and its nub stop above the bar")
         XCTAssertLessThan(app.buttons["add.tray.account"].frame.minY - tray.frame.minY, 40, "with no empty space above the first row")
         capture("release-surface-add-tray")
         app.buttons["add.tray.transaction"].tap()
@@ -76,6 +77,9 @@ extension FinancialLoopUITests {
         capture("release-surface-bar-collapsed")
         add.tap()
         XCTAssertTrue(app.buttons["add.tray.transaction"].waitForExistence(timeout: 5), "the collapsed + opens the tray")
+        XCTAssertGreaterThan(app.buttons["add.tray.transaction"].frame.maxX, app.frame.width - 40, "the collapsed menu stacks round buttons at the right edge")
+        XCTAssertLessThan(app.buttons["add.tray.plan"].frame.maxY, add.frame.minY, "above the +")
+        capture("release-surface-add-stack")
         add.tap()
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["add.tray.transaction"])
         XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed, "the + (now an X) closes the tray")
