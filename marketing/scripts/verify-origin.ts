@@ -101,7 +101,7 @@ async function main(): Promise<void> {
   const robots = await robotsResponse.text();
   const sitemap = await sitemapResponse.text();
   // Whole-line matches: "Disallow: /" would otherwise satisfy "Allow: /" and "Disallow: /api/".
-  const robotsLine = (line: string) => new RegExp(`^${line.replace(/[/]/g, "\\/")}$`, "m").test(robots);
+  const robotsLine = (line: string) => new RegExp(`^${line.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}$`, "m").test(robots);
   const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]).sort();
   if (publicHost) {
     record(

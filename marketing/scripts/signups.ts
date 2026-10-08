@@ -79,7 +79,7 @@ if (command === "summary") {
     }
     if (result.claimUncertain.length > 0) {
       console.error(
-        "A claim got no usable answer. These rows may be claimed but never mailed, so no rerun will mail them. Check notified_at for each digest and decide by hand:\n" +
+        "A claim got no usable answer, so each of these rows is either claimed (notified_at set, never mailed) or not claimed (notified_at empty). Check notified_at for each digest. If it is empty, the claim did not save: do NOT send by hand, a rerun will send it. If it is set, the row is claimed and unsent: send it by hand, a rerun will skip it:\n" +
           result.claimUncertain.join("\n"),
       );
     }
