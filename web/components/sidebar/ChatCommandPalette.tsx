@@ -100,6 +100,8 @@ import {
   type LayoutMode,
 } from "./command-palette/paletteLayout";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
+import { useChatWorkspace } from "@/components/chat/ChatWorkspace";
+import { moveWorkspaceFocus, useWorkspaceSearch, WorkspaceSearchResults } from "./command-palette/WorkspaceSearchResults";
 
 type ChatCommandPaletteProps = {
   onClose: () => void;
@@ -515,6 +517,8 @@ function ChatCommandPaletteSurface({
     };
   }, [decisionStateFilter, isLedgerMode, query, retryNonce]);
 
+  const workspaceSearch = useChatWorkspace()?.search ?? null;
+  const workspaceResults = useWorkspaceSearch(isLedgerMode ? null : workspaceSearch, query);
   const isFiltering = query.trim().length > 0;
   const isWaitingForIndexableQuery =
     isFiltering && !searchQueryIsIndexable(query);
@@ -1084,8 +1088,8 @@ function ChatCommandPaletteSurface({
     [activateItem, isBelowDesktop, setPreviewItem],
   );
 
-  const askText = onAsk && isFiltering && !isWaitingForIndexableQuery && !isLedgerMode && !isSearching && !readError && displayItems.length === 0 && !assetRollupDisplay ? query.trim() : null;
-  const onPaletteKeyDown = useCommandPaletteKeys({
+  const askText = onAsk && isFiltering && !isWaitingForIndexableQuery && !isLedgerMode && !isSearching && !readError && displayItems.length === 0 && !assetRollupDisplay && workspaceResults.quiet ? query.trim() : null;
+  const paletteKeys = useCommandPaletteKeys({
     askText,
     onAsk,
     cancelRename,
@@ -1106,6 +1110,7 @@ function ChatCommandPaletteSurface({
     startRename,
     usesCommandKey: shortcutLegend.usesCommandKey,
   });
+  const onPaletteKeyDown = (event: KeyboardEvent) => moveWorkspaceFocus(event, inputRef.current) || paletteKeys(event);
 
   // Owns more than Escape, so it hands over a whole keydown, and takes system
   // back with it: without an entry, back left Argus from an open search.
@@ -1380,7 +1385,7 @@ function ChatCommandPaletteSurface({
                 setSearchNextCursor(null);
               }
             }}
-            placeholder={t(
+            placeholder={workspaceSearch?.copy.placeholder ?? t(
               "command_palette.search_placeholder",
               "Search Argus...",
             )}
@@ -1465,6 +1470,7 @@ function ChatCommandPaletteSurface({
             data-command-palette-action-region
             {...shortcutLegend.actionRegionProps}
           >
+            {workspaceSearch && <WorkspaceSearchResults search={workspaceSearch} {...workspaceResults} onOpened={onClose} />}
             {isLoading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="h-5 w-5 animate-spin text-black/20 dark:text-white/20" />
@@ -1500,7 +1506,7 @@ function ChatCommandPaletteSurface({
               </div>
             ) : displayItems.length === 0 &&
               !assetRollupDisplay &&
-              !isLedgerMode ? (
+              !isLedgerMode ? (workspaceResults.quiet &&
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Search className="mb-3 h-8 w-8 text-black/10 dark:text-white/10" />
                 <p className="text-[14px] text-black/30 dark:text-white/30">
@@ -1520,14 +1526,14 @@ function ChatCommandPaletteSurface({
                 </p>
                 {isFiltering && (
                   <p className="mt-2 max-w-xs text-[12px] leading-relaxed text-black/25 dark:text-white/25">
-                    {t(
+                    {isWaitingForIndexableQuery || !workspaceSearch ? t(
                       isWaitingForIndexableQuery
                         ? "command_palette.keep_typing_detail"
                         : "command_palette.try_searching",
                       isWaitingForIndexableQuery
                         ? "Search starts with a 2-character ticker or a 3-character word."
                         : "Try a ticker, phrase, or note you remember.",
-                    )}
+                    ) : workspaceSearch.copy.noResultsHint}
                   </p>
                 )}
                 {askText && onAsk ? <div className="mt-6 w-full max-w-md px-3"><AskArgusRow text={askText} onAsk={onAsk} /></div> : null}

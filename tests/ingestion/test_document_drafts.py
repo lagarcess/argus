@@ -8,6 +8,7 @@ from argus.domain.ingestion.documents.models import ExtractionResult
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
+from argus.domain.owner_scope import PERSONAL
 from pydantic import ValidationError
 
 
@@ -72,15 +73,18 @@ async def test_capture_saves_without_extractor_and_reopens_same_source():
         content=b"%PDF-fixture",
         filename="test.pdf",
         media_type="application/pdf",
+        scope=PERSONAL,
     )
     assert result.status == "saved"
     extractor.extract.assert_not_awaited()
     reopened = DocumentsService(hub, store, extractor)
     assert reopened.get(
-        user_id="owner", connection_id=result.connection_id
+        user_id="owner", connection_id=result.connection_id, scope=PERSONAL
     ).source_available
     assert (
-        reopened.source_bytes(user_id="owner", connection_id=result.connection_id)
+        reopened.source_bytes(
+            user_id="owner", connection_id=result.connection_id, scope=PERSONAL
+        )
         == b"%PDF-fixture"
     )
 
@@ -138,18 +142,26 @@ async def test_failure_keeps_source_and_duplicate_does_not_retry(rig):
         media_type="application/pdf",
         consent=True,
     )
-    first = await service.upload(**upload)
-    await service.background_prepare(user_id=user, connection_id=first.connection_id)
+    first = await service.upload(**upload, scope=PERSONAL)
+    await service.background_prepare(
+        user_id=user, connection_id=first.connection_id, scope=PERSONAL
+    )
     assert (
-        service.get(user_id=user, connection_id=first.connection_id).status
+        service.get(
+            user_id=user, connection_id=first.connection_id, scope=PERSONAL
+        ).status
         == "needs_attention"
     )
-    duplicate = await service.upload(**upload)
-    await service.background_prepare(user_id=user, connection_id=duplicate.connection_id)
+    duplicate = await service.upload(**upload, scope=PERSONAL)
+    await service.background_prepare(
+        user_id=user, connection_id=duplicate.connection_id, scope=PERSONAL
+    )
     assert duplicate.connection_id == first.connection_id
     assert extractor.extract.await_count == 1
     assert (
-        service.source_bytes(user_id=user, connection_id=first.connection_id)
+        service.source_bytes(
+            user_id=user, connection_id=first.connection_id, scope=PERSONAL
+        )
         == upload["content"]
     )
     sink.submit.assert_not_called()
@@ -165,15 +177,29 @@ async def test_saved_without_consent_requires_explicit_preparation(rig):
         content=b"%PDF-fixture",
         filename="test.pdf",
         media_type="application/pdf",
+        scope=PERSONAL,
     )
-    await service.background_prepare(user_id="owner", connection_id=saved.connection_id)
+    await service.background_prepare(
+        user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+    )
     extractor.extract.assert_not_awaited()
     with pytest.raises(DocumentServiceError, match="consent_required"):
-        service.queue(user_id="owner", connection_id=saved.connection_id, consent=False)
-    service.queue(user_id="owner", connection_id=saved.connection_id, consent=True)
-    await service.background_prepare(user_id="owner", connection_id=saved.connection_id)
+        service.queue(
+            user_id="owner",
+            connection_id=saved.connection_id,
+            consent=False,
+            scope=PERSONAL,
+        )
+    service.queue(
+        user_id="owner", connection_id=saved.connection_id, consent=True, scope=PERSONAL
+    )
+    await service.background_prepare(
+        user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+    )
     assert (
-        service.get(user_id="owner", connection_id=saved.connection_id).status
+        service.get(
+            user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+        ).status
         == "review_ready"
     )
     assert extractor.extract.await_count == 1
@@ -190,18 +216,25 @@ async def test_interrupted_attempt_needs_attention_without_automatic_retry(rig):
         filename="test.pdf",
         media_type="application/pdf",
         consent=True,
+        scope=PERSONAL,
     )
-    draft = service.get(user_id="owner", connection_id=saved.connection_id)
+    draft = service.get(
+        user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+    )
     hub.connections.lease(
         connection_id=saved.connection_id, holder="lost-worker", now=hub.clock()
     )
     service._update("owner", draft, holder="lost-worker", status="preparing")
     old = hub.clock()
     hub.clock = lambda: old + timedelta(minutes=6)
-    reopened = service.get(user_id="owner", connection_id=saved.connection_id)
+    reopened = service.get(
+        user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+    )
     assert reopened.status == "needs_attention"
     assert reopened.error_code == "document_preparation_interrupted"
-    await service.background_prepare(user_id="owner", connection_id=saved.connection_id)
+    await service.background_prepare(
+        user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+    )
     extractor.extract.assert_not_awaited()
 
 
@@ -218,10 +251,15 @@ async def test_proposal_version_and_owner_checks_preserve_preparation(rig):
         filename="test.pdf",
         media_type="application/pdf",
         consent=True,
+        scope=PERSONAL,
     )
-    await service.background_prepare(user_id="owner", connection_id=saved.connection_id)
+    await service.background_prepare(
+        user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+    )
     before = service.store.get(user_id="owner", connection_id=saved.connection_id)
-    draft = service.get(user_id="owner", connection_id=saved.connection_id)
+    draft = service.get(
+        user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+    )
     proposal = DraftProposal(
         requested_plan="Trip",
         payer_id="p1",
@@ -236,6 +274,7 @@ async def test_proposal_version_and_owner_checks_preserve_preparation(rig):
         connection_id=draft.connection_id,
         version=draft.version,
         proposal=proposal,
+        scope=PERSONAL,
     )
     assert updated.proposal == proposal
     assert service.store.get(user_id="owner", connection_id=draft.connection_id) == before
@@ -245,9 +284,12 @@ async def test_proposal_version_and_owner_checks_preserve_preparation(rig):
             connection_id=draft.connection_id,
             version=draft.version,
             proposal=proposal,
+            scope=PERSONAL,
         )
     with pytest.raises(ConnectionNotFound):
-        service.source_bytes(user_id="other", connection_id=draft.connection_id)
+        service.source_bytes(
+            user_id="other", connection_id=draft.connection_id, scope=PERSONAL
+        )
 
 
 # This is the established mocked service fixture, not a durable database assertion.
@@ -265,23 +307,31 @@ async def test_legacy_checkpoint_reupload_retains_source_without_model(rig):
         filename="test.pdf",
         media_type="application/pdf",
         consent=True,
+        scope=PERSONAL,
     )
-    await service.background_prepare(user_id="owner", connection_id=saved.connection_id)
+    await service.background_prepare(
+        user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+    )
     original = service.store.get(user_id="owner", connection_id=saved.connection_id)
     service.store._drafts.clear()
     service.store._sources.clear()
-    legacy = service.get(user_id="owner", connection_id=saved.connection_id)
+    legacy = service.get(
+        user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+    )
     assert not legacy.source_available
     replayed = await service.upload(
         user_id="owner",
         content=b"%PDF-fixture",
         filename="test.pdf",
         media_type="application/pdf",
+        scope=PERSONAL,
     )
     assert replayed.connection_id == saved.connection_id
     assert replayed.status == "review_ready"
     assert (
-        service.source_bytes(user_id="owner", connection_id=saved.connection_id)
+        service.source_bytes(
+            user_id="owner", connection_id=saved.connection_id, scope=PERSONAL
+        )
         == b"%PDF-fixture"
     )
     assert (
@@ -414,8 +464,11 @@ async def test_stored_filenames_keep_no_control_or_format_characters(given, stor
         content=b"%PDF-fixture",
         filename=given,
         media_type="application/pdf",
+        scope=PERSONAL,
     )
-    draft = service.get(user_id="owner", connection_id=result.connection_id)
+    draft = service.get(
+        user_id="owner", connection_id=result.connection_id, scope=PERSONAL
+    )
     assert draft.filename == stored
 
 
@@ -427,13 +480,15 @@ async def test_memory_sources_are_one_object_until_disconnect():
         content=b"%PDF-fixture",
         filename="a.pdf",
         media_type="application/pdf",
+        scope=PERSONAL,
     )
     await service.upload(
         user_id="owner",
         content=b"%PDF-fixture",
         filename="a.pdf",
         media_type="application/pdf",
+        scope=PERSONAL,
     )
     assert list(store.objects.objects.values()) == [b"%PDF-fixture"]
-    hub.disconnect(user_id="owner", connection_id=first.connection_id)
+    hub.disconnect(user_id="owner", connection_id=first.connection_id, scope=PERSONAL)
     assert store.objects.objects == {}

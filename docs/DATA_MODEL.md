@@ -155,6 +155,13 @@ financial_import_observations
 financial_import_account_links
 ```
 
+Default-off, service-role only (`ARGUS_WHATSAPP_INTAKE_ENABLED`):
+```text
+whatsapp_link_codes
+whatsapp_sender_links
+whatsapp_inbound_messages
+```
+
 Optional or later:
 ```
 - assets
@@ -3338,6 +3345,35 @@ per-person advisory lock, so the five-device limit holds under concurrency. Row 
 with no policies and every client grant revoked, so no client role can read or
 write it. Proven by `tests/test_ingestion_shortcuts_postgres.py`.
 
+WhatsApp receipt intake keeps three service-role-only tables (migration
+`20261008130000_whatsapp_intake.sql`). Phone numbers, provider message ids and
+link codes are stored only as HMAC-SHA256 digests under
+`ARGUS_WHATSAPP_SENDER_KEY`. `destination_owner_id` references `auth.users`
+and is the person today; it becomes the business principal if the Business
+boundary proposal is approved.
+
+- `whatsapp_link_codes`: `destination_owner_id`, `code_digest` (unique),
+  `reply_language` (`es-419` or `en`, from the web app when the code was
+  issued), `created_at`, `expires_at`, `consumed_at`. Single use; issuing a new code or
+  revoking the link deletes the owner's unused ones.
+- `whatsapp_sender_links`: `destination_owner_id`, `wa_id_hash`, `last4`,
+  `reply_language` (copied from the redeemed code; replies use it, not
+  `profiles.language`), `status` (`active` or `revoked`), `linked_at`, `revoked_at`. Partial unique
+  indexes allow one active link per sender and one per destination; linking
+  revokes whichever active link it replaces.
+- `whatsapp_inbound_messages`: one row per provider message, unique on
+  `provider_message_key`, with `sender_hash`, `destination_owner_id`,
+  `status` (`received`, `linked`, `rejected`, `captured`, `failed`),
+  `connection_id` (the captured document's statement connection), `error_code`,
+  `claim_until`, `received_at` and `updated_at`. Linked, rejected and captured
+  are final. A received row whose claim lapsed, or a failed row, is reclaimed by
+  a redelivery of the same message. Settling requires the claim the worker
+  took, so a worker whose claim lapsed cannot overwrite a newer one. A captured row's draft is owned by
+  `financial_document_extractions`.
+
+Row level security is enabled with no policies and every client grant revoked.
+Proven by `tests/test_whatsapp_intake_postgres.py`.
+
 ## Import reconciliation
 
 `financial_document_extractions` owns the durable draft, the immutable preparation
@@ -3346,7 +3382,12 @@ existing statement connection. It is not a second ledger. `draft` stores source
 metadata, consent, preparation status, version and destination
 or split proposals. `batch` holds typed observations, receipt itemization,
 projection issues and compatible canonical candidates. It may be null before
-preparation. Legacy rows can have a batch without retained source; a duplicate
+preparation. `preparation_job` names the current preparation attempt (number,
+ID, the draft version it was dispatched for, dispatch time, when its provider
+call started, and a retry request) when `ARGUS_DOCUMENT_JOBS_ENABLED` is on.
+Only that attempt may claim the draft. The provider-call time is committed
+under the attempt's live lease before the provider can be reached. The job is
+replaced together with the draft only while no lease is live. Legacy rows can have a batch without retained source; a duplicate
 upload can attach that source without changing the frozen batch.
 
 **Retained source objects (#778, `20261008100000`).** The source file lives in

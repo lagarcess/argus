@@ -1,0 +1,461 @@
+"""Business pilot operations over the owners that already hold each fact.
+
+Documents own capture, the source and preparation; the import queue owns the
+reviewed proposal and its one recorded expense; the money service owns canonical
+activity. Every method takes a ``BusinessScope`` from ``resolve_business_scope``.
+"""
+
+from __future__ import annotations
+
+import asyncio
+from collections.abc import Callable, Mapping
+from datetime import date, datetime, time
+from typing import Any
+from zoneinfo import ZoneInfo
+
+from argus.domain import financial_search
+from argus.domain.business import ledger
+from argus.domain.business.receipts import (
+    AWAITING_REVIEW,
+    CLOSED,
+    Receipt,
+    compose,
+    review_fields,
+    updates,
+)
+from argus.domain.business.scope import BusinessScope
+from argus.domain.ingestion.documents.config import (
+    SOURCE_MEDIA_TYPES,
+    load_document_extraction_settings,
+)
+from argus.domain.ingestion.documents.service import (
+    DocumentServiceError,
+    DocumentsService,
+)
+from argus.domain.ingestion.receipt_review import RECEIPT_EVENT_STATES, receipt_ids
+from argus.domain.ingestion.reconcile.model import ReconcileError, StaleEvent
+from argus.domain.ingestion.reconcile.recording import DEFAULT_ZONE
+from argus.domain.ingestion.reconcile.service import ReconciliationService
+from argus.domain.recording.errors import IdempotencyConflict
+from argus.domain.recording.money_reads import current_activities
+from argus.domain.recording.money_schemas import ELIGIBILITY, MoneyRequest
+from argus.domain.recording.schemas import CreateFinancialAccountRequest
+
+EXPENSE_ACCOUNT_TYPES = ELIGIBILITY["expense"]
+# A review field and the import resolution it sets. The merchant is the note
+# ``accept`` records (``recorded_note``); clearing it falls back to the evidence.
+_RESOLUTION = {
+    "merchant": "note",
+    "occurred_on": "occurred_on",
+    "amount": "amount",
+    "currency": "currency",
+    "category_id": "category_id",
+    "account_id": "account_id",
+}
+# Import queue refusals renamed to the codes the Business client shows.
+_CODES = {
+    "import_unresolved": "missing_fields",
+    "import_currency_mismatch": "currency_mismatch",
+}
+
+
+class BusinessError(Exception):
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+
+class BusinessService:
+    def __init__(
+        self,
+        documents: DocumentsService,
+        imports: ReconciliationService,
+        captured: Callable[[str], frozenset[str]],
+    ) -> None:
+        self.documents, self.imports, self.captured = documents, imports, captured
+        self.accounts = imports.money.accounts
+
+    # --- Workspace -------------------------------------------------------
+    def workspace(self, scope: BusinessScope) -> dict[str, Any]:
+        accounts = self.accounts_for_expenses(scope)
+        return {
+            "accounts": accounts,
+            # An expense is saved in its account's currency; nothing converts.
+            "currencies": sorted({account["currency"] for account in accounts}),
+            "assistant_available": False,
+            "receipt_limits": {
+                "max_bytes": load_document_extraction_settings().max_bytes,
+                "media_types": list(SOURCE_MEDIA_TYPES),
+            },
+        }
+
+    def accounts_for_expenses(self, scope: BusinessScope) -> list[dict[str, Any]]:
+        return [
+            {
+                "id": stored.account.id,
+                "nickname": stored.account.nickname,
+                "type": stored.account.type,
+                "currency": stored.account.currency,
+            }
+            for stored in self.accounts.list_accounts(
+                user_id=scope.person_id, scope=scope.owner
+            )
+            if stored.account.type in EXPENSE_ACCOUNT_TYPES
+            and not stored.account.archived
+        ]
+
+    def create_account(
+        self, scope: BusinessScope, request: CreateFinancialAccountRequest, key: str
+    ) -> tuple[dict[str, Any], bool]:
+        result = self.accounts.create(
+            user_id=scope.person_id,
+            idempotency_key=key,
+            request=request,
+            scope=scope.owner,
+        )
+        account = result.stored.account
+        return (
+            {
+                "id": account.id,
+                "nickname": account.nickname,
+                "type": account.type,
+                "currency": account.currency,
+            },
+            result.created,
+        )
+
+    # --- Receipts --------------------------------------------------------
+    def receipts(self, scope: BusinessScope) -> list[Receipt]:
+        person = scope.person_id
+        events = self.imports.list(
+            user_id=person, states=RECEIPT_EVENT_STATES, scope=scope.owner
+        )
+        whatsapp = self.captured(person)
+        found = []
+        for connection in self.documents.hub.connections.list(
+            user_id=person, scope=scope.owner
+        ):
+            if connection.source != "statement" or connection.status == "disconnected":
+                continue
+            try:
+                found.append(self._compose(scope, connection.id, events, whatsapp))
+            except DocumentServiceError as error:
+                if error.code != "document_source_unavailable":
+                    raise
+        return sorted(found, key=lambda item: item.draft.created_at, reverse=True)
+
+    def receipt(self, scope: BusinessScope, receipt_id: str) -> Receipt:
+        events = self.imports.list(
+            user_id=scope.person_id, states=RECEIPT_EVENT_STATES, scope=scope.owner
+        )
+        return self._compose(scope, receipt_id, events, self.captured(scope.person_id))
+
+    def _compose(
+        self,
+        scope: BusinessScope,
+        receipt_id: str,
+        events: list[dict[str, Any]],
+        whatsapp: frozenset[str],
+    ) -> Receipt:
+        person = scope.person_id
+        return compose(
+            self.documents.get(
+                user_id=person, connection_id=receipt_id, scope=scope.owner
+            ),
+            self.documents.store.get(user_id=person, connection_id=receipt_id),
+            events,
+            "whatsapp" if receipt_id in whatsapp else "web",
+        )
+
+    async def upload(
+        self,
+        scope: BusinessScope,
+        *,
+        content: bytes,
+        filename: str,
+        media_type: str,
+        consent: bool,
+    ) -> Receipt:
+        outcome = await self.documents.upload(
+            user_id=scope.person_id,
+            content=content,
+            filename=filename,
+            media_type=media_type,
+            consent=consent,
+            scope=scope.owner,
+        )
+        return self.receipt(scope, outcome.connection_id)
+
+    def queue(self, scope: BusinessScope, receipt_id: str) -> None:
+        """The owner chose AI preparation for a saved receipt."""
+
+        self.documents.queue(
+            user_id=scope.person_id,
+            connection_id=receipt_id,
+            consent=True,
+            scope=scope.owner,
+        )
+
+    def source(self, scope: BusinessScope, receipt_id: str) -> tuple[str, bytes]:
+        draft = self.documents.get(
+            user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
+        )
+        content = self.documents.source_bytes(
+            user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
+        )
+        return draft.media_type, content
+
+    async def start_entry(
+        self,
+        scope: BusinessScope,
+        receipt_id: str,
+        version: int,
+        account_id: str | None = None,
+    ) -> int:
+        """The version a review applies to. For a receipt with no single
+        purchase, first record the owner's one purchase, then that version.
+
+        A repeat delivers the same purchase, so a replay, a second tab or a
+        restart enters one. ``account_id``, the account the review will set, is
+        refused before anything is entered when it is outside the space.
+        """
+
+        current = await asyncio.to_thread(self.receipt, scope, receipt_id)
+        if current.enterable:
+            if version != current.version:
+                raise StaleEvent()
+            if account_id and account_id not in self._account_ids(scope):
+                raise ReconcileError(
+                    "financial_account_not_found", "Choose your own account."
+                )
+            await self.documents.enter(
+                user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
+            )
+            current = await asyncio.to_thread(self.receipt, scope, receipt_id)
+            version = current.version
+        await asyncio.to_thread(self._set_aside, scope, current)
+        return version
+
+    def _account_ids(self, scope: BusinessScope) -> set[str]:
+        return {
+            stored.account.id
+            for stored in self.accounts.list_accounts(
+                user_id=scope.person_id, scope=scope.owner
+            )
+        }
+
+    def _set_aside(self, scope: BusinessScope, receipt: Receipt) -> None:
+        """Beside the owner's entry, dismiss every open purchase a read found,
+        kept as history, so only the owner's can become the expense. Runs on
+        each review and confirm, so an entry interrupted before this finishes
+        on the next one."""
+
+        if not receipt.review.owner_entry:
+            return
+        person, owner = scope.person_id, scope.owner
+        for read in receipt.review.read_purchases:
+            state, version = read.state, read.version
+            for _ in range(3):
+                if state != "open":
+                    break
+                try:
+                    self.imports.dismiss(
+                        user_id=person,
+                        event_id=read.event_id,
+                        version=version,
+                        scope=owner,
+                    )
+                    break
+                except StaleEvent:
+                    # A replayed delivery or another entry changed it first.
+                    seen = self.imports.detail(
+                        user_id=person, event_id=read.event_id, scope=owner
+                    )
+                    state, version = seen["state"], seen["version"]
+            else:
+                raise StaleEvent()
+
+    def review(
+        self,
+        scope: BusinessScope,
+        receipt_id: str,
+        version: int,
+        fields: Mapping[str, str | None],
+    ) -> Receipt:
+        """Corrections become the import's resolution; the evidence is untouched."""
+
+        event_id = _event_id(self.receipt(scope, receipt_id))
+        try:
+            self.imports.resolve(
+                user_id=scope.person_id,
+                event_id=event_id,
+                version=version,
+                changes={_RESOLUTION[name]: value for name, value in fields.items()},
+                scope=scope.owner,
+            )
+        except ReconcileError as error:
+            raise _renamed(error) from None
+        return self.receipt(scope, receipt_id)
+
+    def confirm(
+        self, scope: BusinessScope, receipt_id: str, version: int, key: str
+    ) -> Receipt:
+        """The import accept path, as one expense for the receipt's total.
+
+        A replay, a second key or a concurrent confirm records one expense.
+        """
+
+        current = self.receipt(scope, receipt_id)
+        self._set_aside(scope, current)
+        if current.status == "confirmed":
+            return current
+        if current.version == version and current.missing_fields:
+            raise BusinessError("missing_fields")
+        try:
+            self.imports.accept_reviewed(
+                user_id=scope.person_id,
+                event_id=_event_id(current),
+                version=version,
+                idempotency_key=key,
+                kind="expense",
+                scope=scope.owner,
+            )
+        except ReconcileError as error:
+            if error.code != "import_already_accepted":
+                raise _renamed(error) from None
+        return self.receipt(scope, receipt_id)
+
+    # --- Expenses ---------------------------------------------------------
+    def expenses(
+        self, scope: BusinessScope, start: date, end: date
+    ) -> list[dict[str, Any]]:
+        return self._expenses(scope, self._activities(scope), start, end)
+
+    def _expenses(
+        self,
+        scope: BusinessScope,
+        activities: list[dict[str, Any]],
+        start: date,
+        end: date,
+    ) -> list[dict[str, Any]]:
+        ids = [item["activity_id"] for item in ledger.expense_activities(activities)]
+        with self.imports.store.transaction(scope.person_id, scope=scope.owner) as tx:
+            receipt_of = receipt_ids(tx, self.documents.store, scope.person_id, ids)
+        return [
+            _wire(item) for item in ledger.expenses(activities, receipt_of, start, end)
+        ]
+
+    def search(self, scope: BusinessScope, q: str, limit: int) -> dict[str, Any]:
+        """Expenses and accounts through the canonical financial search, plus
+        receipts matched by the same rule on merchant, filename and amount.
+
+        A receipt whose expense is already a hit is left out: the expense opens it.
+        """
+
+        query = financial_search.query_text(q)
+        found = financial_search.hits(
+            self.accounts, scope.person_id, scope=scope.owner, query=query
+        )
+        activities = [
+            hit.activity.model_dump()
+            for hit in found
+            if isinstance(hit, financial_search.ActivityHit)
+        ]
+        expenses = self._expenses(scope, activities, date.min, date.max)[:limit]
+        listed = {expense["id"] for expense in expenses}
+        receipts = [
+            receipt.summary()
+            for receipt in self.receipts(scope)
+            if receipt.review.expense_id not in listed
+            and financial_search.matches(query, _receipt_text(receipt))
+        ]
+        accounts = [
+            {
+                "id": hit.account.id,
+                "nickname": hit.account.nickname,
+                "type": hit.account.type,
+                "currency": hit.account.currency,
+            }
+            for hit in found
+            if isinstance(hit, financial_search.AccountHit)
+        ]
+        return {
+            "expenses": expenses,
+            "receipts": receipts[:limit],
+            "accounts": accounts[:limit],
+        }
+
+    def record_expense(
+        self, scope: BusinessScope, entered: Mapping[str, Any], key: str
+    ) -> dict[str, Any]:
+        """A manual expense through the canonical money service."""
+
+        request = MoneyRequest(
+            kind="expense",
+            account_id=entered["account_id"],
+            amount=entered["amount"],
+            occurred_at=datetime.combine(
+                entered["occurred_on"], time(0, 0), tzinfo=ZoneInfo(DEFAULT_ZONE)
+            ),
+            time_zone=DEFAULT_ZONE,
+            note=entered["merchant"],
+            category_id=entered["category_id"],
+        )
+        activity = self.imports.money.write_entered(
+            user_id=scope.person_id,
+            request=request,
+            idempotency_key=key,
+            scope=scope.owner,
+        )["activity"]
+        recorded = ledger.expenses([activity], {}, date.min, date.max)
+        if len(recorded) != 1:
+            # This key recorded something that is not an expense.
+            raise IdempotencyConflict()
+        return _wire(recorded[0])
+
+    def overview(self, scope: BusinessScope, start: date, end: date) -> dict[str, Any]:
+        receipts = self.receipts(scope)
+        activities = self._activities(scope)
+        recorded = ledger.recorded_at(activities)
+        return {
+            "from": start,
+            "to": end,
+            "totals": ledger.totals(ledger.expenses(activities, {}, start, end)),
+            "awaiting_review": sum(r.status in AWAITING_REVIEW for r in receipts),
+            "needs_attention": sum(r.status == "needs_attention" for r in receipts),
+            "last_received_at": max((r.draft.created_at for r in receipts), default=None),
+            "last_confirmed_at": max(recorded.values(), default=None),
+        }
+
+    def updates(self, scope: BusinessScope) -> list[dict[str, Any]]:
+        return updates(self.receipts(scope), ledger.recorded_at(self._activities(scope)))
+
+    def inbox(self, scope: BusinessScope) -> list[Receipt]:
+        return [r for r in self.receipts(scope) if r.status not in CLOSED]
+
+    def _activities(self, scope: BusinessScope) -> list[dict[str, Any]]:
+        return current_activities(
+            self.accounts.list_accounts(user_id=scope.person_id, scope=scope.owner)
+        )
+
+
+def _receipt_text(receipt: Receipt) -> str:
+    fields = review_fields(receipt.review)
+    return " ".join(
+        filter(None, [fields["merchant"], receipt.draft.filename, fields["amount"]])
+    )
+
+
+def _wire(expense: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in expense.items() if key != "amount_minor"}
+
+
+def _event_id(receipt: Receipt) -> str:
+    if receipt.review.event_id is None:
+        raise BusinessError("receipt_not_prepared")
+    return receipt.review.event_id
+
+
+def _renamed(error: ReconcileError) -> Exception:
+    code = _CODES.get(error.code)
+    return BusinessError(code) if code else error

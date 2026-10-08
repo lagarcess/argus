@@ -25,6 +25,7 @@ from argus.domain.ingestion.connections_postgres import PostgresConnectionReposi
 from argus.domain.ingestion.documents.models import DocumentDraft
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 from argus.domain.ingestion.secrets import SecretBox
+from argus.domain.owner_scope import PERSONAL
 from loguru import logger
 from psycopg_pool import ConnectionPool
 
@@ -63,6 +64,7 @@ def _other_credential(box: SecretBox, user_id: str) -> str:
             label="Gmail",
             now=NOW,
             secret=b"x",
+            scope=PERSONAL,
         )
     finally:
         repo._pool.close()  # noqa: SLF001
@@ -455,7 +457,12 @@ def test_document_sources_are_erased_before_the_account_delete(lane, world):  # 
         objects.put(path, b"%PDF-fixture", "application/pdf")
     with ConnectionPool(DSN, min_size=0, max_size=2) as pool:
         statement = PostgresConnectionRepository(pool).create(
-            user_id=a, source="statement", external_ref=key(), label=None, now=NOW
+            user_id=a,
+            source="statement",
+            external_ref=key(),
+            label=None,
+            now=NOW,
+            scope=PERSONAL,
         )
         draft = DocumentDraft(
             connection_id=statement.id,

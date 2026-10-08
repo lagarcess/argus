@@ -28,7 +28,7 @@ _warned_flags: set[str] = set()
 _warned_invalid = False
 
 
-def _enabled_flag(value: object) -> bool:
+def enabled_flag(value: object) -> bool:
     if isinstance(value, bool):
         return value
     if value is None:
@@ -40,7 +40,7 @@ class DocumentExtractionSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="ARGUS_DOCUMENT_EXTRACTION_", extra="ignore"
     )
-    enabled: Annotated[bool, BeforeValidator(_enabled_flag)] = False
+    enabled: Annotated[bool, BeforeValidator(enabled_flag)] = False
     max_bytes: int = Field(default=SOURCE_MAX_BYTES, ge=1, le=SOURCE_MAX_BYTES)
     max_pages: int = Field(default=_MAX_PAGES, ge=1, le=_MAX_PAGES)
 
@@ -83,3 +83,27 @@ def load_document_extraction_settings() -> DocumentExtractionSettings:
                 failure_mode="ValidationError",
             )
         return _disabled_document_extraction_settings()
+
+
+class DocumentJobSettings(BaseSettings):
+    """Durable preparation jobs (#823). Off keeps FastAPI background tasks."""
+
+    model_config = SettingsConfigDict(env_prefix="ARGUS_DOCUMENT_JOBS_", extra="ignore")
+    enabled: Annotated[bool, BeforeValidator(enabled_flag)] = False
+    workflow_task: str = ""
+    sweep_seconds: float = Field(default=30.0, gt=0, le=3600)
+
+
+def load_document_job_settings() -> DocumentJobSettings:
+    """Read job settings, or jobs off when they cannot be read."""
+
+    try:
+        return DocumentJobSettings()
+    except ValidationError:
+        logger.warning(
+            "Document job settings are invalid; preparation stays on background tasks",
+            failure_mode="ValidationError",
+        )
+        return DocumentJobSettings.model_construct(
+            enabled=False, workflow_task="", sweep_seconds=30.0
+        )

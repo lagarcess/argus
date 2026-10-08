@@ -19,6 +19,7 @@ from argus.api.routers.financial_connections_schemas import (
     FinancialConnectionListResponse,
     connection_response,
 )
+from argus.domain.owner_scope import PERSONAL
 
 router = APIRouter(prefix="/financial-connections", tags=["financial-connections"])
 
@@ -27,7 +28,7 @@ router = APIRouter(prefix="/financial-connections", tags=["financial-connections
 def list_financial_connections(
     context: IngestionContext = Depends(require_ingestion_context),  # noqa: B008
 ) -> FinancialConnectionListResponse:
-    rows = context.hub.list(user_id=context.user_id)
+    rows = context.hub.list(user_id=context.user_id, scope=PERSONAL)
     return FinancialConnectionListResponse(items=[connection_response(r) for r in rows])
 
 
@@ -41,7 +42,7 @@ def disconnect_financial_connection(
 
     try:
         outcome = context.hub.disconnect(
-            user_id=context.user_id, connection_id=connection_id
+            user_id=context.user_id, connection_id=connection_id, scope=PERSONAL
         )
     except Exception as error:
         raise connection_problem(request, error) from None

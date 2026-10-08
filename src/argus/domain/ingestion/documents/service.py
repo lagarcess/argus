@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import unicodedata
 import uuid
@@ -15,17 +16,52 @@ from argus.domain.ingestion.connections import (
     DuplicateConnection,
     SourceConnection,
 )
-from argus.domain.ingestion.contract import SourceKind
+from argus.domain.ingestion.contract import ImportCandidate, SourceKind, SourceRef
 from argus.domain.ingestion.documents.models import (
     DocumentDraft,
     DraftProposal,
     DraftStatus,
     ExtractionBatch,
+    ReceiptDetails,
 )
 from argus.domain.ingestion.documents.objects import SourceStorageUnavailable
 from argus.domain.ingestion.documents.preparation import validate_source
 from argus.domain.ingestion.documents.store import DocumentStore
 from argus.domain.ingestion.hub import IngestionHub
+from argus.domain.owner_scope import OwnerScope, space_id
+
+# Marks a batch the owner entered by hand: one purchase, nothing read.
+ENTERED_BY_OWNER = {"entered_by": "owner"}
+
+
+def entered_by_owner(batch: ExtractionBatch | None) -> bool:
+    return batch is not None and batch.metadata.get("entered_by") == "owner"
+
+
+def owner_entry_id(sha256: str) -> str:
+    """The one purchase an owner enters by hand for a document, before or
+    after it was read, so a repeat delivers the same observation."""
+
+    return f"{sha256}:entered-by-owner"
+
+
+def owner_purchase(draft: DocumentDraft, now: datetime) -> ImportCandidate:
+    return ImportCandidate(
+        source=SourceRef(
+            source="statement",
+            connection_id=draft.connection_id,
+            external_id=owner_entry_id(draft.sha256),
+            observed_at=now,
+        ),
+        evidence="transaction",
+        direction="outflow",
+        kind_hint="expense",
+        uncertain=frozenset({"amount", "currency", "occurred_on"}),
+    )
+
+
+def lease_live(connection: SourceConnection, now: datetime) -> bool:
+    return connection.lease_until is not None and connection.lease_until > now
 
 
 class Extractor(Protocol):
@@ -54,6 +90,18 @@ def stored_filename(filename: str) -> str:
     return kept[:80] or "document"
 
 
+def document_ref(user_id: str, scope: OwnerScope, digest: str) -> str:
+    """The connection reference for one file in one scope.
+
+    References are globally unique, so the same bytes uploaded in Personal and
+    in Business must differ. The Personal form is the original one, unchanged.
+    """
+
+    space = space_id(scope)
+    owner = user_id if space is None else f"{user_id}:{space}"
+    return hashlib.sha256(f"{owner}:{digest}".encode()).hexdigest()
+
+
 @dataclass(frozen=True)
 class DocumentOutcome:
     connection_id: str
@@ -66,9 +114,17 @@ class DocumentsService:
     source: SourceKind = "statement"
 
     def __init__(
-        self, hub: IngestionHub, store: DocumentStore, extractor: Extractor
+        self,
+        hub: IngestionHub,
+        store: DocumentStore,
+        extractor: Extractor,
+        *,
+        jobs_recover_interruptions: bool = False,
     ) -> None:
         self.hub, self.store, self.extractor = hub, store, extractor
+        # With preparation jobs on, the job reconciler decides what an expired
+        # attempt becomes; a read never settles it.
+        self.jobs_recover_interruptions = jobs_recover_interruptions
         hub.register(self)
 
     def revoke(self, connection: SourceConnection, credential: str | None) -> None:
@@ -77,16 +133,22 @@ class DocumentsService:
     def forget(self, connection: SourceConnection) -> None:
         self.store.forget(user_id=connection.user_id, connection_id=connection.id)
 
-    def _connection(self, user_id: str, connection_id: str) -> SourceConnection:
-        row = self.hub.connections.get(user_id=user_id, connection_id=connection_id)
+    def _connection(
+        self, user_id: str, connection_id: str, *, scope: OwnerScope
+    ) -> SourceConnection:
+        row = self.hub.connections.get(
+            user_id=user_id, connection_id=connection_id, scope=scope
+        )
         if row.source != self.source:
             raise ConnectionNotFound()
         if row.status not in LIVE:
             raise DocumentServiceError("document_disconnected")
         return row
 
-    def get(self, *, user_id: str, connection_id: str) -> DocumentDraft:
-        connection = self._connection(user_id, connection_id)
+    def get(
+        self, *, user_id: str, connection_id: str, scope: OwnerScope
+    ) -> DocumentDraft:
+        connection = self._connection(user_id, connection_id, scope=scope)
         draft = self.store.draft(user_id=user_id, connection_id=connection_id)
         if draft is None:
             if self.store.get(user_id=user_id, connection_id=connection_id) is None:
@@ -102,8 +164,10 @@ class DocumentsService:
                 created_at=connection.created_at,
                 updated_at=connection.updated_at,
             )
-        if draft.status == "preparing" and (
-            connection.lease_until is None or connection.lease_until <= self.hub.clock()
+        if (
+            draft.status == "preparing"
+            and not self.jobs_recover_interruptions
+            and not lease_live(connection, self.hub.clock())
         ):
             draft = self._update(
                 user_id,
@@ -124,11 +188,13 @@ class DocumentsService:
             raise DocumentServiceError("document_source_unavailable")
         return content
 
-    def source_bytes(self, *, user_id: str, connection_id: str) -> bytes:
+    def source_bytes(
+        self, *, user_id: str, connection_id: str, scope: OwnerScope
+    ) -> bytes:
         """A draft whose stored object is gone says so (``source_available``
         false) instead of promising a source that cannot be read."""
 
-        self._connection(user_id, connection_id)
+        self._connection(user_id, connection_id, scope=scope)
         try:
             return self._read_source(user_id, connection_id)
         except DocumentServiceError as error:
@@ -151,25 +217,39 @@ class DocumentsService:
         draft: DocumentDraft,
         *,
         holder: str | None = None,
+        claim: str | None = None,
         **changes: object,
     ) -> DocumentDraft:
-        updated = draft.model_copy(
+        updated = self.revise(draft, **changes)
+        if not self.store.update(
+            user_id=user_id,
+            draft=updated,
+            expected_version=draft.version,
+            holder=holder,
+            claim=claim,
+        ):
+            raise DocumentServiceError("document_version_conflict", retryable=True)
+        return updated
+
+    def revise(self, draft: DocumentDraft, **changes: object) -> DocumentDraft:
+        return draft.model_copy(
             update={
                 **changes,
                 "version": draft.version + 1,
                 "updated_at": self.hub.clock(),
             }
         )
-        if not self.store.update(
-            user_id=user_id, draft=updated, expected_version=draft.version, holder=holder
-        ):
-            raise DocumentServiceError("document_version_conflict", retryable=True)
-        return updated
 
     def update_proposal(
-        self, *, user_id: str, connection_id: str, version: int, proposal: DraftProposal
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        version: int,
+        proposal: DraftProposal,
+        scope: OwnerScope,
     ) -> DocumentDraft:
-        draft = self.get(user_id=user_id, connection_id=connection_id)
+        draft = self.get(user_id=user_id, connection_id=connection_id, scope=scope)
         if version != draft.version or draft.status == "preparing":
             raise DocumentServiceError("document_version_conflict", retryable=True)
         return self._update(user_id, draft, proposal=proposal)
@@ -183,10 +263,11 @@ class DocumentsService:
         media_type: str,
         consent: bool = False,
         proposal: DraftProposal | None = None,
+        scope: OwnerScope,
     ) -> DocumentOutcome:
         validate_source(content, media_type)
         digest = hashlib.sha256(content).hexdigest()
-        external_ref = hashlib.sha256(f"{user_id}:{digest}".encode()).hexdigest()
+        external_ref = document_ref(user_id, scope, digest)
         replayed = False
         try:
             connection = self.hub.connections.create(
@@ -195,11 +276,12 @@ class DocumentsService:
                 external_ref=external_ref,
                 label="Document",
                 now=self.hub.clock(),
+                scope=scope,
             )
         except DuplicateConnection as error:
             if error.elsewhere:
                 raise DocumentServiceError("document_unavailable") from None
-            connection = self._connection(user_id, error.existing_id)
+            connection = self._connection(user_id, error.existing_id, scope=scope)
             replayed = True
         draft = DocumentDraft(
             connection_id=connection.id,
@@ -222,25 +304,28 @@ class DocumentsService:
         if not captured:
             raise DocumentServiceError("document_disconnected")
         return self.outcome(
-            user_id=user_id, connection_id=connection.id, replayed=replayed
+            user_id=user_id, connection_id=connection.id, replayed=replayed, scope=scope
         )
 
     def outcome(
-        self, *, user_id: str, connection_id: str, replayed: bool
+        self, *, user_id: str, connection_id: str, replayed: bool, scope: OwnerScope
     ) -> DocumentOutcome:
-        draft = self.get(user_id=user_id, connection_id=connection_id)
+        draft = self.get(user_id=user_id, connection_id=connection_id, scope=scope)
         batch = self.store.get(user_id=user_id, connection_id=connection_id)
         return DocumentOutcome(
             connection_id, replayed, len(batch.candidates) if batch else 0, draft.status
         )
 
     def queue(
-        self, *, user_id: str, connection_id: str, consent: bool
+        self, *, user_id: str, connection_id: str, consent: bool, scope: OwnerScope
     ) -> DocumentOutcome:
-        draft = self.get(user_id=user_id, connection_id=connection_id)
+        draft = self.get(user_id=user_id, connection_id=connection_id, scope=scope)
         if draft.status == "preparing":
             raise DocumentServiceError("document_busy", retryable=True)
         batch = self.store.get(user_id=user_id, connection_id=connection_id)
+        if entered_by_owner(batch):
+            # Preparing now would read a second purchase from the same receipt.
+            raise DocumentServiceError("document_entered_by_owner")
         if batch is None:
             if not consent:
                 raise DocumentServiceError("document_extraction_consent_required")
@@ -248,22 +333,93 @@ class DocumentsService:
                 raise DocumentServiceError("document_source_unavailable")
             self._update(user_id, draft, status="queued", consent=True, error_code=None)
         return self.outcome(
-            user_id=user_id, connection_id=connection_id, replayed=batch is not None
+            user_id=user_id,
+            connection_id=connection_id,
+            replayed=batch is not None,
+            scope=scope,
         )
 
-    async def background_prepare(self, *, user_id: str, connection_id: str) -> None:
+    async def enter(
+        self, *, user_id: str, connection_id: str, scope: OwnerScope
+    ) -> DocumentOutcome:
+        """The owner records this document's one purchase by hand.
+
+        Unread, it saves one purchase observation with nothing read, marked
+        entered by the owner, and delivers it to review like extracted
+        candidates. Read, the batch stays as read and the same observation is
+        delivered beside it; the caller decides that the read settled no
+        purchase. The owner's values then become that import's resolution. No
+        extractor is called. Repeating it delivers the same observation again,
+        so an interrupted entry is finished. A queued or preparing document is
+        refused.
+        """
+
+        draft = self.get(user_id=user_id, connection_id=connection_id, scope=scope)
+        if draft.status in ("queued", "preparing"):
+            raise DocumentServiceError("document_busy", retryable=True)
+        batch = self.store.get(user_id=user_id, connection_id=connection_id)
+        if batch is not None and not entered_by_owner(batch):
+            purchase = owner_purchase(draft, self.hub.clock())
+            self._deliver(user_id, connection_id, (purchase,), scope)
+            return self.outcome(
+                user_id=user_id, connection_id=connection_id, replayed=False, scope=scope
+            )
+        if batch is None:
+            holder = str(uuid.uuid4())
+            repo = self.hub.connections
+            if not repo.lease(
+                connection_id=connection_id, holder=holder, now=self.hub.clock()
+            ):
+                raise DocumentServiceError("document_busy", retryable=True)
+            try:
+                entered = ExtractionBatch(
+                    candidates=(owner_purchase(draft, self.hub.clock()),),
+                    receipt=ReceiptDetails(),
+                    metadata=dict(ENTERED_BY_OWNER),
+                )
+                if not self.store.save(
+                    user_id=user_id,
+                    connection_id=connection_id,
+                    holder=holder,
+                    now=self.hub.clock(),
+                    batch=entered,
+                ):
+                    raise DocumentServiceError("document_lease_lost", retryable=True)
+            finally:
+                repo.release(connection_id=connection_id, holder=holder)
+            # A read saved before the lease was taken is kept by ``save``.
+            if not entered_by_owner(
+                self.store.get(user_id=user_id, connection_id=connection_id)
+            ):
+                raise DocumentServiceError("document_already_prepared")
+        return await self.resume(
+            user_id=user_id, connection_id=connection_id, scope=scope
+        )
+
+    async def background_prepare(
+        self, *, user_id: str, connection_id: str, scope: OwnerScope
+    ) -> None:
         try:
             await self.resume(
-                user_id=user_id, connection_id=connection_id, queued_only=True
+                user_id=user_id,
+                connection_id=connection_id,
+                queued_only=True,
+                scope=scope,
             )
         except Exception:
             return
 
     async def resume(
-        self, *, user_id: str, connection_id: str, queued_only: bool = False
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        queued_only: bool = False,
+        attempt_id: str | None = None,
+        scope: OwnerScope,
     ) -> DocumentOutcome:
-        connection = self._connection(user_id, connection_id)
-        draft = self.get(user_id=user_id, connection_id=connection_id)
+        connection = self._connection(user_id, connection_id, scope=scope)
+        draft = self.get(user_id=user_id, connection_id=connection_id, scope=scope)
         batch = self.store.get(user_id=user_id, connection_id=connection_id)
         if batch is None and (
             not draft.consent or (queued_only and draft.status != "queued")
@@ -277,14 +433,43 @@ class DocumentsService:
             connection_id=connection_id, holder=holder, now=self.hub.clock()
         ):
             raise DocumentServiceError("document_busy", retryable=True)
+        if attempt_id is not None:
+            # Checked under the lease: a reconciler cannot supersede a held lease.
+            job = self.store.job(user_id=user_id, connection_id=connection_id)
+            if (
+                job is None
+                or job.attempt_id != attempt_id
+                or job.draft_version != draft.version
+            ):
+                repo.release(connection_id=connection_id, holder=holder)
+                raise DocumentServiceError("document_attempt_superseded")
         replayed = batch is not None
         try:
             if batch is None:
+                # The claim names the attempt; a flag-off writer names none.
                 draft = self._update(
-                    user_id, draft, holder=holder, status="preparing", error_code=None
+                    user_id,
+                    draft,
+                    holder=holder,
+                    claim=attempt_id,
+                    status="preparing",
+                    error_code=None,
                 )
+                content = await asyncio.to_thread(
+                    self._read_source, user_id, connection_id
+                )
+                # Committed before the provider can be reached: without it an
+                # attempt provably never called the provider and may be retried.
+                if attempt_id is not None and not self.store.mark_provider_call(
+                    user_id=user_id,
+                    connection_id=connection_id,
+                    attempt_id=attempt_id,
+                    holder=holder,
+                    now=self.hub.clock(),
+                ):
+                    raise DocumentServiceError("document_lease_lost", retryable=True)
                 batch = await self.extractor.extract(
-                    content=self._read_source(user_id, connection_id),
+                    content=content,
                     filename=draft.filename,
                     media_type=draft.media_type,
                     connection_id=connection_id,
@@ -305,20 +490,7 @@ class DocumentsService:
             ):
                 raise DocumentServiceError("document_lease_lost", retryable=True)
             if batch.candidates:
-                if self.hub.sink is None:
-                    raise DocumentServiceError("document_delivery_failed", retryable=True)
-                try:
-                    result = self.hub.sink.submit(
-                        user_id=user_id,
-                        connection_id=connection_id,
-                        candidates=batch.candidates,
-                    )
-                except Exception:
-                    raise DocumentServiceError(
-                        "document_delivery_failed", retryable=True
-                    ) from None
-                if result.ignored:
-                    raise DocumentServiceError("document_disconnected")
+                self._deliver(user_id, connection_id, batch.candidates, scope)
             if draft.source_available:
                 draft = self._update(
                     user_id,
@@ -368,6 +540,29 @@ class DocumentsService:
             raise
         finally:
             repo.release(connection_id=connection_id, holder=holder)
+
+    def _deliver(
+        self,
+        user_id: str,
+        connection_id: str,
+        candidates: tuple[ImportCandidate, ...],
+        scope: OwnerScope,
+    ) -> None:
+        if self.hub.sink is None:
+            raise DocumentServiceError("document_delivery_failed", retryable=True)
+        try:
+            result = self.hub.sink.submit(
+                user_id=user_id,
+                connection_id=connection_id,
+                candidates=candidates,
+                scope=scope,
+            )
+        except Exception:
+            raise DocumentServiceError(
+                "document_delivery_failed", retryable=True
+            ) from None
+        if result.ignored:
+            raise DocumentServiceError("document_disconnected")
 
     @staticmethod
     def _validate(batch: ExtractionBatch, connection_id: str) -> None:

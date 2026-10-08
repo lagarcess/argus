@@ -24,6 +24,7 @@ from argus.domain.account_deletion.service import (
 from argus.domain.household.planning import SharedPlanningService
 from argus.domain.household.schemas import CreateHouseholdRequest
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
+from argus.domain.owner_scope import PERSONAL
 from argus.observability.analytics_deletion import RecordingAnalyticsDeletion
 from argus.observability.product_events import actor_hash_for_user
 from psycopg_pool import ConnectionPool
@@ -295,6 +296,7 @@ def _extras(lane, world):  # noqa: ANN001, F811
         label="Gmail",
         now=NOW,
         secret=b"g",
+        scope=PERSONAL,
     )
     return dict(solo=solo, pair=pair, departed=departed, h3=h3, gmail=gmail.id)
 

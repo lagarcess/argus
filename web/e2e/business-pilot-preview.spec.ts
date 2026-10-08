@@ -160,6 +160,48 @@ test.describe("Business preview", () => {
     await expect(page.getByTestId("workspace-panel-region")).toContainText("Ferretería La Esquina");
   });
 
+  test("an unknown AI outcome offers a consented retry beside entry by hand", async ({ page }) => {
+    await openPreview(page, `${PREVIEW}?receipt=rcpt-unknown`);
+    const attention = page.getByTestId("receipt-attention");
+    await expect(attention).toContainText("We don't know if the AI finished reading this receipt");
+    await expect(attention).toContainText("Trying again sends this receipt to our AI provider.");
+    await expect(page.getByRole("button", { name: "Prepare with AI" })).toHaveCount(0);
+    await expect(page.getByLabel("Merchant")).toBeEnabled();
+
+    await attention.getByRole("button", { name: "Try again with AI" }).click();
+    await expect(page.getByTestId("workspace-panel-region")).toContainText("Reading your receipt");
+    await expect(page.getByRole("button", { name: "Try again with AI" })).toHaveCount(0);
+    await expect(page.getByLabel("Merchant")).toBeDisabled();
+  });
+
+  test("a read with no single purchase is entered by hand and keeps what was read", async ({ page }) => {
+    await openPreview(page, `${PREVIEW}?receipt=rcpt-ambiguous`);
+    const attention = page.getByTestId("receipt-attention");
+    await expect(attention).toContainText("couldn't match this receipt to one purchase. Enter the details yourself");
+    await expect(page.getByRole("button", { name: /with AI/ })).toHaveCount(0);
+    await expect(page.getByText("What the receipt says")).toBeVisible();
+
+    await page.getByLabel("Merchant").fill("Colmado Don Pedro");
+    await page.getByLabel("Date").fill("2026-10-05");
+    await page.locator("label", { hasText: "Currency" }).locator("select").selectOption("DOP");
+    await page.getByTestId("receipt-review-amount").fill("706.10");
+    await page.locator("label", { hasText: "Paid from" }).locator("select").selectOption("acct-ops");
+    await page.getByRole("button", { name: "Confirm expense" }).click();
+
+    await expect(panelHeading(page, "Saved expense")).toBeVisible();
+    await expect(page.getByTestId("receipt-attention")).toHaveCount(0);
+    await expect(page.getByText("What the receipt says")).toBeVisible();
+  });
+
+  test("an unreadable receipt offers entry by hand and no AI retry", async ({ page }) => {
+    await openPreview(page, `${PREVIEW}?receipt=rcpt-blurry`);
+    await expect(page.getByTestId("receipt-attention")).toContainText(
+      "We couldn't read this receipt. Enter the details yourself or send a clearer photo.",
+    );
+    await expect(page.getByRole("button", { name: /with AI/ })).toHaveCount(0);
+    await expect(page.getByLabel("Merchant")).toBeEnabled();
+  });
+
   test("the review Total refuses letters, pads on blur and refuses a decimal comma paste", async ({ page, context }) => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await openPreview(page, `${PREVIEW}?receipt=rcpt-ferreteria`);
@@ -356,7 +398,7 @@ test.describe("Business preview on a phone", () => {
     for (const label of ["Overview", "Inbox", "Expenses", "Updates"]) {
       await expect(drawerNav.getByText(label, { exact: true })).toBeVisible();
     }
-    await expect(drawerNav.getByRole("button", { name: /^Inbox/ })).toContainText("4");
+    await expect(drawerNav.getByRole("button", { name: /^Inbox/ })).toContainText("6");
     await expect(page.getByTestId("business-create")).toHaveText("Create");
   });
 });
