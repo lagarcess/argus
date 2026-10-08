@@ -20,6 +20,22 @@ A `spaces` row of kind `business` belongs to one person (`created_by`). Rows tha
 
 **#819 compatibility.** Records point at `spaces(id)`, never at a membership or a person-as-business. #819 can later add a Personal space per person (switching the null rule to equality inside `sql_predicate`), add `space_memberships` by backfilling one owner row from `created_by`, and link Personal and Business views. None of that copies or re-keys a financial record.
 
+## Where receipt capture sits in the Business roadmap
+
+Receipt capture is the first Business slice. The rest of the Business roadmap stays as recorded in the [master plan](../cuadrao-master-plan.md), and this slice implements none of it.
+
+| Roadmap step | Owner document | Status |
+| --- | --- | --- |
+| Receipt capture: web and WhatsApp intake, review, one expense, retrieval, expense questions | The [owner pilot scope](https://github.com/lagarcess/argus/pull/900) and this plan | In progress, default-off |
+| Business ledger: customers, non-fiscal invoices, payments, matching, Vault | Master plan, "Business ledger" stream | Not started |
+| Dominican fiscal records: tracking e-CF the owner already issues, then live e-CF issuance through a DGII-certified provider (PSFE), partner first | Master plan, fiscal route correction and "Fiscal" streams | Not started; waits on the PSFE partner (founder track) |
+| Cuadrao's own e-CF backend: XML, validation, sequencing, submission, evidence | Master plan, "Fiscal: own backend" | Parallel, lower priority |
+| Accountant handoff: an export package and time-limited accountant access | Master plan, "Business ledger", and §B2.4 accountant role | Not started; needs multi-user memberships (deferred here) |
+
+Two constraints carry forward from this slice:
+- The space model keeps every later record (invoice, payment, fiscal document, accountant grant) attachable to the same Business space without copying.
+- The pilot export already includes every original receipt with its status, so it can feed the accountant handoff later.
+
 ## 1. Migration
 
 One file: `supabase/migrations/20261008140000_business_spaces.sql`, sorted after `20261008130000_whatsapp_intake.sql`.
