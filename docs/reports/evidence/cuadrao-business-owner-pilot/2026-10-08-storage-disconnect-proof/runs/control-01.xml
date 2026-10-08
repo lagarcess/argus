@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="19" time="1.729" timestamp="2026-10-08T16:54:01.605605-05:00" hostname="mb-pro"><testcase classname="tests.test_document_source_objects_postgres" name="test_upload_stores_the_object_and_no_bytes" time="0.066" /><testcase classname="tests.test_document_source_objects_postgres" name="test_duplicate_upload_makes_no_second_object" time="0.045" /><testcase classname="tests.test_document_source_objects_postgres" name="test_only_the_owner_reads_the_source" time="0.038" /><testcase classname="tests.test_document_source_objects_postgres" name="test_disconnect_removes_the_object_and_keeps_confirmed_activity" time="0.059"><failure message="argus.domain.ingestion.documents.service.DocumentServiceError: document_version_conflict">rig = {'hub': &lt;argus.domain.ingestion.hub.IngestionHub object at 0x10d39e980&gt;, 'objects': &lt;argus.domain.ingestion.documents....at 0x10d243dc0&gt;, 'other': '7911239b-2047-4102-80ab-a2561cd32259', 'owner': '66718dc2-c108-408e-9ae7-56434f4193c1', ...}
+
+    @pytest.mark.asyncio
+    async def test_disconnect_removes_the_object_and_keeps_confirmed_activity(
+        rig: dict,
+    ) -&gt; None:
+        owner, world = rig["owner"], rig["world"]
+        assert isinstance(world, World)
+        captured = await _upload(rig["service"], owner, consent=True)
+        connection_id = captured.connection_id
+&gt;       prepared = await rig["service"].resume(
+            user_id=owner, connection_id=connection_id, scope=PERSONAL
+        )
+
+tests/test_document_source_objects_postgres.py:224: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/argus/domain/ingestion/documents/service.py:495: in resume
+    draft = self._update(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = &lt;argus.domain.ingestion.documents.service.DocumentsService object at 0x10d39f550&gt;
+user_id = '66718dc2-c108-408e-9ae7-56434f4193c1'
+draft = DocumentDraft(connection_id='c295c93a-97d5-4b3c-b895-289663ba23e0', filename='statement.pdf', media_type='application/...osal(plan_ref=None, requested_plan=None, payer_id=None, participant_ids=(), split_method='equal', item_assignments=()))
+holder = 'ef411b8d-5c76-43d3-8476-5f9275221078', claim = None
+changes = {'error_code': None, 'status': 'review_ready'}
+updated = DocumentDraft(connection_id='c295c93a-97d5-4b3c-b895-289663ba23e0', filename='statement.pdf', media_type='application/...osal(plan_ref=None, requested_plan=None, payer_id=None, participant_ids=(), split_method='equal', item_assignments=()))
+
+    def _update(
+        self,
+        user_id: str,
+        draft: DocumentDraft,
+        *,
+        holder: str | None = None,
+        claim: str | None = None,
+        **changes: object,
+    ) -&gt; DocumentDraft:
+        updated = self.revise(draft, **changes)
+        if not self.store.update(
+            user_id=user_id,
+            draft=updated,
+            expected_version=draft.version,
+            holder=holder,
+            claim=claim,
+        ):
+&gt;           raise DocumentServiceError("document_version_conflict", retryable=True)
+E           argus.domain.ingestion.documents.service.DocumentServiceError: document_version_conflict
+
+src/argus/domain/ingestion/documents/service.py:231: DocumentServiceError</failure></testcase><testcase classname="tests.test_document_source_objects_postgres" name="test_disconnect_during_preparation_leaves_no_object_and_no_row" time="0.057" /><testcase classname="tests.test_document_source_objects_postgres" name="test_a_crash_after_the_object_write_leaves_no_row" time="0.053" /><testcase classname="tests.test_document_source_objects_postgres" name="test_disconnect_takes_an_orphan_that_was_never_retried" time="0.039" /><testcase classname="tests.test_document_source_objects_postgres" name="test_a_failed_object_delete_keeps_the_row_for_the_retry" time="0.043" /><testcase classname="tests.test_document_source_objects_postgres" name="test_rows_from_before_the_move_are_still_served_and_erased" time="0.033" /><testcase classname="tests.test_document_source_objects_postgres" name="test_the_database_refuses_an_incoherent_source[empty]" time="0.043" /><testcase classname="tests.test_document_source_objects_postgres" name="test_the_database_refuses_an_incoherent_source[path off owner]" time="0.043" /><testcase classname="tests.test_document_source_objects_postgres" name="test_the_database_refuses_an_incoherent_source[partial reference]" time="0.043" /><testcase classname="tests.test_document_source_objects_postgres" name="test_the_database_refuses_an_incoherent_source[two sources]" time="0.043" /><testcase classname="tests.test_document_source_objects_postgres" name="test_the_database_refuses_an_incoherent_source[no draft]" time="0.040" /><testcase classname="tests.test_document_source_objects_postgres" name="test_capture_on_a_gone_connection_removes_its_object" time="0.043" /><testcase classname="tests.test_document_source_objects_postgres" name="test_capture_during_an_account_deletion_run_leaves_no_object" time="0.034" /><testcase classname="tests.test_document_source_objects_postgres" name="test_a_lost_object_is_reported_and_an_identical_upload_restores_it" time="0.073" /><testcase classname="tests.test_document_source_objects_postgres" name="test_a_storage_outage_is_retryable_in_upload_and_preparation" time="0.048" /><testcase classname="tests.test_document_source_objects_postgres" name="test_the_installed_storage_client_reports_a_missing_object_as_none" time="0.023" /></testsuite></testsuites>

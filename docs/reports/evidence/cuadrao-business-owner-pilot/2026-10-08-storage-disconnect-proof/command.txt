@@ -1,0 +1,14 @@
+# Worktree: /Users/garces/Documents/projects/repos/argus-worktrees/business-pilot-storage-proof (detached at 826ace6d4, contains #924 cd3231baa)
+# One run = one fresh process, via run.sh <label> <targets>:
+cd /Users/garces/Documents/projects/repos/argus-worktrees/business-pilot-storage-proof && env -i <env.txt> \
+  /Users/garces/Documents/projects/repos/argus-worktrees/private-alpha-next/.venv/bin/python -m pytest <targets> \
+  -p no:cacheprovider --no-cov -rA -q --junitxml=runs/<label>.xml > runs/<label>.log 2>&1
+
+# Storage-only, 20 runs (loop.py storage 20):
+#   <targets> = tests/test_document_source_objects_postgres.py
+# Combined, 20 runs (loop.py combined 20), jobs file first in one process:
+#   <targets> = tests/test_document_jobs_postgres.py tests/test_document_source_objects_postgres.py
+# Positive control (control.sh): 5 Storage-only runs while foreign_sweeper.py (a separate process)
+#   sweeps the same database every 20 ms on the real clock, recording dispatches only.
+# Driver: cd $P && python3 loop.py storage 20 && ./snapshot.sh pg-activity-between.txt && python3 loop.py combined 20
+# --no-cov and -p no:cacheprovider keep the worktree untouched (pyproject addopts write coverage under temp/).

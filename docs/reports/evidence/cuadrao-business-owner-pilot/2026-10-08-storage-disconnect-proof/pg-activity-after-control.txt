@@ -1,0 +1,54 @@
+# captured 2026-10-08T21:54:24Z on container supabase_db_argus-biz-storageproof (host port 57792)
+# required query
+ pid  |  client_addr  |        application_name         |         backend_start         | state  
+------+---------------+---------------------------------+-------------------------------+--------
+  205 |               | pg_net 0.20.4                   | 2026-10-08 21:49:52.311067+00 | idle
+  206 |               | pg_cron scheduler               | 2026-10-08 21:49:52.311308+00 | 
+  218 | 192.168.192.7 | PostgREST 16.3                  | 2026-10-08 21:49:53.598473+00 | idle
+  296 | 192.168.192.8 |                                 | 2026-10-08 21:50:07.078256+00 | idle
+  316 | 192.168.192.6 | supabase_mt_realtime            | 2026-10-08 21:50:08.906447+00 | idle
+  317 | 192.168.192.6 | supabase_mt_realtime            | 2026-10-08 21:50:08.90659+00  | idle
+  318 | 192.168.192.6 | supabase_mt_realtime            | 2026-10-08 21:50:08.906887+00 | idle
+  319 | 192.168.192.6 | supabase_mt_realtime            | 2026-10-08 21:50:08.90699+00  | idle
+  320 | 192.168.192.6 | supabase_mt_realtime            | 2026-10-08 21:50:08.907155+00 | idle
+  321 | 192.168.192.6 | cluster_node_realtime@127.0.0.1 | 2026-10-08 21:50:08.930825+00 | idle
+  322 | 192.168.192.6 | cluster_node_realtime@127.0.0.1 | 2026-10-08 21:50:08.931005+00 | idle
+  396 | 192.168.192.8 | Supabase Storage API 1.77.0     | 2026-10-08 21:51:04.788034+00 | idle
+ 1009 | 192.168.192.8 | Supabase Storage API 1.77.0     | 2026-10-08 21:52:25.488894+00 | idle
+ 2176 |               | psql                            | 2026-10-08 21:54:24.569755+00 | active
+(14 rows)
+
+# same rows with user and query, to attribute each session
+ pid  |        usename         |  client_addr  |        application_name         |     backend_type     | state  |                                 query                                  
+------+------------------------+---------------+---------------------------------+----------------------+--------+------------------------------------------------------------------------
+  205 | postgres               |               | pg_net 0.20.4                   | pg_net 0.20.4 worker | idle   | 
+  206 | supabase_admin         |               | pg_cron scheduler               | pg_cron launcher     |        | 
+  218 | authenticator          | 192.168.192.7 | PostgREST 16.3                  | client backend       | idle   | LISTEN "pgrst"
+  296 | supabase_storage_admin | 192.168.192.8 |                                 | client backend       | idle   | SELECT pg_backend_pid()
+  316 | supabase_admin         | 192.168.192.6 | supabase_mt_realtime            | client backend       | idle   | SELECT t0."id", t0."name", t0."external_id", t0."jwt_secret", t0."jwt_
+  317 | supabase_admin         | 192.168.192.6 | supabase_mt_realtime            | client backend       | idle   | SELECT e0."id", e0."type", e0."settings", e0."tenant_external_id", e0.
+  318 | supabase_admin         | 192.168.192.6 | supabase_mt_realtime            | client backend       | idle   | SELECT t0."id", t0."name", t0."external_id", t0."jwt_secret", t0."jwt_
+  319 | supabase_admin         | 192.168.192.6 | supabase_mt_realtime            | client backend       | idle   | SELECT t0."id", t0."name", t0."external_id", t0."jwt_secret", t0."jwt_
+  320 | supabase_admin         | 192.168.192.6 | supabase_mt_realtime            | client backend       | idle   | SELECT t0."id", t0."name", t0."external_id", t0."jwt_secret", t0."jwt_
+  321 | supabase_admin         | 192.168.192.6 | cluster_node_realtime@127.0.0.1 | client backend       | idle   | LISTEN "6N4PTYKA6VFSA435N3WVJ6DI6GQJKW6FGUZ7YP2JWFVP4P6G53WQ____"
+  322 | supabase_admin         | 192.168.192.6 | cluster_node_realtime@127.0.0.1 | client backend       | idle   | NOTIFY "6N4PTYKA6VFSA435N3WVJ6DI6GQJKW6FGUZ7YP2JWFVP4P6G53WQ____", 're
+  396 | supabase_storage_admin | 192.168.192.8 | Supabase Storage API 1.77.0     | client backend       | idle   | COMMIT
+ 1009 | supabase_storage_admin | 192.168.192.8 | Supabase Storage API 1.77.0     | client backend       | idle   | COMMIT
+ 2183 | postgres               |               | psql                            | client backend       | active | select pid, usename, client_addr, application_name, backend_type, stat
+(14 rows)
+
+# container addresses on the stack network (client_addr attribution)
+supabase_db_argus-biz-storageproof 192.168.192.2 192.168.192.1
+supabase_studio_argus-biz-storageproof 192.168.192.11 192.168.192.1
+supabase_pg_meta_argus-biz-storageproof 192.168.192.10 192.168.192.1
+supabase_edge_runtime_argus-biz-storageproof 192.168.192.9 192.168.192.1
+supabase_storage_argus-biz-storageproof 192.168.192.8 192.168.192.1
+supabase_rest_argus-biz-storageproof 192.168.192.7 192.168.192.1
+supabase_realtime_argus-biz-storageproof 192.168.192.6 192.168.192.1
+supabase_inbucket_argus-biz-storageproof 192.168.192.5 192.168.192.1
+supabase_auth_argus-biz-storageproof 192.168.192.4 192.168.192.1
+supabase_kong_argus-biz-storageproof 192.168.192.3 192.168.192.1
+# host processes with a TCP connection to the stack ports (57791 API, 57792 Postgres); listeners are Docker's port forwarders
+COMMAND     PID   USER   FD   TYPE             DEVICE SIZE/OFF NODE NAME
+com.docke 32705 garces  171u  IPv6 0xb6b68539b11bcfaa      0t0  TCP *:57792 (LISTEN)
+com.docke 32705 garces  173u  IPv6 0x5d9c132f3a03728f      0t0  TCP *:57791 (LISTEN)

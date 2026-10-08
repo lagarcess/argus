@@ -1,0 +1,33 @@
+# Audit: can anything but the hung test advance a Storage-test draft on the real clock?
+
+Integration 826ace6d4 (contains #924, cd3231baa). Paths are repo-relative.
+
+## Why a foreign sweeper breaks the Storage tests
+
+- `PreparationJobs.sweep` (src/argus/domain/ingestion/documents/jobs.py:101-115) iterates `store.pending()`, which selects every queued, preparing or retryable statement draft in the whole database, for every user (src/argus/domain/ingestion/documents/store_postgres.py:249-262). There is no owner or test scoping.
+- `in_flight` (jobs.py:46-61) treats a draft as live only while `lease_live(connection, now)` or `dispatched_at + DISPATCH_WINDOW > now`. Storage-test leases and drafts are stamped by `IngestionHub(clock=lambda: NOW)` with `NOW = 2026-09-20 18:00Z` (tests/ingestion/reconcile_cases.py:20, rig at tests/test_document_source_objects_postgres.py:116). A sweeper whose clock is `datetime.now()` sees them as dead and redispatches (jobs.py:157-171), which revises the draft to a new version through `store.advance` (jobs.py:249).
+- The test's own `resume` then writes with a stale `expected_version` and raises `document_version_conflict` (src/argus/domain/ingestion/documents/service.py:231, reached from service.py:495 and the test at tests/test_document_source_objects_postgres.py:224).
+- Reproduced in this proof: control.log, 3 of 5 runs failed with exactly that error while foreign_sweeper.py ran in a separate process.
+
+## Callers
+
+| Caller | file:line | Can it touch Storage-test drafts during a run? | Why |
+|---|---|---|---|
+| `sweep_forever` in the two-instance test | tests/test_document_jobs_postgres.py:415 (cancel at 436-438) | Only while that test runs. | Clock is real now (tests/test_document_jobs_postgres.py:148-150). Since #924 every wait is bounded (419-423, 428-434) and the sweepers are cancelled in `finally`. The function-scoped event loop closes at teardown, so a cancelled task never runs again; an in-flight `asyncio.to_thread(jobs.sweep)` finishes one sweep before the loop's executor shuts down. In one process the Storage file runs after this, so no overlap (combined 20/20). A second process on the same database is not protected. |
+| One-shot `jobs.sweep()` in jobs tests | tests/test_document_jobs_postgres.py:281, 283, 298, 317, 325 | Same process: no. Concurrent process on same DB: yes. | Synchronous, real-now clock plus window, scans every pending row. Finishes inside its test. |
+| Threaded sweeps in the concurrent-sweepers test | tests/test_document_jobs_postgres.py:368-375 | Same process: practically no. | Each thread runs one sweep. `barrier.wait(5)` (363) bounds every gated `advance`, and `join(30)` (375) waits; a thread outlives the test only if five gated advances each time out. Not observed in 20 combined runs. |
+| `store.advance` direct calls | tests/test_document_jobs_postgres.py:84-133, 553-657 | No. | Each names a connection the test itself created. |
+| `store.advance` in `_settle` / `_advance` | src/argus/domain/ingestion/documents/jobs.py:215, 249 | Only through `sweep` or `start`. | `start` (jobs.py:80-99) names one connection; `sweep` is covered above. |
+| `store.advance` in `run_attempt` retry path | src/argus/domain/ingestion/documents/jobs.py:304 | No. | Only for the named connection and only when `job.attempt_id` equals the attempt it was given. Storage tests never create an attempt. |
+| `PreparationJobs` in business-space isolation test | tests/test_business_space_isolation_postgres.py:518-533 | No. | Calls `start` on its own receipt and `run_attempt` on the attempt it got. Never sweeps. |
+| `PreparationJobs` in recharge tests | tests/ingestion/test_document_jobs_recharge.py:62-68 | No. | `InMemoryConnectionRepository` and `InMemoryDocumentStore`. No database. |
+| `sweep_forever` in while-off test | tests/ingestion/test_documents_while_off.py:173 | No. | Fake `Jobs` class with no store; bounded by `asyncio.wait_for(..., 0.1)`. |
+| `start_document_jobs` from the app | src/argus/api/documents.py:86-88 to src/argus/api/document_jobs.py:88-103 | Not in any current test against Postgres. | Starts only when `ARGUS_DOCUMENT_JOBS_ENABLED` is true (default False, src/argus/domain/ingestion/documents/config.py:92). Tests that turn it on: tests/ingestion/test_document_jobs_api.py:80, which runs the app in memory mode (asserted at tests/ingestion/conftest.py:28, so `InMemoryDocumentStore`, src/argus/api/documents.py:116-117); tests/ingestion/test_documents_while_off.py:140, with ingestion off, which takes `start_saved_documents` and asserts `document_jobs() is None` (147). The only Postgres app test, tests/test_flags_off_removal_postgres.py:50, forces jobs off. |
+| `stop_document_jobs` on shutdown | src/argus/api/app_setup.py:100-108 to src/argus/api/ingestion.py:174-176 to src/argus/api/documents.py:62 to src/argus/api/document_jobs.py:106-113 | n/a | Lifespan `finally` calls `stop_ingestion`, which calls `configure_documents(None)`, which calls `stop_document_jobs`. That cancels the sweeper task (109) and every in-process attempt task (110-112). It does not await them; the TestClient's loop closes right after, so nothing runs again. `start_document_jobs` also stops any previous sweeper first (90). |
+| Render workflow worker | workflows/document_job.py:79-106 | No. | Runs `run_attempt` for one `(connection_id, attempt_id)` it is handed and never dispatches or sweeps (docstring at 1-7). Its clock is real (35-36), but it acts only on an attempt someone created. In tests it is called directly (tests/test_document_jobs_postgres.py:447). |
+| Background prepare task (jobs off) | src/argus/api/documents.py:259-280 to src/argus/domain/ingestion/documents/service.py:399-410 | No. | `resume` for one named owner and connection, `queued_only=True`. Storage-test owners are fresh `uuid4` per test, so no request can name them. |
+| Database-side schedulers | stack check | No. | `cron.job` does not exist in the `postgres` database of this stack, and there are no user triggers on `financial_document_extractions` or `financial_source_connections`. |
+
+## Conclusion
+
+Within one pytest process, no code path other than the two-instance test's `sweep_forever` can advance a Storage-test draft, and since #924 that sweeper cannot outlive its test. The remaining exposure is outside the process. Any sweep, whether `sweep_forever` or a one-shot `jobs.sweep()` from the jobs file, run by another process against the same database while the Storage file runs, still redispatches the Storage drafts and reproduces `document_version_conflict`. A hung process, a parallel agent, or a parallel CI shard on a shared stack all qualify. The guard is operational: one database per pytest process.
