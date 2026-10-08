@@ -191,6 +191,19 @@ def test_a_document_with_no_receipt_purchase_sets_the_reading_aside(
     assert _events(alice) == [("accepted", "expense"), ("dismissed", None)]
 
 
+def test_receipt_details_with_no_purchase_row_say_no_purchase_was_found(
+    alice: Owner,  # noqa: F811
+    stub: ReceiptStub,
+) -> None:
+    stub.rows = []
+    receipt_id = prepared(alice)
+    read = alice.detail(receipt_id)
+    assert _next(read) == ("needs_attention", "no_purchase_found", False, True)
+    assert read["evidence"] is not None
+    _enter_and_confirm(alice, receipt_id)
+    assert _events(alice) == [("accepted", "expense")]
+
+
 def test_several_purchases_are_set_aside_for_the_owners_one_purchase(
     alice: Owner,  # noqa: F811
     stub: ReceiptStub,

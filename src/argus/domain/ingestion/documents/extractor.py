@@ -84,7 +84,7 @@ def batch_from_result(
     if not result.observations:
         issues.append(ProjectionIssue(code="no_financial_observations"))
     receipt_rows = [row for row in result.observations if row.evidence == "transaction"]
-    receipt_ambiguous = result.receipt is not None and len(receipt_rows) != 1
+    receipt_ambiguous = result.receipt is not None and len(receipt_rows) > 1
     if (
         result.receipt is not None
         and len(receipt_rows) == 1
