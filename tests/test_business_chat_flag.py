@@ -29,10 +29,10 @@ def _code(response) -> tuple[int, str | None]:  # noqa: ANN001
 
 
 def _turns(
-    client: TestClient,
+    client: TestClient,  # noqa: F811
     conversation_id: str,
     *,
-    with_body_routes: bool = True,  # noqa: F811
+    with_body_routes: bool = True,
 ) -> list[tuple[int, str | None]]:
     """Each way a chat turn or card action reaches a conversation. The body
     routes run a turn or a backtest when admitted, so only a refused side
@@ -70,8 +70,8 @@ def _turns(
 
 
 def test_business_chat_off_refuses_every_turn_but_keeps_reading_and_deleting(
-    client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,  # noqa: F811
+    client: TestClient,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _start_space(ALICE)
     business = _create(client, ALICE, "Shop ledger", surface="business")
@@ -104,8 +104,8 @@ def test_business_chat_off_refuses_every_turn_but_keeps_reading_and_deleting(
 
 
 def test_business_chat_is_nested_inside_the_pilot(
-    client: TestClient,
-    monkeypatch: pytest.MonkeyPatch,  # noqa: F811
+    client: TestClient,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     _start_space(ALICE)
     business = _create(client, ALICE, "Shop ledger", surface="business")
@@ -135,3 +135,19 @@ def test_every_conversation_write_route_names_its_side() -> None:
         and not guards & {dependency.call for dependency in route.dependant.dependencies}
     ]
     assert unguarded == []
+
+
+def test_every_route_naming_a_conversation_in_its_body_is_refused_while_off() -> None:
+    """Body-keyed writers refuse inline; a new one must join the behavior test."""
+
+    body_keyed = sorted(
+        route.path
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        and "POST" in route.methods
+        and any(
+            "conversation_id" in getattr(param.field_info.annotation, "model_fields", {})
+            for param in route.dependant.body_params
+        )
+    )
+    assert body_keyed == ["/api/v1/backtests/run", "/api/v1/chat/stream"]

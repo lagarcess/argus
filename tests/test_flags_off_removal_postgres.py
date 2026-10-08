@@ -29,6 +29,7 @@ from fastapi.testclient import TestClient
 from psycopg_pool import ConnectionPool
 
 from tests.document_sources_support import stored_paths
+from tests.ingestion.whatsapp_support import ENV as WHATSAPP_TEST_ENV
 from tests.local_supabase_support import local_supabase_gateway
 from tests.test_conversation_surfaces_postgres import DSN
 from tests.test_financial_accounts_api_postgres import ORIGIN, _login
@@ -47,9 +48,10 @@ ON = {
     "ARGUS_INGESTION_ENABLED": "true",
     "ARGUS_DOCUMENT_EXTRACTION_ENABLED": "true",
     "ARGUS_DOCUMENT_JOBS_ENABLED": "false",
-    "ARGUS_BUSINESS_PILOT_ENABLED": "true",
-    "ARGUS_WHATSAPP_INTAKE_ENABLED": "false",
     "ARGUS_BUSINESS_CHAT_ENABLED": "false",
+    # Intake is on with the project's local test credentials; nothing is sent.
+    **WHATSAPP_TEST_ENV,
+    "ARGUS_WHATSAPP_OUTBOUND_ENABLED": "false",
 }
 
 
@@ -220,7 +222,9 @@ def test_unlink_with_business_or_intake_off_ends_the_link_and_codes(
                     last4="1234",
                     now=now,
                 )
-        assert store.destination_link(destination_owner_id=api.person) is not None
+    with api.running() as client:
+        linked = client.get("/api/v1/whatsapp/link", headers=api.headers)
+        assert (linked.status_code, linked.json()["linked"]) == (200, True)
 
     with api.running(**off) as client:
         gated = client.get("/api/v1/whatsapp/link", headers=api.headers)
