@@ -148,6 +148,48 @@ test.describe("Business preview", () => {
     await expect(page.getByTestId("workspace-panel-region")).toContainText("Ferretería La Esquina");
   });
 
+  test("the review Total refuses letters, pads on blur and refuses a decimal comma paste", async ({ page, context }) => {
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await openPreview(page, `${PREVIEW}?receipt=rcpt-ferreteria`);
+    await expect(panelHeading(page, "Review receipt")).toBeVisible();
+
+    const total = page.getByTestId("receipt-review-amount");
+    await expect(total).toHaveValue("3,450.00");
+    await expect(total).toHaveAccessibleName("Total in DOP (RD$)");
+    const message = page.locator(`[id="${await total.getAttribute("aria-describedby")}"]`);
+
+    await total.click();
+    await page.keyboard.press("End");
+    await page.keyboard.type("wfr");
+    await expect(total).toHaveValue("3,450.00");
+    await expect(message).toHaveText("Use digits and one decimal point.");
+
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.type("1250.5");
+    await expect(message).toHaveText("");
+    await expect(total).toHaveValue("1,250.5");
+    await page.keyboard.press("Tab");
+    await expect(total).toHaveValue("1,250.50");
+
+    await page.evaluate(() => navigator.clipboard.writeText("1.250,50"));
+    await total.click();
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("ControlOrMeta+v");
+    await expect(total).toHaveValue("1,250.50");
+    await expect(message).toContainText("Use a point for decimals");
+  });
+
+  test("Record expense ignores a typed comma on a dot-decimal device", async ({ page }) => {
+    await openPreview(page);
+    await page.getByTestId("business-create").click();
+    await page.getByRole("menuitem", { name: "Record expense" }).click();
+
+    const total = page.getByTestId("record-expense-amount");
+    await total.click();
+    await page.keyboard.type("12,50");
+    await expect(total).toHaveValue("1,250");
+  });
+
   test("a reload of view=chat stays on the chat surface", async ({ page }) => {
     await openPreview(page, `${PREVIEW}?view=chat`);
     const home = page.locator('[data-business-home="new_chat"]');
@@ -157,6 +199,22 @@ test.describe("Business preview", () => {
     await expect(home).toBeVisible();
     await expect(page.getByTestId("workspace-panel-region")).toHaveCount(0);
     await expect(page).toHaveURL(/view=chat/);
+  });
+});
+
+test.describe("Business preview on a comma-decimal device", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, locale: "de-DE" });
+
+  test("Record expense reads a typed comma as the decimal point", async ({ page }) => {
+    await openPreview(page);
+    await page.getByTestId("business-create").click();
+    await page.getByRole("menuitem", { name: "Record expense" }).click();
+
+    const total = page.getByTestId("record-expense-amount");
+    await total.click();
+    await page.keyboard.type("12,50");
+    await expect(total).toHaveValue("12.50");
+    await expect(page.getByRole("button", { name: "Save expense" })).toBeEnabled();
   });
 });
 

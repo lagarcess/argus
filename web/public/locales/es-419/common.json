@@ -2331,5 +2331,19 @@
       "saved": "Guardado en la Bandeja",
       "dismiss": "Descartar"
     }
+  },
+  "money": {
+    "label": "{{label}} en {{currency}}",
+    "invalid": "Usa solo números y un punto decimal.",
+    "decimal_twice": "Un monto lleva un solo punto decimal.",
+    "negative": "Escribe un monto positivo.",
+    "grouping": "Revisa las comas de miles, como en 1,250.50.",
+    "decimal_comma": "Usa un punto para los decimales, como en 1,250.50.",
+    "precision_none": "{{currency}} no lleva decimales.",
+    "precision_one": "{{currency}} admite hasta {{count}} decimal.",
+    "precision_other": "{{currency}} admite hasta {{count}} decimales.",
+    "maximum": "El máximo es {{maximum}}.",
+    "currency_mismatch": "Este monto es en {{field}}, no en {{typed}}.",
+    "zero": "Escribe un monto mayor que 0."
   }
 }

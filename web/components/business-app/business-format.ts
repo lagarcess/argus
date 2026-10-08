@@ -66,9 +66,3 @@ export const RECEIPT_CATEGORY_IDS = [
   "shopping",
   "interest_fees",
 ] as const;
-
-/** "12,50" is a decimal comma; any other shape goes to the backend as typed. */
-export function normalizeAmount(raw: string): string {
-  const value = raw.trim();
-  return !value.includes(".") && value.split(",").length === 2 ? value.replace(",", ".") : value;
-}

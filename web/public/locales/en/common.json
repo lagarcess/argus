@@ -2331,5 +2331,19 @@
       "saved": "Saved to Inbox",
       "dismiss": "Dismiss"
     }
+  },
+  "money": {
+    "label": "{{label}} in {{currency}}",
+    "invalid": "Use digits and one decimal point.",
+    "decimal_twice": "An amount has only one decimal point.",
+    "negative": "Enter a positive amount.",
+    "grouping": "Check the thousands commas, as in 1,250.50.",
+    "decimal_comma": "Use a point for decimals, as in 1,250.50.",
+    "precision_none": "{{currency}} has no decimals.",
+    "precision_one": "{{currency}} allows up to {{count}} decimal.",
+    "precision_other": "{{currency}} allows up to {{count}} decimals.",
+    "maximum": "The maximum is {{maximum}}.",
+    "currency_mismatch": "This amount is in {{field}}, not {{typed}}.",
+    "zero": "Enter an amount greater than 0."
   }
 }

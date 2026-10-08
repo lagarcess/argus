@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Download } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import MoneyInput from "@/components/money/MoneyInput";
+import { moneyProblemFromServer } from "@/lib/money-entry";
 import { randomId } from "@/lib/random-id";
 import type { ReceiptDetail, ReceiptReviewFields } from "@/lib/business-api";
 import { useBusiness } from "./BusinessWorkspace";
@@ -103,6 +105,8 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState<"prepare" | "confirm" | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [amountInvalid, setAmountInvalid] = useState(false);
+  const [amountError, setAmountError] = useState<string | null>(null);
   // One key per receipt version, so a retry of the same confirm replays it and
   // a confirm of a newer version is a new request.
   const confirmKey = useRef<{ version: number; key: string } | null>(null);
@@ -152,6 +156,7 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
   const show = (next: ReceiptDetail) => {
     setDetail(next);
     setDraft(draftFrom(next));
+    setAmountInvalid(false);
   };
 
   const confirmProblem = (code: string | undefined, current: Draft) => {
@@ -200,7 +205,8 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
       reload();
     } catch (error) {
       const code = (error as { code?: string }).code;
-      setProblem(confirmProblem(code, submitted));
+      if (moneyProblemFromServer(code, submitted.currency)) setAmountError(code ?? null);
+      else setProblem(confirmProblem(code, submitted));
       if (code === "stale_version") {
         const fresh = await source.receipt(detail.id).catch(() => null);
         if (fresh) show(fresh);
@@ -293,11 +299,23 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
                 </select>,
               )}
             </div>
-            <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] gap-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] items-start gap-3">
               {field(
                 "amount",
                 t("business.review.amount", "Total"),
-                <input inputMode="decimal" className={`${inputClass} tabular-nums`} value={draft.amount} onChange={set("amount")} disabled={confirmed} />,
+                <MoneyInput
+                  label={t("business.review.amount", "Total")}
+                  currency={draft.currency}
+                  value={draft.amount || null}
+                  onValueChange={({ value, invalid }) => {
+                    setDraft((current) => (current ? { ...current, amount: value ?? "" } : current));
+                    setAmountInvalid(invalid);
+                    setAmountError(null);
+                  }}
+                  serverError={amountError}
+                  disabled={confirmed}
+                  testId="receipt-review-amount"
+                />,
               )}
               {field(
                 "currency",
@@ -364,7 +382,7 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
               <button
                 type="button"
                 className={primaryButtonClass}
-                disabled={busy !== null || missing.length > 0 || waitingForAi}
+                disabled={busy !== null || missing.length > 0 || amountInvalid || waitingForAi}
                 onClick={() => void confirm()}
               >
                 {busy === "confirm" ? t("business.review.confirming", "Saving…") : t("business.review.confirm", "Confirm expense")}

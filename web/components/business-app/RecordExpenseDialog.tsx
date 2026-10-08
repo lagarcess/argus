@@ -2,10 +2,12 @@
 
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import MoneyInput, { type MoneyInputChange } from "@/components/money/MoneyInput";
 import AdaptivePanel from "@/components/ui/AdaptivePanel";
+import { moneyProblemFromServer } from "@/lib/money-entry";
 import { randomId } from "@/lib/random-id";
 import { useBusiness } from "./BusinessWorkspace";
-import { normalizeAmount, RECEIPT_CATEGORY_IDS } from "./business-format";
+import { RECEIPT_CATEGORY_IDS } from "./business-format";
 import { primaryButtonClass, secondaryButtonClass, useCategoryLabel } from "./business-ui";
 
 const inputClass =
@@ -35,7 +37,8 @@ function RecordExpenseSurface({ onClose, onRecorded }: { onClose: () => void; on
   const { source, records } = useBusiness();
   const accounts = records.workspace?.accounts ?? [];
   const [merchant, setMerchant] = useState("");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState<MoneyInputChange>({ value: null, invalid: false });
+  const [amountError, setAmountError] = useState<string | null>(null);
   const [occurredOn, setOccurredOn] = useState(today);
   const [categoryId, setCategoryId] = useState("");
   const [chosenAccountId, setAccountId] = useState("");
@@ -45,16 +48,15 @@ function RecordExpenseSurface({ onClose, onRecorded }: { onClose: () => void; on
   // One key per submitted expense, so a retry replays it and an edit is new.
   const key = useRef<{ payload: string; key: string } | null>(null);
   const account = accounts.find((item) => item.id === accountId);
-  const normalizedAmount = normalizeAmount(amount);
-  const valid = Boolean(accountId && normalizedAmount && !(Number(normalizedAmount) <= 0) && occurredOn);
+  const valid = Boolean(accountId && amount.value && !amount.invalid && occurredOn);
 
   const save = async () => {
-    if (!valid) return;
+    if (!valid || !amount.value) return;
     setState("saving");
     setProblem(null);
     const input = {
       account_id: accountId,
-      amount: normalizedAmount,
+      amount: amount.value,
       occurred_on: occurredOn,
       merchant: merchant.trim() || null,
       category_id: categoryId || null,
@@ -65,7 +67,12 @@ function RecordExpenseSurface({ onClose, onRecorded }: { onClose: () => void; on
       await source.recordExpense(input, key.current.key);
       onRecorded();
     } catch (error) {
-      const { status, message } = error as { status?: number; message?: string };
+      const { status, message, code } = error as { status?: number; message?: string; code?: string };
+      if (account && moneyProblemFromServer(code, account.currency)) {
+        setAmountError(code ?? null);
+        setState("idle");
+        return;
+      }
       setProblem(status === 400 || status === 422 ? message || null : null);
       setState("failed");
     }
@@ -98,12 +105,22 @@ function RecordExpenseSurface({ onClose, onRecorded }: { onClose: () => void; on
           {t("business.review.merchant", "Merchant")}
           <input className={inputClass} value={merchant} onChange={(event) => setMerchant(event.target.value)} autoComplete="off" />
         </label>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 items-start gap-3">
           <label className="block text-[13px] font-medium text-black/60 dark:text-white/60">
             {account
               ? t("business.record.amount_in", "Total in {{currency}}", { currency: account.currency })
               : t("business.review.amount", "Total")}
-            <input inputMode="decimal" className={`${inputClass} tabular-nums`} value={amount} onChange={(event) => setAmount(event.target.value)} />
+            <MoneyInput
+              label={t("business.review.amount", "Total")}
+              currency={account?.currency ?? ""}
+              value={amount.value}
+              onValueChange={(change) => {
+                setAmount(change);
+                setAmountError(null);
+              }}
+              serverError={amountError}
+              testId="record-expense-amount"
+            />
           </label>
           <label className="block text-[13px] font-medium text-black/60 dark:text-white/60">
             {t("business.review.date", "Date")}
