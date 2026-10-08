@@ -777,3 +777,57 @@ def test_the_hosted_connection_must_be_on_port_5432() -> None:
     )
     with pytest.raises(applier.ApplyError, match="port 5432"):
         applier.verify_connection(wrong, [POOLER], ["postgres"], _approval())
+
+
+# --- unrecorded versions leave no trace, so each has an effect probe ------------------------
+
+
+class _EffectConnection:
+    def __init__(self, definitions: list[tuple[str, str]]) -> None:
+        self.definitions = definitions
+
+    def execute(self, sql: str) -> _Cursor:
+        assert "pg_constraint" in sql, "the probe only reads the catalog"
+        return _Cursor(list(self.definitions))  # type: ignore[arg-type]
+
+
+OLD = [
+    (
+        "backtest_runs_asset_class_check",
+        "CHECK (asset_class = ANY (ARRAY['equity', 'crypto']))",
+    ),
+    (
+        "strategies_asset_class_check",
+        "CHECK (asset_class = ANY (ARRAY['equity', 'crypto']))",
+    ),
+]
+NEW = [
+    (name, definition.replace("'crypto'", "'crypto', 'currency_pair'"))
+    for name, definition in OLD
+]
+
+
+def test_the_probe_sees_the_effect_only_when_both_checks_allow_currency_pair() -> None:
+    assert not applier.effect_present(_EffectConnection(OLD), "20260505000001")
+    assert applier.effect_present(_EffectConnection(NEW), "20260505000001")
+    assert not applier.effect_present(_EffectConnection(NEW[:1]), "20260505000001")
+    assert not applier.effect_present(_EffectConnection([]), "20260505000001")
+
+
+def test_an_unrecorded_version_whose_effect_exists_is_refused_before_it_runs() -> None:
+    steps = applier.plan_steps(CANDIDATES, APPLIED, [], ["20260505000001"])
+    applier.check_unrecorded_effects(_EffectConnection(OLD), steps)
+    with pytest.raises(applier.ApplyError, match="already has its effect"):
+        applier.check_unrecorded_effects(_EffectConnection(NEW), steps)
+
+
+def test_an_unrecorded_version_without_a_probe_is_refused() -> None:
+    candidates = [*CANDIDATES, _migration("20260101000001", "old_other")]
+    steps = applier.plan_steps(candidates, APPLIED, [], ["20260101000001"])
+    with pytest.raises(applier.ApplyError, match="no effect probe"):
+        applier.check_unrecorded_effects(_EffectConnection(OLD), steps)
+
+
+def test_recorded_steps_need_no_probe() -> None:
+    steps = applier.plan_steps(CANDIDATES, APPLIED, ["20260925120000"])
+    applier.check_unrecorded_effects(_EffectConnection(NEW), steps)

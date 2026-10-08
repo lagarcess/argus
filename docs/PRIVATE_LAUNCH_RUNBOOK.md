@@ -980,6 +980,18 @@ After a stop, everything printed as committed stays applied; recorded files show
 in the ledger, but `--unrecorded` steps leave no trace, so take each reported one
 out of the retry command.
 
+**Unrecorded versions.** A version at or below the gate's reconciliation threshold
+cannot be recorded without breaking the pinned hand-reconciled history, so it runs
+with `--unrecorded` and leaves no ledger row. With no row, the ledger cannot stop a
+repeat, so each such version has a read-only effect probe in the tool. Today there
+is one: `20260505000001` (it widens `strategies_asset_class_check` and
+`backtest_runs_asset_class_check` to allow `currency_pair`; its probe reads both
+definitions with `pg_get_constraintdef`). The tool refuses an unrecorded version
+that has no probe, refuses one whose effect is already present (before anything
+runs, including in a dry run), and after the run checks the effect is visible. The
+file is also idempotent, so a repeat would end in the same state, but the tool does
+not rely on that.
+
 **Hosted targets.** Pass `--hosted-approval <path>` with a JSON record under
 `docs/release-manifests/` (the tool refuses any other path), committed on top of
 the candidate commit, and `--ssl-root-cert <CA bundle>`. It has exactly these

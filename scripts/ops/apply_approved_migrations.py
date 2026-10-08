@@ -433,6 +433,45 @@ def plan_steps(
     return steps
 
 
+def _currency_pair_checks_present(rows: Sequence[Sequence[object]]) -> bool:
+    return len(rows) == 2 and all("currency_pair" in str(row[1]) for row in rows)
+
+
+# A version run without a ledger row leaves no trace, so each one needs a read-only probe of its own
+# effect. The probe refuses an accidental repeat before the run and verifies the effect after it.
+_EFFECT_PROBES = {
+    "20260505000001": (
+        "select conname, pg_get_constraintdef(oid) from pg_constraint"
+        " where conname in ('strategies_asset_class_check', 'backtest_runs_asset_class_check')"
+        " order by conname",
+        _currency_pair_checks_present,
+    ),
+}  # fmt: skip
+
+
+def effect_present(connection: object, version: str) -> bool:
+    """Read-only: has this unrecorded version's effect already happened?"""
+
+    probe = _EFFECT_PROBES.get(version)
+    if probe is None:
+        raise ApplyError(
+            f"unrecorded version {version} has no effect probe, so a repeat could not be detected"
+        )
+    query, present = probe
+    rows = connection.execute(query).fetchall()  # type: ignore[attr-defined]
+    return present(rows)
+
+
+def check_unrecorded_effects(connection: object, steps: Sequence[Step]) -> None:
+    """Refuse an unrecorded step whose effect already exists, before anything runs."""
+
+    for step in steps:
+        if not step.record and effect_present(connection, step.version):
+            raise ApplyError(
+                f"unrecorded version {step.version} already has its effect; take it out of --unrecorded"
+            )
+
+
 def read_ledger_versions(connection: object) -> list[str]:
     rows = connection.execute(  # type: ignore[attr-defined]
         "select version from supabase_migrations.schema_migrations order by version"
@@ -576,6 +615,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.unrecorded,
             args.allow_mid_file_commit,
         )
+        check_unrecorded_effects(connection, steps)
         for step in steps:
             label = "RECORD" if step.record else "NO-LEDGER"
             print(f"{label:9} {step.version} {step.name} [{step.classification}]")
@@ -602,6 +642,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "be read from the ledger; NO-LEDGER steps leave no trace, so take every one that "
                 "was reported committed out of the retry command"
             ) from error
+        for step in steps:
+            if not step.record and not effect_present(connection, step.version):
+                raise ApplyError(
+                    f"unrecorded version {step.version} ran but its effect is not visible afterwards"
+                )
         print(f"applied {len(done)} step(s)")
     return 0
 
