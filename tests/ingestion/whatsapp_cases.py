@@ -151,6 +151,10 @@ async def linked_image_is_saved_unqueued_and_replay_converges(world: World) -> N
         connection_id,
         world.alice,
     )
+    assert world.store.captured_connections(destination_owner_id=world.alice) == {
+        connection_id
+    }
+    assert world.store.captured_connections(destination_owner_id=world.bob) == set()
     assert RefusingExtractor.calls == 0
     assert world.transport.bodies()[-1] == (
         "Recibimos tu recibo y lo guardamos en tu bandeja. "

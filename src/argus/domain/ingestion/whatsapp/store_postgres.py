@@ -93,6 +93,16 @@ class PostgresWhatsAppStore:
             ).fetchone()
         return _record(row) if row else None
 
+    def captured_connections(self, *, destination_owner_id: str) -> frozenset[str]:
+        with self._pool.connection() as connection:
+            rows = connection.execute(
+                "select distinct connection_id::text from public.whatsapp_inbound_messages "
+                "where destination_owner_id = %s and status = 'captured' "
+                "and connection_id is not null",
+                (destination_owner_id,),
+            ).fetchall()
+        return frozenset(row[0] for row in rows)
+
     def issue_code(
         self,
         *,
