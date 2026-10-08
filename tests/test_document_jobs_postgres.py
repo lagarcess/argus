@@ -410,26 +410,33 @@ async def test_two_running_instances_recover_a_dead_worker_without_restart(
                 dispatch=lambda service: InProcessDispatcher(loop, service),
             ),
         ]
+        # The sweepers scan every row in the database on a real clock, so they
+        # must not outlive this test whatever it raises.
         sweepers = [asyncio.create_task(sweep_forever(api.jobs, 0.02)) for api in apis]
-        connection = await capture(apis[0].service, owner)
-        apis[0].jobs.start(user_id=owner, connection_id=connection)
-        while gated.entered == 0:
-            await asyncio.sleep(0.01)
-        await asyncio.sleep(0.2)
-        assert sum(len(api.attempts(connection)) for api in apis) == 1
+        try:
+            connection = await capture(apis[0].service, owner)
+            apis[0].jobs.start(user_id=owner, connection_id=connection)
+            for _ in range(500):
+                if gated.entered:
+                    break
+                await asyncio.sleep(0.01)
+            assert gated.entered == 1
+            await asyncio.sleep(0.2)
+            assert sum(len(api.attempts(connection)) for api in apis) == 1
 
-        clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
-        for _ in range(500):
-            draft = apis[0].service.get(
-                user_id=owner, connection_id=connection, scope=PERSONAL
-            )
-            if draft.status == "review_ready":
-                break
-            await asyncio.sleep(0.01)
-        await asyncio.sleep(0.2)
-        for sweeper in sweepers:
-            sweeper.cancel()
-        gated.release.set()
+            clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
+            for _ in range(500):
+                draft = apis[0].service.get(
+                    user_id=owner, connection_id=connection, scope=PERSONAL
+                )
+                if draft.status == "review_ready":
+                    break
+                await asyncio.sleep(0.01)
+            await asyncio.sleep(0.2)
+        finally:
+            for sweeper in sweepers:
+                sweeper.cancel()
+            gated.release.set()
 
         assert draft.status == "review_ready"
         assert sum(len(api.attempts(connection)) for api in apis) == 2

@@ -1,7 +1,7 @@
 # Argus iPhone foundation
 
 A SwiftUI foundation, offline by default, with Home, Accounts, Argus, Plan and Search in
-the approved order. It runs as **Argus Sample**. Navigation, local search and
+the approved order. It runs as **Cuadrao**. Navigation, local search and
 Light / Dark / System appearance work. With authentication disabled, financial figures are immutable display fixtures.
 With authentication configured, Home and Accounts use canonical server records. An optional, default-off
 registered-session adapter connects existing Argus authentication. See

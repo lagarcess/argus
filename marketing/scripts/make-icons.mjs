@@ -1,4 +1,4 @@
-// Renders the provisional Cuadrao mark (app/icon.svg) to the PNG and ICO files
+// Renders the Cuadrao mark (app/icon.svg, "Lean, calm") to the PNG and ICO files
 // browsers request by convention. Run after editing the SVG: node scripts/make-icons.mjs
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -34,9 +34,9 @@ header.writeUInt16LE(1, 2);
 header.writeUInt16LE(1, 4);
 header.writeUInt8(48, 6);
 header.writeUInt8(48, 7);
-header.writeUInt16LE(1, 12);
-header.writeUInt16LE(32, 14);
-header.writeUInt32LE(png.length, 14 + 4);
+header.writeUInt16LE(1, 10);
+header.writeUInt16LE(32, 12);
+header.writeUInt32LE(png.length, 14);
 header.writeUInt32LE(22, 18);
 writeFileSync(join(root, "app/favicon.ico"), Buffer.concat([header, png]));
 

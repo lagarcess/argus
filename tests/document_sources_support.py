@@ -1,5 +1,7 @@
 """Retained document sources for real-Postgres tests: the local Supabase
-Storage when the stack is configured, otherwise the in-memory object store."""
+Storage when the stack is configured, otherwise one in-memory bucket. Either
+way every store in the process reads the same bucket, as API instances share
+Storage in production."""
 
 import os
 
@@ -11,11 +13,12 @@ from argus.domain.ingestion.documents.objects import (
 )
 
 LOCAL_STORAGE = bool(os.getenv("ARGUS_LOCAL_SUPABASE_URL", "").strip())
+_BUCKET = InMemorySourceObjects()
 
 
 def source_objects() -> SourceObjects:
     if not LOCAL_STORAGE:
-        return InMemorySourceObjects()
+        return _BUCKET
     from tests.local_supabase_support import local_supabase_gateway
 
     return SupabaseSourceObjects(local_supabase_gateway().client.storage)
