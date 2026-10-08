@@ -36,7 +36,7 @@ export default function ComposerAttachControl() {
             aria-label={t("business.composer_receipt.dismiss", "Dismiss")}
             title={t("business.composer_receipt.dismiss", "Dismiss")}
             onClick={clearAttachedReceipt}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5 dark:hover:bg-white/5"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full hover:bg-black/5 focus-visible:outline-none focus-visible:ring-[0.125rem] focus-visible:ring-black/25 dark:hover:bg-white/5 dark:focus-visible:ring-white/30"
           >
             <X className="h-4 w-4" />
           </button>
