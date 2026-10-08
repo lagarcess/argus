@@ -143,64 +143,121 @@ export function planNotice(pending: ActiveSignup[], only: string[] | null): Noti
   return { recipients: pending.filter((row) => wanted.has(row.email)), stamp: false };
 }
 
+export type NoticeResult = {
+  sent: number;
+  // Sent nothing: the provider answered with a refusal, and the claim was released.
+  failed: number;
+  // Not eligible any more when its turn came (removed or already notified).
+  skipped: number;
+  // The send's outcome is unknown after a retry. The row stays claimed so no rerun
+  // can mail it again; the operator checks the provider by this digest.
+  unknownOutcome: string[];
+  // A claim got no usable answer. That row may be claimed but unsent; the run stopped.
+  claimUncertain: string[];
+  // The run stopped before sending anything further.
+  stoppedEarly: boolean;
+};
+
+// A row is claimed (notified_at set) before its message is sent. The claim only
+// succeeds for a row that is still active and not yet notified, so a removal or an
+// earlier notice is respected at the moment of sending. A failure to claim sends
+// nothing. A plain refusal (4xx other than 409) releases the claim. A lost response is retried once under the
+// same idempotency key, which the provider answers without sending twice; if that
+// still gives no answer the row stays claimed rather than risk a second message.
 export async function sendNotice(
   config: OpsConfig,
   template: NoticeTemplate,
   plan: NoticePlan,
   doFetch: typeof fetch,
   now: () => Date = () => new Date(),
-): Promise<{ sent: number; failed: number; sentNotRecorded: string[]; stoppedEarly: boolean }> {
-  let sent = 0;
-  let failed = 0;
-  const sentNotRecorded: string[] = [];
-  let stoppedEarly = false;
+): Promise<NoticeResult> {
+  const result: NoticeResult = { sent: 0, failed: 0, skipped: 0, unknownOutcome: [], claimUncertain: [], stoppedEarly: false };
+
+  const patch = async (query: string, body: Record<string, unknown>, returning: boolean) =>
+    checked(
+      await doFetch(table(config, query), {
+        method: "PATCH",
+        headers: restHeaders(config, { Prefer: returning ? "return=representation" : "return=minimal" }),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+      }),
+      "updating the signup",
+    );
+
+  const send = (row: ActiveSignup, key: string) =>
+    doFetch(`${config.resendApiUrl}/emails`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${config.resendApiKey}`,
+        "Content-Type": "application/json",
+        "Idempotency-Key": key,
+      },
+      body: JSON.stringify({
+        from: config.noticeFrom,
+        to: [row.email],
+        reply_to: businessContactEmail,
+        subject: template.subject[row.language],
+        text: template.text[row.language],
+      }),
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    });
+
   for (const row of plan.recipients) {
     const key = `${plan.stamp ? "notice" : "notice-test"}-${template.id}-${row.email_digest}`;
-    try {
-      const response = await doFetch(`${config.resendApiUrl}/emails`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.resendApiKey}`,
-          "Content-Type": "application/json",
-          "Idempotency-Key": key,
-        },
-        body: JSON.stringify({
-          from: config.noticeFrom,
-          to: [row.email],
-          reply_to: businessContactEmail,
-          subject: template.subject[row.language],
-          text: template.text[row.language],
-        }),
-        signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    } catch {
-      failed += 1;
-      continue;
+    const claimedAt = now().toISOString();
+    const active = `?email_digest=eq.${row.email_digest}&removed_at=is.null`;
+
+    if (plan.stamp) {
+      try {
+        const claimed = (await (await patch(`${active}&notified_at=is.null`, { notified_at: claimedAt }, true)).json()) as unknown[];
+        if (claimed.length === 0) {
+          result.skipped += 1;
+          continue;
+        }
+      } catch {
+        // The update may have been saved even though its answer was lost, so this
+        // row can be claimed and unsent. Name it and stop; nothing further is sent.
+        result.claimUncertain.push(row.email_digest);
+        result.stoppedEarly = true;
+        break;
+      }
     }
-    sent += 1;
-    if (!plan.stamp) continue;
-    // The message is out. A failed stamp is reported on its own, because
-    // sending that row again after the idempotency window would double-send.
-    try {
-      await checked(
-        await doFetch(table(config, `?email_digest=eq.${row.email_digest}&removed_at=is.null`), {
-          method: "PATCH",
-          headers: restHeaders(config, { Prefer: "return=minimal" }),
-          body: JSON.stringify({ notified_at: now().toISOString() }),
-          signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
-        }),
-        "recording the notice",
-      );
-    } catch {
-      // The database stopped recording. Sending on would mail people it cannot
-      // remember, so stop here and hand the operator exactly who was sent.
-      sentNotRecorded.push(row.email_digest);
-      stoppedEarly = true;
-      break;
+
+    let response: Response | null = null;
+    // A request that got no answer may still have been processed, so once any
+    // attempt is lost a later refusal proves nothing about the first.
+    let lost = false;
+    for (let attempt = 0; attempt < 2 && response === null; attempt += 1) {
+      try {
+        response = await send(row, key);
+      } catch {
+        lost = true;
+        response = null;
+      }
+    }
+
+    // Only a plain client-side refusal on a request that was never lost proves
+    // nothing was sent. A 409 (a request with this key is still in flight), a 5xx
+    // or any answer after a lost attempt may have been processed.
+    const refused =
+      !lost && response !== null && response.status >= 400 && response.status < 500 && response.status !== 409;
+    if (response?.ok) {
+      result.sent += 1;
+    } else if (refused) {
+      result.failed += 1;
+      if (plan.stamp) {
+        try {
+          await patch(`${active}&notified_at=eq.${encodeURIComponent(claimedAt)}`, { notified_at: null }, false);
+        } catch {
+          // Could not release: the row stays claimed, which is the safe direction.
+          result.unknownOutcome.push(row.email_digest);
+        }
+      }
+    } else {
+      result.unknownOutcome.push(row.email_digest);
     }
   }
-  return { sent, failed, sentNotRecorded, stoppedEarly };
+  return result;
 }
 
 export type { OpsConfig };
