@@ -632,9 +632,11 @@ async def forwarded_and_captioned_messages_capture_like_a_direct_send(
     assert RefusingExtractor.calls == 0
 
 
-async def a_link_revoked_before_settling_keeps_no_capture(world: World) -> None:
-    await world.link(world.alice, ALICE_PHONE)
-    world.graph.media["700000000000140"] = Media(RECEIPT_PNG, "image/png")
+async def _revoke_while_capturing(
+    world: World, language: str, media_id: str, message_id: str
+) -> None:
+    await world.link(world.alice, ALICE_PHONE, language)
+    world.graph.media[media_id] = Media(RECEIPT_PNG, "image/png")
     destination = world.intake.destination
     capture = destination.capture
 
@@ -644,9 +646,9 @@ async def a_link_revoked_before_settling_keeps_no_capture(world: World) -> None:
         return captured
 
     destination.capture = capture_then_revoke  # type: ignore[method-assign]
-    await world.deliver(image("700000000000140", "wamid.CASE-REVOKED-IN-FLIGHT"))
+    await world.deliver(image(media_id, message_id))
 
-    record = world.record("wamid.CASE-REVOKED-IN-FLIGHT")
+    record = world.record(message_id)
     assert (
         record.status,
         record.error_code,
@@ -654,9 +656,34 @@ async def a_link_revoked_before_settling_keeps_no_capture(world: World) -> None:
         record.destination_owner_id,
     ) == ("rejected", "sender_link_revoked", None, world.alice)
     assert world.store.captured_connections(destination_owner_id=world.alice) == set()
+    assert [
+        row.id
+        for row in world.documents.hub.connections.list(
+            user_id=world.alice, scope=world.business(world.alice)
+        )
+        if row.status != "disconnected"
+    ] == []
+
+
+async def a_link_revoked_before_settling_keeps_no_capture(world: World) -> None:
+    await _revoke_while_capturing(
+        world, "es-419", "700000000000140", "wamid.CASE-REVOKED-IN-FLIGHT"
+    )
     assert world.transport.bodies()[-1] == (
         "Este número no está conectado a Cuadrao. "
         "Conéctalo desde Cuadrao en la web y vuelve a enviar el recibo."
+    )
+
+
+async def a_link_revoked_before_settling_answers_in_the_links_language(
+    world: World,
+) -> None:
+    await _revoke_while_capturing(
+        world, "en", "700000000000141", "wamid.CASE-REVOKED-IN-FLIGHT-EN"
+    )
+    assert world.transport.bodies()[-1] == (
+        "This number isn't connected to Cuadrao. "
+        "Connect it from Cuadrao on the web, then send the receipt again."
     )
 
 
@@ -759,6 +786,7 @@ CASES = (
     same_bytes_in_a_new_message_get_the_duplicate_reply,
     forwarded_and_captioned_messages_capture_like_a_direct_send,
     a_link_revoked_before_settling_keeps_no_capture,
+    a_link_revoked_before_settling_answers_in_the_links_language,
     a_failed_code_answers_in_the_senders_linked_language,
     one_failing_message_does_not_stop_the_rest,
     media_urls_off_the_meta_allowlist_are_never_fetched,

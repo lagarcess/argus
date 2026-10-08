@@ -54,8 +54,12 @@ class Settlement:
 
 
 def revoked(settlement: Settlement) -> Settlement:
-    return Settlement(
-        "rejected", settlement.destination_owner_id, error_code=SENDER_LINK_REVOKED
+    return replace(
+        settlement,
+        status="rejected",
+        connection_id=None,
+        error_code=SENDER_LINK_REVOKED,
+        duplicate=False,
     )
 
 

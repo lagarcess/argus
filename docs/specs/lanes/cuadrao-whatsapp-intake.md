@@ -113,7 +113,7 @@ it with Ctrl-C and delete the callback URL in the Meta dashboard.
 ## The Business destination
 
 The founder chose separate Personal and Business spaces on October 8
-([slice plan](cuadrao-business-space-slice-plan.md)).
+([slice plan, PR #910](https://github.com/lagarcess/argus/pull/910)).
 
 - Intake is on only while the Business pilot is on. Linking needs the person's
   Business space: the link routes answer 404 `business_space_missing` until the

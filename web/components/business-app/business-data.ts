@@ -59,3 +59,44 @@ export const liveBusinessDataSource: BusinessDataSource = {
   recordExpense: api.recordBusinessExpense,
   createAccount: api.createBusinessAccount,
 };
+
+/**
+ * Every Business call needs the person's space, so the first call starts it
+ * once and every call waits for it; a failed start is retried by the next call.
+ */
+export function withBusinessSpace(
+  source: BusinessDataSource,
+  language: () => ArgusLanguage,
+): BusinessDataSource {
+  let started: Promise<BusinessSpace> | null = null;
+  const ready = () => {
+    started ??= source.ensureSpace(language()).catch((error: unknown) => {
+      started = null;
+      throw error;
+    });
+    return started;
+  };
+  const after =
+    <A extends unknown[], R>(call: (...args: A) => Promise<R>) =>
+    async (...args: A): Promise<R> => {
+      await ready();
+      return call(...args);
+    };
+  return {
+    mode: source.mode,
+    ensureSpace: ready,
+    workspace: after(source.workspace),
+    overview: after(source.overview),
+    receipts: after(source.receipts),
+    receipt: after(source.receipt),
+    receiptSource: after(source.receiptSource),
+    updates: after(source.updates),
+    expenses: after(source.expenses),
+    uploadReceipt: after(source.uploadReceipt),
+    prepareReceipt: after(source.prepareReceipt),
+    saveReview: after(source.saveReview),
+    confirmReceipt: after(source.confirmReceipt),
+    recordExpense: after(source.recordExpense),
+    createAccount: after(source.createAccount),
+  };
+}

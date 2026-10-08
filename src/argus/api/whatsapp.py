@@ -8,6 +8,7 @@ off. Every route answers 404 when off.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from dataclasses import dataclass
@@ -107,6 +108,17 @@ class DocumentsDestination:
         except DocumentServiceError:
             raise CaptureFailed("whatsapp_capture_failed") from None
         return Captured(outcome.connection_id, already_held=outcome.replayed)
+
+    async def discard(self, *, owner_id: str, connection_id: str) -> None:
+        scope = resolve_business_scope(self.spaces, owner_id)
+        if scope is None:
+            return
+        await asyncio.to_thread(
+            self.documents.hub.disconnect,
+            user_id=owner_id,
+            connection_id=connection_id,
+            scope=scope.owner,
+        )
 
 
 @dataclass(frozen=True)

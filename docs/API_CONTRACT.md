@@ -8767,17 +8767,19 @@ owned only by them. Each route takes its scope from
 only that space's accounts, documents, imports and expenses. Personal routes
 never return Business records, and a Business route never returns Personal
 ones: an id from the other side, or from another person, is 404. Until the
-person starts their space, every route below except the space routes answers
-404 `business_space_missing`
-([slice plan](specs/lanes/cuadrao-business-space-slice-plan.md)).
+person starts their space, every route below except POST `/space` answers 404
+`business_space_missing`
+([slice plan, PR #910](https://github.com/lagarcess/argus/pull/910)).
 
 - POST `/api/v1/business/space` takes `{name?, language?}` and answers 201
   `{id, name}` with a new space, or 200 with the existing one unchanged.
   Without `name` the space is named "Mi negocio", or "My business" when
   `language` is `en`. Concurrent calls create one space. A name is 1 to 80
   characters after trimming, else 422.
-- GET `/api/v1/business/space` returns `{id, name}`.
-- PATCH `/api/v1/business/space` takes `{name}` and returns the renamed space.
+- GET `/api/v1/business/space` returns `{id, name}`, or 404
+  `business_space_missing` before the space is started.
+- PATCH `/api/v1/business/space` takes `{name}` and returns the renamed space,
+  or 404 `business_space_missing` before the space is started.
 
 Each fact keeps its owner. A receipt is a document draft (`id` is its
 connection id). Its review is the import event its purchase created, composed

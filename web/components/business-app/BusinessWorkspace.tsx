@@ -24,7 +24,7 @@ import type {
   ReceiptSummary,
 } from "@/lib/business-api";
 import { normalizeEnabledLanguage } from "@/lib/language-features";
-import type { BusinessDataSource } from "./business-data";
+import { withBusinessSpace, type BusinessDataSource } from "./business-data";
 import { periodRange, type Period } from "./business-format";
 import { useBusinessActions, type BusinessActions } from "./business-actions";
 import BusinessSidebarNav from "./BusinessSidebarNav";
@@ -111,14 +111,17 @@ function writePanelToUrl(view: ChatShellView, panel: BusinessPanelState) {
 }
 
 export function BusinessWorkspaceProvider({
-  source,
+  source: apiSource,
   children,
 }: {
   source: BusinessDataSource;
   children: ReactNode;
 }) {
   const { t, i18n } = useTranslation();
-  const language = normalizeEnabledLanguage(i18n.language);
+  const source = useMemo(
+    () => withBusinessSpace(apiSource, () => normalizeEnabledLanguage(i18n.language)),
+    [apiSource, i18n],
+  );
   const searchParams = useSearchParams();
   const [panel, setPanel] = useState<BusinessPanelState>(() =>
     panelFromSearch(new URLSearchParams(searchParams.toString())),
@@ -152,16 +155,11 @@ export function BusinessWorkspaceProvider({
 
   useEffect(() => {
     let cancelled = false;
-    // Every Business read needs the space, so the first entry starts it.
-    source
-      .ensureSpace(language)
-      .then(() =>
-        Promise.all([
-          source.workspace(),
-          source.overview(period.from, period.to),
-          source.receipts("inbox"),
-        ]),
-      )
+    Promise.all([
+      source.workspace(),
+      source.overview(period.from, period.to),
+      source.receipts("inbox"),
+    ])
       .then(([workspace, overview, inbox]) => {
         if (!cancelled) setRecords({ workspace, overview, inbox, error: false });
       })
@@ -171,7 +169,7 @@ export function BusinessWorkspaceProvider({
     return () => {
       cancelled = true;
     };
-  }, [language, period.from, period.to, revision, source]);
+  }, [period.from, period.to, revision, source]);
 
   // The shell may replace the route while leaving a conversation; writing again
   // once that navigation lands keeps the panel in the address bar.

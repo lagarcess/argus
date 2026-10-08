@@ -58,6 +58,7 @@ class BusinessPerson:
 def require_business_person(
     request: Request,
     _surface: None = Depends(require_business_surface),  # noqa: B008
+    _documents: DocumentsService = Depends(require_document_surface),  # noqa: B008
     context: IngestionContext = Depends(require_ingestion_context),  # noqa: B008
 ) -> BusinessPerson:
     """The signed-in person and the space store, for the space routes."""

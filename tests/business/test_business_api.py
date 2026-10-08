@@ -146,6 +146,21 @@ def test_flag_off_every_route_is_404_before_auth(client: TestClient, monkeypatch
     assert {r.headers["Cache-Control"] for r in calls} == {"no-store"}
 
 
+def test_space_routes_wait_for_the_document_surface(
+    biz: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    alice = Owner(biz, ALICE)
+    monkeypatch.setenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED", "false")
+    off = [
+        alice.start(),
+        alice.get("/space"),
+        biz.patch(f"{BASE}/space", json={"name": "Taller"}, headers=alice.auth),
+    ]
+    assert [r.status_code for r in off] == [404] * 3
+    monkeypatch.setenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED", "true")
+    assert alice.get("/space").json()["code"] == "business_space_missing"
+
+
 def test_flag_on_still_requires_a_registered_session(biz: TestClient) -> None:
     assert biz.get(f"{BASE}/workspace").status_code == 401
     assert biz.post(f"{BASE}/space", json={}).status_code == 401
