@@ -145,14 +145,18 @@ the asset compiler does not store oversized bitmaps; paths unchanged). Take the 
 re-colour or re-set them in a font.
 
 - **Wordmark.** Lowercase `cuadrao`, Space Grotesk 2.0.0, weight 700, letter-spacing
-  -0.085em, line-height 1 (the website's `.wordmark`; SIL OFL 1.1). Native code shows
-  it only as the outlined SVG, never as live text, so the font is neither shipped nor
+  -0.085em, line-height 1, with the font's kerning on (a-d, r-a, a-o), the website's
+  `.wordmark`; SIL OFL 1.1. Native code shows it only as the outlined SVG, which
+  already carries the kerning, never as live text, so the font is neither shipped nor
   approximated. Earlier icon sheets used 600 / -0.045em; that was an approximation.
 - **Lockup.** Mark and wordmark as one composition. With the wordmark's font size as
-  1 em: mark height 1 em (width 1.17 em), gap 0.25 em, the mark's centre 0.35 em above
-  the baseline, clear space 0.5 em on every side. Minimum: wordmark at 20 px font size,
+  1 em: mark height 1 em (the mark's ink is about 1.11 em wide), gap 0.25 em from the
+  mark's unrounded box (about 0.28 em between ink and first letter), the mark's centre
+  0.35 em above the baseline, clear space 0.5 em on every side. The lockup SVGs'
+  viewBox is authoritative; do not recompute these numbers from prose. Minimum: wordmark at 20 px font size,
   mark alone at 16 px.
-- **Files.** `cuadrao-lockup-light.svg` / `cuadrao-lockup-dark.svg` (welcome),
+- **Files.** Each brand SVG names its gradients `a`, `b`, `c`: use them as image files
+  (asset catalog), never inline two of them in one document. `cuadrao-lockup-light.svg` / `cuadrao-lockup-dark.svg` (welcome),
   `icon.svg` (app icon and favicon, tiled), `cuadrao-mark-light.svg` (mark alone on
   light), `cuadrao-mark-dark.svg` (mark alone on `#172b26` only).
 - **Colours.** Light surface `#fafbf8`: wordmark `#172b26`; mark front `#2f5a49` to
