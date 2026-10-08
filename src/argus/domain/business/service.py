@@ -361,7 +361,7 @@ class BusinessService:
             for hit in found
             if isinstance(hit, financial_search.ActivityHit)
         ]
-        expenses = self._expenses(scope, activities, date.min, date.max)
+        expenses = self._expenses(scope, activities, date.min, date.max)[:limit]
         listed = {expense["id"] for expense in expenses}
         receipts = [
             receipt.summary()
@@ -380,7 +380,7 @@ class BusinessService:
             if isinstance(hit, financial_search.AccountHit)
         ]
         return {
-            "expenses": expenses[:limit],
+            "expenses": expenses,
             "receipts": receipts[:limit],
             "accounts": accounts[:limit],
         }

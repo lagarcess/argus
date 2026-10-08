@@ -155,6 +155,39 @@ def test_manual_expenses_and_accounts_newest_first_and_capped(alice: Owner) -> N
     ]
 
 
+def test_a_receipt_whose_expense_is_past_the_cap_is_still_listed(alice: Owner) -> None:  # noqa: F811
+    account = alice.account()
+    receipt_id = prepared(alice)
+    version = alice.review(
+        receipt_id,
+        alice.detail(receipt_id)["version"],
+        account_id=account,
+        merchant="Gasolina Shell",
+        occurred_on="2026-09-01",
+    ).json()["version"]
+    assert (
+        alice.confirm(receipt_id, version, str(uuid4())).json()["status"] == "confirmed"
+    )
+    for day in ("2026-10-02", "2026-10-03"):
+        made = alice.post(
+            "/expenses",
+            {
+                "account_id": account,
+                "amount": "100.00",
+                "occurred_on": day,
+                "merchant": "Gasolina Shell",
+                "category_id": "transport",
+            },
+            key=str(uuid4()),
+        )
+        assert made.status_code == 201, made.text
+
+    found = alice.get("/search", q="gasolina", limit="2").json()
+
+    assert [e["receipt_id"] for e in found["expenses"]] == [None, None]
+    assert [r["id"] for r in found["receipts"]] == [receipt_id]
+
+
 def test_another_owner_finds_nothing(alice: Owner, bob: Owner) -> None:  # noqa: F811
     account = alice.account("DOP", "Caja")
     confirmed(alice, account, FERRETERIA)

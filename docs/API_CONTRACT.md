@@ -8851,7 +8851,10 @@ accept path recorded.
   the same way. The read stays stored and its `evidence` stays visible. The
   owner's one purchase is delivered beside the read, then every open purchase
   the read created is dismissed and kept as history, so only the owner's can
-  become the expense. Each later review and confirm repeats that dismissal, so
+  become the expense. A document read as several rows that are not a receipt,
+  such as a photographed statement, counts as no purchase: entering its one
+  expense dismisses all of those rows, each kept as history. Each later review
+  and confirm repeats that dismissal, so
   an interrupted entry finishes. A replay, a second tab or a restart enters one
   purchase and confirm records one expense. An account outside the Business
   space, Personal or another person's, is 404 `financial_account_not_found`,
@@ -8892,8 +8895,8 @@ accept path recorded.
   nickname, type and currency. A Business space has no plans, so no plan hits.
   Receipts match by the same rule on the reviewed merchant, the filename and
   the reviewed amount as written. Expenses and receipts are newest first. A
-  receipt whose expense is also a hit is left out, because the expense's
-  `receipt_id` opens it and its source.
+  receipt whose expense is among the returned expenses is left out, because the
+  expense's `receipt_id` opens it and its source.
 
 Another person's receipt id answers 404 `receipt_not_found` on every receipt
 route. 
