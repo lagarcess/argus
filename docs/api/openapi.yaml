@@ -8346,6 +8346,152 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/webhooks/whatsapp:
+    get:
+      tags:
+      - financial-accounts
+      - whatsapp
+      parameters:
+      - name: hub.mode
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 32
+          - type: 'null'
+      - name: hub.verify_token
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 256
+          - type: 'null'
+      - name: hub.challenge
+        in: query
+        required: false
+        schema:
+          anyOf:
+          - type: string
+            maxLength: 128
+          - type: 'null'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/plain:
+              schema:
+                type: string
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - financial-accounts
+      - whatsapp
+      description: 'Signature checked over the raw bytes before any parsing.
+
+
+        200 means every message in the delivery has a committed record. A failure
+
+        after that answers 503 so Meta redelivers; the redelivery resumes the
+
+        same record instead of starting a second capture.'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WebhookAck'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/whatsapp/link:
+    get:
+      tags:
+      - financial-accounts
+      - whatsapp
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkStatusResponse'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+      - financial-accounts
+      - whatsapp
+      responses:
+        '204':
+          description: Successful Response
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/whatsapp/link-codes:
+    post:
+      tags:
+      - financial-accounts
+      - whatsapp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/LinkCodeRequest'
+              - type: 'null'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LinkCodeResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 components:
   schemas:
     AcceptBatchBody:
@@ -14305,6 +14451,36 @@ components:
       required:
       - version
       - activity_id
+    LinkCodeRequest:
+      properties:
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: es-419
+      additionalProperties: false
+      type: object
+    LinkCodeResponse:
+      properties:
+        code:
+          type: string
+        message_text:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
+        wa_me_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - code
+      - message_text
+      - expires_at
+      - wa_me_url
     LinkReceipt:
       properties:
         occurrence:
@@ -14315,6 +14491,30 @@ components:
       required:
       - occurrence
       - replayed
+    LinkStatusResponse:
+      properties:
+        linked:
+          type: boolean
+        last4:
+          anyOf:
+          - type: string
+          - type: 'null'
+        linked_at:
+          anyOf:
+          - type: string
+            format: date-time
+          - type: 'null'
+        reply_language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      required:
+      - linked
     LinkTokenRequest:
       properties:
         language:
@@ -19459,6 +19659,14 @@ components:
       type: object
       required:
       - expected_version
+    WebhookAck:
+      properties:
+        received:
+          type: boolean
+      additionalProperties: false
+      type: object
+      required:
+      - received
     WebhookReceipt:
       properties:
         received:

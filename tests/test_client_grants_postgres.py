@@ -203,6 +203,9 @@ RELATIONS_WITHOUT_CLIENT_TABLE_GRANTS = frozenset(
         "public.strategies",
         "public.usage_counters",
         "public.visitor_usage_counters",
+        "public.whatsapp_inbound_messages",
+        "public.whatsapp_link_codes",
+        "public.whatsapp_sender_links",
     }
 )
 

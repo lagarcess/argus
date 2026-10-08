@@ -8692,3 +8692,50 @@ explicit `currency` settles only a bare `$` or an unmarked amount; any other
 marker it cannot vouch for (`R$`, `€` with `DOP`, `¥`) leaves currency
 unresolved. A sign or parentheses on the amount adds `direction` to the
 uncertain fields, and more than 18 digits leaves the amount unresolved.
+
+### WhatsApp receipt intake (default-off)
+
+Off unless `ARGUS_WHATSAPP_INTAKE_ENABLED` is true, its credentials are set and
+the document surface above is on. While off, every route below answers 404
+`whatsapp_unavailable`. A WhatsApp receipt becomes a document draft with
+`consent: false` and `status: saved`; AI preparation still waits for the
+owner's consent on the web. Spec and activation:
+[cuadrao-whatsapp-intake](specs/lanes/cuadrao-whatsapp-intake.md).
+
+The destination owner is the signed-in person today, read only through
+`resolve_intake_destination`. It is pending the Business boundary decision.
+
+- GET `/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…`
+  answers 200 `text/plain` with the challenge when the verify token matches,
+  else 403 `whatsapp_webhook_verification_failed`.
+- POST `/api/v1/webhooks/whatsapp` takes no session. `X-Hub-Signature-256`
+  must be `sha256=` HMAC-SHA256 of the raw body under the app secret, checked
+  in constant time before parsing: else 401 `whatsapp_webhook_rejected`. A body
+  over 512 KiB is 413 `whatsapp_webhook_too_large`; a signed body that is not
+  a WhatsApp `messages` change is 400 `whatsapp_webhook_invalid`. 200
+  `{received: true}` means every image, document and text message in it has a
+  settled delivery record; other message types and statuses are ignored. A
+  failure or timeout after the record commits, or a redelivery while another
+  worker still holds an unsettled message, answers 503
+  `whatsapp_webhook_retry`, and Meta's redelivery resumes that record. A
+  replayed message never captures twice or replies twice. The webhook query
+  string is redacted from uvicorn access logs.
+- POST `/api/v1/whatsapp/link-codes` (registered-only) takes an optional
+  `{language}`, the web app's current language (`es-419` or `en`, default
+  `es-419`; anything else is 422), and returns 201
+  `{code, message_text, expires_at, wa_me_url}`. The link the code creates keeps
+  that language for every WhatsApp reply. The code is single use, lives
+  10 minutes and replaces any unused code for the same destination.
+  `message_text` is `CUADRAO <code>`; `wa_me_url` is null until
+  `ARGUS_WHATSAPP_DISPLAY_PHONE_NUMBER` is set. Five codes per 10 minutes, then
+  429 `whatsapp_link_code_rate_limited`.
+- GET `/api/v1/whatsapp/link` returns `{linked, last4, linked_at, reply_language}`.
+- DELETE `/api/v1/whatsapp/link` revokes the active link and every unused code
+  for the destination, and answers 204, also when nothing was linked.
+
+Replies are sent only when `ARGUS_WHATSAPP_OUTBOUND_ENABLED` is true, always as
+a free-form answer to the person's own message, in one language: the sender
+link's `reply_language`, or Spanish for a sender with no active link. A new message
+whose bytes the owner's inbox already holds gets the duplicate reply. A message whose WhatsApp
+timestamp is more than 24 hours old is still captured but gets no reply, so
+nothing is sent outside the service window.
