@@ -169,6 +169,45 @@ class Recording:
                 )
         return results
 
+    def accept_reviewed(
+        self, *, user_id: str, event_id: str, version: int, idempotency_key: str
+    ) -> dict[str, Any]:
+        """Record one import as reviewed, with its preview built here.
+
+        For a client that confirms by version and key alone. A retry or a
+        concurrent confirm under the same key replays the claimed request
+        instead of previewing an import that is no longer open.
+        """
+
+        for _ in range(2):
+            with self.store.transaction(user_id) as tx:
+                event = tx.event(event_id)
+            if (
+                event.state in ("accepting", "accepted")
+                and event.accept_key == idempotency_key
+            ):
+                result = self._write(user_id, event, None, self.clock())
+                return {
+                    "event": self.detail(user_id=user_id, event_id=event_id),
+                    "activity": result["activity"],
+                    "replayed": True,
+                }
+            try:
+                request = self._reviewed_request(user_id, event_id)
+            except ReconcileError as error:
+                # Claimed by the same key between the read and the preview.
+                if error.code != "import_not_open":
+                    raise
+                continue
+            return self.accept(
+                user_id=user_id,
+                event_id=event_id,
+                idempotency_key=idempotency_key,
+                version=version,
+                request=request,
+            )
+        raise ReconcileError("import_not_open", "This import is not waiting for review.")
+
     def link_activity(
         self, *, user_id: str, event_id: str, activity_id: str, version: int
     ) -> dict[str, Any]:
@@ -220,22 +259,24 @@ class Recording:
             raise ReconcileError(
                 "import_possible_duplicate", "Review this one individually."
             )
-        preview = self.preview(user_id=user_id, event_id=event_id)["preview"]
-        if not preview["ready"]:
-            raise ReconcileError(
-                "balance_coverage_required", "Answer its balance question."
-            )
-        request = MoneyRequest.model_validate(preview["reviewed_request"]).model_copy(
-            update={"preview_token": preview["preview_token"]}
-        )
         result = self.accept(
             user_id=user_id,
             event_id=event_id,
             idempotency_key=key,
             version=version,
-            request=request,
+            request=self._reviewed_request(user_id, event_id),
         )
         return _outcome(event_id, result["activity"]["activity_id"], result["replayed"])
+
+    def _reviewed_request(self, user_id: str, event_id: str) -> MoneyRequest:
+        preview = self.preview(user_id=user_id, event_id=event_id)["preview"]
+        if not preview["ready"]:
+            raise ReconcileError(
+                "balance_coverage_required", "Answer its balance question."
+            )
+        return MoneyRequest.model_validate(preview["reviewed_request"]).model_copy(
+            update={"preview_token": preview["preview_token"]}
+        )
 
     def _complete(self, user_id: str, event: ImportEvent) -> None:
         try:
