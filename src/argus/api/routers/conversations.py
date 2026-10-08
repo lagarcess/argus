@@ -859,7 +859,9 @@ def list_messages(
     if has_more and page_items:
         last = page_items[-1]
         next_cursor = encode_cursor(last.created_at.isoformat(), last.id)
-    return PaginatedMessages(items=page_items, next_cursor=next_cursor)
+    return PaginatedMessages(
+        items=page_items, next_cursor=next_cursor, surface=conversation.surface
+    )
 
 
 @router.post(

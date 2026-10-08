@@ -3479,8 +3479,14 @@ Personal), so every conversation written before Business existed is Personal.
 that side's conversations, with the Business flag on or off. A request without
 `surface` is exactly the Personal request it was before. Reads by conversation
 id (messages, activity, `PATCH`, `DELETE /conversations/{id}`) stay owner-scoped
-and serve both sides. A continued computed answer keeps its source's side; a
-fork of a public receipt is Personal.
+and serve both sides. Every `Conversation` in a response (list, create, patch,
+continue, fork) carries `surface` (`personal` or `business`), and
+`GET /conversations/{id}/messages` returns the conversation's `surface` beside
+its items. A web shell that loads a conversation of the other surface sends it
+to `/chat` or `/biz` with the same id and does not render it. A continued
+computed answer keeps its source's side; a fork of a public receipt is
+Personal. The guest-only `GET /conversations?limit=2` reads (initial session,
+receipt follow-up) send no surface: guests have only Personal chats.
 
 Personal artifacts never attach to a Business conversation. The decision,
 computation re-run, evidence decision, sharing (`public-excerpt*`) and receipt
@@ -5987,7 +5993,7 @@ retrieval or provider.
 
 | Method | Path | Purpose |
 | :----- | :--- | :------ |
-| `GET`  | `/computations/answers?kind=&exclude_message_id=` | The owner's newest computed answers of one kind in live conversations, at most 10 |
+| `GET`  | `/computations/answers?kind=&exclude_message_id=&surface=` | The owner's newest computed answers of one kind in live conversations of one surface (`personal` by default, or `business`), at most 10 |
 | `POST` | `/computations/compare` | Two answers of one kind side by side |
 | `POST` | `/conversations/{conversation_id}/messages/{message_id}/continue` | A new chat carrying only this result |
 | `POST` | `/conversations/{conversation_id}/messages/{message_id}/computation/refresh` | Look the answer's cited inputs up again |

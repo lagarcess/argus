@@ -64,3 +64,12 @@ Playwright case found the Promising filter on /biz. At head all pass.
   same test-file errors as base; `eslint` 0 errors. Playwright with
   `PLAYWRIGHT_PORT=3671`: `business-pilot-preview`, `business-pilot-walkthrough`
   and `business-search-preview` 37 of 37.
+
+## Review fixes: surface in conversation responses
+
+After the review, every `Conversation` and the messages page carry `surface`,
+so the /chat bodies gain `"surface": "personal"`. The journey was rerun against
+the base and the new head. The only differences are 15 added `surface` lines
+(14 conversations and 1 messages page); with those lines removed the two dumps
+are identical. `flag-off-chat-journey.json` is now the head output. No request
+changed, and no other byte of any response changed.

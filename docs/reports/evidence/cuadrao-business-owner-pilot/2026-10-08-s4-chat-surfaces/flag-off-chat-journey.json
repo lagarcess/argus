@@ -119,6 +119,7 @@
       "template": null,
       "text": "How is my savings ledger doing?"
      },
+     "surface": "personal",
      "title": "Savings ledger",
      "title_source": "system_default",
      "updated_at": "<t2>"
@@ -149,6 +150,7 @@
       "template": null,
       "text": "How is my groceries ledger doing?"
      },
+     "surface": "personal",
      "title": "Groceries ledger",
      "title_source": "system_default",
      "updated_at": "<t3>"
@@ -190,6 +192,7 @@
       "template": null,
       "text": "How is my rent ledger doing?"
      },
+     "surface": "personal",
      "title": "Rent ledger",
      "title_source": "system_default",
      "updated_at": "<t4>"
@@ -231,6 +234,7 @@
       "template": null,
       "text": "How is my savings ledger doing?"
      },
+     "surface": "personal",
      "title": "Savings ledger",
      "title_source": "system_default",
      "updated_at": "<t2>"
@@ -261,6 +265,7 @@
       "template": null,
       "text": "How is my groceries ledger doing?"
      },
+     "surface": "personal",
      "title": "Groceries ledger",
      "title_source": "system_default",
      "updated_at": "<t3>"
@@ -291,6 +296,7 @@
       "template": null,
       "text": "How is my rent ledger doing?"
      },
+     "surface": "personal",
      "title": "Rent ledger",
      "title_source": "system_default",
      "updated_at": "<t4>"
@@ -574,7 +580,8 @@
      "role": "user"
     }
    ],
-   "next_cursor": null
+   "next_cursor": null,
+   "surface": "personal"
   },
   null
  ],
@@ -609,6 +616,7 @@
      "template": null,
      "text": "How is my savings ledger doing?"
     },
+    "surface": "personal",
     "title": "Savings ledger",
     "title_source": "system_default",
     "updated_at": "<t5>"
@@ -647,6 +655,7 @@
      "template": null,
      "text": null
     },
+    "surface": "personal",
     "title": "New idea",
     "title_source": "system_default",
     "updated_at": "<t6>"
@@ -685,6 +694,7 @@
      "template": null,
      "text": null
     },
+    "surface": "personal",
     "title": "Named",
     "title_source": "user_renamed",
     "updated_at": "<t7>"
@@ -826,6 +836,7 @@
       "template": null,
       "text": "How is my groceries ledger doing?"
      },
+     "surface": "personal",
      "title": "Groceries ledger",
      "title_source": "system_default",
      "updated_at": "<t9>"
@@ -856,6 +867,7 @@
       "template": null,
       "text": null
      },
+     "surface": "personal",
      "title": "Named",
      "title_source": "user_renamed",
      "updated_at": "<t9>"
@@ -886,6 +898,7 @@
       "template": null,
       "text": null
      },
+     "surface": "personal",
      "title": "New idea",
      "title_source": "system_default",
      "updated_at": "<t9>"
@@ -916,6 +929,7 @@
       "template": null,
       "text": "How is my rent ledger doing?"
      },
+     "surface": "personal",
      "title": "Rent ledger",
      "title_source": "system_default",
      "updated_at": "<t9>"
@@ -946,6 +960,7 @@
       "template": null,
       "text": "How is my savings ledger doing?"
      },
+     "surface": "personal",
      "title": "Savings ledger",
      "title_source": "system_default",
      "updated_at": "<t8>"

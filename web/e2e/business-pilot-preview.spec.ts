@@ -424,3 +424,58 @@ test.describe("Argus chat without a workspace", () => {
     await expect(page.getByTestId("business-sidebar-nav")).toHaveCount(0);
   });
 });
+
+test.describe("A conversation opens in the shell of its own surface", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  async function serveSurface(page: Page, surface: "personal" | "business", seen: string[]) {
+    await page.route("**/api/v1/conversations/*/messages?**", (route) => {
+      seen.push(new URL(route.request().url()).pathname);
+      return route.fulfill({
+        json: {
+          items: [
+            {
+              id: "message-1",
+              conversation_id: "conversation-alpha",
+              role: "user",
+              content: "Lunch with the supplier",
+              created_at: "2026-10-08T12:00:00Z",
+              metadata: {},
+            },
+          ],
+          next_cursor: null,
+          surface,
+        },
+      });
+    });
+  }
+
+  test("a Personal chat opened on /biz moves to /chat with its id", async ({ page }) => {
+    const seen: string[] = [];
+    await openPreview(page, PREVIEW, { emptyChat: false });
+    await serveSurface(page, "personal", seen);
+    await page.goto(`${PREVIEW}?conversation=conversation-alpha&message=message-1`);
+
+    await expect(page).toHaveURL(/\/chat\?conversation=conversation-alpha&message=message-1$/);
+    expect(seen.length).toBeGreaterThan(0);
+  });
+
+  test("a Business chat opened on /chat moves to /biz with its id", async ({ page }) => {
+    const seen: string[] = [];
+    await openPreview(page, "/chat", { emptyChat: false });
+    await serveSurface(page, "business", seen);
+    await page.goto("/chat?conversation=conversation-alpha");
+
+    await expect(page).toHaveURL(/\/biz\?conversation=conversation-alpha$/);
+  });
+
+  test("a chat on its own surface stays and renders", async ({ page }) => {
+    const seen: string[] = [];
+    await openPreview(page, "/chat", { emptyChat: false });
+    await serveSurface(page, "personal", seen);
+    await page.goto("/chat?conversation=conversation-alpha");
+
+    await expect(page.getByText("Lunch with the supplier").first()).toBeVisible();
+    await expect(page).toHaveURL(/\/chat\?conversation=conversation-alpha$/);
+  });
+});

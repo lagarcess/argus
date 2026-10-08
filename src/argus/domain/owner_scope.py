@@ -11,7 +11,7 @@ rule lives only here: ``sql_predicate``, ``sql_named_predicate`` and
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,12 @@ class BusinessSpace:
 
 OwnerScope = Personal | BusinessSpace
 PERSONAL = Personal()
+
+
+def surface_of(stored_space_id: object) -> Literal["personal", "business"]:
+    """The chat surface a stored ``owner_space_id`` belongs to."""
+
+    return "personal" if stored_space_id is None else "business"
 
 
 def space_id(scope: OwnerScope) -> str | None:
@@ -70,10 +76,12 @@ def sql_named_predicate(scope: OwnerScope, column: str) -> str:
 
 
 def sql_named_join_predicate(column: str) -> str:
-    """One text for both sides, for rows already reached by id through a join.
+    """One text for both sides, for SQL built once for either side.
 
     Bind ``SCOPE_PARAMETER`` to ``space_id``. Postgres cannot use an index for
-    ``is not distinct from``, so it is only for rows the join already found.
+    ``is not distinct from``, so use it only where another condition already
+    bounds the rows: a join by id, or the owner's ``user_id`` index, as in the
+    search reader's owner scans. A full scan needs ``sql_named_predicate``.
     """
 
     return f"{column} is not distinct from %({SCOPE_PARAMETER})s::uuid"

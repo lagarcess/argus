@@ -54,6 +54,7 @@ from argus.domain.home_country import (
     TenderCurrencyCode,
     resolved_currency,
 )
+from argus.domain.owner_scope import surface_of
 from argus.domain.result_readout_content import ResultReadoutContent
 from argus.domain.strategy_template_contract import (
     ExecutableStrategyTemplate as StrategyTemplate,
@@ -328,6 +329,16 @@ class Conversation(BaseModel):
     preview: ConversationPreview | None = None
     language: Language | None = None
     activity: ConversationActivity | None = None
+    #: The chats it belongs to, from its stored owner_space_id: Personal (/chat)
+    #: or Business (/biz). A shell that receives the other surface sends it there.
+    surface: ConversationSurface = "personal"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _surface_from_stored_space(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "owner_space_id" in data and "surface" not in data:
+            return {**data, "surface": surface_of(data["owner_space_id"])}
+        return data
 
 
 class ConversationResponse(BaseModel):
@@ -346,6 +357,8 @@ class Message(BaseModel):
 class PaginatedMessages(BaseModel):
     items: list[Message]
     next_cursor: str | None = None
+    #: The surface of the conversation these messages belong to.
+    surface: ConversationSurface = "personal"
 
 
 class PaginatedConversations(BaseModel):

@@ -315,3 +315,29 @@ def test_a_business_turn_recalls_no_memory(
         assert service.calls == 1
     finally:
         configure_memory_service(None)
+
+
+def test_every_conversation_response_names_its_surface(client: TestClient) -> None:
+    _start_space(ALICE)
+    personal = _create(client, ALICE, "Household ledger")
+    business = _create(client, ALICE, "Shop ledger", surface="business")
+
+    def surfaces(surface: str) -> dict[str, str]:
+        listed = client.get(
+            "/api/v1/conversations", params={"surface": surface}, headers=_as(ALICE)
+        ).json()["items"]
+        return {item["id"]: item["surface"] for item in listed}
+
+    assert surfaces("personal") == {personal: "personal"}
+    assert surfaces("business") == {business: "business"}
+    for conversation_id, surface in ((personal, "personal"), (business, "business")):
+        messages = client.get(
+            f"/api/v1/conversations/{conversation_id}/messages", headers=_as(ALICE)
+        )
+        assert messages.json()["surface"] == surface
+        patched = client.patch(
+            f"/api/v1/conversations/{conversation_id}",
+            json={"pinned": True},
+            headers=_as(ALICE),
+        )
+        assert patched.json()["conversation"]["surface"] == surface

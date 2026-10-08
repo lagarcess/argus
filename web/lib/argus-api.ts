@@ -49,6 +49,7 @@ import {
   unauthenticatedApiFetch,
 } from "./argus-api-transport";
 import { appendSurface, surfaceQuery, type ConversationSurface } from "./conversation-surface-api";
+import { requireConversationInShell } from "./conversation-surface-guard";
 
 export { apiFetch, unauthenticatedApiFetch } from "./argus-api-transport";
 export type { ConversationSurface } from "./conversation-surface-api";
@@ -239,6 +240,7 @@ export type Conversation = {
   preview?: ConversationPreview | null;
   language?: "en" | "es-419" | null;
   activity?: ConversationActivity | null;
+  surface?: ConversationSurface;
 };
 
 type AuthSessionPayload = {
@@ -774,10 +776,12 @@ export async function getConversationMessages(
   if (options.anchorMessageId) {
     searchParams.append("anchor_message_id", options.anchorMessageId);
   }
-  return apiFetch<{ items: ApiMessage[]; next_cursor: string | null }>(
+  const page = await apiFetch<{ items: ApiMessage[]; next_cursor: string | null; surface?: ConversationSurface }>(
     `/conversations/${conversationId}/messages?${searchParams.toString()}`,
     { signal: options.signal },
   );
+  requireConversationInShell(conversationId, page.surface);
+  return page;
 }
 
 export async function addConfirmationPeerAssets(

@@ -25,7 +25,7 @@ from argus.domain.confirmation_turn_facts import (
     confirmation_turn_facts,
     confirmation_turn_history_text,
 )
-from argus.domain.owner_scope import OwnerScope, space_id
+from argus.domain.owner_scope import OwnerScope, space_id, surface_of
 from argus.domain.store import utcnow
 from argus.domain.supabase_conversation_messages import StaleMessageArtifactError
 from argus.domain.usage_limits import settle_memory_usage
@@ -271,6 +271,7 @@ def memory_conversation(
         language=language,
         created_at=now,
         updated_at=now,
+        surface=surface_of(space_id(scope)),
     )
     api_state.store.conversations[conversation.id] = conversation
     if user_id is not None:

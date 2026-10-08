@@ -1266,6 +1266,15 @@ paths:
           - type: string
             maxLength: 64
           - type: 'null'
+      - name: surface
+        in: query
+        required: false
+        schema:
+          enum:
+          - personal
+          - business
+          type: string
+          default: personal
       responses:
         '200':
           description: Successful Response
@@ -11917,6 +11926,12 @@ components:
           anyOf:
           - $ref: '#/components/schemas/ConversationActivity'
           - type: 'null'
+        surface:
+          type: string
+          enum:
+          - personal
+          - business
+          default: personal
       type: object
       required:
       - id
@@ -16930,6 +16945,12 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        surface:
+          type: string
+          enum:
+          - personal
+          - business
+          default: personal
       type: object
       required:
       - items

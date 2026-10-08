@@ -7,6 +7,13 @@ import {
   listHistory,
   searchGlobal,
 } from "@/lib/argus-api";
+import { listComputedAnswers } from "@/lib/computations-api";
+import {
+  ConversationOnOtherSurfaceError,
+  conversationShellHref,
+  registerConversationShell,
+  requireConversationInShell,
+} from "@/lib/conversation-surface-guard";
 
 type Call = { path: string; method: string; body: unknown };
 
@@ -34,6 +41,7 @@ async function everyCall(surface?: "personal" | "business") {
   await listHistory({ limit: 50, surface });
   await searchGlobal({ q: "renta", limit: 30, includeLedgerGroups: true, surface });
   await deleteAllConversations(surface);
+  await listComputedAnswers("price_multiple", "m-1", surface);
   return calls;
 }
 
@@ -55,6 +63,7 @@ describe("the chat surface a request names", () => {
       { path: "/history?limit=50", method: "GET", body: null },
       { path: "/search?q=renta&limit=30&include_ledger_groups=true", method: "GET", body: null },
       { path: "/conversations", method: "DELETE", body: null },
+      { path: "/computations/answers?kind=price_multiple&exclude_message_id=m-1", method: "GET", body: null },
     ];
     expect(await everyCall()).toEqual(expected);
     expect(await everyCall("personal")).toEqual(expected);
@@ -76,6 +85,39 @@ describe("the chat surface a request names", () => {
         body: null,
       },
       { path: "/conversations?surface=business", method: "DELETE", body: null },
+      {
+        path: "/computations/answers?kind=price_multiple&exclude_message_id=m-1&surface=business",
+        method: "GET",
+        body: null,
+      },
     ]);
+  });
+});
+
+describe("a conversation opened in the wrong shell", () => {
+  test("is sent to its own shell and never returned to the caller", () => {
+    const opened: string[] = [];
+    const unregister = registerConversationShell({
+      surface: "personal",
+      open: (id, surface) => opened.push(`${surface}:${id}`),
+    });
+    try {
+      expect(() => requireConversationInShell("c-1", "personal")).not.toThrow();
+      expect(() => requireConversationInShell("c-1", undefined)).not.toThrow();
+      expect(() => requireConversationInShell("c-2", "business")).toThrow(ConversationOnOtherSurfaceError);
+      expect(opened).toEqual(["business:c-2"]);
+    } finally {
+      unregister();
+    }
+    expect(() => requireConversationInShell("c-3", "business")).not.toThrow();
+  });
+
+  test("keeps the conversation id and its linked message", () => {
+    expect(conversationShellHref("http://x/chat?conversation=c-2&message=m-9", "c-2", "business")).toBe(
+      "/biz?conversation=c-2&message=m-9",
+    );
+    expect(conversationShellHref("http://x/biz?conversation=other&message=m-9", "c-2", "personal")).toBe(
+      "/chat?conversation=c-2",
+    );
   });
 });

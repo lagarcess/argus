@@ -28,7 +28,8 @@ archived,
 last_message_preview,
 deleted_at,
 created_at,
-updated_at
+updated_at,
+owner_space_id
 """
 _MESSAGE_COLUMNS = """
 id,
