@@ -338,34 +338,38 @@ export function textForParentValue(text: string, value: string | null, rules: Mo
   return value === readMoney(text, rules).value ? null : displayForValue(value, rules);
 }
 
+const FIELD_GROUPED = /^-?\d{1,3}(,\d{3})*(\.\d*)?$/;
+const TYPED_DECIMAL_COMMA = /^-?\d*,\d{0,2}$/;
+
 /**
  * An edit the browser did not announce as cancellable (word deletion, undo, an
- * IME commit, autofill) arrives as the whole new text. Only the commas that
- * were already in the field are its grouping; a comma in the changed segment is
- * the user's and follows the same rules as an announced insert.
+ * IME commit, autofill) arrives as the whole new value, read by one rule:
+ * (a) no commas: plain digits and one optional point;
+ * (b) grouped in the field's own format: the commas are grouping, so "1,234"
+ *     is 1234 on every device, as the field itself would show it;
+ * (c) otherwise, on a comma-decimal device, one comma with no point and at most
+ *     two digits after it is the decimal point, as when typed;
+ * (d) anything else is refused with the paste rule's message for that shape.
  */
-export function fallbackEdit(current: string, raw: string, caret: number, rules: MoneyRules): MoneyEdit {
-  let prefix = 0;
-  while (prefix < current.length && prefix < raw.length && current[prefix] === raw[prefix]) prefix += 1;
-  let suffix = 0;
-  while (
-    suffix < current.length - prefix &&
-    suffix < raw.length - prefix &&
-    current[current.length - 1 - suffix] === raw[raw.length - 1 - suffix]
-  ) {
-    suffix += 1;
+export function fallbackEdit(raw: string, caret: number, rules: MoneyRules): MoneyEdit {
+  const text = raw.trim();
+  if (!text) return { kind: "accept", display: "", caret: 0, problem: null };
+  let logical: string;
+  let logicalCaret: number;
+  if (!text.includes(",") || FIELD_GROUPED.test(text)) {
+    logical = ungroup(raw);
+    logicalCaret = logicalIndex(raw, caret);
+  } else if (rules.commaDecimal && TYPED_DECIMAL_COMMA.test(text)) {
+    logical = raw.replace(",", ".");
+    logicalCaret = caret;
+  } else {
+    const refused = parsePasted(raw, rules);
+    return { kind: "reject", problem: "problem" in refused ? refused.problem : { code: "grouping" } };
   }
-  const inserted = raw.slice(prefix, raw.length - suffix);
-  if (inserted.includes(",")) {
-    return editMoney(current, prefix, current.length - suffix, { type: "insert", text: inserted }, rules);
-  }
-  const logical = ungroup(raw);
-  if (!logical.trim()) return { kind: "accept", display: "", caret: 0, problem: null };
   const parsed = parsePasted(logical, rules);
   if ("problem" in parsed) return { kind: "reject", problem: parsed.problem };
-  const mapped = normalize(logical, logicalIndex(raw, caret), true);
-  const logicalCaret = mapped.logical === parsed.logical ? mapped.caret : parsed.logical.length;
-  return accept(parsed.logical, logicalCaret, null);
+  const mapped = normalize(logical.trim(), logicalCaret - (logical.length - logical.trimStart().length), true);
+  return accept(parsed.logical, mapped.logical === parsed.logical ? mapped.caret : parsed.logical.length, null);
 }
 
 /**

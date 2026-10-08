@@ -238,13 +238,20 @@ test.describe("Business preview", () => {
     await expect(total).toHaveValue("3,450.00");
     const message = await amountMessage(page, total);
 
-    await total.evaluate((input: HTMLInputElement) => {
-      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
-      setter.call(input, "3,4501");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
-    });
-    await expect(total).toHaveValue("34,501");
+    const replaceWithoutBeforeInput = (next: string) =>
+      total.evaluate((input: HTMLInputElement, value) => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")!.set!;
+        setter.call(input, value);
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+      }, next);
+
+    await replaceWithoutBeforeInput("1,500,000");
+    await expect(total).toHaveValue("1,500,000");
     await expect(message).toHaveText("");
+
+    await replaceWithoutBeforeInput("1,5,00,000");
+    await expect(total).toHaveValue("1,500,000");
+    await expect(message).toHaveText("Check the thousands commas, as in 1,250.50.");
   });
 
   test("the review maps the backend's amount_out_of_range onto its Total", async ({ page }) => {

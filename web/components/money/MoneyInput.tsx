@@ -145,7 +145,7 @@ export default function MoneyInput({
 
   const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const raw = event.target.value;
-    const result = fallbackEdit(text, raw, event.target.selectionStart ?? raw.length, rules);
+    const result = fallbackEdit(raw, event.target.selectionStart ?? raw.length, rules);
     if (result.kind === "accept") commit(result.display, result.caret, null);
     else if (result.kind === "reject") setProblem(result.problem);
   };
