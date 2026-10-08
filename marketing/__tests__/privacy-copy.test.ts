@@ -7,23 +7,50 @@ import { LOCALES } from "../lib/site-routes";
 // service is added or replaced, this list and the text change together.
 const PROCESSORS = ["Render", "Resend", "Apple", "Supabase", "Cloudflare"] as const;
 
+const sectionText = (section: { paragraphs?: string[]; items?: string[] }) =>
+  [...(section.paragraphs ?? []), ...(section.items ?? [])].join("\n");
+
 describe.each(LOCALES)("privacy text (%s)", (locale) => {
   const copy = privacyCopy[locale];
-  const processors = copy.sections.find((section) => section.items)?.items ?? [];
+  const byId = (id: string) => {
+    const section = copy.sections.find((candidate) => candidate.id === id);
+    if (!section) throw new Error(`missing section ${id}`);
+    return section;
+  };
+  const providers = byId("providers").items ?? [];
+  const allText = JSON.stringify(copy);
 
-  test.each(PROCESSORS)("names %s as a processor", (name) => {
-    expect(processors.some((item) => item.includes(name))).toBe(true);
+  test.each(PROCESSORS)("names %s once, in the providers section", (name) => {
+    expect(providers.filter((item) => item.includes(name))).toHaveLength(1);
+    const elsewhere = copy.sections
+      .filter((section) => section.id !== "providers")
+      .map(sectionText)
+      .join("\n");
+    expect(elsewhere).not.toContain(name);
   });
 
-  test("names iCloud Mail and the public address for the mailbox", () => {
-    const text = JSON.stringify(copy.sections);
-    expect(text).toContain("iCloud Mail");
-    expect(text).toContain(businessContactEmail);
+  test("mentions iCloud Mail once, beside the public address", () => {
+    expect(allText.match(/iCloud/g)).toHaveLength(1);
+    expect(providers.some((item) => item.includes("iCloud Mail") && item.includes(businessContactEmail))).toBe(true);
   });
 
-  test("no longer describes the mailbox only as Cuadrao's mailbox", () => {
-    const text = JSON.stringify(copy.sections);
-    expect(text).not.toContain("buzón de Cuadrao");
-    expect(text).not.toContain("Cuadrao's mailbox");
+  test("keeps the operator in its own short section", () => {
+    const operator = byId("operator");
+    expect(operator.paragraphs).toHaveLength(1);
+    expect(sectionText(operator)).toContain(businessContactEmail);
+    expect(allText).not.toMatch(/Cuadra LLC|Cuadrao LLC/);
+  });
+
+  test("does not claim data is received only in certain cases", () => {
+    expect(allText).not.toMatch(/solo cuando|only when/i);
+  });
+
+  test("keeps the hosting IP-address disclosure", () => {
+    expect(sectionText(byId("data"))).toMatch(/IP/);
+  });
+
+  test("does not describe the mailbox vaguely", () => {
+    expect(allText).not.toContain("buzón de Cuadrao");
+    expect(allText).not.toContain("Cuadrao's mailbox");
   });
 });
