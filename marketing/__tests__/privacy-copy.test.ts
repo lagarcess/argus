@@ -38,7 +38,7 @@ describe.each(LOCALES)("privacy text (%s)", (locale) => {
   // The prepared wording is in docs/runbooks/cuadrao-marketing-launch.md.
   test("does not publish an operator before it is confirmed", () => {
     expect(copy.sections.some((section) => section.id === "operator")).toBe(false);
-    expect(allText).not.toMatch(/LLC|Garcés|Garces/);
+    expect(allText).not.toMatch(/LLC|Garcés|Garces|Lucas/);
   });
 
   test("does not claim data is received only in certain cases", () => {
@@ -52,5 +52,15 @@ describe.each(LOCALES)("privacy text (%s)", (locale) => {
   test("does not describe the mailbox vaguely", () => {
     expect(allText).not.toContain("buzón de Cuadrao");
     expect(allText).not.toContain("Cuadrao's mailbox");
+  });
+
+  test("tells the visitor the site briefly keeps their address and email to limit submissions", () => {
+    const data = sectionText(byId("data"));
+    expect(data).toMatch(locale === "es" ? /memoria del servidor/ : /server's memory/);
+    expect(data).toMatch(locale === "es" ? /dos horas/ : /two hours/);
+  });
+
+  test("does not claim the contact details are used only to reply", () => {
+    expect(sectionText(byId("data"))).not.toMatch(/solo para responderte|only to reply/);
   });
 });

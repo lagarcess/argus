@@ -36,4 +36,14 @@ describe("window limiter", () => {
     now = 9_000;
     expect(limiter.check("a")).toBe(1);
   });
+
+  test("drops a key's stored value once its window has passed, even if the key never returns", () => {
+    let now = 1_000_000;
+    const limiter = new WindowLimiter(5, 10_000, () => now);
+    limiter.check("visitor@example.invalid");
+    expect(limiter.tracked).toBe(1);
+    now += 25_000;
+    limiter.check("someone-else");
+    expect(limiter.tracked).toBe(1);
+  });
 });

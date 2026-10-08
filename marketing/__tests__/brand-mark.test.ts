@@ -77,3 +77,30 @@ describe("intrinsic size", () => {
     },
   );
 });
+
+const markGroup = (svg: string) => svg.match(/<g transform="translate\(6\.8 0\) skewX\(-12\)">.*?<\/g>/s)?.[0] ?? "";
+
+describe("whole mark group", () => {
+  test("is identical, with its opacity, in the icon, the dark mark and the dark lockup", () => {
+    const group = markGroup(tiled);
+    expect(group).toContain('opacity=".55"');
+    expect(markGroup(brand("cuadrao-mark-dark.svg"))).toBe(group);
+    expect(markGroup(brand("cuadrao-lockup-dark.svg"))).toBe(group);
+  });
+
+  test("is identical in the light mark and the light lockup", () => {
+    expect(markGroup(brand("cuadrao-lockup-light.svg"))).toBe(markGroup(brand("cuadrao-mark-light.svg")));
+  });
+
+  test("the dark lockup carries the same wordmark path in the paper colour", () => {
+    const dark = brand("cuadrao-lockup-dark.svg");
+    expect(paths(dark).at(-1)).toEqual(paths(brand("cuadrao-wordmark.svg"))[0]);
+    expect(dark).toMatch(/<path transform="[^"]*" fill="#fafbf8"/);
+    expect(brand("cuadrao-lockup-light.svg")).toMatch(/<path transform="[^"]*" fill="#172b26"/);
+  });
+
+  test("the icon tile is the site's ink", () => {
+    expect(tiled).toContain('<rect width="64" height="64" rx="14" fill="#172b26"/>');
+  });
+});
+

@@ -24,9 +24,10 @@ const es: PrivacyCopy = {
       id: "data",
       title: "Qué datos recibimos",
       paragraphs: [
-        "Si nos escribes: tu nombre, tu correo, el comentario opcional y el idioma de la página. Los usamos solo para responderte.",
+        "Si nos escribes: tu nombre, tu correo, el comentario opcional y el idioma de la página. Los usamos para responderte.",
         "Si pides acceso anticipado a Cuadrao Personal: tu correo, el idioma de la página, la fecha del registro y la versión de este texto que aceptaste. Los usamos solo para avisarte cuando haya acceso disponible. Registrarte no crea una cuenta ni garantiza acceso inmediato.",
         "Cuando visitas el sitio: el proveedor de alojamiento puede registrar datos técnicos de la conexión, como la dirección IP.",
+        "Para frenar envíos automáticos, el sitio guarda tu dirección IP y, si nos escribes, tu correo en la memoria del servidor, no en una base de datos. Se olvidan en un máximo de dos horas, o antes si el servicio se reinicia.",
       ],
     },
     {
@@ -53,7 +54,7 @@ const es: PrivacyCopy = {
       title: "Cuánto tiempo los conservamos",
       paragraphs: [
         "Tu mensaje se conserva en nuestro correo mientras haga falta para responderte y dar seguimiento a la conversación.",
-        "Tu registro de acceso anticipado permanece hasta que pidas retirarlo. Al retirarlo borramos tu correo y conservamos solo una huella técnica de la dirección, sin la dirección misma, para no volver a registrarte ni escribirte.",
+        "Tu registro de acceso anticipado permanece hasta que pidas retirarlo. Al retirarlo borramos tu correo y conservamos una huella técnica de la dirección, sin la dirección misma, junto con el idioma y las fechas del registro y del retiro, para no volver a registrarte ni escribirte.",
         "Los registros técnicos de la conexión los conserva el proveedor de alojamiento según sus propias reglas.",
       ],
     },
@@ -71,16 +72,17 @@ const en: PrivacyCopy = {
   eyebrow: "PRIVACY",
   title: "Your privacy at Cuadrao.",
   intro:
-    "We use the data you share to answer your enquiries and to tell you when early access is available. This page explains what information we receive, how we use it and how you can ask us to delete it.",
+    "We use the data you share to answer your inquiries and to tell you when early access is available. This page explains what information we receive, how we use it and how you can ask us to delete it.",
   updated: "Updated October 8, 2026",
   sections: [
     {
       id: "data",
       title: "What data we receive",
       paragraphs: [
-        "If you write to us: your name, your email, the optional comment and the page language. We use them only to reply to you.",
+        "If you write to us: your name, your email, the optional comment and the page language. We use them to reply to you.",
         "If you request Cuadrao Personal early access: your email, the page language, the signup date and the version of this text you accepted. We use them only to tell you when access is available. Signing up does not create an account or guarantee immediate access.",
         "When you visit the site: the hosting provider may record technical connection data, such as the IP address.",
+        "To slow down automated submissions, the site keeps your IP address and, if you write to us, your email in the server's memory, not in a database. They are forgotten after at most two hours, or sooner if the service restarts.",
       ],
     },
     {
@@ -107,7 +109,7 @@ const en: PrivacyCopy = {
       title: "How long we keep it",
       paragraphs: [
         "Your message is kept in our email for as long as it is needed to reply and follow up.",
-        "Your early-access signup stays until you ask to remove it. When you remove it we delete your email and keep only a technical fingerprint of the address, not the address itself, so we do not register or email you again.",
+        "Your early-access signup stays until you ask to remove it. When you remove it we delete your email and keep a technical fingerprint of the address, not the address itself, along with the language and the signup and removal dates, so we do not register or email you again.",
         "Technical connection records are kept by the hosting provider under its own rules.",
       ],
     },
