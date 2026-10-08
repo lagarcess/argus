@@ -152,7 +152,9 @@ export type NoticeResult = {
   // The send's outcome is unknown after a retry. The row stays claimed so no rerun
   // can mail it again; the operator checks the provider by this digest.
   unknownOutcome: string[];
-  // The claim itself failed, so the run stopped before sending anything further.
+  // A claim got no usable answer. That row may be claimed but unsent; the run stopped.
+  claimUncertain: string[];
+  // The run stopped before sending anything further.
   stoppedEarly: boolean;
 };
 
@@ -169,7 +171,7 @@ export async function sendNotice(
   doFetch: typeof fetch,
   now: () => Date = () => new Date(),
 ): Promise<NoticeResult> {
-  const result: NoticeResult = { sent: 0, failed: 0, skipped: 0, unknownOutcome: [], stoppedEarly: false };
+  const result: NoticeResult = { sent: 0, failed: 0, skipped: 0, unknownOutcome: [], claimUncertain: [], stoppedEarly: false };
 
   const patch = async (query: string, body: Record<string, unknown>, returning: boolean) =>
     checked(
@@ -213,23 +215,32 @@ export async function sendNotice(
           continue;
         }
       } catch {
+        // The update may have been saved even though its answer was lost, so this
+        // row can be claimed and unsent. Name it and stop; nothing further is sent.
+        result.claimUncertain.push(row.email_digest);
         result.stoppedEarly = true;
         break;
       }
     }
 
     let response: Response | null = null;
+    // A request that got no answer may still have been processed, so once any
+    // attempt is lost a later refusal proves nothing about the first.
+    let lost = false;
     for (let attempt = 0; attempt < 2 && response === null; attempt += 1) {
       try {
         response = await send(row, key);
       } catch {
+        lost = true;
         response = null;
       }
     }
 
-    // Only a plain client-side refusal proves nothing was sent. A 409 (a request
-    // with this key is still in flight) or a 5xx may have been processed.
-    const refused = response !== null && response.status >= 400 && response.status < 500 && response.status !== 409;
+    // Only a plain client-side refusal on a request that was never lost proves
+    // nothing was sent. A 409 (a request with this key is still in flight), a 5xx
+    // or any answer after a lost attempt may have been processed.
+    const refused =
+      !lost && response !== null && response.status >= 400 && response.status < 500 && response.status !== 409;
     if (response?.ok) {
       result.sent += 1;
     } else if (refused) {

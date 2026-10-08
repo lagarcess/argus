@@ -60,7 +60,7 @@ async function checkPage(route: SiteRoute): Promise<void> {
     `found ${alternates.map(([, lang]) => lang).join(",")}`,
   );
   record(`${label} sets no cookie`, !response.headers.has("set-cookie"), "Set-Cookie present");
-  record(`${label} share image`, /<meta property="og:image" content="https:\/\/cuadrao\.ai\/cuadrao-site\//.test(html), "og:image missing");
+  record(`${label} share image`, html.includes(`<meta property="og:image" content="${SITE_ORIGIN}/cuadrao-site/`), "og:image missing or off the public origin");
   const robots = response.headers.get("x-robots-tag");
   record(
     `${label} robots header`,
@@ -94,16 +94,26 @@ async function main(): Promise<void> {
   record("no manifest", (await get("/manifest.json")).status === 404);
   record("form endpoints reject GET", (await get("/api/inquiries")).status === 405 && (await get("/api/signups")).status === 405);
 
-  const robots = await (await get("/robots.txt")).text();
-  const sitemap = await (await get("/sitemap.xml")).text();
+  const robotsResponse = await get("/robots.txt");
+  const sitemapResponse = await get("/sitemap.xml");
+  record("robots.txt returns 200", robotsResponse.status === 200, `got ${robotsResponse.status}`);
+  record("sitemap.xml returns 200", sitemapResponse.status === 200, `got ${sitemapResponse.status}`);
+  const robots = await robotsResponse.text();
+  const sitemap = await sitemapResponse.text();
+  // Whole-line matches: "Disallow: /" would otherwise satisfy "Allow: /" and "Disallow: /api/".
+  const robotsLine = (line: string) => new RegExp(`^${line.replace(/[/]/g, "\\/")}$`, "m").test(robots);
   const locations = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((match) => match[1]).sort();
   if (publicHost) {
-    record("robots allows and names the sitemap", robots.includes("Allow: /") && robots.includes(`Sitemap: ${SITE_ORIGIN}/sitemap.xml`) && robots.includes("Disallow: /api/"));
+    record(
+      "robots allows, keeps the API out and names the sitemap",
+      robotsLine("Allow: /") && !robotsLine("Disallow: /") && robotsLine("Disallow: /api/") && robotsLine(`Sitemap: ${SITE_ORIGIN}/sitemap.xml`),
+      "robots.txt does not match the public expectation",
+    );
     record("sitemap lists every page once", JSON.stringify(locations) === JSON.stringify(SITE_ROUTES.map((route) => route.url).sort()), `found ${locations.length}`);
     record("sitemap leaves out private routes", !sitemap.includes("/api/"));
   } else {
-    record("robots disallows everything", robots.includes("Disallow: /") && !robots.includes("Sitemap"));
-    record("sitemap is empty", locations.length === 0);
+    record("robots disallows everything", robotsLine("Disallow: /") && !robotsLine("Allow: /") && !robots.includes("Sitemap"), "robots.txt does not disallow everything");
+    record("sitemap is empty", sitemapResponse.status === 200 && locations.length === 0, `status ${sitemapResponse.status}, ${locations.length} urls`);
   }
 
   if (www) {

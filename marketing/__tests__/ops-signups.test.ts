@@ -91,6 +91,8 @@ describe("notice template", () => {
 function backend(options: {
   rows: Record<string, { removed?: boolean; notifiedAt?: string | null }>;
   claimStatus?: number;
+  // The database saves the claim, then the answer is lost.
+  claimAnswerLost?: boolean;
   mail?: (attempt: number, key: string) => Response | "throw";
 }) {
   const rows = options.rows;
@@ -104,6 +106,7 @@ function backend(options: {
         return new Response("", { status: options.claimStatus });
       }
       const query = new URL(call.url).searchParams;
+      const isClaim = JSON.parse(String(call.init.body)).notified_at !== null;
       const digest = query.get("email_digest")?.replace("eq.", "") ?? "";
       const row = rows[digest];
       const wantsUnnotified = query.get("notified_at") === "is.null";
@@ -118,6 +121,7 @@ function backend(options: {
         (wantsUnnotified || query.get("notified_at") === null || row.notifiedAt === claimedValue);
       if (!matches) return Response.json([]);
       row.notifiedAt = JSON.parse(String(call.init.body)).notified_at;
+      if (options.claimAnswerLost && isClaim) throw new DOMException("timed out", "TimeoutError");
       return Response.json([{ email_digest: digest }]);
     }
     events.push("mail");
@@ -144,7 +148,7 @@ describe("notice sending", () => {
   test("claims a row, then sends it in its language under a per-recipient key", async () => {
     const { doFetch, calls, events, rows } = backend({ rows: fresh(a) });
     const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
-    expect(result).toEqual({ sent: 1, failed: 0, skipped: 0, unknownOutcome: [], stoppedEarly: false });
+    expect(result).toEqual({ sent: 1, failed: 0, skipped: 0, unknownOutcome: [], claimUncertain: [], stoppedEarly: false });
     expect(events).toEqual(["patch", "mail"]);
     const email = JSON.parse(String(calls[1].init.body));
     expect(email.to).toEqual(["a@example.invalid"]);
@@ -169,11 +173,22 @@ describe("notice sending", () => {
     expect(mailCalls()).toBe(0);
   });
 
-  test("a database that refuses the claim stops the run before anything is sent", async () => {
+  test("a database that refuses the claim stops the run before anything is sent, naming that row", async () => {
     const { doFetch, mailCalls } = backend({ rows: fresh(a, b, c), claimStatus: 503 });
     const result = await sendNotice(ops, template, planNotice([a, b, c], null), doFetch, NOW);
-    expect(result).toEqual({ sent: 0, failed: 0, skipped: 0, unknownOutcome: [], stoppedEarly: true });
+    expect(result).toEqual({ sent: 0, failed: 0, skipped: 0, unknownOutcome: [], claimUncertain: [a.email_digest], stoppedEarly: true });
     expect(mailCalls()).toBe(0);
+  });
+
+  test("a claim saved but unanswered is named, because that row is claimed and was never mailed", async () => {
+    const { doFetch, mailCalls, rows } = backend({ rows: fresh(a, b), claimAnswerLost: true });
+    const result = await sendNotice(ops, template, planNotice([a, b], null), doFetch, NOW);
+    expect(result.claimUncertain).toEqual([a.email_digest]);
+    expect(result.stoppedEarly).toBe(true);
+    expect(mailCalls()).toBe(0);
+    expect(rows[a.email_digest].notifiedAt).not.toBeNull();
+    // b was never reached and stays eligible for a rerun
+    expect(rows[b.email_digest].notifiedAt).toBeNull();
   });
 
   test("a plain provider refusal releases the claim so a rerun can try again", async () => {
@@ -201,6 +216,16 @@ describe("notice sending", () => {
     expect(keys).toHaveLength(2);
     expect(new Set(keys).size).toBe(1);
     expect(delivered()).toBe(1);
+  });
+
+  test.each([422, 429])("a %d after a lost first attempt does not prove nothing was sent, so the claim stays", async (status) => {
+    const { doFetch, rows } = backend({
+      rows: fresh(a),
+      mail: (attempt) => (attempt === 1 ? "throw" : new Response("", { status })),
+    });
+    const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
+    expect(result).toMatchObject({ sent: 0, failed: 0, unknownOutcome: [a.email_digest] });
+    expect(rows[a.email_digest].notifiedAt).not.toBeNull();
   });
 
   test("no answer after the retry leaves the row claimed, named, and not mailed again by a rerun", async () => {

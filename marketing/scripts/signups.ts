@@ -68,13 +68,23 @@ if (command === "summary") {
     const result = await sendNotice(config, template, plan, fetch);
     console.log(JSON.stringify(result));
     if (result.unknownOutcome.length > 0) {
+      const prefix = plan.stamp ? "notice" : "notice-test";
       console.error(
-        "These rows stay claimed and may or may not have been mailed. Check each in Resend by its idempotency key (notice-<template id>-<digest>) before anything else:\n" +
+        (plan.stamp
+          ? "These rows stay claimed and may or may not have been mailed. "
+          : "Test send, nothing was claimed. These addresses may or may not have been mailed. ") +
+          `Check each in Resend by its idempotency key (${prefix}-<template id>-<digest>) before anything else:\n` +
           result.unknownOutcome.join("\n"),
       );
     }
-    if (result.stoppedEarly) console.error("Stopped: the database refused a claim, so nothing further was sent. Fix the database and rerun; claimed rows are not repeated.");
-    if (result.failed > 0 || result.unknownOutcome.length > 0 || result.stoppedEarly) process.exit(1);
+    if (result.claimUncertain.length > 0) {
+      console.error(
+        "A claim got no usable answer. These rows may be claimed but never mailed, so no rerun will mail them. Check notified_at for each digest and decide by hand:\n" +
+          result.claimUncertain.join("\n"),
+      );
+    }
+    if (result.stoppedEarly) console.error("Stopped: the database did not confirm a claim, so nothing further was sent. Fix the database and rerun; claimed rows are not repeated.");
+    if (result.failed > 0 || result.unknownOutcome.length > 0 || result.claimUncertain.length > 0 || result.stoppedEarly) process.exit(1);
   }
 } else {
   fail("Commands: summary | remove <email> | notice --template <file> [--only a,b] [--send] [--expect N]");
