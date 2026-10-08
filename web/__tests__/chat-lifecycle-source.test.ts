@@ -221,7 +221,8 @@ describe("chat archive/delete lifecycle source contract", () => {
       "utf-8",
     );
 
-    expect(chat).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
+    const dialog = readFileSync(join(root, "components/chat/ConversationDeleteDialog.tsx"), "utf-8");
+    expect(dialog).toContain('import { ConfirmDialog } from "@/components/ui/ConfirmDialog";');
     expect(chat).toContain('import type { KeyboardDeleteRequest } from "@/lib/keyboard-shortcuts";');
     expect(chat).toContain("useState<KeyboardDeleteRequest | null>(null)");
     expect(shortcuts).toContain("export type KeyboardDeleteRequest = {");
@@ -232,8 +233,9 @@ describe("chat archive/delete lifecycle source contract", () => {
     expect(chat).toContain("setPendingHeaderDelete({ conversationId, showKeyboardHints: fromKeyboardShortcut });");
     expect(chat).toContain("deleteConversation(pendingHeaderDelete.conversationId)");
     expect(chat).toContain("handleConversationRemoved(pendingHeaderDelete.conversationId);");
-    expect(chat).toContain("isOpen={Boolean(pendingHeaderDelete)}");
-    expect(chat).toContain("showKeyboardHints={pendingHeaderDelete?.showKeyboardHints}");
+    expect(chat).toContain("pending={pendingHeaderDelete}");
+    expect(dialog).toContain("isOpen={Boolean(pending)}");
+    expect(dialog).toContain("showKeyboardHints={pending?.showKeyboardHints}");
     expect(chat).toContain(') : currentView === "chat" &&');
     expect(chat).toContain("conversationId &&");
     expect(chat).toContain("canManageConversation ? (");

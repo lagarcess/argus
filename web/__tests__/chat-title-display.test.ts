@@ -182,7 +182,9 @@ describe("chat header wiring", () => {
   });
 
   test("header delete dialog names the active chat", () => {
-    expect(chat).toContain("{ title: headerConversationTitle }");
+    const dialog = readFileSync(join(root, "components/chat/ConversationDeleteDialog.tsx"), "utf-8");
+    expect(chat).toContain("title={headerConversationTitle}");
+    expect(dialog).toContain("{ title },");
     expect(chat).not.toContain('{ title: t("common.conversation", "Conversation") }');
   });
 
