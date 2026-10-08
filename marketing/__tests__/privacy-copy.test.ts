@@ -34,11 +34,11 @@ describe.each(LOCALES)("privacy text (%s)", (locale) => {
     expect(providers.some((item) => item.includes("iCloud Mail") && item.includes(businessContactEmail))).toBe(true);
   });
 
-  test("keeps the operator in its own short section", () => {
-    const operator = byId("operator");
-    expect(operator.paragraphs).toHaveLength(1);
-    expect(sectionText(operator)).toContain(businessContactEmail);
-    expect(allText).not.toMatch(/Cuadra LLC|Cuadrao LLC/);
+  // Held until the founder confirms Cuadrao LLC is formed and operates the site.
+  // The prepared wording is in docs/runbooks/cuadrao-marketing-launch.md.
+  test("does not publish an operator before it is confirmed", () => {
+    expect(copy.sections.some((section) => section.id === "operator")).toBe(false);
+    expect(allText).not.toMatch(/LLC|Garcés|Garces/);
   });
 
   test("does not claim data is received only in certain cases", () => {

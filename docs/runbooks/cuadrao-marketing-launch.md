@@ -104,6 +104,16 @@ Not part of this launch. If chosen later, switch Auto-Deploy to "After CI Checks
 3. `notify.cuadrao.ai` verified in Resend (Section 6), the founder has chosen the inquiry mailbox and set `CUADRAO_INQUIRY_TO`, and one approved test message is received at that mailbox.
 4. The founder has typed the three provider values into the Render form, and the complete form has been read back to them before Create.
 5. Rollback target named (Section 8). The first deploy has no earlier artifact, so a rollback cannot be exercised until a second deploy exists.
+6. The operator wording below is settled and published. Until the founder confirms it, the contact and signup forms are not published and no real visitor submission is taken: the privacy notice must identify who is responsible for the data those forms collect.
+
+### Operator wording (prepared, not published)
+
+The privacy notice has no responsible-operator section yet, on purpose. Prepared text, Spanish first, for the founder's approval:
+
+- ES, "Quién es responsable": "Cuadrao LLC es responsable de los datos que se reciben en este sitio. Para cualquier consulta sobre ellos, escribe a hola@cuadrao.ai."
+- EN, "Who is responsible": "Cuadrao LLC is responsible for the data received on this site. For any question about it, write to hola@cuadrao.ai."
+
+Cuadrao LLC is pending formation. This text is true only once the company is formed and operates the site; do not publish it before the founder confirms both. It names no individual. If the forms must go live before then, the notice has to name the actual current responsible party, and the founder chooses that wording. Publishing the section means adding it to `marketing/components/privacy-copy.ts` in both languages and removing the matching hold in `marketing/__tests__/privacy-copy.test.ts`.
 
 ## 5. Hosted acceptance on the Render address
 
@@ -154,4 +164,4 @@ After hosted acceptance and the founder's publication approval, coordinating wit
 
 ## 9. Open founder inputs
 
-Batched in the launch record: Spanish copy approvals, the privacy text facts (retention wording, legal entity, processors), the Option B exception, provider access for read-only inspection, and the approved test addresses.
+Batched in the launch record: Spanish copy approvals, the privacy text facts (retention wording, processors) and the confirmation that Cuadrao LLC is formed and operates the site (operator wording above), the Option B exception, provider access for read-only inspection, and the approved test addresses.

@@ -38,13 +38,6 @@ const es: PrivacyCopy = {
       ],
     },
     {
-      id: "operator",
-      title: "Quién es responsable",
-      paragraphs: [
-        `Lucas Garcés, a título personal, es responsable de los datos que se reciben en este sitio. Para cualquier consulta sobre ellos, escribe a ${email}.`,
-      ],
-    },
-    {
       id: "providers",
       title: "Proveedores que intervienen",
       items: [
@@ -96,13 +89,6 @@ const en: PrivacyCopy = {
       paragraphs: [
         "This site does not use cookies, analytics tools or advertising tracking, and it does not store data in your browser. Fonts are served from the site itself. We do not use your contact details to send you advertising.",
         "Please do not enter documents, account numbers or private financial information in the form.",
-      ],
-    },
-    {
-      id: "operator",
-      title: "Who is responsible",
-      paragraphs: [
-        `Lucas Garcés, as an individual, is responsible for the data received on this site. For any question about it, write to ${email}.`,
       ],
     },
     {
