@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import json
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from importlib.resources import files
 from typing import Any
 from uuid import uuid4
 
-from argus.agent_runtime.recovery_messages import (
-    recovery_message,
-    recovery_state_stage_patch,
-)
+from argus.agent_runtime.presentation_i18n import runtime_locale
+from argus.agent_runtime.recovery_messages import recovery_state_stage_patch
 from argus.agent_runtime.stages.interpret_types import (
     InterpretDecision,
     StageOutcome,
@@ -255,6 +255,13 @@ def _with_cards(
     return StageResult(outcome=outcome, stage_patch=patch)
 
 
+# The persisted refusal is the founder's copy in the turn's language; the web
+# locale bundles carry the same sentence, and a test keeps them equal.
+_BUSINESS_REFUSAL: dict[str, str] = json.loads(
+    files("argus_display_contract").joinpath("business_chat_refusal.json").read_text()
+)
+
+
 def surface_tool_refusal(
     language: str | None,
     *,
@@ -273,9 +280,7 @@ def surface_tool_refusal(
             "tool_calls": [],
             "tool_call_records": [],
             "tool_effects": [],
-            "assistant_response": recovery_message(
-                "business_chat_tool_unavailable", language=language
-            ),
+            "assistant_response": _BUSINESS_REFUSAL[runtime_locale(language)],
             **recovery_state_stage_patch(
                 "business_chat_tool_unavailable",
                 language=language,

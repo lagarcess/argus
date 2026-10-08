@@ -640,3 +640,18 @@ def test_the_refusal_persists_in_the_turns_language(
     ).json()["items"]
     assert messages[-1]["role"] == "assistant"
     assert messages[-1]["content"] == persisted
+
+
+def test_persisted_refusal_and_web_copy_have_one_owner() -> None:
+    from pathlib import Path
+
+    web = Path(__file__).resolve().parents[1] / "web"
+    owner = json.loads(
+        (web / "argus_display_contract" / "business_chat_refusal.json").read_text()
+    )
+    for language in ("en", "es-419"):
+        bundle = json.loads(
+            (web / "public" / "locales" / language / "common.json").read_text()
+        )
+        rendered = bundle["chat"]["recovery"]["business_chat_tool_unavailable"]
+        assert rendered == owner[language]
