@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next";
 import type { BusinessUpdate } from "@/lib/business-api";
 import { useBusiness } from "./BusinessWorkspace";
 import { formatRelativeTime } from "./business-format";
-import { cardClass, LoadingRows, PanelHeading, useErrorLabel } from "./business-ui";
+import { cardClass, LoadingRows, PanelHeading, useAttentionLabel } from "./business-ui";
 
 /**
  * Updates are read from the receipts' and expenses' own states. There is no
@@ -15,7 +15,7 @@ import { cardClass, LoadingRows, PanelHeading, useErrorLabel } from "./business-
 export default function BusinessUpdatesPanel() {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? "en";
-  const errorLabel = useErrorLabel();
+  const attentionLabel = useAttentionLabel();
   const { source, revision, openPanel } = useBusiness();
   const [items, setItems] = useState<BusinessUpdate[] | null>(null);
   const [failed, setFailed] = useState(false);
@@ -37,7 +37,7 @@ export default function BusinessUpdatesPanel() {
       return { Icon: CircleDashed, tone: "text-black/45 dark:text-white/45", text: t("business.updates.ready", "{{name}} is ready to review", { name }) };
     }
     if (update.kind === "receipt_needs_attention") {
-      return { Icon: AlertCircle, tone: "text-[#d66d75]", text: `${t("business.updates.attention", "{{name}} needs attention", { name })}. ${errorLabel(update.error_code)}` };
+      return { Icon: AlertCircle, tone: "text-[#d66d75]", text: `${t("business.updates.attention", "{{name}} needs attention", { name })}. ${attentionLabel(update.attention)}` };
     }
     return { Icon: CheckCircle2, tone: "text-black/45 dark:text-white/45", text: t("business.updates.confirmed", "{{name}} was saved as an expense", { name }) };
   };

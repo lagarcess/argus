@@ -40,6 +40,9 @@ function receipt(
     size_bytes: 412_000,
     received_at: daysAgo(1),
     error_code: null,
+    attention: null,
+    preparable: false,
+    enterable: false,
     expense_id: null,
     merchant: null,
     occurred_on: null,
@@ -53,6 +56,9 @@ function receipt(
     ...partial,
   };
 }
+
+/** What the backend lists for a receipt nobody has read. */
+const UNREAD: ReceiptDetail["missing_fields"] = ["account_id", "amount", "currency", "occurred_on"];
 
 function seedReceipts(): ReceiptDetail[] {
   return [
@@ -111,8 +117,47 @@ function seedReceipts(): ReceiptDetail[] {
       channel: "whatsapp",
       filename: "IMG_2209.jpg",
       received_at: daysAgo(2),
-      error_code: "document_unreadable",
-      missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
+      error_code: "unreadable_document",
+      attention: "unreadable",
+      enterable: true,
+      version: 0,
+      missing_fields: UNREAD,
+    }),
+    receipt({
+      id: "rcpt-unknown",
+      status: "needs_attention",
+      filename: "IMG_2215.jpg",
+      received_at: daysAgo(2),
+      error_code: "document_preparation_outcome_unknown",
+      attention: "outcome_unknown",
+      preparable: true,
+      enterable: true,
+      version: 0,
+      missing_fields: UNREAD,
+    }),
+    receipt({
+      id: "rcpt-ambiguous",
+      status: "needs_attention",
+      filename: "colmado-oct.jpg",
+      received_at: daysAgo(3),
+      error_code: "receipt_purchase_ambiguous",
+      attention: "several_purchases",
+      enterable: true,
+      version: 0,
+      missing_fields: UNREAD,
+      evidence: {
+        merchant: "COLMADO DON PEDRO",
+        occurred_on: dayOnly(daysAgo(3)),
+        total: "706.10",
+        currency: "DOP",
+        tax: null,
+        tip: null,
+        service: null,
+        lines: [
+          { description: "Arroz 5 lb", amount: "325.00" },
+          { description: "Aceite 1 L", amount: "410.00" },
+        ],
+      },
     }),
     receipt({
       id: "rcpt-saved",
@@ -120,7 +165,10 @@ function seedReceipts(): ReceiptDetail[] {
       filename: "almuerzo-cliente.png",
       media_type: "image/png",
       received_at: daysAgo(3),
-      missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
+      preparable: true,
+      enterable: true,
+      version: 0,
+      missing_fields: UNREAD,
     }),
     receipt({
       id: "rcpt-confirmed",
@@ -303,6 +351,7 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
           receipt_id: item.id,
           expense_id: item.expense_id,
           error_code: item.error_code,
+          attention: item.attention,
           label: item.merchant ?? item.filename,
         }));
       return items;
@@ -325,7 +374,10 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
         media_type: file.type,
         size_bytes: file.size,
         received_at: new Date().toISOString(),
-        missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
+        preparable: !consentToPrepare,
+        enterable: !consentToPrepare,
+        version: 0,
+        missing_fields: UNREAD,
       });
       receipts = [created, ...receipts];
       uploads.set(key, created);
@@ -333,7 +385,11 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
     },
     prepareReceipt: async (id) => {
       await delay();
-      return replace({ ...find(id), status: "queued" });
+      const current = find(id);
+      if (!current.preparable) {
+        throw Object.assign(new Error("document_busy"), { status: 409, code: "document_busy" });
+      }
+      return replace({ ...current, status: "queued", error_code: null, attention: null, preparable: false, enterable: false });
     },
     saveReview: async (id, version, fields) => {
       await delay();
@@ -344,8 +400,13 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
       const merged = { ...current, ...fields };
       const injected = injectedWriteError();
       if (injected) throw injected;
+      // An entry by hand becomes the receipt's one purchase, ready to review.
+      const entered = current.enterable
+        ? { status: "review_ready" as const, error_code: null, attention: null, preparable: false, enterable: false }
+        : {};
       return replace({
         ...merged,
+        ...entered,
         version: current.version + 1,
         missing_fields: missing(merged),
       });

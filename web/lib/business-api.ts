@@ -21,6 +21,20 @@ export type ReceiptStatus =
 
 export type ReceiptChannel = "web" | "whatsapp";
 
+/** Why a `needs_attention` receipt needs the owner. The backend decides it. */
+export const RECEIPT_ATTENTIONS = [
+  "unreadable",
+  "ai_unavailable",
+  "interrupted",
+  "outcome_unknown",
+  "no_purchase_found",
+  "several_purchases",
+  "source_unavailable",
+  "check_details",
+  "other",
+] as const;
+export type ReceiptAttention = (typeof RECEIPT_ATTENTIONS)[number];
+
 export type ReceiptReviewFields = {
   merchant: string | null;
   occurred_on: string | null;
@@ -39,6 +53,11 @@ export type ReceiptSummary = ReceiptReviewFields & {
   received_at: string;
   status: ReceiptStatus;
   error_code: string | null;
+  attention: ReceiptAttention | null;
+  /** The owner may ask for a consented AI read now. */
+  preparable: boolean;
+  /** The owner may fill in the one purchase by hand from version 0. */
+  enterable: boolean;
   expense_id: string | null;
 };
 
@@ -110,6 +129,7 @@ export type BusinessUpdate = {
   receipt_id: string | null;
   expense_id: string | null;
   error_code: string | null;
+  attention: ReceiptAttention | null;
   label: string | null;
 };
 
