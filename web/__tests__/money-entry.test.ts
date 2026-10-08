@@ -1,18 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import {
+  currencyChange,
   currencyDigits,
   currencySymbol,
   displayIndex,
   editMoney,
+  fallbackEdit,
   formatMoney,
   group,
   localeUsesCommaDecimal,
   logicalIndex,
-  maximumFor,
   moneyPlaceholder,
   moneyProblemFromServer,
+  nextRenderedHistory,
   parsePasted,
   readMoney,
+  textForParentValue,
   type MoneyRules,
 } from "../lib/money-entry";
 
@@ -58,11 +61,6 @@ describe("currency facts", () => {
   test("the placeholder shows the currency's precision", () => {
     expect(moneyPlaceholder("DOP")).toBe("0.00");
     expect(moneyPlaceholder("JPY")).toBe("0");
-  });
-
-  test("the maximum is 9,999,999.99 cut to the currency's precision", () => {
-    expect(maximumFor("DOP")).toBe("9,999,999.99");
-    expect(maximumFor("JPY")).toBe("9,999,999");
   });
 
   test("a comma-decimal device is read from Intl, not guessed", () => {
@@ -141,10 +139,13 @@ describe("typing", () => {
     expect(typeKeys(".", JPY)).toEqual({ display: "", caret: 0, problem: "precision" });
   });
 
-  test("the maximum is 9,999,999.99", () => {
-    expect(typeKeys("9999999.99", DOP)).toEqual({ display: "9,999,999.99", caret: 12, problem: null });
-    expect(typeKeys("99999999", DOP)).toEqual({ display: "9,999,999", caret: 9, problem: "maximum" });
-    expect(typeKeys("10000000", DOP).problem).toBe("maximum");
+  test("no UI maximum; only a 15-digit length guard before the point", () => {
+    expect(typeKeys("10000000.99", DOP)).toEqual({ display: "10,000,000.99", caret: 13, problem: null });
+    expect(typeKeys("1234567890123456", DOP)).toEqual({
+      display: "123,456,789,012,345",
+      caret: 19,
+      problem: "too_long",
+    });
   });
 
   test('"." becomes "0." and leading zeros collapse while typing', () => {
@@ -198,10 +199,10 @@ describe("deleting", () => {
     });
   });
 
-  test("deleting the decimal point cannot push past the maximum", () => {
-    expect(editMoney("9,999,999.99", 10, 10, { type: "delete", direction: "backward" }, DOP)).toEqual({
+  test("deleting the decimal point cannot push past the length guard", () => {
+    expect(editMoney("999,999,999,999,999.99", 20, 20, { type: "delete", direction: "backward" }, DOP)).toEqual({
       kind: "reject",
-      problem: { code: "maximum", maximum: "9,999,999.99" },
+      problem: { code: "too_long", digits: 15 },
     });
   });
 
@@ -244,15 +245,16 @@ describe("paste and drop", () => {
     expect(paste("DOP 1,250.50")).toEqual({ kind: "accept", display: "1,250.50", caret: 8, problem: null });
     expect(paste("US$ 12.50", USD)).toEqual({ kind: "accept", display: "12.50", caret: 5, problem: null });
     expect(paste("USD12.50", USD)).toEqual({ kind: "accept", display: "12.50", caret: 5, problem: null });
-    expect(paste("$12.50", USD)).toEqual({ kind: "accept", display: "12.50", caret: 5, problem: null });
+  });
+
+  test("a bare $ is ambiguous between RD$ and US$ in any field", () => {
+    expect(paste("$12.50")).toEqual({ kind: "reject", problem: { code: "ambiguous_currency" } });
+    expect(paste("$12.50", USD)).toEqual({ kind: "reject", problem: { code: "ambiguous_currency" } });
+    expect(paste("$ 1,250")).toEqual({ kind: "reject", problem: { code: "ambiguous_currency" } });
   });
 
   test("a mismatched marker names both currencies", () => {
     expect(paste("US$12.50")).toEqual({
-      kind: "reject",
-      problem: { code: "currency_mismatch", typed: "USD", field: "DOP" },
-    });
-    expect(paste("$12.50")).toEqual({
       kind: "reject",
       problem: { code: "currency_mismatch", typed: "USD", field: "DOP" },
     });
@@ -276,6 +278,13 @@ describe("paste and drop", () => {
     expect(paste("1.250,50")).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
     expect(paste("12,50")).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
     expect(paste("12,50", COMMA_DEVICE)).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+  });
+
+  test("a comma-decimal device refuses any pasted comma, since typing it means decimals", () => {
+    expect(paste("1,250", COMMA_DEVICE)).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+    expect(paste("1,250.50", COMMA_DEVICE)).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+    expect(paste("1250.50", COMMA_DEVICE)).toEqual({ kind: "accept", display: "1,250.50", caret: 8, problem: null });
+    expect(typeKeys("1,25", COMMA_DEVICE)).toEqual({ display: "1.25", caret: 4, problem: null });
   });
 
   test("excess precision is refused, never rounded", () => {
@@ -306,11 +315,9 @@ describe("paste and drop", () => {
     expect(paste("-1,250.50", SIGNED)).toEqual({ kind: "accept", display: "-1,250.50", caret: 9, problem: null });
   });
 
-  test("an amount over the maximum is refused", () => {
-    expect(paste("10,000,000")).toEqual({
-      kind: "reject",
-      problem: { code: "maximum", maximum: "9,999,999.99" },
-    });
+  test("a large amount is the backend's to judge; only the length guard applies", () => {
+    expect(paste("10,000,000")).toEqual({ kind: "accept", display: "10,000,000", caret: 10, problem: null });
+    expect(paste("1234567890123456")).toEqual({ kind: "reject", problem: { code: "too_long", digits: 15 } });
   });
 
   test("leading zeros and a bare point normalize", () => {
@@ -388,7 +395,112 @@ describe("backend errors", () => {
   test("map to the same inline problems", () => {
     expect(moneyProblemFromServer("amount_invalid", "DOP")).toEqual({ code: "invalid" });
     expect(moneyProblemFromServer("amount_precision", "DOP")).toEqual({ code: "precision", currency: "DOP", digits: 2 });
-    expect(moneyProblemFromServer("amount_out_of_range", "JPY")).toEqual({ code: "maximum", maximum: "9,999,999" });
+    expect(moneyProblemFromServer("amount_out_of_range", "JPY")).toEqual({ code: "out_of_range" });
     expect(moneyProblemFromServer("stale_version", "DOP")).toBe(null);
+  });
+});
+
+describe("MoneyInput decisions", () => {
+  test("a parent value the text does not read as replaces the text", () => {
+    expect(textForParentValue("1,250.50", "980.5", DOP)).toBe("980.50");
+    expect(textForParentValue("1,250.50", null, DOP)).toBe("");
+    expect(textForParentValue("", "3450.00", DOP)).toBe("3,450.00");
+  });
+
+  test("an echo of the field's own value keeps the text as typed", () => {
+    expect(textForParentValue("1,250.5", "1250.5", DOP)).toBe(null);
+    expect(textForParentValue("", null, DOP)).toBe(null);
+  });
+
+  test("a currency change revalidates the same digits and notes no conversion", () => {
+    expect(currencyChange("1,250.50", "DOP", USD)).toEqual({ value: "1250.50", invalid: false, problem: null, note: true });
+    expect(currencyChange("1,250.50", "DOP", JPY)).toEqual({
+      value: null,
+      invalid: true,
+      problem: { code: "precision", currency: "JPY", digits: 0 },
+      note: true,
+    });
+    expect(currencyChange("", "DOP", USD).note).toBe(false);
+    expect(currencyChange("12", "", DOP).note).toBe(false);
+  });
+
+  test("the onChange fallback reads the whole new value", () => {
+    // A non-cancellable insert of "0" after "1,250" arrives as "1,2500".
+    expect(fallbackEdit("1,2500", 6, DOP)).toEqual({ kind: "reject", problem: { code: "grouping" } });
+    expect(fallbackEdit("12500", 5, DOP)).toEqual({ kind: "accept", display: "12,500", caret: 6, problem: null });
+    expect(fallbackEdit("1,250.", 6, DOP)).toEqual({ kind: "accept", display: "1,250.", caret: 6, problem: null });
+    expect(fallbackEdit("", 0, DOP)).toEqual({ kind: "accept", display: "", caret: 0, problem: null });
+    expect(fallbackEdit("1,25x", 5, DOP)).toEqual({ kind: "reject", problem: { code: "invalid" } });
+    expect(fallbackEdit("1,250.505", 9, DOP)).toEqual({
+      kind: "reject",
+      problem: { code: "precision", currency: "DOP", digits: 2 },
+    });
+  });
+
+  test("a value grouped in the field's own format is accepted whole", () => {
+    // Undo from "234,567", autofill over "1,234", an edit of "250,000".
+    expect(fallbackEdit("1,234,567", 9, DOP)).toEqual({ kind: "accept", display: "1,234,567", caret: 9, problem: null });
+    expect(fallbackEdit("1,500,000", 9, DOP)).toEqual({ kind: "accept", display: "1,500,000", caret: 9, problem: null });
+    expect(fallbackEdit("1,250,000", 1, DOP)).toEqual({ kind: "accept", display: "1,250,000", caret: 1, problem: null });
+  });
+
+  test("a comma that is neither grouping nor a typed decimal is refused", () => {
+    // A comma inserted mid-number: "1,250" becomes "1,2,550".
+    expect(fallbackEdit("1,2,550", 3, DOP)).toEqual({ kind: "reject", problem: { code: "grouping" } });
+    expect(fallbackEdit("12,5", 4, DOP)).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+    expect(fallbackEdit("1,2,3,4", 7, DOP)).toEqual({ kind: "reject", problem: { code: "grouping" } });
+    expect(fallbackEdit("1,2,3,4", 7, COMMA_DEVICE)).toEqual({ kind: "reject", problem: { code: "grouping" } });
+  });
+
+  test("on a comma-decimal device one comma with up to two digits after it is the decimal point", () => {
+    expect(fallbackEdit("1,5", 3, COMMA_DEVICE)).toEqual({ kind: "accept", display: "1.5", caret: 3, problem: null });
+    expect(fallbackEdit("12,", 3, COMMA_DEVICE)).toEqual({ kind: "accept", display: "12.", caret: 3, problem: null });
+  });
+
+  test("on a comma-decimal device a grouped value is grouping only when the field rendered it", () => {
+    // Undo back to the field's previous "1,234".
+    expect(fallbackEdit("1,234", 5, COMMA_DEVICE, ["1,234", "12,345"])).toEqual({
+      kind: "accept",
+      display: "1,234",
+      caret: 5,
+      problem: null,
+    });
+    // Autofill of a "1,234" the field never showed is not guessed.
+    expect(fallbackEdit("1,234", 5, COMMA_DEVICE, ["12,345"])).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+    expect(fallbackEdit("123,456", 7, COMMA_DEVICE)).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+    // A dot device keeps reading its own grouping without history.
+    expect(fallbackEdit("123,456", 7, DOP)).toEqual({ kind: "accept", display: "123,456", caret: 7, problem: null });
+  });
+
+  test("a leading-zero group is never the field's grouping", () => {
+    expect(fallbackEdit("01,234", 6, DOP)).toEqual({ kind: "reject", problem: { code: "grouping" } });
+    expect(fallbackEdit("01,234", 6, COMMA_DEVICE, ["01,234"])).toEqual({ kind: "reject", problem: { code: "grouping" } });
+    expect(fallbackEdit("0.5", 3, DOP)).toEqual({ kind: "accept", display: "0.5", caret: 3, problem: null });
+  });
+
+  test("the fallback caret follows normalization", () => {
+    expect(fallbackEdit(".5", 1, DOP)).toEqual({ kind: "accept", display: "0.5", caret: 2, problem: null });
+    expect(fallbackEdit("007", 3, DOP)).toEqual({ kind: "accept", display: "7", caret: 1, problem: null });
+  });
+});
+
+describe("rendered history", () => {
+  test("keeps the newest 20 renderings", () => {
+    let history: string[] = [];
+    for (let index = 1; index <= 25; index += 1) history = nextRenderedHistory(history, String(index), false);
+    expect(history).toEqual(Array.from({ length: 20 }, (_, index) => String(index + 6)));
+  });
+
+  test("a repeated rendering moves to the end once", () => {
+    expect(nextRenderedHistory(["1", "1,234", "12"], "1,234", false)).toEqual(["1", "12", "1,234"]);
+  });
+
+  test("an empty field clears the history", () => {
+    expect(nextRenderedHistory(["1", "1,234"], "", false)).toEqual([]);
+  });
+
+  test("a parent replacement starts over with the new text", () => {
+    expect(nextRenderedHistory(["1", "1,234"], "980.50", true)).toEqual(["980.50"]);
+    expect(nextRenderedHistory(["1", "1,234"], "", true)).toEqual([]);
   });
 });

@@ -11,8 +11,11 @@
  * - canonical: the value a parent submits ("1250.5"), or null.
  */
 
-/** Matches the consumer iOS control's CanvasMoney.maximum. */
-export const MONEY_MAXIMUM = "9999999.99";
+/**
+ * A length guard so the field cannot grow without bound. The backend owns the
+ * largest amount it records and answers amount_out_of_range past it.
+ */
+export const MONEY_MAX_INTEGER_DIGITS = 15;
 
 export type MoneyRules = {
   currency: string;
@@ -29,8 +32,10 @@ export type MoneyProblem =
   | { code: "grouping" }
   | { code: "decimal_comma" }
   | { code: "precision"; currency: string; digits: number }
-  | { code: "maximum"; maximum: string }
+  | { code: "too_long"; digits: number }
+  | { code: "out_of_range" }
   | { code: "currency_mismatch"; typed: string; field: string }
+  | { code: "ambiguous_currency" }
   | { code: "zero" };
 
 export type MoneyEditInput =
@@ -49,11 +54,13 @@ const isDigit = (char: string) => char.length === 1 && DIGITS.includes(char);
 
 const SYMBOLS: Record<string, string> = { DOP: "RD$", USD: "US$" };
 
-/** Markers a pasted amount may start with, longest first so "US$" wins over "$". */
+/**
+ * Markers a pasted amount may start with. A bare "$" is not one: in the
+ * Dominican Republic it usually means pesos, so it is refused as ambiguous.
+ */
 const MARKERS: { marker: string; currency: string }[] = [
   { marker: "RD$", currency: "DOP" },
   { marker: "US$", currency: "USD" },
-  { marker: "$", currency: "USD" },
   { marker: "€", currency: "EUR" },
 ];
 
@@ -98,12 +105,6 @@ export function localeUsesCommaDecimal(locale: string): boolean {
 export function moneyPlaceholder(currency: string): string {
   const digits = currencyDigits(currency);
   return digits > 0 ? `0.${"0".repeat(digits)}` : "0";
-}
-
-export function maximumFor(currency: string): string {
-  const digits = currencyDigits(currency);
-  const [whole, fraction] = MONEY_MAXIMUM.split(".");
-  return group(digits > 0 ? `${whole}.${fraction.slice(0, digits)}` : whole);
 }
 
 export function group(logical: string): string {
@@ -151,22 +152,13 @@ function split(logical: string) {
   };
 }
 
-function exceeds(amount: string, limit: string): boolean {
-  const a = split(amount);
-  const b = split(limit);
-  const aWhole = a.whole.replace(/^0+/, "");
-  const bWhole = b.whole.replace(/^0+/, "");
-  if (aWhole.length !== bWhole.length) return aWhole.length > bWhole.length;
-  if (aWhole !== bWhole) return aWhole > bWhole;
-  const width = Math.max(a.fraction.length, b.fraction.length);
-  return a.fraction.padEnd(width, "0") > b.fraction.padEnd(width, "0");
-}
-
 function limitProblem(logical: string, currency: string): MoneyProblem | null {
   const { whole, fraction, hasDot } = split(logical);
   const digits = currencyDigits(currency);
   if ((digits === 0 && hasDot) || fraction.length > digits) return { code: "precision", currency, digits };
-  if (exceeds(`${whole || "0"}.${fraction}`, MONEY_MAXIMUM)) return { code: "maximum", maximum: maximumFor(currency) };
+  if (whole.replace(/^0+/, "").length > MONEY_MAX_INTEGER_DIGITS) {
+    return { code: "too_long", digits: MONEY_MAX_INTEGER_DIGITS };
+  }
   return null;
 }
 
@@ -226,6 +218,7 @@ export function parsePasted(text: string, rules: MoneyRules): { logical: string 
   const marker =
     MARKERS.find((item) => upper.startsWith(item.marker)) ??
     (/^[A-Z]{3}(?![A-Z])/.test(upper) && isCurrencyCode(code) ? { marker: code, currency: code } : null);
+  if (!marker && upper.startsWith("$")) return { problem: { code: "ambiguous_currency" } };
   if (marker) {
     if (!rules.currency) return { problem: { code: "invalid" } };
     if (marker.currency !== rules.currency) {
@@ -292,12 +285,15 @@ export function editMoney(
     const kept = ungroup(display.slice(0, from));
     const next = normalize(kept + ungroup(display.slice(to)), kept.length, false);
     const problem = limitProblem(next.logical, rules.currency);
-    if (problem?.code === "maximum") return { kind: "reject", problem };
+    if (problem?.code === "too_long") return { kind: "reject", problem };
     return accept(next.logical, next.caret, problem);
   }
 
   if (!input.text) return { kind: "ignore" };
   if (input.text.length > 1) {
+    // On a comma-decimal device a typed "1,25" is 1.25, so a pasted "1,250"
+    // cannot be read as grouping without contradicting typing.
+    if (rules.commaDecimal && input.text.includes(",")) return { kind: "reject", problem: { code: "decimal_comma" } };
     const parsed = parsePasted(before + input.text + after, rules);
     if ("problem" in parsed) return { kind: "reject", problem: parsed.problem };
     return accept(parsed.logical, Math.max(0, parsed.logical.length - after.length), null);
@@ -327,10 +323,101 @@ function accept(logical: string, caret: number, problem: MoneyProblem | null): M
   return { kind: "accept", display, caret: displayIndex(display, caret), problem };
 }
 
+/** The display for a canonical value a parent sets. */
+export function displayForValue(value: string | null, rules: MoneyRules): string {
+  if (!value) return "";
+  const parsed = parsePasted(value, rules);
+  return "logical" in parsed ? formatMoney(group(parsed.logical), rules) : value;
+}
+
+/**
+ * A value set by the parent (a reload, a server correction) replaces the text,
+ * unless the text already reads as that value, as our own emits do.
+ */
+export function textForParentValue(text: string, value: string | null, rules: MoneyRules): string | null {
+  return value === readMoney(text, rules).value ? null : displayForValue(value, rules);
+}
+
+const FIELD_GROUPED = /^-?(0|[1-9]\d{0,2}(,\d{3})*)(\.\d*)?$/;
+const TYPED_DECIMAL_COMMA = /^-?\d*,\d{0,2}$/;
+
+/**
+ * An edit the browser did not announce as cancellable (word deletion, undo, an
+ * IME commit, autofill) arrives as the whole new value, read by one rule:
+ * (a) no commas: plain digits and one optional point;
+ * (b) grouped in the field's own format (first group nonzero): the commas are
+ *     grouping. On a comma-decimal device a typed comma is the decimal point,
+ *     so this holds only for an exact text the field itself already rendered
+ *     (`shown`, as undo and redo restore); any other grouped-looking value
+ *     there is refused as decimal_comma rather than guessed;
+ * (c) on a comma-decimal device, one comma with no point and at most two
+ *     digits after it is the decimal point, as when typed;
+ * (d) anything else is refused with the paste rule's message for that shape.
+ */
+export function fallbackEdit(
+  raw: string,
+  caret: number,
+  rules: MoneyRules,
+  shown: readonly string[] = [],
+): MoneyEdit {
+  const text = raw.trim();
+  if (!text) return { kind: "accept", display: "", caret: 0, problem: null };
+  const grouped = FIELD_GROUPED.test(text);
+  let logical: string;
+  let logicalCaret: number;
+  if (!text.includes(",") || (grouped && (!rules.commaDecimal || shown.includes(text)))) {
+    logical = ungroup(raw);
+    logicalCaret = logicalIndex(raw, caret);
+  } else if (rules.commaDecimal && TYPED_DECIMAL_COMMA.test(text)) {
+    logical = raw.replace(",", ".");
+    logicalCaret = caret;
+  } else if (rules.commaDecimal && grouped) {
+    return { kind: "reject", problem: { code: "decimal_comma" } };
+  } else {
+    const refused = parsePasted(raw, rules);
+    return { kind: "reject", problem: "problem" in refused ? refused.problem : { code: "grouping" } };
+  }
+  const parsed = parsePasted(logical, rules);
+  if ("problem" in parsed) return { kind: "reject", problem: parsed.problem };
+  const mapped = normalize(logical.trim(), logicalCaret - (logical.length - logical.trimStart().length), true);
+  return accept(parsed.logical, mapped.logical === parsed.logical ? mapped.caret : parsed.logical.length, null);
+}
+
+export const RENDERED_HISTORY_LIMIT = 20;
+
+/**
+ * The texts the field has rendered, newest last, for `fallbackEdit`'s `shown`.
+ * An empty field or a text the parent replaced starts the history over, so no
+ * earlier rendering can vouch for a later value.
+ */
+export function nextRenderedHistory(history: readonly string[], text: string, parentReplaced: boolean): string[] {
+  if (!text) return [];
+  const kept = parentReplaced ? [] : history.filter((item) => item !== text);
+  return [...kept, text].slice(-RENDERED_HISTORY_LIMIT);
+}
+
+/**
+ * A currency change keeps the digits and revalidates them; nothing converts.
+ * `note` says so whenever an amount was already there under another currency.
+ */
+export function currencyChange(
+  text: string,
+  previousCurrency: string,
+  rules: MoneyRules,
+): { value: string | null; invalid: boolean; problem: MoneyProblem | null; note: boolean } {
+  const reading = readMoney(text, rules);
+  return {
+    value: reading.value,
+    invalid: reading.problem !== null,
+    problem: reading.problem?.code === "precision" ? reading.problem : null,
+    note: Boolean(previousCurrency && rules.currency && ungroup(text).trim()),
+  };
+}
+
 const SERVER_PROBLEMS: Record<string, (currency: string) => MoneyProblem> = {
   amount_invalid: () => ({ code: "invalid" }),
   amount_precision: (currency) => ({ code: "precision", currency, digits: currencyDigits(currency) }),
-  amount_out_of_range: (currency) => ({ code: "maximum", maximum: maximumFor(currency) }),
+  amount_out_of_range: () => ({ code: "out_of_range" }),
 };
 
 export function moneyProblemFromServer(code: string | null | undefined, currency: string): MoneyProblem | null {

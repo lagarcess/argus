@@ -196,6 +196,19 @@ function sampleReceiptImage(detail: ReceiptDetail): Blob {
   return new Blob([svg], { type: "image/svg+xml" });
 }
 
+/**
+ * Lets a browser test have the next write fail with a backend error code, the
+ * way the live API answers, so each dialog's error mapping can be seen. The
+ * preview only; the live source has no such switch.
+ */
+function injectedWriteError() {
+  const holder = globalThis as { __businessFixtureFailNextWrite?: string };
+  const code = holder.__businessFixtureFailNextWrite;
+  if (!code) return null;
+  delete holder.__businessFixtureFailNextWrite;
+  return Object.assign(new Error(code), { status: 422, code });
+}
+
 const delay = (ms = 240) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function createFixtureBusinessDataSource(): BusinessDataSource {
@@ -251,9 +264,6 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
           amount: total.amount.toFixed(2),
           count: total.count,
         })),
-        awaiting_review: receipts.filter((item) =>
-          ["saved", "queued", "preparing", "review_ready"].includes(item.status),
-        ).length,
         needs_attention: receipts.filter((item) => item.status === "needs_attention").length,
         last_received_at: receipts[0]?.received_at ?? null,
         last_confirmed_at: daysAgo(6),
@@ -328,6 +338,8 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
         throw Object.assign(new Error("stale_version"), { status: 409, code: "stale_version" });
       }
       const merged = { ...current, ...fields };
+      const injected = injectedWriteError();
+      if (injected) throw injected;
       return replace({
         ...merged,
         version: current.version + 1,
@@ -366,8 +378,10 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
     },
     recordExpense: async (input) => {
       await delay();
-      counter += 1;
       const account = ACCOUNTS.find((item) => item.id === input.account_id) ?? ACCOUNTS[0];
+      const injected = injectedWriteError();
+      if (injected) throw injected;
+      counter += 1;
       const created: BusinessExpense = {
         id: `exp-manual-${counter}`,
         merchant: input.merchant,

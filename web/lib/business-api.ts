@@ -97,7 +97,6 @@ export type BusinessOverview = {
   from: string;
   to: string;
   totals: { currency: CurrencyCode; amount: DecimalString; count: number }[];
-  awaiting_review: number;
   needs_attention: number;
   last_received_at: string | null;
   last_confirmed_at: string | null;

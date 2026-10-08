@@ -3,17 +3,18 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  currencyChange,
   currencySymbol,
+  displayForValue,
   editMoney,
+  fallbackEdit,
   formatMoney,
   localeUsesCommaDecimal,
   moneyPlaceholder,
   moneyProblemFromServer,
-  parsePasted,
+  nextRenderedHistory,
   readMoney,
-  group,
-  logicalIndex,
-  displayIndex,
+  textForParentValue,
   type MoneyEditInput,
   type MoneyProblem,
   type MoneyRules,
@@ -33,6 +34,8 @@ type MoneyInputProps = {
   disabled?: boolean;
   /** A backend recording error code such as amount_precision. */
   serverError?: string | null;
+  /** Read after the label, such as "Needed"; the visible label cannot reach the input. */
+  description?: string | null;
   testId?: string;
 };
 
@@ -45,12 +48,6 @@ const DELETES: Record<string, "backward" | "forward"> = {
   deleteContent: "backward",
 };
 
-function displayFor(value: string | null, rules: MoneyRules): string {
-  if (!value) return "";
-  const parsed = parsePasted(value, rules);
-  return "logical" in parsed ? formatMoney(group(parsed.logical), rules) : value;
-}
-
 export default function MoneyInput({
   label,
   currency,
@@ -59,11 +56,13 @@ export default function MoneyInput({
   allowNegative = false,
   disabled = false,
   serverError = null,
+  description = null,
   testId,
 }: MoneyInputProps) {
   const { t } = useTranslation();
   const id = useId();
   const messageId = `${id}-message`;
+  const descriptionId = `${id}-description`;
   const inputRef = useRef<HTMLInputElement>(null);
   const pendingCaret = useRef<number | null>(null);
   const rulesFor = (code: string): MoneyRules => ({
@@ -72,24 +71,37 @@ export default function MoneyInput({
     commaDecimal: typeof navigator !== "undefined" && localeUsesCommaDecimal(navigator.language),
   });
   const rules = rulesFor(currency);
-  const [text, setText] = useState(() => displayFor(value, rules));
+  const [text, setText] = useState(() => displayForValue(value, rules));
   const [problem, setProblem] = useState<MoneyProblem | null>(null);
-
-  // A value the parent sets that this text does not already read as (a reload,
-  // a server correction) replaces the text; echoes of our own emits do not.
+  const [currencyNote, setCurrencyNote] = useState(false);
   const [seenValue, setSeenValue] = useState(value);
+  const [parentReplacements, setParentReplacements] = useState(0);
   if (value !== seenValue) {
     setSeenValue(value);
-    if (value !== readMoney(text, rules).value) {
-      setText(displayFor(value, rules));
+    const replaced = textForParentValue(text, value, rules);
+    if (replaced !== null) {
+      setParentReplacements((count) => count + 1);
+      setText(replaced);
       setProblem(null);
+      setCurrencyNote(false);
     }
   }
+
+  // Texts this field has rendered, so an undo or redo that restores one is
+  // recognized as the field's own grouping.
+  const rendered = useRef<string[]>([]);
+  const seenReplacements = useRef(0);
+  useLayoutEffect(() => {
+    const parentReplaced = seenReplacements.current !== parentReplacements;
+    seenReplacements.current = parentReplacements;
+    rendered.current = nextRenderedHistory(rendered.current, text, parentReplaced);
+  }, [text, parentReplacements]);
 
   const commit = (next: string, caret: number | null, nextProblem: MoneyProblem | null) => {
     pendingCaret.current = caret;
     setText(next);
     setProblem(nextProblem);
+    setCurrencyNote(false);
     const reading = readMoney(next, rules);
     onValueChange({ value: reading.value, invalid: reading.problem !== null });
   };
@@ -100,14 +112,15 @@ export default function MoneyInput({
     latest.current = { text, rules, onValueChange, commit };
   });
 
-  // A currency change revalidates the same digits; there is no conversion.
   const seenCurrency = useRef(currency);
   useEffect(() => {
     if (seenCurrency.current === currency) return;
+    const previous = seenCurrency.current;
     seenCurrency.current = currency;
-    const reading = readMoney(latest.current.text, latest.current.rules);
-    setProblem(reading.problem?.code === "precision" ? reading.problem : null);
-    latest.current.onValueChange({ value: reading.value, invalid: reading.problem !== null });
+    const change = currencyChange(latest.current.text, previous, latest.current.rules);
+    setProblem(change.problem);
+    setCurrencyNote(change.note);
+    latest.current.onValueChange({ value: change.value, invalid: change.invalid });
   }, [currency]);
 
   useLayoutEffect(() => {
@@ -142,18 +155,11 @@ export default function MoneyInput({
     return () => input.removeEventListener("beforeinput", onBeforeInput);
   }, []);
 
-  // Edits the browser does not announce as cancellable (word deletion, undo,
-  // IME commits) arrive here and are validated whole, like a paste.
   const onChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const raw = event.target.value;
-    const caret = event.target.selectionStart ?? raw.length;
-    const parsed = raw.trim() ? parsePasted(raw, rules) : { logical: "" };
-    if ("problem" in parsed) {
-      setProblem(parsed.problem);
-      return;
-    }
-    const next = group(parsed.logical);
-    commit(next, displayIndex(next, logicalIndex(raw, caret)), null);
+    const result = fallbackEdit(raw, event.target.selectionStart ?? raw.length, rules, rendered.current);
+    if (result.kind === "accept") commit(result.display, result.caret, null);
+    else if (result.kind === "reject") setProblem(result.problem);
   };
 
   const onBlur = () => {
@@ -200,12 +206,31 @@ export default function MoneyInput({
           disabled={disabled}
           aria-label={accessibleLabel}
           aria-invalid={shown ? true : undefined}
-          aria-describedby={messageId}
+          aria-describedby={description ? `${descriptionId} ${messageId}` : messageId}
           data-testid={testId}
         />
       </div>
-      <p id={messageId} aria-live="polite" className={shown ? "mt-1 text-[13px] text-[#a8434c] dark:text-[#ec9aa0]" : ""}>
-        {shown ? moneyMessage(shown, t) : ""}
+      {description ? (
+        <span id={descriptionId} className="sr-only">
+          {description}
+        </span>
+      ) : null}
+      <p
+        id={messageId}
+        aria-live="polite"
+        className={
+          shown
+            ? "mt-1 text-[13px] text-[#a8434c] dark:text-[#ec9aa0]"
+            : currencyNote
+              ? "mt-1 text-[13px] text-black/55 dark:text-white/55"
+              : ""
+        }
+      >
+        {shown
+          ? moneyMessage(shown, t)
+          : currencyNote
+            ? t("money.same_amount", "Same amount, no conversion.")
+            : ""}
       </p>
     </div>
   );
@@ -229,8 +254,12 @@ function moneyMessage(problem: MoneyProblem, t: Translate): string {
       return problem.digits === 0
         ? t("money.precision_none", "{{currency}} has no decimals.", { currency: problem.currency })
         : t("money.precision", "{{currency}} allows up to {{count}} decimals.", { currency: problem.currency, count: problem.digits });
-    case "maximum":
-      return t("money.maximum", "The maximum is {{maximum}}.", { maximum: problem.maximum });
+    case "too_long":
+      return t("money.too_long", "Use at most {{count}} digits before the decimal point.", { count: problem.digits });
+    case "out_of_range":
+      return t("money.out_of_range", "This amount is too large to record.");
+    case "ambiguous_currency":
+      return t("money.ambiguous_currency", "$ could mean RD$ or US$. Enter the amount without a symbol, or with RD$ or US$.");
     case "currency_mismatch":
       return t("money.currency_mismatch", "This amount is in {{field}}, not {{typed}}.", {
         field: problem.field,

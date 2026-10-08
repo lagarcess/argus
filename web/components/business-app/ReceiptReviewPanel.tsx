@@ -313,6 +313,7 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
                     setAmountError(null);
                   }}
                   serverError={amountError}
+                  description={!confirmed && missing.includes("amount") ? t("business.review.needed", "Needed") : null}
                   disabled={confirmed}
                   testId="receipt-review-amount"
                 />,
