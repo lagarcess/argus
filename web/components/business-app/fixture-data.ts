@@ -23,8 +23,11 @@ function daysAgo(days: number): string {
   return date.toISOString();
 }
 
+/** The local calendar day, matching how the period filter builds its range. */
 function dayOnly(iso: string): string {
-  return iso.slice(0, 10);
+  const date = new Date(iso);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
 }
 
 function receipt(
