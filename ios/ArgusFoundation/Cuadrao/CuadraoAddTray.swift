@@ -38,14 +38,15 @@ struct CuadraoAddTray: View {
     let choose: (CuadraoAddItem) -> Void
     @ScaledMetric(relativeTo: .body) private var glyphSize: CGFloat = 19
     @AccessibilityFocusState private var focusedRow: String?
+    @State private var contentHeight: CGFloat?
 
     var body: some View {
+        // The tray is as tall as its rows, up to a cap; it scrolls only when large text leaves no room.
         ScrollView {
-            rows
+            rows.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
         .scrollBounceBehavior(.basedOnSize)
-        .fixedSize(horizontal: false, vertical: true)
-        .frame(maxHeight: 420)
+        .frame(height: contentHeight.map { min($0, 420) } ?? CGFloat(items.count) * 49)
         .padding(.vertical, 6).padding(.horizontal, 12)
         .background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 28))
         .shadow(color: .black.opacity(0.14), radius: 20, y: 6)

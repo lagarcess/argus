@@ -28,6 +28,10 @@ extension FinancialLoopUITests {
         }
         for row in ["scan", "group", "invite"] { XCTAssertFalse(app.buttons["add.tray." + row].exists, row) }
         XCTAssertLessThan(app.buttons["add.tray.transaction"].frame.maxY, add.frame.minY, "the tray sits above the bar")
+        let tray = app.descendants(matching: .any)["add.tray"]
+        XCTAssertTrue(tray.exists)
+        XCTAssertLessThan(tray.frame.height, 3 * 70 + 40, "the tray hugs its three rows")
+        XCTAssertLessThan(app.buttons["add.tray.account"].frame.minY - tray.frame.minY, 40, "with no empty space above the first row")
         capture("release-surface-add-tray")
         app.buttons["add.tray.transaction"].tap()
         XCTAssertFalse(app.staticTexts["Choose an account"].exists, "no list of accounts comes first")
