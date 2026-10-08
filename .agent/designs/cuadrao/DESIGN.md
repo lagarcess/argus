@@ -170,7 +170,9 @@ re-colour or re-set them in a font.
   Never redraw it or set the wordmark as text.
 - **Large decorative mark.** Invitation pages keep their large mark (208 pt frame):
   `CuadraoMark` in the asset catalog, `cuadrao-mark-light.svg` on light and
-  `cuadrao-mark-dark.svg` on dark (not the tiled icon), so it is the same size in both.
+  `cuadrao-mark-dark.svg` on dark (not the tiled icon), so it is the same size in both. On
+  the invitation page's palette background it accepts the same slight back-square tone
+  shift as the lockup there.
 - **App icon.** `icon.svg` rendered full-bleed at 1024 x 1024 with the tile corner
   radius 0 (iOS rounds it and rejects transparency). Dark and tinted variants are not
   designed yet; a new founder decision is needed first.
