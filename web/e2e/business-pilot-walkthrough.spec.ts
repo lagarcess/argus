@@ -84,7 +84,7 @@ test.describe("Business pilot walkthrough", () => {
 
   test("4 a receipt that needs attention explains itself", async ({ page }) => {
     await openPreview(page);
-    await panel(page).getByRole("button", { name: /needs your attention/ }).click();
+    await panel(page).getByRole("button", { name: /need your attention/ }).click();
     await expect(heading(page, "Inbox")).toBeVisible();
     await panel(page).getByRole("button", { name: /IMG_2209/ }).click();
     await expect(panel(page)).toContainText("We couldn't read this receipt");
@@ -138,7 +138,7 @@ test.describe("Business pilot walkthrough on a phone", () => {
     await openPreview(page);
     await page.getByTestId("chat-shell-menu-trigger").click();
     const drawerNav = page.getByTestId("business-sidebar-nav");
-    await expect(drawerNav.getByRole("button", { name: /^Inbox/ })).toContainText("4");
+    await expect(drawerNav.getByRole("button", { name: /^Inbox/ })).toContainText("6");
     await page.keyboard.press("Escape");
     await page.getByTestId("business-create-compact").click();
     await expect(page.getByRole("menuitem")).toHaveText(["Upload receipt", "Record expense"]);

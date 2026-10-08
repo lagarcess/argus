@@ -115,9 +115,20 @@ it with Ctrl-C and delete the callback URL in the Meta dashboard.
   delivery as `failed` and asks the person to resend. A resend captures
   normally, and a redelivery of the same message retries the failed record.
 
-## Needs the Business boundary decision
+## The Business destination
 
-- `resolve_intake_destination` in `src/argus/api/whatsapp.py` returns the
-  signed-in person. Under option A it returns the business principal through an
-  active owner membership, and captures land under `business_id`.
+The founder chose separate Personal and Business spaces on October 8
+([slice plan, PR #910](https://github.com/lagarcess/argus/pull/910)).
+
+- Intake is on only while the Business pilot is on. Linking needs the person's
+  Business space: the link routes answer 404 `business_space_missing` until the
+  person starts it. The sender link stores `destination_space_id`, filled from
+  `public.business_space_of` when the link is created.
+- A capture resolves the owner's space with `resolve_business_scope` and saves
+  the document in that space. If the link ends before the capture settles, the
+  message settles `rejected` with `sender_link_revoked`, keeps no connection and
+  gets the not-linked reply. `whatsapp_capture_same_space` refuses a captured
+  row whose connection is not in the active link's space.
+- The reply language is the sender link's `reply_language`, set from the web
+  language when the person created the link code.
 - The founder approved the reply copy in `whatsapp/replies.py` on October 8, 2026.

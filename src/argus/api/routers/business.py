@@ -1,13 +1,14 @@
 """Business pilot: receipts in, reviewed expenses out. Thin transport.
 
-Default-off and isolation pending (see ``argus.domain.business.scope``). Rules
-live in ``argus.domain.business``; each fact stays with its existing owner.
+Default-off. Each person's Business records live in their own space (see
+``argus.domain.business.scope``), apart from Personal. Rules live in
+``argus.domain.business``; each fact stays with its existing owner.
 """
 
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import (
     APIRouter,
@@ -23,14 +24,18 @@ from fastapi.concurrency import run_in_threadpool
 
 from argus.api.business import (
     BusinessContext,
+    BusinessPerson,
     require_business,
     require_business_document_write,
+    require_business_person,
     require_business_surface,
 )
 from argus.api.business_schemas import (
     BusinessAccount,
     BusinessExpense,
     BusinessOverview,
+    BusinessSearch,
+    BusinessSpaceInfo,
     BusinessWorkspace,
     ConfirmBody,
     CreateBusinessAccount,
@@ -40,8 +45,11 @@ from argus.api.business_schemas import (
     ReceiptPage,
     ReceiptReviewBody,
     ReceiptSummary,
+    RenameBusinessSpace,
+    StartBusinessSpace,
     UpdatePage,
 )
+from argus.api.business_spaces import space_missing_problem
 from argus.api.dependencies import problem
 from argus.api.documents import (
     NO_STORE,
@@ -52,6 +60,7 @@ from argus.api.documents import (
 )
 from argus.api.financial_accounts import domain_problem
 from argus.domain.business.service import BusinessError
+from argus.domain.business.spaces import Space, default_space_name
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.documents.config import SOURCE_MEDIA_TYPES
 from argus.domain.ingestion.documents.models import DocumentExtractionError
@@ -61,7 +70,7 @@ from argus.domain.ingestion.reconcile.model import (
     ReconcileError,
     StaleEvent,
 )
-from argus.domain.recording.errors import StaleVersion
+from argus.domain.recording.errors import AccountNotFound, StaleVersion
 from argus.domain.recording.schemas import CreateFinancialAccountRequest
 
 
@@ -104,6 +113,12 @@ def _problem(request: Request, error: Exception) -> HTTPException:
             detail="This receipt changed since you opened it. Reload and try again.",
             headers=NO_STORE,
         )
+    if (
+        isinstance(error, (BusinessError, ReconcileError))
+        and error.code == "financial_account_not_found"
+    ):
+        # An account outside this space is not found, as on POST /expenses.
+        return domain_problem(request, AccountNotFound())
     if isinstance(error, (BusinessError, ReconcileError)):
         return problem(
             request,
@@ -116,6 +131,48 @@ def _problem(request: Request, error: Exception) -> HTTPException:
     if isinstance(error, (DocumentServiceError, DocumentExtractionError)):
         return document_problem(request, error)
     return domain_problem(request, error)
+
+
+def _space(space: Space) -> dict[str, Any]:
+    return {"id": space.id, "name": space.name}
+
+
+@router.get("/space", response_model=BusinessSpaceInfo)
+def get_space(
+    request: Request,
+    person: BusinessPerson = Depends(require_business_person),  # noqa: B008
+) -> dict[str, Any]:
+    space = person.spaces.open_space(person.person_id)
+    if space is None:
+        raise space_missing_problem(request)
+    return _space(space)
+
+
+@router.post("/space", response_model=BusinessSpaceInfo, status_code=201)
+def start_space(
+    response: Response,
+    body: StartBusinessSpace,
+    person: BusinessPerson = Depends(require_business_person),  # noqa: B008
+) -> dict[str, Any]:
+    """Idempotent: an existing space is returned unchanged, with 200."""
+
+    space, created = person.spaces.create(
+        person.person_id, body.name or default_space_name(body.language)
+    )
+    response.status_code = 201 if created else 200
+    return _space(space)
+
+
+@router.patch("/space", response_model=BusinessSpaceInfo)
+def rename_space(
+    request: Request,
+    body: RenameBusinessSpace,
+    person: BusinessPerson = Depends(require_business_person),  # noqa: B008
+) -> dict[str, Any]:
+    space = person.spaces.rename(person.person_id, body.name)
+    if space is None:
+        raise space_missing_problem(request)
+    return _space(space)
 
 
 @router.get("/workspace", response_model=BusinessWorkspace)
@@ -187,6 +244,7 @@ async def upload_receipt(
                 context.scope.person_id,
                 receipt.id,
                 background_tasks,
+                scope=context.scope.owner,
             )
     except Exception as error:
         raise _problem(request, error) from None
@@ -261,6 +319,7 @@ async def prepare_receipt(
             context.scope.person_id,
             receipt_id,
             background_tasks,
+            scope=context.scope.owner,
         )
         return context.service.receipt(context.scope, receipt_id).summary()
     except Exception as error:
@@ -278,7 +337,9 @@ async def review_receipt(
 
     service, scope = context.service, context.scope
     try:
-        version = await service.start_entry(scope, receipt_id, body.version)
+        version = await service.start_entry(
+            scope, receipt_id, body.version, body.fields.get("account_id")
+        )
         reviewed = await run_in_threadpool(
             service.review, scope, receipt_id, version, body.fields
         )
@@ -328,6 +389,19 @@ def record_expense(
     entered = {**body.model_dump(), "account_id": str(body.account_id)}
     try:
         return context.service.record_expense(context.scope, entered, key)
+    except Exception as error:
+        raise _problem(request, error) from None
+
+
+@router.get("/search", response_model=BusinessSearch)
+def search(
+    request: Request,
+    q: Annotated[str, Query(min_length=1, max_length=512)],
+    limit: Annotated[int, Query(ge=1, le=20)] = 5,
+    context: BusinessContext = Depends(require_business),  # noqa: B008
+) -> dict[str, Any]:
+    try:
+        return context.service.search(context.scope, q, limit)
     except Exception as error:
         raise _problem(request, error) from None
 

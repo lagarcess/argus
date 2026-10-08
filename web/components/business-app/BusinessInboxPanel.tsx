@@ -5,12 +5,12 @@ import { useTranslation } from "react-i18next";
 import type { ReceiptSummary } from "@/lib/business-api";
 import { useBusiness } from "./BusinessWorkspace";
 import { formatMoney, formatRelativeTime } from "./business-format";
-import { cardClass, LoadingRows, PanelHeading, primaryButtonClass, StatusPill, useErrorLabel } from "./business-ui";
+import { cardClass, LoadingRows, PanelHeading, primaryButtonClass, StatusPill, useAttentionLabel } from "./business-ui";
 
 export function ReceiptRow({ receipt, onOpen }: { receipt: ReceiptSummary; onOpen: () => void }) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? "en";
-  const errorLabel = useErrorLabel();
+  const attentionLabel = useAttentionLabel();
   const Icon = receipt.media_type === "application/pdf" ? FileText : ImageIcon;
   return (
     <li>
@@ -30,8 +30,8 @@ export function ReceiptRow({ receipt, onOpen }: { receipt: ReceiptSummary; onOpe
             {receipt.channel === "whatsapp" ? (
               <MessageCircle className="h-3.5 w-3.5 shrink-0" aria-label="WhatsApp" />
             ) : null}
-            {receipt.status === "needs_attention" && receipt.error_code
-              ? errorLabel(receipt.error_code)
+            {receipt.attention
+              ? attentionLabel(receipt.attention)
               : formatRelativeTime(receipt.received_at, locale)}
           </span>
         </span>

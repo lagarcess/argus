@@ -11,6 +11,7 @@ from argus.domain.ingestion.whatsapp.store import (
     InboundRecord,
     SenderLink,
     Settlement,
+    revoked,
 )
 
 _INBOUND_COLUMNS = (
@@ -64,8 +65,19 @@ class PostgresWhatsAppStore:
         claim_until: datetime | None,
         settlement: Settlement,
         now: datetime,
-    ) -> bool:
-        with self._pool.connection() as connection:
+    ) -> Settlement | None:
+        with self._pool.connection() as connection, connection.transaction():
+            # Held until commit, so a revoke cannot land between this read and
+            # the write; whatsapp_capture_same_space checks the same fact.
+            if settlement.connection_id is not None and (
+                connection.execute(
+                    "select 1 from public.whatsapp_sender_links"
+                    " where destination_owner_id = %s and status = 'active' for share",
+                    (settlement.destination_owner_id,),
+                ).fetchone()
+                is None
+            ):
+                settlement = revoked(settlement)
             cursor = connection.execute(
                 "update public.whatsapp_inbound_messages set status = %s, "
                 "destination_owner_id = %s, connection_id = %s, error_code = %s, "
@@ -82,7 +94,7 @@ class PostgresWhatsAppStore:
                     claim_until,
                 ),
             )
-            return cursor.rowcount == 1
+            return settlement if cursor.rowcount == 1 else None
 
     def inbound(self, provider_message_key: bytes) -> InboundRecord | None:
         with self._pool.connection() as connection:

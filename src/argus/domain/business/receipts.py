@@ -35,6 +35,70 @@ AWAITING_REVIEW: frozenset[ReceiptStatus] = frozenset(
 CLOSED: frozenset[ReceiptStatus] = frozenset({"confirmed", "dismissed"})
 # What a receipt nobody has read needs before the owner can save it by hand.
 UNREAD_NEEDS = ("account_id", "amount", "currency", "occurred_on")
+# Why a receipt needs the owner, in the words the owner sees. The web keys its
+# message on this; ``error_code`` stays the precise cause.
+Attention = Literal[
+    "unreadable",
+    "ai_unavailable",
+    "interrupted",
+    "outcome_unknown",
+    "no_purchase_found",
+    "several_purchases",
+    "source_unavailable",
+    "check_details",
+    "other",
+]
+# Preparation failures with nothing read, by the code the draft records.
+_UNREAD_ATTENTION: Mapping[str, Attention] = {
+    **dict.fromkeys(
+        (
+            "invalid_document",
+            "empty_document",
+            "encrypted_document",
+            "unsupported_image_frames",
+            "unsupported_media_type",
+            "document_too_large",
+            "document_page_limit",
+            "document_text_limit",
+            "document_memory_limit",
+            "document_empty",
+        ),
+        "unreadable",
+    ),
+    **dict.fromkeys(
+        (
+            "missing_vision_model",
+            "missing_api_key",
+            "document_tools_unavailable",
+            "document_extraction_disabled",
+            "document_extraction_unavailable",
+            "extraction_unavailable",
+            "extraction_provider_failed",
+            "document_extraction_failed",
+            "document_invalid_extraction",
+            "document_preparation_timeout",
+            "document_rate_limited",
+        ),
+        "ai_unavailable",
+    ),
+    **dict.fromkeys(
+        (
+            "document_preparation_interrupted",
+            "document_delivery_failed",
+            "document_lease_lost",
+            "document_storage_unavailable",
+            "document_version_conflict",
+            "document_busy",
+            "document_attempt_superseded",
+        ),
+        "interrupted",
+    ),
+    "document_preparation_outcome_unknown": "outcome_unknown",
+    "document_source_unavailable": "source_unavailable",
+}
+# Another read of the same bytes fails the same way, or cannot be made.
+_NO_RETRY: frozenset[Attention] = frozenset({"unreadable", "source_unavailable"})
+_BUSY = ("queued", "preparing")
 _UPDATE_KINDS: Mapping[str, str] = {
     "review_ready": "receipt_ready",
     "needs_attention": "receipt_needs_attention",
@@ -74,15 +138,51 @@ class Receipt:
 
     @property
     def enterable(self) -> bool:
-        """The owner may fill it in by hand: never read and not being read, or
-        entered by hand before its purchase reached review."""
+        """The owner may fill it in by hand: there is no single purchase to
+        review, nothing is reading it, and no read purchase is being recorded."""
 
-        if self.entered_by_owner:
-            return self.review.blocker == "no_purchase_found"
-        return self.review.blocker == "not_prepared" and self.draft.status not in (
-            "queued",
-            "preparing",
+        return (
+            self.review.blocker is not None
+            and self.draft.status not in _BUSY
+            and all(
+                read.state in ("open", "dismissed") for read in self.review.read_purchases
+            )
         )
+
+    @property
+    def preparable(self) -> bool:
+        """The owner may ask for an AI read: nothing was read or entered, the
+        source is stored, and another read could succeed."""
+
+        return (
+            self.review.blocker == "not_prepared"
+            and self.draft.source_available
+            and self.draft.status not in _BUSY
+            and _UNREAD_ATTENTION.get(self.draft.error_code or "") not in _NO_RETRY
+        )
+
+    @property
+    def attention(self) -> Attention | None:
+        """Why the owner must look; ``enterable`` and ``preparable`` say what
+        they can do about it."""
+
+        if self.status != "needs_attention":
+            return None
+        blocker = self.review.blocker
+        if blocker is None:
+            return "check_details"
+        if blocker == "not_prepared":
+            if not self.draft.source_available:
+                return "source_unavailable"
+            return _UNREAD_ATTENTION.get(self.draft.error_code or "", "other")
+        if self.entered_by_owner:
+            # The owner's entry stopped before it reached review.
+            return "other"
+        if self.draft.error_code == "unreadable_document":
+            return "unreadable"
+        if blocker == "no_purchase_found":
+            return "no_purchase_found"
+        return "several_purchases"
 
     @property
     def missing_fields(self) -> list[str]:
@@ -100,6 +200,9 @@ class Receipt:
             "received_at": self.draft.created_at,
             "status": self.status,
             "error_code": self.error_code,
+            "attention": self.attention,
+            "preparable": self.preparable,
+            "enterable": self.enterable,
             "expense_id": self.review.expense_id,
             **review_fields(self.review),
         }
@@ -185,6 +288,7 @@ def updates(
                 "receipt_id": receipt.id,
                 "expense_id": expense_id,
                 "error_code": receipt.error_code,
+                "attention": receipt.attention,
                 "label": review_fields(receipt.review)["merchant"]
                 or receipt.draft.filename,
             }

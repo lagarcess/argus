@@ -3,6 +3,7 @@
 from collections.abc import Iterator
 
 import pytest
+from argus.domain.business.spaces import PostgresSpaceStore
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
@@ -38,6 +39,7 @@ def _world(pool: ConnectionPool, users: dict[str, str]) -> cases.World:
         clock=clock,
         alice=users["owner"],
         bob=users["other"],
+        spaces=PostgresSpaceStore(pool),
     )
 
 

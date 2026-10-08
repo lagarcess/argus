@@ -115,7 +115,9 @@ class InMemoryDocumentStore:
         now: datetime | None = None,
     ) -> bool:
         try:
-            row = self.connections.get(user_id=user_id, connection_id=connection_id)
+            row = self.connections.get_any_scope(
+                user_id=user_id, connection_id=connection_id
+            )
         except ConnectionNotFound:
             return False
         return (
@@ -196,7 +198,7 @@ class InMemoryDocumentStore:
                 or previous.version != expected_version
             ):
                 return False
-            lease = self.connections.get(
+            lease = self.connections.get_any_scope(
                 user_id=user_id, connection_id=draft.connection_id
             ).lease_until
             if (
@@ -287,7 +289,7 @@ class InMemoryDocumentStore:
         with self.connections._lock, self._lock:
             if not self._live(user_id, connection_id) or key not in self._drafts:
                 return False
-            lease = self.connections.get(
+            lease = self.connections.get_any_scope(
                 user_id=user_id, connection_id=connection_id
             ).lease_until
             raw = self._jobs.get(key)

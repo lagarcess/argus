@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
+import type { LucideIcon } from "lucide-react";
 import type { WorkspaceStarterEntry } from "./StarterActions";
 
 /**
@@ -37,6 +38,37 @@ export type WorkspaceComposer = Readonly<{
   onSent: () => void;
 }>;
 
+export type WorkspaceSearchHit = Readonly<{
+  id: string;
+  icon: LucideIcon;
+  title: string;
+  detail: string;
+  amount: string | null;
+  open: () => void;
+}>;
+
+export type WorkspaceSearchGroup = Readonly<{
+  id: string;
+  label: string;
+  hits: readonly WorkspaceSearchHit[];
+}>;
+
+/**
+ * The workspace's own records in the shared omnisearch, above conversations.
+ * Each group is already authorized and matched by the workspace's backend.
+ */
+export type WorkspaceSearch = Readonly<{
+  find: (query: string) => Promise<readonly WorkspaceSearchGroup[]>;
+  copy: Readonly<{
+    placeholder: string;
+    noResultsHint: string;
+    region: string;
+    loading: string;
+    failed: string;
+    retry: string;
+  }>;
+}>;
+
 export type ChatWorkspace = Readonly<{
   id: string;
   initialView: ChatShellView;
@@ -50,6 +82,7 @@ export type ChatWorkspace = Readonly<{
   starterEntries: (bridge: ChatShellBridge) => readonly WorkspaceStarterEntry[];
   composer: (bridge: ChatShellBridge) => WorkspaceComposer;
   emptyChatLead: (bridge: ChatShellBridge) => ReactNode;
+  search: WorkspaceSearch;
   onShellChange: (bridge: ChatShellBridge) => void;
 }>;
 

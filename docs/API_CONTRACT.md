@@ -7432,6 +7432,9 @@ most one automatic stale-cursor restart before showing Retry. Response pages are
 bounded; database loading currently reuses the full owner snapshot and is not
 claimed to be bounded database work.
 
+This route reads only Personal records. The same matching, given a Business
+space as its scope, serves `GET /api/v1/business/search` (Business pilot below).
+
 `GET /api/v1/financial-plan/expectations/{expectation_id}` returns the existing
 `Expectation` projection, including archived or out-of-forecast-window records.
 Missing and other-owner IDs both return the existing financial-record 404.
@@ -8711,9 +8714,12 @@ media id from Graph, then the download URL Graph returns. Outbound replies are
 a third kind, and they are off by default. It never reads message history,
 contacts or profiles.
 
-The destination owner is read only through `resolve_intake_destination`,
-which takes it from `resolve_business_scope` (Business pilot below). Today that
-is the signed-in person; it is pending the Business boundary decision.
+Intake is on only while the Business pilot (below) is on too. A receipt lands
+in the owner's Business space, read through `resolve_business_scope`; it never
+appears in Personal documents or imports. The link routes answer 404
+`business_space_missing` until the person starts their space. A capture whose
+sender link ended before it settled is recorded `rejected` with
+`sender_link_revoked`, keeps no connection, and gets the not-linked reply.
 
 - GET `/api/v1/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=…&hub.challenge=…`
   answers 200 `text/plain` with the challenge when the verify token matches,
@@ -8750,7 +8756,7 @@ whose bytes the owner's inbox already holds gets the duplicate reply. A message 
 timestamp is more than 24 hours old is still captured but gets no reply, so
 nothing is sent outside the service window.
 
-### Business pilot (default-off, isolation pending)
+### Business pilot (default-off)
 
 Off unless `ARGUS_BUSINESS_PILOT_ENABLED` is true and the document surface
 above is on. While the flag is off every route below answers 404
@@ -8758,12 +8764,25 @@ above is on. While the flag is off every route below answers 404
 `Cache-Control: no-store`. The routes are registered-only and match
 `web/lib/business-api.ts`.
 
-**Isolation is pending.** Each route takes its scope from
-`resolve_business_scope(person)`, never from the client. Until the
-founder-approved boundary
-([proposal](specs/lanes/cuadrao-business-boundary-proposal.md), #819) the scope
-is the person with `space_id: null`, so Business reads and writes the same
-accounts, documents, imports and expenses as Personal.
+**Business has its own space.** Each person has at most one Business space,
+owned only by them. Each route takes its scope from
+`resolve_business_scope(person)`, never from the client, and reads and writes
+only that space's accounts, documents, imports and expenses. Personal routes
+never return Business records, and a Business route never returns Personal
+ones: an id from the other side, or from another person, is 404. Until the
+person starts their space, every route below except POST `/space` answers 404
+`business_space_missing`
+([slice plan, PR #910](https://github.com/lagarcess/argus/pull/910)).
+
+- POST `/api/v1/business/space` takes `{name?, language?}` and answers 201
+  `{id, name}` with a new space, or 200 with the existing one unchanged.
+  Without `name` the space is named "Mi negocio", or "My business" when
+  `language` is `en`. Concurrent calls create one space. A name is 1 to 80
+  characters after trimming, else 422.
+- GET `/api/v1/business/space` returns `{id, name}`, or 404
+  `business_space_missing` before the space is started.
+- PATCH `/api/v1/business/space` takes `{name}` and returns the renamed space,
+  or 404 `business_space_missing` before the space is started.
 
 Each fact keeps its owner. A receipt is a document draft (`id` is its
 connection id). Its review is the import event its purchase created, composed
@@ -8795,6 +8814,20 @@ accept path recorded.
   read lists `account_id`, `amount`, `currency` and `occurred_on`. A prepared
   receipt with no single purchase is `needs_attention`, with the blocker as
   `error_code`.
+- Every `ReceiptSummary` and `ReceiptDetail` carries the owner's next step,
+  decided by the backend. `preparable` is true when nothing was read or
+  entered, the source is stored, nothing is reading it, and another read could
+  succeed; the client then offers the consented `/prepare`. `enterable` is true
+  when there is no single purchase to review and nothing is reading it; the
+  client then offers entry by hand from `version: 0`. `attention` is null
+  unless the status is `needs_attention`, and then names why:
+  `unreadable` (the file cannot be read), `ai_unavailable`, `interrupted`,
+  `outcome_unknown` (an attempt may have reached the provider; only the
+  owner's consented retry starts another), `no_purchase_found`,
+  `several_purchases` (several or ambiguous purchases), `source_unavailable`,
+  `check_details` (a purchase is ready but the read was incomplete) or
+  `other`. `error_code` stays the precise cause. Nothing is retried
+  automatically because of it.
 - GET `/api/v1/business/receipts/{id}/source` returns the stored original
   (#778) as an attachment, with `X-Content-Type-Options: nosniff`. It is
   readable by the owner only.
@@ -8813,6 +8846,19 @@ accept path recorded.
   become its resolution, its `evidence` stays null, and no model is called.
   Unknown fields stay unknown until the owner supplies them. Confirm then uses
   the same accept path, and `receipt_ids` links the expense to the receipt.
+  A receipt that was read but has no single purchase (`no_purchase_found`,
+  `several_purchases_found`, `receipt_purchase_ambiguous`) is entered by hand
+  the same way. The read stays stored and its `evidence` stays visible. The
+  owner's one purchase is delivered beside the read, then every open purchase
+  the read created is dismissed and kept as history, so only the owner's can
+  become the expense. A document read as several rows that are not a receipt,
+  such as a photographed statement, counts as no purchase: entering its one
+  expense dismisses all of those rows, each kept as history. Each later review
+  and confirm repeats that dismissal, so
+  an interrupted entry finishes. A replay, a second tab or a restart enters one
+  purchase and confirm records one expense. An account outside the Business
+  space, Personal or another person's, is 404 `financial_account_not_found`,
+  as on POST `/expenses`, and is refused before anything is entered.
 - POST `/api/v1/business/receipts/{id}/confirm` (`Idempotency-Key` required)
   takes `{version}` and records the receipt as one expense through the import
   accept path. Confirm changes nothing before it claims the import. A
@@ -8837,7 +8883,20 @@ accept path recorded.
   `last_confirmed_at`.
 - GET `/api/v1/business/updates` returns `{items}` derived from receipt states
   (`receipt_ready`, `receipt_needs_attention`, `expense_confirmed`), newest
-  first. Nothing is stored for them.
+  first, each with the receipt's `error_code` and `attention`. Nothing is
+  stored for them.
+- GET `/api/v1/business/search?q&limit` returns `{expenses: BusinessExpense[],
+  receipts: ReceiptSummary[], accounts: BusinessAccount[]}`. `q` is 1 to 512
+  characters and `limit` is 1 to 20 (default 5), applied to each list. Nothing
+  is paged and there is no index of its own. Expenses and accounts are the
+  space's hits from the canonical financial search (`financial_search.hits`
+  with the Business scope) and match as `/financial-search` matches: an
+  expense on its note (the merchant), kind and category, an account on its
+  nickname, type and currency. A Business space has no plans, so no plan hits.
+  Receipts match by the same rule on the reviewed merchant, the filename and
+  the reviewed amount as written. Expenses and receipts are newest first. A
+  receipt whose expense is among the returned expenses is left out, because the
+  expense's `receipt_id` opens it and its source.
 
 Another person's receipt id answers 404 `receipt_not_found` on every receipt
 route. 

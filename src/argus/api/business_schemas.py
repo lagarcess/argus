@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from argus.api.schemas import Language
+from argus.domain.business.receipts import Attention
+from argus.domain.business.spaces import MAX_NAME_LENGTH
 from argus.domain.ingestion.receipt_review import ReceiptStatus
 
 ExpenseAccountType = Literal["cash", "checking", "savings", "credit_card"]
@@ -15,6 +18,28 @@ ExpenseAccountType = Literal["cash", "checking", "savings", "credit_card"]
 
 class _Wire(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+SpaceName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_NAME_LENGTH),
+]
+
+
+class BusinessSpaceInfo(_Wire):
+    id: str
+    name: str
+
+
+class StartBusinessSpace(_Wire):
+    """No name starts the space with the default name in ``language``."""
+
+    name: SpaceName | None = None
+    language: Language | None = None
+
+
+class RenameBusinessSpace(_Wire):
+    name: SpaceName
 
 
 class BusinessAccount(_Wire):
@@ -51,6 +76,12 @@ class ReceiptSummary(_Wire):
     received_at: datetime
     status: ReceiptStatus
     error_code: str | None
+    # Why a needs_attention receipt needs the owner; null otherwise.
+    attention: Attention | None
+    # The owner may ask for a consented AI read now.
+    preparable: bool
+    # The owner may fill in the one purchase by hand from version 0.
+    enterable: bool
     expense_id: str | None
     merchant: str | None
     occurred_on: str | None
@@ -147,8 +178,17 @@ class BusinessUpdate(_Wire):
     receipt_id: str | None
     expense_id: str | None
     error_code: str | None
+    attention: Attention | None
     label: str | None
 
 
 class UpdatePage(_Wire):
     items: list[BusinessUpdate]
+
+
+class BusinessSearch(_Wire):
+    """Each list is capped at the request's ``limit``; nothing is paged."""
+
+    expenses: list[BusinessExpense]
+    receipts: list[ReceiptSummary]
+    accounts: list[BusinessAccount]

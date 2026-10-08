@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Download } from "lucide-react";
+import { AlertCircle, ArrowLeft, Download, RotateCcw } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import MoneyInput from "@/components/money/MoneyInput";
 import { moneyProblemFromServer } from "@/lib/money-entry";
@@ -15,8 +15,8 @@ import {
   primaryButtonClass,
   secondaryButtonClass,
   StatusPill,
+  useAttentionLabel,
   useCategoryLabel,
-  useErrorLabel,
 } from "./business-ui";
 
 type Draft = Record<keyof ReceiptReviewFields, string>;
@@ -98,7 +98,7 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? "en";
   const categoryLabel = useCategoryLabel();
-  const errorLabel = useErrorLabel();
+  const attentionLabel = useAttentionLabel();
   const { source, records, reload, openPanel } = useBusiness();
   const [detail, setDetail] = useState<ReceiptDetail | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -147,6 +147,8 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
     );
   }
   if (!detail || !draft) return <LoadingRows rows={4} />;
+  // A receipt with no purchase yet opens for entry only when the backend says so.
+  const locked = confirmed || (detail.version === 0 && !detail.enterable);
 
   const changedFields = (): Partial<ReceiptReviewFields> =>
     Object.fromEntries(
@@ -253,7 +255,25 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
         <SourcePreview detail={detail} />
 
         <div className="space-y-4">
-          {detail.status === "saved" ? (
+          {detail.status === "needs_attention" ? (
+            <div role="alert" data-testid="receipt-attention" className={`${cardClass} text-[14px] text-black/75 dark:text-white/75`}>
+              <p className="flex gap-2.5">
+                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-[#d66d75]" aria-hidden="true" />
+                <span>{attentionLabel(detail.attention)}</span>
+              </p>
+              {detail.preparable ? (
+                <>
+                  <p className="mt-3 text-[13px] text-black/55 dark:text-white/55">
+                    {t("business.review.retry_consent", "Trying again sends this receipt to our AI provider.")}
+                  </p>
+                  <button type="button" disabled={busy !== null} onClick={() => void prepare()} className={`${secondaryButtonClass} mt-3`}>
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    {t("business.review.retry", "Try again with AI")}
+                  </button>
+                </>
+              ) : null}
+            </div>
+          ) : detail.preparable ? (
             <div className={cardClass}>
               <p className="text-[14px] text-black/75 dark:text-white/75">
                 {t("business.review.consent", "Cuadrao can read this receipt with AI and fill in the details for you to check. The receipt is sent to our AI provider only if you choose this. You can also fill in the details yourself.")}
@@ -268,28 +288,23 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
               {t("business.review.preparing", "Reading your receipt. You can leave this page; the result will wait in your inbox.")}
             </div>
           ) : null}
-          {detail.status === "needs_attention" ? (
-            <div role="alert" className={`${cardClass} text-[14px] text-black/75 dark:text-white/75`}>
-              {errorLabel(detail.error_code)}
-            </div>
-          ) : null}
 
           <div className={`${cardClass} space-y-4`}>
             {field(
               "merchant",
               t("business.review.merchant", "Merchant"),
-              <input className={inputClass} value={draft.merchant} onChange={set("merchant")} disabled={confirmed} autoComplete="off" />,
+              <input className={inputClass} value={draft.merchant} onChange={set("merchant")} disabled={locked} autoComplete="off" />,
             )}
             <div className="grid grid-cols-2 gap-3">
               {field(
                 "occurred_on",
                 t("business.review.date", "Date"),
-                <input type="date" className={inputClass} value={draft.occurred_on} onChange={set("occurred_on")} disabled={confirmed} />,
+                <input type="date" className={inputClass} value={draft.occurred_on} onChange={set("occurred_on")} disabled={locked} />,
               )}
               {field(
                 "category_id",
                 t("business.review.category", "Category"),
-                <select className={inputClass} value={draft.category_id} onChange={set("category_id")} disabled={confirmed}>
+                <select className={inputClass} value={draft.category_id} onChange={set("category_id")} disabled={locked}>
                   <option value="">{categoryLabel(null)}</option>
                   {RECEIPT_CATEGORY_IDS.map((id) => (
                     <option key={id} value={id}>
@@ -314,14 +329,14 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
                   }}
                   serverError={amountError}
                   description={!confirmed && missing.includes("amount") ? t("business.review.needed", "Needed") : null}
-                  disabled={confirmed}
+                  disabled={locked}
                   testId="receipt-review-amount"
                 />,
               )}
               {field(
                 "currency",
                 t("business.review.currency", "Currency"),
-                <select className={inputClass} value={draft.currency} onChange={set("currency")} disabled={confirmed}>
+                <select className={inputClass} value={draft.currency} onChange={set("currency")} disabled={locked}>
                   <option value="">{t("business.review.choose", "Choose")}</option>
                   {currencies.map((code) => (
                     <option key={code} value={code}>
@@ -334,7 +349,7 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
             {field(
               "account_id",
               t("business.review.account", "Paid from"),
-              <select className={inputClass} value={draft.account_id} onChange={set("account_id")} disabled={confirmed}>
+              <select className={inputClass} value={draft.account_id} onChange={set("account_id")} disabled={locked}>
                 <option value="">{t("business.review.choose_account", "Choose an account")}</option>
                 {accounts.map((account) => (
                   <option key={account.id} value={account.id}>
@@ -383,7 +398,7 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
               <button
                 type="button"
                 className={primaryButtonClass}
-                disabled={busy !== null || missing.length > 0 || amountInvalid || waitingForAi}
+                disabled={busy !== null || missing.length > 0 || amountInvalid || waitingForAi || locked}
                 onClick={() => void confirm()}
               >
                 {busy === "confirm" ? t("business.review.confirming", "Saving…") : t("business.review.confirm", "Confirm expense")}

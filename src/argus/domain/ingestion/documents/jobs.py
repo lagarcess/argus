@@ -83,7 +83,7 @@ class PreparationJobs:
         draft = store.draft(user_id=user_id, connection_id=connection_id)
         if draft is None:
             return
-        connection = self.service.hub.connections.get(
+        connection = self.service.hub.connections.get_any_scope(
             user_id=user_id, connection_id=connection_id
         )
         job = store.job(user_id=user_id, connection_id=connection_id)
@@ -120,7 +120,7 @@ class PreparationJobs:
         store = self.service.store
         draft = store.draft(user_id=user_id, connection_id=connection_id)
         job = store.job(user_id=user_id, connection_id=connection_id)
-        connection = self.service.hub.connections.get(
+        connection = self.service.hub.connections.get_any_scope(
             user_id=user_id, connection_id=connection_id
         )
         if draft is None:
@@ -277,11 +277,19 @@ async def run_attempt(
     if user_id is None:
         return "gone"
     try:
+        # The job is keyed by its connection, so the draft keeps that scope.
+        scope = service.hub.connections.get_any_scope(
+            user_id=user_id, connection_id=connection_id
+        ).scope
+    except ConnectionNotFound:
+        return "gone"
+    try:
         await service.resume(
             user_id=user_id,
             connection_id=connection_id,
             queued_only=True,
             attempt_id=attempt_id,
+            scope=scope,
         )
         return "prepared"
     except (DocumentServiceError, DocumentExtractionError) as error:

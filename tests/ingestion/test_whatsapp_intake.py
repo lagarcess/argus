@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
+from argus.domain.business.spaces import InMemorySpaceStore
 from argus.domain.ingestion.connections import InMemoryConnectionRepository
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
@@ -48,6 +49,7 @@ def _world() -> cases.World:
         clock=clock,
         alice=str(uuid4()),
         bob=str(uuid4()),
+        spaces=InMemorySpaceStore(),
     )
 
 

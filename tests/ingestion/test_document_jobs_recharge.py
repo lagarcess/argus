@@ -20,6 +20,7 @@ from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.sink import SubmitResult
+from argus.domain.owner_scope import PERSONAL
 
 
 class Clock:
@@ -75,6 +76,7 @@ async def queued(service: DocumentsService) -> str:
         filename="receipt.pdf",
         media_type="application/pdf",
         consent=True,
+        scope=PERSONAL,
     )
     return outcome.connection_id
 
@@ -97,7 +99,7 @@ async def test_dead_preparing_draft_without_a_job_waits_for_the_owner(rig):
     clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
     report = jobs.sweep()
 
-    draft = service.get(user_id="owner", connection_id=connection)
+    draft = service.get(user_id="owner", connection_id=connection, scope=PERSONAL)
     assert report.outcome_unknown == [connection]
     assert (draft.status, draft.error_code) == ("needs_attention", OUTCOME_UNKNOWN)
     assert dispatched == []
@@ -114,6 +116,7 @@ async def test_dead_preparing_draft_with_a_stale_job_waits_for_the_owner(rig):
     draft = service.store.draft(user_id="owner", connection_id=connection)
     service.update_proposal(
         user_id="owner",
+        scope=PERSONAL,
         connection_id=connection,
         version=draft.version,
         proposal=DraftProposal(requested_plan="Trip"),
@@ -126,7 +129,7 @@ async def test_dead_preparing_draft_with_a_stale_job_waits_for_the_owner(rig):
     clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
     report = jobs.sweep()
 
-    draft = service.get(user_id="owner", connection_id=connection)
+    draft = service.get(user_id="owner", connection_id=connection, scope=PERSONAL)
     assert report.outcome_unknown == [connection]
     assert (draft.status, draft.error_code) == ("needs_attention", OUTCOME_UNKNOWN)
     assert dispatched == [stale]
@@ -142,6 +145,7 @@ async def test_superseded_queued_attempt_is_replaced_on_the_next_sweep(rig):
     draft = service.store.draft(user_id="owner", connection_id=connection)
     service.update_proposal(
         user_id="owner",
+        scope=PERSONAL,
         connection_id=connection,
         version=draft.version,
         proposal=DraftProposal(requested_plan="Trip"),
@@ -181,9 +185,9 @@ async def test_storage_failure_before_the_marker_is_retried_once(rig):
     [_, second] = dispatched
     assert await run_attempt(service, connection, second) == "prepared"
     assert extractor.calls == 1
-    assert service.get(user_id="owner", connection_id=connection).status == (
-        "review_ready"
-    )
+    assert service.get(
+        user_id="owner", connection_id=connection, scope=PERSONAL
+    ).status == ("review_ready")
 
 
 @pytest.mark.asyncio
@@ -199,7 +203,7 @@ async def test_foreign_claim_of_the_dispatched_version_waits_for_the_owner(rig):
     clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
     report = jobs.sweep()
 
-    draft = service.get(user_id="owner", connection_id=connection)
+    draft = service.get(user_id="owner", connection_id=connection, scope=PERSONAL)
     assert report.outcome_unknown == [connection]
     assert (draft.status, draft.error_code) == ("needs_attention", OUTCOME_UNKNOWN)
     assert len(dispatched) == 1
@@ -214,6 +218,7 @@ async def test_foreign_claim_after_a_superseding_redispatch_waits_for_the_owner(
     draft = service.store.draft(user_id="owner", connection_id=connection)
     service.update_proposal(
         user_id="owner",
+        scope=PERSONAL,
         connection_id=connection,
         version=draft.version,
         proposal=DraftProposal(requested_plan="Trip"),
@@ -224,7 +229,7 @@ async def test_foreign_claim_after_a_superseding_redispatch_waits_for_the_owner(
     clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
     report = jobs.sweep()
 
-    draft = service.get(user_id="owner", connection_id=connection)
+    draft = service.get(user_id="owner", connection_id=connection, scope=PERSONAL)
     assert report.outcome_unknown == [connection]
     assert draft.error_code == OUTCOME_UNKNOWN
     assert len(dispatched) == 2
@@ -257,9 +262,9 @@ async def test_marked_attempt_that_saved_its_batch_is_replayed_without_a_call(ri
     assert await run_attempt(service, connection, replay) == "prepared"
     assert extractor.calls == 1, "replaying a saved preparation never calls"
     assert sink.submit.call_count == 2
-    assert service.get(user_id="owner", connection_id=connection).status == (
-        "review_ready"
-    )
+    assert service.get(
+        user_id="owner", connection_id=connection, scope=PERSONAL
+    ).status == ("review_ready")
 
 
 @pytest.mark.asyncio
@@ -289,7 +294,7 @@ async def test_foreign_claim_of_a_recovered_attempt_waits_for_the_owner(rig):
     clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
     report = jobs.sweep()
 
-    draft = service.get(user_id="owner", connection_id=connection)
+    draft = service.get(user_id="owner", connection_id=connection, scope=PERSONAL)
     assert report.outcome_unknown == [connection]
     assert draft.error_code == OUTCOME_UNKNOWN
     assert len(dispatched) == 2

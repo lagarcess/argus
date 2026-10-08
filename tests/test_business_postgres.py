@@ -14,13 +14,16 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 import pytest
-from argus.domain.business.scope import resolve_business_scope
+from argus.domain import financial_search
+from argus.domain.business.scope import BusinessScope, resolve_business_scope
 from argus.domain.business.service import BusinessService
+from argus.domain.business.spaces import PostgresSpaceStore
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
-from argus.domain.ingestion.documents.objects import owner_prefix
+from argus.domain.ingestion.documents.objects import SourceObjects, owner_prefix
 from argus.domain.ingestion.documents.service import (
     DocumentServiceError,
     DocumentsService,
@@ -29,6 +32,8 @@ from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStor
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.reconcile.service import ReconciliationService
 from argus.domain.ingestion.reconcile.store_postgres import PostgresImportStore
+from argus.domain.owner_scope import PERSONAL
+from argus.domain.recording.money_schemas import MoneyRequest
 from argus.domain.recording.money_service import MoneyService
 from argus.domain.recording.postgres_repository import (
     PostgresFinancialAccountRepository,
@@ -38,7 +43,7 @@ from argus.domain.recording.service import FinancialAccountService
 from psycopg_pool import ConnectionPool
 
 from tests import test_financial_accounts_postgres as shared
-from tests.business.receipt_stub import ReceiptStub
+from tests.business.receipt_stub import PURCHASE, ReceiptStub
 from tests.document_sources_support import LOCAL_STORAGE, source_objects, stored_paths
 
 pytestmark = pytest.mark.skipif(
@@ -66,19 +71,15 @@ def rig() -> Iterator[dict]:
                 (user, f"business-{user}@example.test"),
             )
     objects = source_objects()
-    connections = PostgresConnectionRepository(pool)
-    accounts = FinancialAccountService(PostgresFinancialAccountRepository(pool), _now)
-    imports = ReconciliationService(
-        PostgresImportStore(pool), MoneyService(accounts), _now, connections=connections
-    )
-    hub = IngestionHub(connections, box=None, sink=imports, clock=_now)
-    documents = DocumentsService(hub, PostgresDocumentStore(pool, objects), ReceiptStub())
+    spaces = PostgresSpaceStore(pool)
     try:
         yield {
             "pool": pool,
-            "owner": resolve_business_scope(owner),
-            "other": resolve_business_scope(other),
-            "service": BusinessService(documents, imports, lambda _: frozenset()),
+            "owner": _started(spaces, owner),
+            "other": _started(spaces, other),
+            "service": _service(pool, objects),
+            # A new process over the same database and storage.
+            "restart": lambda: _service(pool, objects),
         }
     finally:
         for user in (owner, other):
@@ -88,6 +89,24 @@ def rig() -> Iterator[dict]:
                 "delete from auth.users where id = any(%s)", ([owner, other],)
             )
         pool.close()
+
+
+def _service(pool: ConnectionPool, objects: SourceObjects) -> BusinessService:
+    connections = PostgresConnectionRepository(pool)
+    accounts = FinancialAccountService(PostgresFinancialAccountRepository(pool), _now)
+    imports = ReconciliationService(
+        PostgresImportStore(pool), MoneyService(accounts), _now, connections=connections
+    )
+    hub = IngestionHub(connections, box=None, sink=imports, clock=_now)
+    documents = DocumentsService(hub, PostgresDocumentStore(pool, objects), ReceiptStub())
+    return BusinessService(documents, imports, lambda _: frozenset())
+
+
+def _started(spaces: PostgresSpaceStore, person: str) -> BusinessScope:
+    spaces.create(person, "Mi negocio")
+    scope = resolve_business_scope(spaces, person)
+    assert scope is not None
+    return scope
 
 
 def _prepared(rig: dict) -> str:
@@ -102,7 +121,9 @@ def _prepared(rig: dict) -> str:
         )
     )
     asyncio.run(
-        service.documents.resume(user_id=scope.person_id, connection_id=receipt.id)
+        service.documents.resume(
+            user_id=scope.person_id, connection_id=receipt.id, scope=scope.owner
+        )
     )
     return receipt.id
 
@@ -244,3 +265,118 @@ def test_a_receipt_entered_by_hand_is_saved_once_and_linked(rig: dict) -> None:
         ).fetchone()[0]
     assert (events, _written(rig)) == (1, 1)
     assert service.source(scope, receipt.id) == ("image/png", RECEIPT)
+
+
+def test_entry_by_hand_after_a_read_records_one_expense_across_tabs_and_a_restart(
+    rig: dict,
+) -> None:
+    service, scope = rig["service"], rig["owner"]
+    service.documents.extractor.rows = [
+        PURCHASE,
+        {**PURCHASE, "row": 2, "evidence": "payment_notice", "amount": "100.00"},
+    ]
+    receipt_id = _prepared(rig)
+    read = service.receipt(scope, receipt_id)
+    assert (read.attention, read.enterable, read.preparable, read.version) == (
+        "several_purchases",
+        True,
+        False,
+        0,
+    )
+    account, _ = service.create_account(
+        scope,
+        CreateFinancialAccountRequest(type="cash", currency="DOP", nickname="Caja"),
+        "acct",
+    )
+
+    def enter(_: int) -> int:
+        return asyncio.run(service.start_entry(scope, receipt_id, 0))
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(enter, range(2)))
+    current = service.receipt(scope, receipt_id)
+    entered = service.review(
+        scope,
+        receipt_id,
+        current.version,
+        {
+            "merchant": "Ferretería La Esquina",
+            "occurred_on": "2026-10-06",
+            "amount": "3450.00",
+            "currency": "DOP",
+            "account_id": account["id"],
+        },
+    )
+    assert (entered.status, entered.attention, entered.missing_fields) == (
+        "review_ready",
+        None,
+        [],
+    )
+    assert entered.detail()["evidence"]["total"] == "3450.00"
+
+    restarted = rig["restart"]()
+    assert asyncio.run(restarted.start_entry(scope, receipt_id, 0)) == 0
+    first = restarted.confirm(scope, receipt_id, entered.version, "by-hand")
+    second = rig["restart"]().confirm(scope, receipt_id, entered.version, "other-tab")
+    assert first.review.expense_id == second.review.expense_id
+    [expense] = restarted.expenses(scope, *OCTOBER)
+    assert (expense["receipt_id"], expense["amount"]) == (receipt_id, "3450.00")
+    with rig["pool"].connection() as connection:
+        states = connection.execute(
+            "select state, count(*) from public.financial_import_events"
+            " where user_id = %s group by state order by state",
+            (scope.person_id,),
+        ).fetchall()
+    assert (states, _written(rig)) == ([("accepted", 1), ("dismissed", 2)], 1)
+
+
+def test_search_finds_the_business_expense_and_its_source_never_personal(
+    rig: dict,
+) -> None:
+    service, scope = rig["service"], rig["owner"]
+    accounts = service.accounts
+    personal = accounts.create(
+        user_id=scope.person_id,
+        idempotency_key="personal-acct",
+        request=CreateFinancialAccountRequest(
+            type="checking", currency="DOP", nickname="Casa"
+        ),
+        scope=PERSONAL,
+    ).stored.account
+    zone = "America/Santo_Domingo"
+    personal_expense = service.imports.money.write_entered(
+        user_id=scope.person_id,
+        request=MoneyRequest(
+            kind="expense",
+            account_id=personal.id,
+            amount="99.00",
+            occurred_at=datetime(2026, 10, 6, 9, 0, tzinfo=ZoneInfo(zone)),
+            time_zone=zone,
+            note="Ferretería La Esquina",
+        ),
+        idempotency_key="personal-expense",
+        scope=PERSONAL,
+    )["activity"]["activity_id"]
+    receipt_id, version = _reviewed(rig)
+    expense_id = service.confirm(scope, receipt_id, version, "k").review.expense_id
+
+    found = service.search(scope, "ferreteria", 5)
+
+    assert [(e["id"], e["receipt_id"]) for e in found["expenses"]] == [
+        (expense_id, receipt_id)
+    ]
+    assert (found["receipts"], found["accounts"]) == ([], [])
+    assert service.source(scope, receipt_id) == ("image/png", RECEIPT)
+    assert [r["id"] for r in service.search(scope, "recibo", 5)["receipts"]] == [
+        receipt_id
+    ]
+    assert [a["nickname"] for a in service.search(scope, "ops", 5)["accounts"]] == ["Ops"]
+    assert service.search(rig["other"], "ferreteria", 5) == {
+        "expenses": [],
+        "receipts": [],
+        "accounts": [],
+    }
+    personal_hits = financial_search.search(
+        accounts, scope.person_id, q="ferreteria"
+    ).items
+    assert [hit.activity.activity_id for hit in personal_hits] == [personal_expense]

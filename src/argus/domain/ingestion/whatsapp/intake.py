@@ -47,6 +47,7 @@ from argus.domain.ingestion.whatsapp.replies import (
 )
 from argus.domain.ingestion.whatsapp.store import (
     RETRYABLE,
+    SENDER_LINK_REVOKED,
     ReplyLanguage,
     Settlement,
     WhatsAppStore,
@@ -82,11 +83,13 @@ class Captured:
 
 
 class IntakeDestination(Protocol):
-    """Where a linked sender's receipt lands. Pending the Business boundary."""
+    """Where a linked sender's receipt lands: the owner's Business space."""
 
     async def capture(
         self, *, owner_id: str, content: bytes, filename: str, media_type: str
     ) -> Captured: ...
+
+    async def discard(self, *, owner_id: str, connection_id: str) -> None: ...
 
 
 class MediaSource(Protocol):
@@ -189,9 +192,17 @@ class WhatsAppIntake:
             await self._settle(key, held, Settlement("failed", error_code=code))
             log.warning("WhatsApp message failed", failure_mode=type(error).__name__)
             raise
-        if not await self._settle(key, held, settlement):
+        settled = await self._settle(key, held, settlement)
+        if settled is None:
             log.warning("WhatsApp message claim lost before settling")
             return False
+        if (
+            settled.error_code == SENDER_LINK_REVOKED
+            and settlement.connection_id is not None
+            and not settlement.duplicate
+        ):
+            await self._discard(settlement, log)
+        settlement = settled
         log.info(
             "WhatsApp message settled",
             status=settlement.status,
@@ -200,9 +211,25 @@ class WhatsAppIntake:
         await self._reply(message, settlement, log)
         return True
 
+    async def _discard(self, captured: Settlement, log) -> None:  # noqa: ANN001
+        """The link ended while this receipt was being saved; the sender is
+        told to send it again, so the new draft must not stay in the inbox."""
+
+        try:
+            await self.destination.discard(
+                owner_id=captured.destination_owner_id or "",
+                connection_id=captured.connection_id or "",
+            )
+            log.info("WhatsApp capture discarded after the link ended")
+        except Exception as error:
+            log.warning(
+                "WhatsApp capture could not be discarded after the link ended",
+                failure_mode=type(error).__name__,
+            )
+
     async def _settle(
         self, key: bytes, held: datetime | None, settlement: Settlement
-    ) -> bool:
+    ) -> Settlement | None:
         return await asyncio.to_thread(
             self.store.settle,
             provider_message_key=key,

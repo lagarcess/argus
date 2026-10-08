@@ -9,21 +9,24 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from argus.domain.business.spaces import SpaceStore
+from argus.domain.owner_scope import BusinessSpace
+
 
 @dataclass(frozen=True)
 class BusinessScope:
     person_id: str
-    space_id: str | None
+    owner: BusinessSpace
 
 
-def resolve_business_scope(person_id: str) -> BusinessScope:
-    """The signed-in person's Business scope.
+def resolve_business_scope(spaces: SpaceStore, person_id: str) -> BusinessScope | None:
+    """The signed-in person's open Business space, or None before they start one.
 
-    Isolation is pending the founder-approved ownership boundary
-    (docs/specs/lanes/cuadrao-business-boundary-proposal.md, #819). Until it
-    is approved ``space_id`` is None and Business reads and writes the
-    person's own records, the same rows Personal sees. When a boundary is
-    approved this is the one place that starts returning a space.
+    A space belongs only to the person who created it; nothing here reads a
+    membership or a client-supplied id.
     """
 
-    return BusinessScope(person_id=person_id, space_id=None)
+    space = spaces.open_space(person_id)
+    if space is None:
+        return None
+    return BusinessScope(person_id=person_id, owner=BusinessSpace(space.id))

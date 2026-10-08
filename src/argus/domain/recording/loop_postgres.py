@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from psycopg import Connection
 
+from argus.domain.owner_scope import OwnerScope, sql_predicate
 from argus.domain.recording.loop_storage import Planner
 from argus.domain.recording.repository import StoredAccount
 
@@ -135,7 +136,9 @@ def mutate(
     identity_hash: str,
     expected_version: int,
     planner: Planner,
+    scope: OwnerScope,
 ) -> OperationResult:
+    in_scope, in_params = sql_predicate(scope, "owner_space_id")
     with repository._pool.connection() as connection:
         with connection.transaction():
             owner = connection.execute(
@@ -145,8 +148,9 @@ def mutate(
             if not owner:
                 raise RegisteredAccountRequired()
             locked = connection.execute(
-                "select version from public.financial_accounts where id=%s and user_id=%s for update",
-                (account_id, user_id),
+                "select version from public.financial_accounts where id=%s and user_id=%s"
+                f" and {in_scope} for update",
+                (account_id, user_id, *in_params),
             ).fetchone()
             if not locked:
                 raise AccountNotFound()
@@ -158,7 +162,7 @@ def mutate(
                 if receipt[0] != identity_hash:
                     raise IdempotencyConflict()
                 return OperationResult(
-                    repository._load(connection, user_id, account_id),
+                    repository._load(connection, user_id, account_id, scope=scope),
                     str(receipt[1]),
                     receipt[2],
                     receipt[3],
@@ -166,7 +170,7 @@ def mutate(
                 )
             if locked[0] != expected_version:
                 raise StaleVersion()
-            stored = repository._load(connection, user_id, account_id)
+            stored = repository._load(connection, user_id, account_id, scope=scope)
             mutation = planner(stored)
             record = mutation.record
             if isinstance(record, CheckRecord):
@@ -247,7 +251,7 @@ def mutate(
                 ),
             )
             return OperationResult(
-                repository._load(connection, user_id, account_id),
+                repository._load(connection, user_id, account_id, scope=scope),
                 record.id,
                 revision,
                 mutation.kind,

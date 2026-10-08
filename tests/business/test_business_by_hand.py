@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from argus.api.ingestion import ingestion_hub
 from argus.domain.ingestion.reconcile.service import ReconciliationService
 from fastapi.testclient import TestClient
 
@@ -20,11 +21,17 @@ def _saved(alice: Owner) -> str:  # noqa: F811
 
 
 def _imports(alice: Owner) -> list[dict]:  # noqa: F811
-    listed = alice.client.get("/api/v1/financial-imports?state=open", headers=alice.auth)
-    accepted = alice.client.get(
-        "/api/v1/financial-imports?state=accepted", headers=alice.auth
+    """The Business space's imports; Personal review never lists them."""
+
+    for state in ("open", "accepted"):
+        personal = alice.client.get(
+            f"/api/v1/financial-imports?state={state}", headers=alice.auth
+        )
+        assert personal.json()["items"] == []
+    scope = alice.scope()
+    return ingestion_hub().sink.list(
+        user_id=scope.person_id, states=("open", "accepted"), scope=scope.owner
     )
-    return listed.json()["items"] + accepted.json()["items"]
 
 
 def test_declined_ai_receipt_is_entered_by_hand_and_saved_once(
@@ -111,8 +118,9 @@ def test_declined_ai_receipt_is_entered_by_hand_and_saved_once(
         headers={**alice.auth, "X-Extraction-Consent": "true"},
     )
     assert [(r.status_code, r.json()["code"]) for r in (prepare, generic)] == [
-        (409, "document_entered_by_owner")
-    ] * 2
+        (409, "document_entered_by_owner"),
+        (404, "financial_document_not_found"),
+    ]
     assert stub.calls == []
     assert len(_imports(alice)) == 1
 

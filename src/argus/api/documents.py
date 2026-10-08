@@ -37,6 +37,7 @@ from argus.domain.ingestion.documents.service import (
 )
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
+from argus.domain.owner_scope import OwnerScope
 
 NO_STORE = {"Cache-Control": "no-store"}
 _service: DocumentsService | None = None
@@ -182,13 +183,21 @@ async def dispatch_preparation(
     user_id: str,
     connection_id: str,
     background_tasks: BackgroundTasks,
+    *,
+    scope: OwnerScope,
 ) -> None:
-    """A durable attempt when preparation jobs are on, else a background task."""
+    """A durable attempt when preparation jobs are on, else a background task.
+
+    A job reads its scope from the connection; the background task is told it.
+    """
 
     jobs = document_jobs()
     if jobs is None:
         background_tasks.add_task(
-            service.background_prepare, user_id=user_id, connection_id=connection_id
+            service.background_prepare,
+            user_id=user_id,
+            connection_id=connection_id,
+            scope=scope,
         )
         return
     # Recorded before the response, so a closed client cannot lose the intake.

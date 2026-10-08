@@ -13,12 +13,14 @@ from datetime import date, datetime, time
 from typing import Any
 from zoneinfo import ZoneInfo
 
+from argus.domain import financial_search
 from argus.domain.business import ledger
 from argus.domain.business.receipts import (
     AWAITING_REVIEW,
     CLOSED,
     Receipt,
     compose,
+    review_fields,
     updates,
 )
 from argus.domain.business.scope import BusinessScope
@@ -95,7 +97,9 @@ class BusinessService:
                 "type": stored.account.type,
                 "currency": stored.account.currency,
             }
-            for stored in self.accounts.list_accounts(user_id=scope.person_id)
+            for stored in self.accounts.list_accounts(
+                user_id=scope.person_id, scope=scope.owner
+            )
             if stored.account.type in EXPENSE_ACCOUNT_TYPES
             and not stored.account.archived
         ]
@@ -104,7 +108,10 @@ class BusinessService:
         self, scope: BusinessScope, request: CreateFinancialAccountRequest, key: str
     ) -> tuple[dict[str, Any], bool]:
         result = self.accounts.create(
-            user_id=scope.person_id, idempotency_key=key, request=request
+            user_id=scope.person_id,
+            idempotency_key=key,
+            request=request,
+            scope=scope.owner,
         )
         account = result.stored.account
         return (
@@ -120,39 +127,41 @@ class BusinessService:
     # --- Receipts --------------------------------------------------------
     def receipts(self, scope: BusinessScope) -> list[Receipt]:
         person = scope.person_id
-        events = self.imports.list(user_id=person, states=RECEIPT_EVENT_STATES)
+        events = self.imports.list(
+            user_id=person, states=RECEIPT_EVENT_STATES, scope=scope.owner
+        )
         whatsapp = self.captured(person)
         found = []
-        for connection in self.documents.hub.connections.list(user_id=person):
+        for connection in self.documents.hub.connections.list(
+            user_id=person, scope=scope.owner
+        ):
             if connection.source != "statement" or connection.status == "disconnected":
                 continue
             try:
-                found.append(self._compose(person, connection.id, events, whatsapp))
+                found.append(self._compose(scope, connection.id, events, whatsapp))
             except DocumentServiceError as error:
                 if error.code != "document_source_unavailable":
                     raise
         return sorted(found, key=lambda item: item.draft.created_at, reverse=True)
 
     def receipt(self, scope: BusinessScope, receipt_id: str) -> Receipt:
-        person = scope.person_id
-        draft = self.documents.get(user_id=person, connection_id=receipt_id)
-        events = self.imports.list(user_id=person, states=RECEIPT_EVENT_STATES)
-        return compose(
-            draft,
-            self.documents.store.get(user_id=person, connection_id=receipt_id),
-            events,
-            "whatsapp" if receipt_id in self.captured(person) else "web",
+        events = self.imports.list(
+            user_id=scope.person_id, states=RECEIPT_EVENT_STATES, scope=scope.owner
         )
+        return self._compose(scope, receipt_id, events, self.captured(scope.person_id))
 
     def _compose(
         self,
-        person: str,
+        scope: BusinessScope,
         receipt_id: str,
         events: list[dict[str, Any]],
         whatsapp: frozenset[str],
     ) -> Receipt:
+        person = scope.person_id
         return compose(
-            self.documents.get(user_id=person, connection_id=receipt_id),
+            self.documents.get(
+                user_id=person, connection_id=receipt_id, scope=scope.owner
+            ),
             self.documents.store.get(user_id=person, connection_id=receipt_id),
             events,
             "whatsapp" if receipt_id in whatsapp else "web",
@@ -173,6 +182,7 @@ class BusinessService:
             filename=filename,
             media_type=media_type,
             consent=consent,
+            scope=scope.owner,
         )
         return self.receipt(scope, outcome.connection_id)
 
@@ -180,29 +190,90 @@ class BusinessService:
         """The owner chose AI preparation for a saved receipt."""
 
         self.documents.queue(
-            user_id=scope.person_id, connection_id=receipt_id, consent=True
+            user_id=scope.person_id,
+            connection_id=receipt_id,
+            consent=True,
+            scope=scope.owner,
         )
 
     def source(self, scope: BusinessScope, receipt_id: str) -> tuple[str, bytes]:
-        draft = self.documents.get(user_id=scope.person_id, connection_id=receipt_id)
+        draft = self.documents.get(
+            user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
+        )
         content = self.documents.source_bytes(
-            user_id=scope.person_id, connection_id=receipt_id
+            user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
         )
         return draft.media_type, content
 
     async def start_entry(
-        self, scope: BusinessScope, receipt_id: str, version: int
+        self,
+        scope: BusinessScope,
+        receipt_id: str,
+        version: int,
+        account_id: str | None = None,
     ) -> int:
-        """The version a review applies to; for a receipt nobody has read, first
-        record its one purchase as entered by the owner, then that version."""
+        """The version a review applies to. For a receipt with no single
+        purchase, first record the owner's one purchase, then that version.
+
+        A repeat delivers the same purchase, so a replay, a second tab or a
+        restart enters one. ``account_id``, the account the review will set, is
+        refused before anything is entered when it is outside the space.
+        """
 
         current = await asyncio.to_thread(self.receipt, scope, receipt_id)
-        if not current.enterable:
-            return version
-        if version != current.version:
-            raise StaleEvent()
-        await self.documents.enter(user_id=scope.person_id, connection_id=receipt_id)
-        return (await asyncio.to_thread(self.receipt, scope, receipt_id)).version
+        if current.enterable:
+            if version != current.version:
+                raise StaleEvent()
+            if account_id and account_id not in self._account_ids(scope):
+                raise ReconcileError(
+                    "financial_account_not_found", "Choose your own account."
+                )
+            await self.documents.enter(
+                user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
+            )
+            current = await asyncio.to_thread(self.receipt, scope, receipt_id)
+            version = current.version
+        await asyncio.to_thread(self._set_aside, scope, current)
+        return version
+
+    def _account_ids(self, scope: BusinessScope) -> set[str]:
+        return {
+            stored.account.id
+            for stored in self.accounts.list_accounts(
+                user_id=scope.person_id, scope=scope.owner
+            )
+        }
+
+    def _set_aside(self, scope: BusinessScope, receipt: Receipt) -> None:
+        """Beside the owner's entry, dismiss every open purchase a read found,
+        kept as history, so only the owner's can become the expense. Runs on
+        each review and confirm, so an entry interrupted before this finishes
+        on the next one."""
+
+        if not receipt.review.owner_entry:
+            return
+        person, owner = scope.person_id, scope.owner
+        for read in receipt.review.read_purchases:
+            state, version = read.state, read.version
+            for _ in range(3):
+                if state != "open":
+                    break
+                try:
+                    self.imports.dismiss(
+                        user_id=person,
+                        event_id=read.event_id,
+                        version=version,
+                        scope=owner,
+                    )
+                    break
+                except StaleEvent:
+                    # A replayed delivery or another entry changed it first.
+                    seen = self.imports.detail(
+                        user_id=person, event_id=read.event_id, scope=owner
+                    )
+                    state, version = seen["state"], seen["version"]
+            else:
+                raise StaleEvent()
 
     def review(
         self,
@@ -220,6 +291,7 @@ class BusinessService:
                 event_id=event_id,
                 version=version,
                 changes={_RESOLUTION[name]: value for name, value in fields.items()},
+                scope=scope.owner,
             )
         except ReconcileError as error:
             raise _renamed(error) from None
@@ -234,6 +306,7 @@ class BusinessService:
         """
 
         current = self.receipt(scope, receipt_id)
+        self._set_aside(scope, current)
         if current.status == "confirmed":
             return current
         if current.version == version and current.missing_fields:
@@ -245,6 +318,7 @@ class BusinessService:
                 version=version,
                 idempotency_key=key,
                 kind="expense",
+                scope=scope.owner,
             )
         except ReconcileError as error:
             if error.code != "import_already_accepted":
@@ -255,13 +329,61 @@ class BusinessService:
     def expenses(
         self, scope: BusinessScope, start: date, end: date
     ) -> list[dict[str, Any]]:
-        activities = self._activities(scope)
+        return self._expenses(scope, self._activities(scope), start, end)
+
+    def _expenses(
+        self,
+        scope: BusinessScope,
+        activities: list[dict[str, Any]],
+        start: date,
+        end: date,
+    ) -> list[dict[str, Any]]:
         ids = [item["activity_id"] for item in ledger.expense_activities(activities)]
-        with self.imports.store.transaction(scope.person_id) as tx:
+        with self.imports.store.transaction(scope.person_id, scope=scope.owner) as tx:
             receipt_of = receipt_ids(tx, self.documents.store, scope.person_id, ids)
         return [
             _wire(item) for item in ledger.expenses(activities, receipt_of, start, end)
         ]
+
+    def search(self, scope: BusinessScope, q: str, limit: int) -> dict[str, Any]:
+        """Expenses and accounts through the canonical financial search, plus
+        receipts matched by the same rule on merchant, filename and amount.
+
+        A receipt whose expense is already a hit is left out: the expense opens it.
+        """
+
+        query = financial_search.query_text(q)
+        found = financial_search.hits(
+            self.accounts, scope.person_id, scope=scope.owner, query=query
+        )
+        activities = [
+            hit.activity.model_dump()
+            for hit in found
+            if isinstance(hit, financial_search.ActivityHit)
+        ]
+        expenses = self._expenses(scope, activities, date.min, date.max)[:limit]
+        listed = {expense["id"] for expense in expenses}
+        receipts = [
+            receipt.summary()
+            for receipt in self.receipts(scope)
+            if receipt.review.expense_id not in listed
+            and financial_search.matches(query, _receipt_text(receipt))
+        ]
+        accounts = [
+            {
+                "id": hit.account.id,
+                "nickname": hit.account.nickname,
+                "type": hit.account.type,
+                "currency": hit.account.currency,
+            }
+            for hit in found
+            if isinstance(hit, financial_search.AccountHit)
+        ]
+        return {
+            "expenses": expenses,
+            "receipts": receipts[:limit],
+            "accounts": accounts[:limit],
+        }
 
     def record_expense(
         self, scope: BusinessScope, entered: Mapping[str, Any], key: str
@@ -280,7 +402,10 @@ class BusinessService:
             category_id=entered["category_id"],
         )
         activity = self.imports.money.write_entered(
-            user_id=scope.person_id, request=request, idempotency_key=key
+            user_id=scope.person_id,
+            request=request,
+            idempotency_key=key,
+            scope=scope.owner,
         )["activity"]
         recorded = ledger.expenses([activity], {}, date.min, date.max)
         if len(recorded) != 1:
@@ -309,7 +434,16 @@ class BusinessService:
         return [r for r in self.receipts(scope) if r.status not in CLOSED]
 
     def _activities(self, scope: BusinessScope) -> list[dict[str, Any]]:
-        return current_activities(self.accounts.list_accounts(user_id=scope.person_id))
+        return current_activities(
+            self.accounts.list_accounts(user_id=scope.person_id, scope=scope.owner)
+        )
+
+
+def _receipt_text(receipt: Receipt) -> str:
+    fields = review_fields(receipt.review)
+    return " ".join(
+        filter(None, [fields["merchant"], receipt.draft.filename, fields["amount"]])
+    )
 
 
 def _wire(expense: dict[str, Any]) -> dict[str, Any]:

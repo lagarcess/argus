@@ -5,6 +5,7 @@ import type {
   ReceiptDetail,
   ReceiptReviewFields,
 } from "@/lib/business-api";
+import { normalizeSearchText } from "@/lib/search-text";
 import type { BusinessDataSource } from "./business-data";
 
 /**
@@ -40,6 +41,9 @@ function receipt(
     size_bytes: 412_000,
     received_at: daysAgo(1),
     error_code: null,
+    attention: null,
+    preparable: false,
+    enterable: false,
     expense_id: null,
     merchant: null,
     occurred_on: null,
@@ -53,6 +57,9 @@ function receipt(
     ...partial,
   };
 }
+
+/** What the backend lists for a receipt nobody has read. */
+const UNREAD: ReceiptDetail["missing_fields"] = ["account_id", "amount", "currency", "occurred_on"];
 
 function seedReceipts(): ReceiptDetail[] {
   return [
@@ -111,8 +118,47 @@ function seedReceipts(): ReceiptDetail[] {
       channel: "whatsapp",
       filename: "IMG_2209.jpg",
       received_at: daysAgo(2),
-      error_code: "document_unreadable",
-      missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
+      error_code: "unreadable_document",
+      attention: "unreadable",
+      enterable: true,
+      version: 0,
+      missing_fields: UNREAD,
+    }),
+    receipt({
+      id: "rcpt-unknown",
+      status: "needs_attention",
+      filename: "IMG_2215.jpg",
+      received_at: daysAgo(2),
+      error_code: "document_preparation_outcome_unknown",
+      attention: "outcome_unknown",
+      preparable: true,
+      enterable: true,
+      version: 0,
+      missing_fields: UNREAD,
+    }),
+    receipt({
+      id: "rcpt-ambiguous",
+      status: "needs_attention",
+      filename: "colmado-oct.jpg",
+      received_at: daysAgo(3),
+      error_code: "receipt_purchase_ambiguous",
+      attention: "several_purchases",
+      enterable: true,
+      version: 0,
+      missing_fields: UNREAD,
+      evidence: {
+        merchant: "COLMADO DON PEDRO",
+        occurred_on: dayOnly(daysAgo(3)),
+        total: "706.10",
+        currency: "DOP",
+        tax: null,
+        tip: null,
+        service: null,
+        lines: [
+          { description: "Arroz 5 lb", amount: "325.00" },
+          { description: "Aceite 1 L", amount: "410.00" },
+        ],
+      },
     }),
     receipt({
       id: "rcpt-saved",
@@ -120,7 +166,10 @@ function seedReceipts(): ReceiptDetail[] {
       filename: "almuerzo-cliente.png",
       media_type: "image/png",
       received_at: daysAgo(3),
-      missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
+      preparable: true,
+      enterable: true,
+      version: 0,
+      missing_fields: UNREAD,
     }),
     receipt({
       id: "rcpt-confirmed",
@@ -197,7 +246,7 @@ function sampleReceiptImage(detail: ReceiptDetail): Blob {
 }
 
 /**
- * Lets a browser test have the next write fail with a backend error code, the
+ * Lets a browser test have the next write or search fail with a backend error code, the
  * way the live API answers, so each dialog's error mapping can be seen. The
  * preview only; the live source has no such switch.
  */
@@ -207,6 +256,17 @@ function injectedWriteError() {
   if (!code) return null;
   delete holder.__businessFixtureFailNextWrite;
   return Object.assign(new Error(code), { status: 422, code });
+}
+
+function fold(value: string): string {
+  return value.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase();
+}
+
+/** Close to the API's rule, for sample data: every query word inside the record's text. */
+function matches(query: string, text: string): boolean {
+  const words = normalizeSearchText(fold(query)).split(" ").filter(Boolean);
+  const haystack = normalizeSearchText(fold(text));
+  return words.length > 0 && words.every((word) => haystack.includes(word));
 }
 
 const delay = (ms = 240) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -231,6 +291,10 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
 
   return {
     mode: "fixture",
+    ensureSpace: async () => {
+      await delay();
+      return { id: "fixture-space", name: "Mi negocio" };
+    },
     workspace: async () => {
       await delay();
       return {
@@ -299,6 +363,7 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
           receipt_id: item.id,
           expense_id: item.expense_id,
           error_code: item.error_code,
+          attention: item.attention,
           label: item.merchant ?? item.filename,
         }));
       return items;
@@ -321,7 +386,10 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
         media_type: file.type,
         size_bytes: file.size,
         received_at: new Date().toISOString(),
-        missing_fields: ["merchant", "amount", "currency", "occurred_on", "account_id"],
+        preparable: !consentToPrepare,
+        enterable: !consentToPrepare,
+        version: 0,
+        missing_fields: UNREAD,
       });
       receipts = [created, ...receipts];
       uploads.set(key, created);
@@ -329,7 +397,11 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
     },
     prepareReceipt: async (id) => {
       await delay();
-      return replace({ ...find(id), status: "queued" });
+      const current = find(id);
+      if (!current.preparable) {
+        throw Object.assign(new Error("document_busy"), { status: 409, code: "document_busy" });
+      }
+      return replace({ ...current, status: "queued", error_code: null, attention: null, preparable: false, enterable: false });
     },
     saveReview: async (id, version, fields) => {
       await delay();
@@ -340,8 +412,13 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
       const merged = { ...current, ...fields };
       const injected = injectedWriteError();
       if (injected) throw injected;
+      // An entry by hand becomes the receipt's one purchase, ready to review.
+      const entered = current.enterable
+        ? { status: "review_ready" as const, error_code: null, attention: null, preparable: false, enterable: false }
+        : {};
       return replace({
         ...merged,
+        ...entered,
         version: current.version + 1,
         missing_fields: missing(merged),
       });
@@ -375,6 +452,25 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
         ...expenses,
       ];
       return replace({ ...current, status: "confirmed", expense_id: expenseId });
+    },
+    search: async (query) => {
+      await delay();
+      const injected = injectedWriteError();
+      if (injected) throw injected;
+      const found = expenses
+        .filter((item) => matches(query, [item.merchant, item.category_id].join(" ")))
+        .sort((a, b) => b.occurred_on.localeCompare(a.occurred_on));
+      const listed = new Set(found.map((item) => item.id));
+      return {
+        expenses: found.slice(0, 5),
+        receipts: receipts
+          .filter((item) => !listed.has(item.expense_id ?? ""))
+          .filter((item) => matches(query, [item.merchant, item.filename, item.amount].join(" ")))
+          .slice(0, 5),
+        accounts: ACCOUNTS.filter((item) =>
+          matches(query, [item.nickname, item.type, item.currency].join(" ")),
+        ).slice(0, 5),
+      };
     },
     recordExpense: async (input) => {
       await delay();

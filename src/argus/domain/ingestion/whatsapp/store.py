@@ -18,6 +18,8 @@ ReplyLanguage = Literal["en", "es-419"]
 InboundStatus = Literal["received", "linked", "rejected", "captured", "failed"]
 SettledStatus = Literal["linked", "rejected", "captured", "failed"]
 RETRYABLE: frozenset[InboundStatus] = frozenset({"received", "failed"})
+# A capture whose sender link ended before it settled keeps no connection.
+SENDER_LINK_REVOKED = "sender_link_revoked"
 
 
 @dataclass(frozen=True)
@@ -51,6 +53,16 @@ class Settlement:
     reply_language: str | None = None
 
 
+def revoked(settlement: Settlement) -> Settlement:
+    return replace(
+        settlement,
+        status="rejected",
+        connection_id=None,
+        error_code=SENDER_LINK_REVOKED,
+        duplicate=False,
+    )
+
+
 @dataclass(frozen=True)
 class SenderLink:
     destination_owner_id: str
@@ -76,8 +88,13 @@ class WhatsAppStore(Protocol):
         claim_until: datetime | None,
         settlement: Settlement,
         now: datetime,
-    ) -> bool:
-        """Settle only while the caller's claim is the one held."""
+    ) -> Settlement | None:
+        """Settle only while the caller's claim is the one held; None when it is not.
+
+        A capture settles only while its owner's sender link is active, checked
+        in the same transaction. Otherwise the message settles ``rejected`` with
+        ``SENDER_LINK_REVOKED`` and no connection. Returns what was stored.
+        """
         ...
 
     def issue_code(
@@ -173,11 +190,16 @@ class InMemoryWhatsAppStore:
         claim_until: datetime | None,
         settlement: Settlement,
         now: datetime,
-    ) -> bool:
+    ) -> Settlement | None:
         with self._lock:
             current = self._inbound[provider_message_key]
             if current.status not in RETRYABLE or current.claim_until != claim_until:
-                return False
+                return None
+            if settlement.connection_id is not None and not any(
+                link.active and link.owner == settlement.destination_owner_id
+                for link in self._links
+            ):
+                settlement = revoked(settlement)
             self._inbound[provider_message_key] = replace(
                 current,
                 status=settlement.status,
@@ -187,7 +209,7 @@ class InMemoryWhatsAppStore:
                 claim_until=None,
                 updated_at=now,
             )
-            return True
+            return settlement
 
     def inbound(self, provider_message_key: bytes) -> InboundRecord | None:
         return self._inbound.get(provider_message_key)
