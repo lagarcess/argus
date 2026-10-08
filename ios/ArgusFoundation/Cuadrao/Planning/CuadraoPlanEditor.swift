@@ -134,8 +134,8 @@ struct CuadraoPlanEditor<Details: View, Footer: View>: View {
                 .navigationTitle(editing ? (spanish ? "Editar plan" : "Edit plan") : (spanish ? "Un nuevo plan" : "A new plan"))
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button(spanish ? "Cancelar" : "Cancel") { if draft != initial { discard = true } else { dismiss() } }.disabled(host.saving)
+                    CuadraoCancelToolbar(title: spanish ? "Cancelar" : "Cancel", disabled: host.saving) {
+                        if draft != initial { discard = true } else { dismiss() }
                     }
                 }
                 .confirmationDialog(spanish ? "¿Descartar cambios?" : "Discard changes?", isPresented: $discard, titleVisibility: .visible) {
