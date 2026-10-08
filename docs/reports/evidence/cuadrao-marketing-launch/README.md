@@ -13,7 +13,7 @@ Hosted evidence (Render address, real inquiry receipt, hosted signup, domain) do
 
 ## Test runs on the final code
 
-- Unit: 123 passing when the screenshots were captured (`bun test`; CI holds the current count), lint and typecheck clean. The inquiry recipient (`CUADRAO_INQUIRY_TO`, no default) was added after the screenshots were captured; it changes no rendered page.
+- Unit: 123 passing at `4567c95c4` (`bun test`; CI holds the current count), lint and typecheck clean. The inquiry recipient (`CUADRAO_INQUIRY_TO`, no default) was added after the screenshots were captured; it changes no rendered page.
 - Browser: 130 passing across desktop (1440) and mobile (390) in Chromium, covering both forms against recording providers (receipt, double click, retry after a lost response, provider down, repeat signup, no cookies or browser storage), identity, redirects, indexing on candidate and public hosts, 404 page, mixed-case URLs and automated WCAG 2.1 AA checks on all eight pages.
 - Clean install: `bun install --frozen-lockfile` with Bun 1.3.14, then build and start on Node 24.21.0 with an empty environment: health 200, pages 200, both forms answer a truthful 503.
 - `web/` is byte-identical to its state before the website was added (`git diff da2d4633f^ -- web` is empty); it still lints (0 errors), passes 2,221 tests and builds.

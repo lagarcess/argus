@@ -227,6 +227,14 @@ describe("notice sending", () => {
     expect(rows[c.email_digest].notifiedAt).toBeNull();
   });
 
+  test("a test send also stops at the first unknown result and claims nothing", async () => {
+    const { doFetch, rows, mailCalls } = backend({ rows: fresh(a, b), mail: () => new Response("", { status: 503 }) });
+    const result = await sendNotice(ops, template, planNotice([a, b], ["a@example.invalid", "b@example.invalid"]), doFetch, NOW);
+    expect(result).toMatchObject({ sent: 0, unknownOutcome: [a.email_digest], stoppedEarly: true });
+    expect(mailCalls()).toBe(1);
+    expect(rows[a.email_digest].notifiedAt).toBeNull();
+  });
+
   test.each([409, 500, 503])("a %d may have been processed, so the row stays claimed and is named", async (status) => {
     const { doFetch, rows } = backend({ rows: fresh(a), mail: () => new Response("", { status }) });
     const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);

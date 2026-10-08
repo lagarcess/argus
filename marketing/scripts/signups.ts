@@ -85,7 +85,7 @@ if (command === "summary") {
     }
     if (result.releaseFailed.length > 0) {
       console.error(
-        "The provider refused these rows (nothing was sent) but the claim could not be released, so they stay claimed and a rerun will skip them. Set notified_at to empty for each digest to try again, or send by hand:\n" +
+        "The provider refused these rows (nothing was sent) but the claim could not be released, so they stay claimed and a rerun will skip them. First check notified_at for each digest. If it is empty, the release did save: a rerun will send it, so do not send by hand. If it is set, clear it to try again, or send by hand and leave it set:\n" +
           result.releaseFailed.join("\n"),
       );
     }
@@ -93,7 +93,9 @@ if (command === "summary") {
       console.error(
         result.claimUncertain.length > 0
           ? "Stopped: the database did not confirm a claim, so nothing further was sent. Fix the database and rerun; claimed rows are not repeated."
-          : "Stopped: a send had no usable answer, so nothing further was sent. Check the row named above, fix the cause and rerun; claimed rows are not repeated.",
+          : plan.stamp
+            ? "Stopped: a send had no usable answer, so nothing further was sent. Check the unknown-outcome row printed above in Resend, fix the cause and rerun; claimed rows are not repeated."
+            : "Stopped: a test send had no usable answer, so nothing further was sent. A test send claims nothing, so a rerun mails every test address again; Resend's key blocks a duplicate only for 24 hours. Check the unknown-outcome address printed above in Resend first.",
       );
     }
     if (result.failed > 0 || result.unknownOutcome.length > 0 || result.releaseFailed.length > 0 || result.claimUncertain.length > 0 || result.stoppedEarly) process.exit(1);

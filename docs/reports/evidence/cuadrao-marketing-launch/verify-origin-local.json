@@ -13,5 +13,5 @@
   "publicBuildCheckedAsCandidate": 10,
   "candidateBuildCheckedAsPublic": 10
  },
- "note": "Read-only GET/HEAD checks from marketing/scripts/verify-origin.ts. After review, robots.txt lines are matched whole, both robots.txt and sitemap.xml must return 200, and the share-image prefix comes from the route owner."
+ "note": "Read-only GET checks from marketing/scripts/verify-origin.ts. The counts were rerun after the redirect host check was added: 87 and 88 checks, 0 failed, wrong mode still rejected. After review, robots.txt lines are matched whole, both robots.txt and sitemap.xml must return 200, and the share-image prefix comes from the route owner."
 }
