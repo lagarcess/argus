@@ -580,7 +580,7 @@ def test_a_hosted_target_without_a_record_is_still_refused() -> None:
 def test_the_hosted_connection_must_reach_a_named_host_and_database() -> None:
     hosted = _approval()
     ok = SimpleNamespace(
-        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6"),
+        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6", port=5432),
         execute=lambda _sql: _Row("postgres"),
     )
     applier.verify_connection(ok, [DIRECT, POOLER], ["postgres"], hosted)
@@ -593,7 +593,7 @@ def test_the_hosted_connection_must_reach_a_named_host_and_database() -> None:
     with pytest.raises(applier.ApplyError):
         applier.verify_connection(elsewhere, [DIRECT, POOLER], ["postgres"], hosted)
     wrong_db = SimpleNamespace(
-        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6"),
+        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6", port=5432),
         execute=lambda _sql: _Row("other"),
     )
     with pytest.raises(applier.ApplyError):
@@ -756,3 +756,24 @@ def test_a_local_run_leaves_the_ssl_mode_to_libpq(
          "--allow-host", "127.0.0.1", "--allow-database", "rehearsal"]
     )  # fmt: skip
     assert "sslmode" not in seen and "sslrootcert" not in seen
+
+
+def test_a_hosted_url_without_a_port_or_with_a_bad_one_is_refused() -> None:
+    for url in (
+        f"postgresql://postgres.{REF}:p@{POOLER}/postgres",
+        f"postgresql://postgres.{REF}:p@{POOLER}:abc/postgres",
+        f"postgresql://postgres.{REF}:p@{POOLER}:6543/postgres",
+    ):
+        with pytest.raises(applier.ApplyError, match="port 5432"):
+            applier.check_target(
+                url, [POOLER], ["postgres"], environ={}, hosted=_approval()
+            )
+
+
+def test_the_hosted_connection_must_be_on_port_5432() -> None:
+    wrong = SimpleNamespace(
+        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6", port=6543),
+        execute=lambda _sql: _Row("postgres"),
+    )
+    with pytest.raises(applier.ApplyError, match="port 5432"):
+        applier.verify_connection(wrong, [POOLER], ["postgres"], _approval())

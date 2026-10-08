@@ -996,8 +996,8 @@ keys: `id`, `project_ref`, `hosts`, `database`, `candidate_sha`,
   record;
 - the record is valid now and for at most three days (ISO 8601 with a time zone);
 - every `hosts` entry is the project's direct host `db.<ref>.supabase.co` or a
-  Supabase pooler host; the target is one of them, uses port 5432 (a
-  transaction pooler breaks the run lock), carries the project ref (direct host,
+  Supabase pooler host; the target is one of them, names port 5432 in the URL
+  and the live connection is on 5432 (a transaction pooler breaks the run lock), carries the project ref (direct host,
   or the pooler user `postgres.<ref>` exactly), and the database matches;
 - the connection reaches a named host and database, and the server certificate
   is verified against `--ssl-root-cert` (verify-full, as the gate does).

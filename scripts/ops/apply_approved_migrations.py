@@ -266,9 +266,13 @@ def check_target(
         direct = f"db.{hosted.project_ref}.supabase.co"
         if host != direct and (parts.username or "") != f"postgres.{hosted.project_ref}":
             raise ApplyError("the target does not carry the approved project ref")
-        if (parts.port or 5432) != 5432:
+        try:
+            port = parts.port
+        except ValueError:
+            port = None
+        if port != 5432:
             raise ApplyError(
-                "a hosted target must use port 5432 (a transaction pooler breaks the run lock)"
+                "a hosted URL must name port 5432 explicitly (a transaction pooler breaks the run lock)"
             )
         if parts.path.lstrip("/") != hosted.database:
             raise ApplyError(
@@ -299,6 +303,8 @@ def verify_connection(
         raise ApplyError(
             "the connection went to a host the hosted approval record does not name"
         )
+    elif int(getattr(info, "port", 0) or 0) != 5432:
+        raise ApplyError("the hosted connection is not on port 5432")
     if host not in allowed:
         raise ApplyError("the connection went to a host that is not on the allowed list")
     if (
