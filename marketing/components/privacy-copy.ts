@@ -24,7 +24,7 @@ const es: PrivacyCopy = {
       title: "Si nos escribes",
       paragraphs: [
         "Recibimos tu nombre, tu correo, el comentario opcional y el idioma de la página. Los usamos solo para responderte.",
-        "El mensaje llega por correo electrónico al buzón de Cuadrao. No lo guardamos en otra base de datos y no lo usamos para enviarte publicidad.",
+        "El mensaje llega por correo electrónico a la cuenta de iCloud Mail de Cuadrao (hola@cuadrao.ai). No lo guardamos en otra base de datos y no lo usamos para enviarte publicidad.",
       ],
     },
     {
@@ -44,7 +44,8 @@ const es: PrivacyCopy = {
       title: "Quién procesa los datos",
       items: [
         "Render aloja el sitio y puede registrar datos técnicos de la conexión, como la dirección IP.",
-        "Resend envía el correo con tu mensaje al buzón de Cuadrao y, más adelante, el aviso de acceso anticipado a quienes se registraron. Puede conservar sus propios registros de envío.",
+        "Resend envía el correo con tu mensaje a la cuenta de iCloud Mail de Cuadrao y, más adelante, el aviso de acceso anticipado a quienes se registraron. Puede conservar sus propios registros de envío.",
+        "Apple (iCloud Mail) recibe y guarda los correos que llegan a hola@cuadrao.ai, incluidos los mensajes del formulario y las solicitudes de retiro.",
         "Supabase guarda los registros de acceso anticipado en servidores de Estados Unidos (Ohio).",
         "Cloudflare administra el dominio cuadrao.ai.",
       ],
@@ -52,7 +53,7 @@ const es: PrivacyCopy = {
     {
       title: "Cuánto tiempo los conservamos",
       paragraphs: [
-        "Tu mensaje permanece en el buzón de Cuadrao mientras haga falta para responderte y dar seguimiento a la conversación.",
+        "Tu mensaje permanece en la cuenta de iCloud Mail de Cuadrao mientras haga falta para responderte y dar seguimiento a la conversación.",
         "Tu registro de acceso anticipado permanece hasta que pidas retirarlo. Al retirarlo borramos tu correo y conservamos solo una huella técnica de la dirección, sin la dirección misma, para no volver a registrarte ni escribirte.",
       ],
     },
@@ -76,7 +77,7 @@ const en: PrivacyCopy = {
       title: "If you write to us",
       paragraphs: [
         "We receive your name, your email, the optional comment and the page language. We use them only to reply to you.",
-        "The message arrives by email in Cuadrao's mailbox. We do not store it in another database and we do not use it to send you advertising.",
+        "The message arrives by email in Cuadrao's iCloud Mail account (hola@cuadrao.ai). We do not store it in another database and we do not use it to send you advertising.",
       ],
     },
     {
@@ -96,7 +97,8 @@ const en: PrivacyCopy = {
       title: "Who processes the data",
       items: [
         "Render hosts the site and may log technical connection data, such as the IP address.",
-        "Resend sends the email with your message to Cuadrao's mailbox and, later, the early-access notice to people who signed up. It may keep its own sending logs.",
+        "Resend sends the email with your message to Cuadrao's iCloud Mail account and, later, the early-access notice to people who signed up. It may keep its own sending logs.",
+        "Apple (iCloud Mail) receives and stores the email sent to hola@cuadrao.ai, including form messages and removal requests.",
         "Supabase stores early-access signups on servers in the United States (Ohio).",
         "Cloudflare manages the cuadrao.ai domain.",
       ],
@@ -104,7 +106,7 @@ const en: PrivacyCopy = {
     {
       title: "How long we keep it",
       paragraphs: [
-        "Your message stays in Cuadrao's mailbox for as long as it is needed to reply and follow up.",
+        "Your message stays in Cuadrao's iCloud Mail account for as long as it is needed to reply and follow up.",
         "Your early-access signup stays until you ask to remove it. When you remove it we delete your email and keep only a technical fingerprint of the address, not the address itself, so we do not register or email you again.",
       ],
     },
