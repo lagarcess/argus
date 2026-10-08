@@ -94,6 +94,11 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["search.filter.all"].exists)
         for kind in ["chats", "files", "memory"] { XCTAssertFalse(app.buttons["search.filter." + kind].exists, kind) }
         capture("release-surface-search-filters")
+        app.buttons["search.filter.plans"].tap()
+        let copy = app.staticTexts["Create a goal, budget or debt plan with the + button."]
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.'"))
+        if rows.firstMatch.waitForExistence(timeout: 5) == false { XCTAssertTrue(copy.waitForExistence(timeout: 10), "empty Plans points to the + button") }
+        app.buttons["search.filter.all"].tap()
 
         // The tray does not outlive the screen it was opened on.
         app.buttons["tab.home"].tap()
