@@ -21,6 +21,7 @@ from argus.domain.ingestion.documents.models import DocumentDraft, ExtractionBat
 from argus.domain.ingestion.documents.objects import (
     SOURCE_BUCKET,
     SourceObjects,
+    SourceStorageUnavailable,
     owner_prefix,
 )
 from argus.domain.ingestion.documents.service import (
@@ -347,3 +348,107 @@ async def test_the_database_refuses_an_incoherent_source(rig: dict, columns: str
                 " where connection_id = %s",
                 (outcome.connection_id,),
             )
+
+
+@pytest.mark.asyncio
+async def test_capture_on_a_gone_connection_removes_its_object(rig: dict) -> None:
+    owner, pool, store = rig["owner"], rig["pool"], rig["store"]
+    outcome = await _upload(rig["service"], owner)
+    draft = store.draft(user_id=owner, connection_id=outcome.connection_id)
+    rig["hub"].connections.disconnect(
+        user_id=owner, connection_id=outcome.connection_id, now=NOW
+    )
+    assert not store.capture(user_id=owner, draft=draft, content=PDF)
+    assert _paths(pool, owner_prefix(owner)) == []
+
+
+@pytest.mark.asyncio
+async def test_capture_during_an_account_deletion_run_leaves_no_object(rig: dict) -> None:
+    owner, pool = rig["owner"], rig["pool"]
+    with pool.connection() as connection:
+        connection.execute(
+            "insert into argus_private.account_deletion_runs"
+            " (subject_hash, user_id, analytics_distinct_id) values (%s, %s, 'test')",
+            (hashlib.sha256(owner.encode()).hexdigest(), owner),
+        )
+    try:
+        with pytest.raises(DocumentServiceError, match="document_disconnected"):
+            await _upload(rig["service"], owner)
+        assert _paths(pool, owner_prefix(owner)) == []
+    finally:
+        with pool.connection() as connection:
+            connection.execute(
+                "delete from argus_private.account_deletion_runs where user_id = %s",
+                (owner,),
+            )
+
+
+@pytest.mark.asyncio
+async def test_a_lost_object_is_reported_and_an_identical_upload_restores_it(
+    rig: dict,
+) -> None:
+    owner, service = rig["owner"], rig["service"]
+    outcome = await _upload(service, owner)
+    connection_id = outcome.connection_id
+    rig["objects"].delete(f"{owner}/{connection_id}/")
+    with pytest.raises(DocumentServiceError, match="document_source_unavailable"):
+        service.source_bytes(user_id=owner, connection_id=connection_id)
+    assert not service.get(user_id=owner, connection_id=connection_id).source_available
+
+    again = await _upload(service, owner)
+    assert (again.connection_id, again.replayed) == (connection_id, True)
+    assert service.get(user_id=owner, connection_id=connection_id).source_available
+    assert service.source_bytes(user_id=owner, connection_id=connection_id) == PDF
+    assert _paths(rig["pool"], owner_prefix(owner)) == [
+        f"{owner}/{connection_id}/{DIGEST}"
+    ]
+
+
+class StorageDown(CrashAfterPut):
+    def put(self, path: str, content: bytes, media_type: str) -> None:
+        raise SourceStorageUnavailable("ConnectError")
+
+    def get(self, path: str) -> bytes | None:
+        raise SourceStorageUnavailable("ConnectError")
+
+
+@pytest.mark.asyncio
+async def test_a_storage_outage_is_retryable_in_upload_and_preparation(
+    rig: dict,
+) -> None:
+    owner, pool, hub = rig["owner"], rig["pool"], rig["hub"]
+    captured = await _upload(rig["service"], owner, consent=True)
+    down = DocumentsService(
+        hub,
+        PostgresDocumentStore(pool, StorageDown(rig["objects"])),
+        StatementExtractor(),
+    )
+    with pytest.raises(DocumentServiceError) as raised:
+        await down.resume(user_id=owner, connection_id=captured.connection_id)
+    assert (raised.value.code, raised.value.retryable) == (
+        "document_storage_unavailable",
+        True,
+    )
+    draft = down.get(user_id=owner, connection_id=captured.connection_id)
+    assert (draft.status, draft.error_code, draft.source_available) == (
+        "needs_attention",
+        "document_storage_unavailable",
+        True,
+    )
+    with pytest.raises(DocumentServiceError) as raised:
+        await down.upload(
+            user_id=owner,
+            content=b"%PDF-1.4 another",
+            filename="b.pdf",
+            media_type="application/pdf",
+        )
+    assert (raised.value.code, raised.value.retryable) == (
+        "document_storage_unavailable",
+        True,
+    )
+
+
+def test_the_installed_storage_client_reports_a_missing_object_as_none(
+    rig: dict,
+) -> None:
+    assert rig["objects"].get(f"{rig['owner']}/{uuid4()}/{DIGEST}") is None

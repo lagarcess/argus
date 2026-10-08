@@ -69,18 +69,25 @@ class PostgresDocumentStore:
         return bytes(legacy) if legacy is not None else None
 
     def capture(self, *, user_id: str, draft: DocumentDraft, content: bytes) -> bool:
+        """Rewrites the object unless the row holds legacy bytes: the path names
+        its content, so a repeat makes no second object and repairs a lost one.
+        Refused, and the object removed, once the connection is gone or an
+        account deletion run holds the person."""
+
         connection_id = draft.connection_id
-        row = self._read(user_id, connection_id, "source_path", "source_bytes")
+        row = self._read(user_id, connection_id, "source_bytes")
+        legacy = row is not None and row[0] is not None
         digest = hashlib.sha256(content).hexdigest()
         path = source_path(user_id=user_id, connection_id=connection_id, sha256=digest)
-        attach = row is None or row == (None, None)
-        if attach:
+        if not legacy:
             self.objects.put(path, content, draft.media_type)
         with self._pool.connection() as connection, connection.transaction():
             live = connection.execute(
                 "select id from public.financial_source_connections where id=%s "
-                "and user_id=%s and source='statement' and status <> 'disconnected' for update",
-                (connection_id, user_id),
+                "and user_id=%s and source='statement' and status <> 'disconnected' "
+                "and not exists (select 1 from argus_private.account_deletion_runs "
+                "where user_id=%s) for update",
+                (connection_id, user_id, user_id),
             ).fetchone()
             if live is not None:
                 connection.execute(
@@ -97,23 +104,31 @@ class PostgresDocumentStore:
                         draft.created_at,
                     ),
                 )
-                if attach:
-                    connection.execute(
-                        "update public.financial_document_extractions set "
-                        "source_bucket=%s,source_path=%s,source_media_type=%s,"
-                        "source_size_bytes=%s,source_sha256=%s "
-                        "where connection_id=%s and source_path is null and source_bytes is null",
-                        (
-                            self.objects.bucket,
-                            path,
-                            draft.media_type,
-                            len(content),
-                            digest,
-                            connection_id,
-                        ),
-                    )
+            if live is not None and not legacy:
+                connection.execute(
+                    "update public.financial_document_extractions set "
+                    "source_bucket=%s,source_path=%s,source_media_type=%s,"
+                    "source_size_bytes=%s,source_sha256=%s "
+                    "where connection_id=%s and source_path is null and source_bytes is null",
+                    (
+                        self.objects.bucket,
+                        path,
+                        draft.media_type,
+                        len(content),
+                        digest,
+                        connection_id,
+                    ),
+                )
+                connection.execute(
+                    "update public.financial_document_extractions set draft=draft || "
+                    "jsonb_build_object('source_available',true,"
+                    "'version',(draft->>'version')::integer+1) "
+                    "where connection_id=%s and source_path=%s "
+                    "and (draft->>'source_available')::boolean is false",
+                    (connection_id, path),
+                )
         if live is None:
-            if attach:
+            if not legacy:
                 self.objects.delete(
                     connection_prefix(user_id=user_id, connection_id=connection_id)
                 )

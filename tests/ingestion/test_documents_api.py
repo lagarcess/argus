@@ -1,6 +1,7 @@
 """Upload through reviewed acceptance, with real preparation and a scripted provider response."""
 
 from pathlib import Path
+from urllib.parse import quote
 from uuid import uuid4
 
 import pytest
@@ -347,3 +348,20 @@ def test_capture_keeps_destination_before_preparation(client, extraction):
     assert draft["proposal"]["requested_plan"] == proposal["requested_plan"]
     assert draft["proposal"]["participant_ids"] == proposal["participant_ids"]
     extraction.assert_not_awaited()
+
+
+@pytest.mark.parametrize(
+    "header",
+    [
+        quote("Ñame recibo.png"),
+        "Ñame recibo.png".encode(),
+    ],
+    ids=["percent-encoded", "raw utf-8"],
+)
+def test_the_filename_header_is_utf8(client, extraction, header):
+    saved = upload(client, **{"X-Document-Filename": header})
+    assert saved.status_code == 200, saved.text
+    draft = client.get(
+        f"{DOCUMENTS}/{saved.json()['connection_id']}", headers=bearer(ALICE)
+    ).json()
+    assert draft["filename"] == "Ñame recibo.png"

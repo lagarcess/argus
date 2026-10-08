@@ -3338,7 +3338,7 @@ being retried), and the account is locked: its sessions are refused from the
 moment the run opens and the auth user is banned, so clients sign out. A third
 party hasn't confirmed yet, so the auth delete waits. `pending` names it
 (`apple`, `gmail`, `plaid`, `analytics`, `storage` for retained document
-sources); it is empty when the data step
+sources, which is ours to fix and never operator-forced); it is empty when the data step
 itself is being retried. Every third-party step (Sign in with Apple through
 #793, Google/Gmail and Plaid tokens, PostHog personless event deletion) runs before the
 auth delete. A repeat request resumes the run, and so does the operator-run
@@ -8440,7 +8440,9 @@ backend contracts under implementation in the default-off lane, not hosted or
 native availability claims.
 
 `POST /api/v1/financial-documents` accepts bounded PDF, JPEG or PNG bytes and an
-optional `X-Document-Filename`. Optional `X-Document-Proposal` is a bounded
+optional `X-Document-Filename`, percent-encoded UTF-8 (`encodeURIComponent`);
+raw UTF-8 is also accepted and undecodable bytes become replacement characters.
+Optional `X-Document-Proposal` is a bounded
 (8192-character) JSON `DraftProposal`, saved atomically with the source so a known
 Plan destination survives closing the app immediately after capture. It grants no
 Plan access or sharing. Capture does not require a model, provider key,
@@ -8481,7 +8483,9 @@ client reads it. Poll `GET /financial-documents/{connection_id}` for current sta
 - `GET /financial-documents/{connection_id}/source` returns the retained file as a
   download with a safe generic filename, `Cache-Control: no-store` and `nosniff`.
   The API reads it from private Storage and proxies the bytes; no signed URL
-  leaves the server. Another person's connection is 404.
+  leaves the server. Another person's connection is 404. A Storage outage is a
+  retryable 503 `document_storage_unavailable`, during upload and preparation
+  alike.
 - `POST /financial-documents/{connection_id}/prepare` and `/resume` queue explicit
   preparation or replay saved candidate delivery. A fresh provider attempt requires
   `X-Extraction-Consent: true`; replay of saved preparation makes no provider call.
@@ -8492,8 +8496,14 @@ client reads it. Poll `GET /financial-documents/{connection_id}` for current sta
   do not change extracted evidence, grant access, share content or write money.
 
 All draft/source reads are owner-only and `no-store`. Missing retained source on
-an older checkpoint is explicit (`source_available=false`); an identical reupload
-can attach source to that same checkpoint without repeating extraction.
+an older checkpoint, or a stored object that is gone, is explicit
+(`source_available=false`); an identical reupload can attach or restore source on
+that same checkpoint without repeating extraction.
+
+**Deploy order.** Apply migration `20261008100000_financial_document_source_objects`
+(bucket and reference columns) before deploying an API that contains #778; the
+API writes those columns on capture and reads the run table to refuse captures
+during account deletion.
 
 The existing document checkpoint owns retained source, preparation lifecycle and
 prepared evidence. Owner-authorized draft and source reads support close/reopen.

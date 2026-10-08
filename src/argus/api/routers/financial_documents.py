@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import asdict
+from urllib.parse import unquote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request, Response
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -12,13 +13,16 @@ from argus.api.dependencies import problem
 from argus.api.document_jobs import document_jobs
 from argus.api.documents import DocumentContext, require_document_context
 from argus.domain.ingestion.connections import ConnectionNotFound
+from argus.domain.ingestion.documents.config import (
+    SOURCE_MEDIA_TYPES,
+    load_document_extraction_settings,
+)
 from argus.domain.ingestion.documents.models import (
     DocumentExtractionError,
     DraftProposal,
     DraftStatus,
 )
 from argus.domain.ingestion.documents.service import DocumentServiceError
-from argus.domain.ingestion.gmail.attachments import MAX_ATTACHMENT_BYTES
 
 router = APIRouter(prefix="/financial-documents", tags=["financial-documents"])
 NO_STORE = {"Cache-Control": "no-store"}
@@ -88,6 +92,17 @@ async def _prepare(
     )
 
 
+def _filename(header: str | None) -> str:
+    """``X-Document-Filename`` is percent-encoded UTF-8 (``encodeURIComponent``).
+    Raw UTF-8, which the server reads as latin-1, is recovered; bytes that are
+    not UTF-8 become replacement characters rather than mojibake."""
+
+    if not header:
+        return "document"
+    text = header.encode("latin-1").decode("utf-8", errors="replace")
+    return unquote(text, errors="replace")
+
+
 @router.post(
     "",
     response_model=DocumentResponse,
@@ -96,7 +111,7 @@ async def _prepare(
             "required": True,
             "content": {
                 media: {"schema": {"type": "string", "format": "binary"}}
-                for media in ("application/pdf", "image/jpeg", "image/png")
+                for media in SOURCE_MEDIA_TYPES
             },
         }
     },
@@ -124,7 +139,7 @@ async def upload_document(
             request, DocumentServiceError("document_proposal_invalid")
         ) from None
     media_type = request.headers.get("content-type", "").split(";", 1)[0].strip()
-    if media_type not in {"application/pdf", "image/jpeg", "image/png"}:
+    if media_type not in SOURCE_MEDIA_TYPES:
         raise problem(
             request,
             status_code=415,
@@ -133,15 +148,16 @@ async def upload_document(
             detail="Upload a PDF, JPEG or PNG file.",
             headers=NO_STORE,
         )
+    limit = load_document_extraction_settings().max_bytes
     content = bytearray()
     async for chunk in request.stream():
-        if len(content) + len(chunk) > MAX_ATTACHMENT_BYTES:
+        if len(content) + len(chunk) > limit:
             raise problem(
                 request,
                 status_code=413,
                 code="document_too_large",
                 title="Document too large",
-                detail="Upload a document of at most 10 MiB.",
+                detail=f"Upload a document of at most {limit / 1048576:g} MiB.",
                 headers=NO_STORE,
             )
         content.extend(chunk)
@@ -149,7 +165,7 @@ async def upload_document(
         outcome = await context.service.upload(
             user_id=context.user_id,
             content=bytes(content),
-            filename=filename or "document",
+            filename=_filename(filename),
             media_type=media_type,
             consent=consent == "true",
             proposal=destination,
@@ -250,9 +266,7 @@ def get_source(
         content = context.service.source_bytes(
             user_id=context.user_id, connection_id=connection_id
         )
-        suffix = {"application/pdf": "pdf", "image/png": "png", "image/jpeg": "jpg"}[
-            draft.media_type
-        ]
+        suffix = SOURCE_MEDIA_TYPES[draft.media_type]
         return Response(
             content,
             media_type=draft.media_type,
