@@ -10,7 +10,10 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from argus.agent_runtime.stages.interpret_types import StructuredInterpretation
+from argus.agent_runtime.stages.interpret_types import (
+    AssetDiscoveryRequest,
+    StructuredInterpretation,
+)
 from argus.agent_runtime.state.models import StrategySummary
 
 from tests.evals import measurement_eval_harness as harness
@@ -43,6 +46,18 @@ def test_business_cases_are_bilingual_business_turns_outside_the_personal_set() 
 
 
 def _scripted(case: harness.EvalCase) -> StructuredInterpretation:
+    if case.expected.semantic_turn_act == "asset_discovery":
+        return StructuredInterpretation(
+            intent="conversation_followup",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary=case.prompt,
+            candidate_strategy_draft=StrategySummary(),
+            semantic_turn_act="asset_discovery",
+            asset_discovery=AssetDiscoveryRequest(
+                relationship="peer", anchor_symbols=["TSLA"]
+            ),
+        )
     if "backtest_execution" in case.expected.intent:
         return StructuredInterpretation(
             intent="backtest_execution",

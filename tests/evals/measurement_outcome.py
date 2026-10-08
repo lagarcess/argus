@@ -21,6 +21,7 @@ from tests.evals.measurement_assertions import (
 # The patch key that carries each Personal tool or record into a turn. A
 # Business chat turn reaches none of them.
 _PERSONAL_CARRIERS = {
+    "asset_discovery": "discovery",
     "backtest_confirmation": "confirmation_payload",
     "tool_cards": "tool_result_cards",
     "research": "research",

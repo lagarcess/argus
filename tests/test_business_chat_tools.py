@@ -25,6 +25,7 @@ from argus.agent_runtime.stages.interpret import (
     StageResult,
     StructuredInterpretation,
 )
+from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
 from argus.agent_runtime.stages.tool_execution import execute_tool_calls_async
 from argus.agent_runtime.state.models import RunState, StrategySummary, UserState
 from argus.api import state as api_state
@@ -526,3 +527,46 @@ def test_a_business_turn_logs_the_memory_recall_it_skips(
     assert recalled is None
     assert service.calls == 0
     assert _gate_names(gates) == ["memory_recall"]
+
+
+def test_a_business_turn_runs_no_asset_discovery(
+    client: TestClient,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+    gates: list[dict[str, Any]],
+) -> None:
+    from argus.agent_runtime.discovery import composer
+
+    searched: list[object] = []
+
+    async def fake_find(**kwargs: object) -> StageResult:
+        searched.append(kwargs)
+        return StageResult(
+            outcome="ready_to_respond",
+            stage_patch={"assistant_response": "Rivian, Lucid."},
+        )
+
+    monkeypatch.setattr(composer, "discovery_operation_result", fake_find)
+    _install_runtime(
+        monkeypatch,
+        StructuredInterpretation(
+            intent="conversation_followup",
+            task_relation="new_task",
+            requires_clarification=False,
+            user_goal_summary="Companies like Tesla.",
+            candidate_strategy_draft=StrategySummary(),
+            semantic_turn_act="asset_discovery",
+            asset_discovery=AssetDiscoveryRequest(
+                relationship="peer", anchor_symbols=["TSLA"]
+            ),
+        ),
+    )
+    _start_space(ALICE)
+    business = _create(client, ALICE, "Shop ledger", surface="business")
+    personal = _create(client, ALICE, "Household ledger")
+
+    refused = _turn(client, business, "¿Qué empresas parecidas a Tesla puedo mirar?")
+    assert refused["recovery"]["code"] == "business_chat_tool_unavailable"
+    assert searched == []
+    assert _gate_names(gates) == ["asset_discovery"]
+    _turn(client, personal, "Companies like Tesla?")
+    assert len(searched) == 1

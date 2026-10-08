@@ -166,6 +166,22 @@ cases:
         recovery_code: business_chat_tool_unavailable
       intent: ["backtest_execution", "strategy_drafting"]
       capability_verdict: answer_only
+  - id: business_chat_asset_discovery_es
+    # Asset discovery is a Personal investing tool; the discovery gate answers
+    # with the same notice and offers no candidate rows.
+    surface: business
+    prompt: "¿Qué empresas parecidas a Tesla podría mirar para invertir?"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+        recovery_code: business_chat_tool_unavailable
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      semantic_turn_act: asset_discovery
+      stage_outcomes: ["ready_to_respond"]
   - id: business_chat_personal_decision_recall_en
     # A Personal saved decision is never recalled into a Business turn; the
     # honest answer says this chat does not have it.

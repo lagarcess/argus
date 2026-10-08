@@ -11,7 +11,11 @@ from argus.agent_runtime.recovery_messages import (
     recovery_message,
     recovery_state_stage_patch,
 )
-from argus.agent_runtime.stages.interpret_types import StageOutcome, StageResult
+from argus.agent_runtime.stages.interpret_types import (
+    InterpretDecision,
+    StageOutcome,
+    StageResult,
+)
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     RunState,
@@ -251,10 +255,13 @@ def _with_cards(
     return StageResult(outcome=outcome, stage_patch=patch)
 
 
-def surface_tool_refusal(language: str | None) -> StageResult:
+def surface_tool_refusal(
+    language: str | None, *, decision: InterpretDecision | None = None
+) -> StageResult:
     """The turn's chat does not declare the tool: say so, with no card or call."""
     return StageResult(
         outcome="ready_to_respond",
+        decision=decision,
         stage_patch={
             "tool_calls": [],
             "tool_call_records": [],

@@ -26,6 +26,7 @@ SurfaceGate = Literal[
     "backtest_confirmation",
     "backtest_clarification",
     "calculation",
+    "asset_discovery",
     "memory_recall",
     "memory_source",
     "personal_route",

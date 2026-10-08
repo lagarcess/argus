@@ -3516,8 +3516,8 @@ chat or Personal only; `tests/test_business_chat_flag.py` enforces this.
 **Business chat tools.** A turn reads its side from the stored conversation,
 never from the request. A Business turn sees only Business-declared tools,
 which today is none: no backtest, calculation or research tool, and research
-is off for the turn whatever `ARGUS_RESEARCH_RAIL_ENABLED` says. A Business
-turn that asks for a Personal tool gets `ready_to_respond` with the assistant
+is off for the turn whatever `ARGUS_RESEARCH_RAIL_ENABLED` says. Asset
+discovery is off too. A Business turn that asks for a Personal tool gets `ready_to_respond` with the assistant
 text and `recovery: {"code": "business_chat_tool_unavailable", "retryable":
 false}` and no confirmation card, tool card or run. With Business chat on,
 `POST /backtests/run` with a Business `conversation_id` answers 404 `not_found`,
