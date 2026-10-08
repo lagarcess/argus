@@ -380,3 +380,21 @@ def test_link_code_carries_the_web_language_to_the_link(wa_client: TestClient) -
     relink = wa_client.post(CODES, headers=bearer(ALICE)).json()["message_text"]
     post(wa_client, fixture("text_link_code.json", id="wamid.RELINK", text=relink))
     assert wa_client.get(LINK, headers=bearer(ALICE)).json()["reply_language"] == "es-419"
+
+
+def test_unlink_answers_503_when_the_link_store_cannot_be_reached(
+    wa_client: TestClient, monkeypatch
+) -> None:
+    import psycopg
+    from argus.api.routers import whatsapp as routes
+
+    class Unreachable:
+        def revoke(self, **_: object) -> bool:
+            raise psycopg.OperationalError("connection refused")
+
+    monkeypatch.setattr(routes, "link_store", lambda: Unreachable())
+    refused = wa_client.delete(LINK, headers=bearer(ALICE))
+    assert (refused.status_code, refused.json()["code"]) == (
+        503,
+        "whatsapp_link_unavailable",
+    )

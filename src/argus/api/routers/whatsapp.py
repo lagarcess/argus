@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, Query, Request, Response
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import PlainTextResponse
 from loguru import logger
+from psycopg import OperationalError
+from psycopg_pool import PoolTimeout
 from pydantic import BaseModel, ConfigDict
 
 from argus.api import state as api_state
@@ -217,13 +219,17 @@ async def revoke_whatsapp_link(
     unused codes, whatever the Business and intake flags say."""
 
     store = link_store()
+    unreachable = store is None and api_state.PERSISTENCE_MODE == "supabase"
     if store is not None:
-        await run_in_threadpool(
-            store.revoke,
-            destination_owner_id=user.id,
-            now=datetime.now(timezone.utc),
-        )
-    elif api_state.PERSISTENCE_MODE == "supabase":
+        try:
+            await run_in_threadpool(
+                store.revoke,
+                destination_owner_id=user.id,
+                now=datetime.now(timezone.utc),
+            )
+        except (OperationalError, PoolTimeout):
+            unreachable = True
+    if unreachable:
         raise problem(
             request,
             status_code=503,
