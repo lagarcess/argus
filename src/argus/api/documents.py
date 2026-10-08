@@ -9,6 +9,7 @@ from loguru import logger
 
 from argus.api import state as api_state
 from argus.api.dependencies import problem
+from argus.api.document_jobs import start_document_jobs, stop_document_jobs
 from argus.api.ingestion import (
     IngestionContext,
     require_ingestion_context,
@@ -16,7 +17,10 @@ from argus.api.ingestion import (
     unavailable_problem,
 )
 from argus.api.rate_limits import SlidingWindowLimiter
-from argus.domain.ingestion.documents.config import load_document_extraction_settings
+from argus.domain.ingestion.documents.config import (
+    load_document_extraction_settings,
+    load_document_job_settings,
+)
 from argus.domain.ingestion.documents.extractor import DocumentExtractor
 from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
@@ -33,6 +37,7 @@ def documents_service() -> DocumentsService | None:
 
 def configure_documents(service: DocumentsService | None) -> None:
     global _service
+    stop_document_jobs()
     _service = service
     _minute.reset()
     _day.reset()
@@ -55,17 +60,24 @@ def start_documents(app: object, hub: IngestionHub | None) -> None:
 def _start_documents(app: object, hub: IngestionHub) -> None:
     pool = getattr(getattr(app, "state", None), "financial_accounts_pool", None)
     if api_state.PERSISTENCE_MODE == "supabase":
-        if pool is None:
+        gateway = api_state.supabase_gateway
+        if pool is None or gateway is None:
             configure_documents(None)
             return
+        from argus.domain.ingestion.documents.objects import SupabaseSourceObjects
         from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 
-        store = PostgresDocumentStore(pool)
+        store = PostgresDocumentStore(pool, SupabaseSourceObjects(gateway.client.storage))
     else:
         store = InMemoryDocumentStore(hub.connections)
     # Register cleanup even when extraction is off, so disconnect still erases it.
-    service = DocumentsService(hub, store, DocumentExtractor())
+    jobs = load_document_job_settings()
+    service = DocumentsService(
+        hub, store, DocumentExtractor(), jobs_recover_interruptions=jobs.enabled
+    )
     configure_documents(service)
+    if jobs.enabled:
+        start_document_jobs(service, jobs)
 
 
 def require_document_surface(
@@ -105,6 +117,6 @@ def require_document_context(
                 code="document_rate_limited",
                 title="Too Many Requests",
                 detail="Wait before uploading another document.",
-                headers={"Retry-After": str(retry)},
+                headers={"Retry-After": str(retry), "Cache-Control": "no-store"},
             )
     return DocumentContext(service, context.user_id)

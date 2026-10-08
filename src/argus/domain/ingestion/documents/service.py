@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,9 +23,14 @@ from argus.domain.ingestion.documents.models import (
     DraftStatus,
     ExtractionBatch,
 )
+from argus.domain.ingestion.documents.objects import SourceStorageUnavailable
 from argus.domain.ingestion.documents.preparation import validate_source
 from argus.domain.ingestion.documents.store import DocumentStore
 from argus.domain.ingestion.hub import IngestionHub
+
+
+def lease_live(connection: SourceConnection, now: datetime) -> bool:
+    return connection.lease_until is not None and connection.lease_until > now
 
 
 class Extractor(Protocol):
@@ -44,6 +51,14 @@ class DocumentServiceError(RuntimeError):
         self.code, self.retryable = code, retryable
 
 
+def stored_filename(filename: str) -> str:
+    """Without control or format characters (bidi overrides included), so a
+    stored name can neither break a log line nor disguise its extension."""
+
+    kept = "".join(c for c in filename if unicodedata.category(c) not in ("Cc", "Cf"))
+    return kept[:80] or "document"
+
+
 @dataclass(frozen=True)
 class DocumentOutcome:
     connection_id: str
@@ -56,9 +71,17 @@ class DocumentsService:
     source: SourceKind = "statement"
 
     def __init__(
-        self, hub: IngestionHub, store: DocumentStore, extractor: Extractor
+        self,
+        hub: IngestionHub,
+        store: DocumentStore,
+        extractor: Extractor,
+        *,
+        jobs_recover_interruptions: bool = False,
     ) -> None:
         self.hub, self.store, self.extractor = hub, store, extractor
+        # With preparation jobs on, the job reconciler decides what an expired
+        # attempt becomes; a read never settles it.
+        self.jobs_recover_interruptions = jobs_recover_interruptions
         hub.register(self)
 
     def revoke(self, connection: SourceConnection, credential: str | None) -> None:
@@ -92,8 +115,10 @@ class DocumentsService:
                 created_at=connection.created_at,
                 updated_at=connection.updated_at,
             )
-        if draft.status == "preparing" and (
-            connection.lease_until is None or connection.lease_until <= self.hub.clock()
+        if (
+            draft.status == "preparing"
+            and not self.jobs_recover_interruptions
+            and not lease_live(connection, self.hub.clock())
         ):
             draft = self._update(
                 user_id,
@@ -103,12 +128,37 @@ class DocumentsService:
             )
         return draft
 
-    def source_bytes(self, *, user_id: str, connection_id: str) -> bytes:
-        self._connection(user_id, connection_id)
-        content = self.store.source(user_id=user_id, connection_id=connection_id)
+    def _read_source(self, user_id: str, connection_id: str) -> bytes:
+        try:
+            content = self.store.source(user_id=user_id, connection_id=connection_id)
+        except SourceStorageUnavailable:
+            raise DocumentServiceError(
+                "document_storage_unavailable", retryable=True
+            ) from None
         if content is None:
             raise DocumentServiceError("document_source_unavailable")
         return content
+
+    def source_bytes(self, *, user_id: str, connection_id: str) -> bytes:
+        """A draft whose stored object is gone says so (``source_available``
+        false) instead of promising a source that cannot be read."""
+
+        self._connection(user_id, connection_id)
+        try:
+            return self._read_source(user_id, connection_id)
+        except DocumentServiceError as error:
+            if error.code == "document_source_unavailable":
+                draft = self.store.draft(user_id=user_id, connection_id=connection_id)
+                if (
+                    draft is not None
+                    and draft.source_available
+                    and draft.status != "preparing"
+                ):
+                    try:
+                        self._update(user_id, draft, source_available=False)
+                    except DocumentServiceError:
+                        pass
+            raise
 
     def _update(
         self,
@@ -116,20 +166,28 @@ class DocumentsService:
         draft: DocumentDraft,
         *,
         holder: str | None = None,
+        claim: str | None = None,
         **changes: object,
     ) -> DocumentDraft:
-        updated = draft.model_copy(
+        updated = self.revise(draft, **changes)
+        if not self.store.update(
+            user_id=user_id,
+            draft=updated,
+            expected_version=draft.version,
+            holder=holder,
+            claim=claim,
+        ):
+            raise DocumentServiceError("document_version_conflict", retryable=True)
+        return updated
+
+    def revise(self, draft: DocumentDraft, **changes: object) -> DocumentDraft:
+        return draft.model_copy(
             update={
                 **changes,
                 "version": draft.version + 1,
                 "updated_at": self.hub.clock(),
             }
         )
-        if not self.store.update(
-            user_id=user_id, draft=updated, expected_version=draft.version, holder=holder
-        ):
-            raise DocumentServiceError("document_version_conflict", retryable=True)
-        return updated
 
     def update_proposal(
         self, *, user_id: str, connection_id: str, version: int, proposal: DraftProposal
@@ -168,7 +226,7 @@ class DocumentsService:
             replayed = True
         draft = DocumentDraft(
             connection_id=connection.id,
-            filename=filename[:80],
+            filename=stored_filename(filename),
             media_type=media_type,
             proposal=proposal or DraftProposal(),
             sha256=digest,
@@ -178,7 +236,13 @@ class DocumentsService:
             created_at=self.hub.clock(),
             updated_at=self.hub.clock(),
         )
-        if not self.store.capture(user_id=user_id, draft=draft, content=content):
+        try:
+            captured = self.store.capture(user_id=user_id, draft=draft, content=content)
+        except SourceStorageUnavailable:
+            raise DocumentServiceError(
+                "document_storage_unavailable", retryable=True
+            ) from None
+        if not captured:
             raise DocumentServiceError("document_disconnected")
         return self.outcome(
             user_id=user_id, connection_id=connection.id, replayed=replayed
@@ -219,7 +283,12 @@ class DocumentsService:
             return
 
     async def resume(
-        self, *, user_id: str, connection_id: str, queued_only: bool = False
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        queued_only: bool = False,
+        attempt_id: str | None = None,
     ) -> DocumentOutcome:
         connection = self._connection(user_id, connection_id)
         draft = self.get(user_id=user_id, connection_id=connection_id)
@@ -236,16 +305,43 @@ class DocumentsService:
             connection_id=connection_id, holder=holder, now=self.hub.clock()
         ):
             raise DocumentServiceError("document_busy", retryable=True)
+        if attempt_id is not None:
+            # Checked under the lease: a reconciler cannot supersede a held lease.
+            job = self.store.job(user_id=user_id, connection_id=connection_id)
+            if (
+                job is None
+                or job.attempt_id != attempt_id
+                or job.draft_version != draft.version
+            ):
+                repo.release(connection_id=connection_id, holder=holder)
+                raise DocumentServiceError("document_attempt_superseded")
         replayed = batch is not None
         try:
             if batch is None:
+                # The claim names the attempt; a flag-off writer names none.
                 draft = self._update(
-                    user_id, draft, holder=holder, status="preparing", error_code=None
+                    user_id,
+                    draft,
+                    holder=holder,
+                    claim=attempt_id,
+                    status="preparing",
+                    error_code=None,
                 )
+                content = await asyncio.to_thread(
+                    self.source_bytes, user_id=user_id, connection_id=connection_id
+                )
+                # Committed before the provider can be reached: without it an
+                # attempt provably never called the provider and may be retried.
+                if attempt_id is not None and not self.store.mark_provider_call(
+                    user_id=user_id,
+                    connection_id=connection_id,
+                    attempt_id=attempt_id,
+                    holder=holder,
+                    now=self.hub.clock(),
+                ):
+                    raise DocumentServiceError("document_lease_lost", retryable=True)
                 batch = await self.extractor.extract(
-                    content=self.source_bytes(
-                        user_id=user_id, connection_id=connection_id
-                    ),
+                    content=content,
                     filename=draft.filename,
                     media_type=draft.media_type,
                     connection_id=connection_id,
@@ -315,6 +411,7 @@ class DocumentsService:
                         holder=holder,
                         status="needs_attention",
                         error_code=code,
+                        source_available=code != "document_source_unavailable",
                     )
                 repo.record_failure(
                     connection_id=connection_id,

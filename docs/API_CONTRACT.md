@@ -3337,7 +3337,8 @@ and the auth user is gone.
 being retried), and the account is locked: its sessions are refused from the
 moment the run opens and the auth user is banned, so clients sign out. A third
 party hasn't confirmed yet, so the auth delete waits. `pending` names it
-(`apple`, `gmail`, `plaid`, `analytics`); it is empty when the data step
+(`apple`, `gmail`, `plaid`, `analytics`, `storage` for retained document
+sources, which is ours to fix and never operator-forced); it is empty when the data step
 itself is being retried. Every third-party step (Sign in with Apple through
 #793, Google/Gmail and Plaid tokens, PostHog personless event deletion) runs before the
 auth delete. A repeat request resumes the run, and so does the operator-run
@@ -8439,7 +8440,9 @@ backend contracts under implementation in the default-off lane, not hosted or
 native availability claims.
 
 `POST /api/v1/financial-documents` accepts bounded PDF, JPEG or PNG bytes and an
-optional `X-Document-Filename`. Optional `X-Document-Proposal` is a bounded
+optional `X-Document-Filename`, percent-encoded UTF-8 (`encodeURIComponent`);
+raw UTF-8 is also accepted and undecodable bytes become replacement characters.
+Optional `X-Document-Proposal` is a bounded
 (8192-character) JSON `DraftProposal`, saved atomically with the source so a known
 Plan destination survives closing the app immediately after capture. It grants no
 Plan access or sharing. Capture does not require a model, provider key,
@@ -8453,13 +8456,18 @@ is implied by capture or recovery.
 accepts the same true values as the other default-off surfaces (`1`, `true`,
 `yes`, `on`). Unset, `false`, `0`, `no`, `off`, a blank value, or an
 unrecognized value leaves the document surface off. A document setting that
-cannot be read, including a non-integer max-bytes value, also leaves it off.
-While the document surface is off, every `/api/v1/financial-documents` route
-answers 404 `financial_connections_unavailable` and no extraction runs. Plaid,
+cannot be read, including a non-integer or out-of-range max-bytes value (0,
+negative, or above the 10 MiB cap), also leaves it off, with one warning per
+process. While the document surface is off, every `/api/v1/financial-documents`
+route answers 404 `financial_connections_unavailable` with
+`Cache-Control: no-store` and no extraction runs. Plaid,
 Gmail, Shortcuts, disconnect, and `GET /api/v1/financial-connections` keep
 their own gates.
 
-Capture responds with `{connection_id,status,replayed,candidate_count}`. `status`
+Capture responds with `{connection_id,status,replayed,candidate_count}`. Every
+upload answer, success or problem, is `Cache-Control: no-store`. The stored
+filename drops control and format characters (bidi overrides included) and is
+at most 80 characters; an empty result is stored as `document`. `status`
 is preparation state (`saved|queued|preparing|review_ready|needs_attention`), never
 an approval flag. Approval remains owned by reconciliation events on that connection.
 The response can be `queued` even when a fast background task completes before the
@@ -8474,6 +8482,10 @@ client reads it. Poll `GET /financial-documents/{connection_id}` for current sta
   existing import review; no duplicate approval state is stored here.
 - `GET /financial-documents/{connection_id}/source` returns the retained file as a
   download with a safe generic filename, `Cache-Control: no-store` and `nosniff`.
+  The API reads it from private Storage and proxies the bytes; no signed URL
+  leaves the server. Another person's connection is 404. A Storage outage is a
+  retryable 503 `document_storage_unavailable`, during upload and preparation
+  alike.
 - `POST /financial-documents/{connection_id}/prepare` and `/resume` queue explicit
   preparation or replay saved candidate delivery. A fresh provider attempt requires
   `X-Extraction-Consent: true`; replay of saved preparation makes no provider call.
@@ -8484,8 +8496,14 @@ client reads it. Poll `GET /financial-documents/{connection_id}` for current sta
   do not change extracted evidence, grant access, share content or write money.
 
 All draft/source reads are owner-only and `no-store`. Missing retained source on
-an older checkpoint is explicit (`source_available=false`); an identical reupload
-can attach source to that same checkpoint without repeating extraction.
+an older checkpoint, or a stored object that is gone, is explicit
+(`source_available=false`); an identical reupload can attach or restore source on
+that same checkpoint without repeating extraction.
+
+**Deploy order.** Apply migration `20261008100000_financial_document_source_objects`
+(bucket and reference columns) before deploying an API that contains #778; the
+API writes those columns on capture and reads the run table to refuse captures
+during account deletion.
 
 The existing document checkpoint owns retained source, preparation lifecycle and
 prepared evidence. Owner-authorized draft and source reads support close/reopen.
@@ -8494,6 +8512,35 @@ process interruption leaves recoverable work. An expired in-flight attempt is
 marked for attention and is never automatically billed again. Explicit prepare
 or resume recovers from retained source; completed preparation is replayed without
 another model call. Identical owner/file captures reuse the same draft.
+
+`ARGUS_DOCUMENT_JOBS_ENABLED` (default off) changes only who runs and recovers
+preparation; routes and bodies stay the same. Off, the rules above hold
+exactly. On, capture and `/prepare` or `/resume` record one attempt before
+responding and hand it to a worker (a Render Workflow task, or a task in the
+API process). Before an attempt can reach the provider it durably records that
+its provider call started. The expired-attempt rule above still holds: an
+attempt is never billed again automatically. A sweep in the API settles an
+attempt whose worker died as follows:
+
+- No provider-call record, and the draft's claim names the current attempt
+  (or nothing claimed it yet): the provider was never reached, so the sweep
+  re-dispatches it automatically, at most three attempts per explicit
+  preparation. The draft may return to `queued` meanwhile. Past the bound it
+  becomes `needs_attention` with `document_preparation_interrupted`.
+- A saved preparation exists: the sweep replays its delivery automatically.
+  That makes no provider call and needs no consent.
+- Any other dead `preparing` draft (a provider-call record, or a claim that
+  does not name the current attempt): the outcome is unknown. The draft becomes
+  `needs_attention` with `document_preparation_outcome_unknown` and nothing is
+  re-dispatched.
+- A reported provider failure keeps its own code and is not retried.
+
+Only the owner's `/prepare` or `/resume` with `X-Extraction-Consent: true`
+starts a new paid attempt from `needs_attention`. A superseded attempt's late
+result is refused. Instances coordinate through the database, so one attempt is
+dispatched once. Settings are `ARGUS_DOCUMENT_JOBS_ENABLED`,
+`ARGUS_DOCUMENT_JOBS_WORKFLOW_TASK` and `ARGUS_DOCUMENT_JOBS_SWEEP_SECONDS`. Design:
+`docs/specs/lanes/cuadrao-document-preparation-jobs.md`.
 
 Preparation preserves extracted observations and receipt itemization separately
 from canonical candidate projection. Compatible observations enter existing
@@ -8512,8 +8559,9 @@ integration work, not implemented financial effects of this foundation.
 
 **Retention amendment:** the former transient-source/re-upload contract is
 superseded by this explicit founder assignment. Supported source files stay in the
-same server-only document store until explicit disconnect/deletion; user/connection
-deletion cascades. Rendered pages and OCR intermediates stay transient. Draft/source
+private, service-role-only Storage bucket until explicit disconnect/deletion;
+disconnect deletes the connection's objects and account deletion the person's.
+Rendered pages and OCR intermediates stay transient. Draft/source
 reads are owner-only and uncached. Disconnect removes retained source and draft
 without deleting already accepted activity. Source and extracted contents never
 belong in logs, analytics, public evidence or automatically shared household data.

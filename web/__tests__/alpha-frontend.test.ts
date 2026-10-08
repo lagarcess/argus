@@ -2858,7 +2858,7 @@ describe("Argus Alpha frontend contract", () => {
     const page = readFileSync(join(root, "app/page.tsx"), "utf-8");
 
     expect(page).toContain("await getMe()");
-    expect(page).toContain("router.replace(currentChatPath())");
+    expect(page).toContain("router.replace(postAuthPath())");
     expect(page).toContain("skipAuthenticatedRedirect");
     expect(page).toContain("font-display text-6xl");
     expect(page).toContain("font-display flex w-full max-w-sm");

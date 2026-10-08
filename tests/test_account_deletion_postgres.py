@@ -171,6 +171,7 @@ def _service(  # noqa: ANN201
     box=None,  # noqa: ANN001
     allow_fake=True,  # noqa: ANN001
     clock=None,  # noqa: ANN001
+    source_objects=None,  # noqa: ANN001
 ):
     return AccountDeletionService(
         households=lane[0]._repository,
@@ -181,6 +182,7 @@ def _service(  # noqa: ANN201
         secret_box=box,
         # Tests are where the recording fake is explicitly the adapter.
         allow_fake_analytics=allow_fake,
+        source_objects=source_objects,
         clock=clock or (lambda: NOW),
     )
 

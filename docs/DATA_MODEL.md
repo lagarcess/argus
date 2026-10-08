@@ -3340,14 +3340,33 @@ write it. Proven by `tests/test_ingestion_shortcuts_postgres.py`.
 
 ## Import reconciliation
 
-`financial_document_extractions` owns the private retained source, durable draft
-and immutable preparation delivery checkpoint, keyed by the existing statement
-connection. It is not a second ledger. `source_bytes` is bounded to 10 MiB;
-`draft` stores source metadata, consent, preparation status, version and destination
+`financial_document_extractions` owns the durable draft, the immutable preparation
+delivery checkpoint and the reference to the retained source, keyed by the
+existing statement connection. It is not a second ledger. `draft` stores source
+metadata, consent, preparation status, version and destination
 or split proposals. `batch` holds typed observations, receipt itemization,
 projection issues and compatible canonical candidates. It may be null before
-preparation. Legacy rows can have a batch without retained source; a duplicate
+preparation. `preparation_job` names the current preparation attempt (number,
+ID, the draft version it was dispatched for, dispatch time, when its provider
+call started, and a retry request) when `ARGUS_DOCUMENT_JOBS_ENABLED` is on.
+Only that attempt may claim the draft. The provider-call time is committed
+under the attempt's live lease before the provider can be reached. The job is
+replaced together with the draft only while no lease is live. Legacy rows can have a batch without retained source; a duplicate
 upload can attach that source without changing the frozen batch.
+
+**Retained source objects (#778, `20261008100000`).** The source file lives in
+the private Storage bucket `financial-document-sources` at
+`{user_id}/{connection_id}/{sha256}`: owner-scoped, unguessable through the
+random connection id, and content-addressed, so a duplicate upload writes no
+second object. The bucket is private and `storage.objects` has no client
+policy, so only the service role reaches it. The row keeps `source_bucket`,
+`source_path`, `source_media_type`, `source_size_bytes` (1 to 10 MiB) and
+`source_sha256`, all set or all null; a check ties the path to the row's owner,
+connection and digest. `source_bytes` is legacy: never written, refused beside a
+reference, and still served for rows captured before the move until a later
+migration drops it. A retained source always has its draft, and a row with
+neither batch nor draft is refused. `argus.domain.ingestion.documents.objects`
+owns the put/get/delete interface; memory mode uses an in-memory store behind it.
 
 The October 2 founder clarification explicitly replaces this lane's former
 transient-file policy. Source files remain until explicit disconnect/deletion;
@@ -3356,8 +3375,20 @@ revoked client grants remain. Owner/live-connection checks protect all draft and
 source reads. User/connection deletion cascades; disconnect removes source,
 draft and preparation while accepted financial activity follows existing retention.
 
-Capture locks the live owner connection and saves source plus draft before
-background dispatch. Draft updates compare versions, and preparation completion
+Capture writes the object first, then locks the live owner connection and
+commits the draft and its reference before background dispatch. A crash in
+between leaves an unreferenced object, never a row pointing at nothing; an
+identical retry rewrites the same path and adopts it, and also restores an
+object that went missing (the draft says `source_available=false` until then).
+Capture refuses a person whose account deletion run is in flight and removes the
+object it wrote. `SOURCE_MAX_BYTES` and `SOURCE_MEDIA_TYPES` in
+`argus.domain.ingestion.documents.config` are the code's single copy of the
+bucket's limits; a real-Postgres test holds the bucket to them. Disconnect deletes the
+connection's prefix (orphans included) before the row, so a failed delete keeps
+the row and the idempotent disconnect retry finishes it. Account deletion
+deletes the person's prefix as its `storage` step, and once more right before
+the auth delete. No
+path deletes confirmed financial activity. Draft updates compare versions, and preparation completion
 checks the connection lease. Duplicate capture cannot replace a source or reset
 an attempt. A persisted in-flight state prevents automatic retry after uncertain
 process loss. Queued work can resume explicitly; frozen candidate delivery can

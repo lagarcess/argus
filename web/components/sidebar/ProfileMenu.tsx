@@ -23,6 +23,7 @@ import {
   profileMenuClass,
   profileSubmenuAnchorClass,
   profileSubmenuClass,
+  type ProfileMenuPlacement,
 } from "./profileMenuPlacement";
 import {
   Activity,
@@ -106,7 +107,7 @@ type ProfileMenuProps = {
    * Where the menu is opening from. The rail can afford a detached popover that
    * flies its submenus out to the right; a drawer cannot.
    */
-  placement?: "rail" | "drawer";
+  placement?: ProfileMenuPlacement;
 };
 
 // Derived from the panel registry, so a new settings panel needs no edit here.

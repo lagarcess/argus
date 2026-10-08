@@ -26,7 +26,9 @@ Order, matching ``docs/specs/lanes/account-deletion-fk-census.md``:
    (Google) refresh tokens, then PostHog person deletion (8). Revoked counts as
    done; a provider that no longer held the grant (``invalid_grant``, Google
    ``invalid_token``, Plaid's item gone; #802 for Apple) is recorded
-   ``already_revoked`` and counted for the spike alert. A transient failure
+   ``already_revoked`` and counted for the spike alert. The person's retained
+   document sources (#778) are deleted from Storage by their owner prefix,
+   which also takes any object a crashed capture left unreferenced. A transient failure
    leaves that step pending: the run stays ``data_deleted``, the account stays
    locked, the auth delete waits, and the operator-run resume sweep
    (``scripts/ops/resume_account_deletions.py`` inside scheduled_maintenance)
@@ -80,6 +82,7 @@ from argus.domain.apple_sign_in.credentials_postgres import (
     PostgresAppleCredentialRepository,
 )
 from argus.domain.household import deletion as household_deletion
+from argus.domain.ingestion.documents.objects import SourceObjects, owner_prefix
 from argus.domain.ingestion.secrets import SecretBox
 from argus.observability.analytics_deletion import (
     AnalyticsDeletion,
@@ -186,6 +189,7 @@ class AccountDeletionService:
         apple: AppleCredentials | None = None,
         secret_box: SecretBox | None = None,
         allow_fake_analytics: bool = False,
+        source_objects: SourceObjects | None = None,
         clock: Callable[[], datetime] = _utcnow,
     ) -> None:
         # The household repository owns the pool and binds one connection per
@@ -201,6 +205,7 @@ class AccountDeletionService:
         # adapter (tests, local dev). Anywhere else the PostHog step stays
         # pending until a real deletion adapter ships.
         self._allow_fake_analytics = allow_fake_analytics
+        self._sources = source_objects
         self._clock = clock
 
     # -- entry point -------------------------------------------------------------
@@ -314,6 +319,9 @@ class AccountDeletionService:
         analytics = self._delete_analytics(subject)
         if analytics is not None:
             pending["analytics"] = analytics
+        storage = self._erase_sources(user_id, subject, run)
+        if storage is not None:
+            pending["storage"] = storage
         self._track_pending(subject, pending)
         if pending:
             logger.warning(
@@ -321,6 +329,12 @@ class AccountDeletionService:
             )
             raise AccountDeletionIncomplete("third_party_pending", list(pending))
         self._settle_late_writes(user_id, subject)
+        # An upload authenticated before the lock can still write after the
+        # first erase; capture refuses it, and this second erase takes the rest.
+        late = self._erase_sources(user_id, subject, run)
+        if late is not None:
+            self._track_pending(subject, {"storage": late})
+            raise AccountDeletionIncomplete("third_party_pending", ["storage"])
         counts = self._delete_auth_user(user_id, run["id"], run["claim"])
         return DeletionOutcome(status="done", counts=counts, run_id=run["id"])
 
@@ -965,7 +979,16 @@ class AccountDeletionService:
             )
         for step, started in sorted(since.items()):
             waited = now - datetime.fromisoformat(started)
-            if waited >= ESCALATE_AFTER:
+            if waited >= ESCALATE_AFTER and step == "storage":
+                # Our own Storage: nothing to force, it has to be fixed.
+                logger.error(
+                    "Account deletion cannot erase document sources; fix Storage",
+                    metric="account_deletion.storage_failing",
+                    step=step,
+                    error=pending[step],
+                    pending_days=waited.days,
+                )
+            elif waited >= ESCALATE_AFTER:
                 logger.error(
                     "Account deletion step needs an operator",
                     metric="account_deletion.needs_operator",
@@ -1063,7 +1086,8 @@ class AccountDeletionService:
                 "     analytics_distinct_id = null, claim_id = null, claimed_until = null,"
                 "     updated_at = %s, completed_at = %s,"
                 "     steps = (steps - 'pending_since' - 'last_error')"
-                "       || jsonb_build_object('storage', 'not_applicable', 'revocations', %s::jsonb)"
+                "       || jsonb_build_object('storage', coalesce(steps ->> 'storage', 'not_applicable'),"
+                "                             'revocations', %s::jsonb)"
                 " where id = %s and claim_id = %s returning steps",
                 (now, now, json.dumps(revocations), run_id, claim),
             ).fetchone()
@@ -1123,6 +1147,24 @@ class AccountDeletionService:
                 pending[str(provider)] = error or "provider_revoke_failed"
             self._record_revocation(subject, provider, str(source_ref), status, error)
         return pending
+
+    def _erase_sources(
+        self, user_id: str, subject: str, run: dict[str, Any]
+    ) -> str | None:
+        """The reason while the person's Storage objects are still owed."""
+
+        if self._sources is None:
+            return None
+        try:
+            self._sources.delete(owner_prefix(user_id))
+        except Exception as exc:
+            logger.warning(
+                "Account deletion could not erase document sources",
+                failure_mode=type(exc).__name__,
+            )
+            return "storage_delete_failed"
+        self._record_step(subject, "storage", "deleted", run=run)
+        return None
 
     def _delete_analytics(self, subject: str) -> str | None:
         """The reason while the PostHog person deletion is still owed."""

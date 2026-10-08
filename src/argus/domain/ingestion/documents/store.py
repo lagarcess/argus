@@ -2,16 +2,29 @@
 
 from __future__ import annotations
 
+import hashlib
 import threading
+from dataclasses import replace
 from datetime import datetime
 from typing import Protocol
 
 from argus.domain.ingestion.connections import (
+    DEFAULT_LEASE,
     LIVE,
     ConnectionNotFound,
     InMemoryConnectionRepository,
 )
-from argus.domain.ingestion.documents.models import DocumentDraft, ExtractionBatch
+from argus.domain.ingestion.documents.models import (
+    DocumentDraft,
+    ExtractionBatch,
+    PreparationJob,
+)
+from argus.domain.ingestion.documents.objects import (
+    InMemorySourceObjects,
+    SourceObjects,
+    connection_prefix,
+    source_path,
+)
 
 
 class DocumentStore(Protocol):
@@ -26,7 +39,12 @@ class DocumentStore(Protocol):
         draft: DocumentDraft,
         expected_version: int,
         holder: str | None = None,
-    ) -> bool: ...
+        claim: str | None = None,
+    ) -> bool:
+        """With ``claim``, the same write requires that attempt to be current
+        and records that it claimed the draft."""
+        ...
+
     def save(
         self,
         *,
@@ -37,14 +55,56 @@ class DocumentStore(Protocol):
         batch: ExtractionBatch,
     ) -> bool: ...
     def forget(self, *, user_id: str, connection_id: str) -> None: ...
+    def owner(self, *, connection_id: str) -> str | None: ...
+    def job(self, *, user_id: str, connection_id: str) -> PreparationJob | None: ...
+    def pending(self, *, limit: int) -> list[tuple[str, str]]:
+        """Owner and connection of drafts awaiting preparation or a retry."""
+        ...
+
+    def mark_provider_call(
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        attempt_id: str,
+        holder: str,
+        now: datetime,
+    ) -> bool:
+        """Record that ``attempt_id`` may now reach the provider and renew the
+        lease, only while ``holder`` holds it and the attempt is current."""
+        ...
+
+    def advance(
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        now: datetime,
+        expected_attempt_id: str | None,
+        job: PreparationJob,
+        draft: DocumentDraft | None = None,
+        unmarked: bool = False,
+    ) -> bool:
+        """Replace the job (and draft) only while no lease is live and the current
+        attempt is ``expected_attempt_id``. With a draft, its version moves by
+        one; installing a new attempt without one requires the draft to still be
+        the version that attempt is for. ``unmarked`` also requires the current
+        attempt never to have marked a provider call."""
+        ...
 
 
 class InMemoryDocumentStore:
-    def __init__(self, connections: InMemoryConnectionRepository) -> None:
+    def __init__(
+        self,
+        connections: InMemoryConnectionRepository,
+        objects: SourceObjects | None = None,
+    ) -> None:
         self.connections = connections
+        self.objects = objects if objects is not None else InMemorySourceObjects()
         self._rows: dict[tuple[str, str], str] = {}
         self._drafts: dict[tuple[str, str], str] = {}
-        self._sources: dict[tuple[str, str], bytes] = {}
+        self._sources: dict[tuple[str, str], str] = {}
+        self._jobs: dict[tuple[str, str], str] = {}
         self._lock = threading.RLock()
 
     def _live(
@@ -92,11 +152,12 @@ class InMemoryDocumentStore:
 
     def source(self, *, user_id: str, connection_id: str) -> bytes | None:
         with self.connections._lock, self._lock:
-            return (
+            path = (
                 self._sources.get((user_id, connection_id))
                 if self._live(user_id, connection_id)
                 else None
             )
+            return self.objects.get(path) if path is not None else None
 
     def capture(self, *, user_id: str, draft: DocumentDraft, content: bytes) -> bool:
         with self.connections._lock, self._lock:
@@ -106,8 +167,14 @@ class InMemoryDocumentStore:
             if key not in self._drafts:
                 if key in self._rows:
                     draft = draft.model_copy(update={"status": "review_ready"})
+                path = source_path(
+                    user_id=user_id,
+                    connection_id=draft.connection_id,
+                    sha256=hashlib.sha256(content).hexdigest(),
+                )
+                self.objects.put(path, content, draft.media_type)
                 self._drafts[key] = draft.model_dump_json()
-                self._sources[key] = content
+                self._sources[key] = path
             return True
 
     def update(
@@ -117,9 +184,11 @@ class InMemoryDocumentStore:
         draft: DocumentDraft,
         expected_version: int,
         holder: str | None = None,
+        claim: str | None = None,
     ) -> bool:
+        key = (user_id, draft.connection_id)
         with self.connections._lock, self._lock:
-            raw = self._drafts.get((user_id, draft.connection_id))
+            raw = self._drafts.get(key)
             previous = DocumentDraft.model_validate_json(raw) if raw else None
             if (
                 not self._live(user_id, draft.connection_id, holder, draft.updated_at)
@@ -136,7 +205,15 @@ class InMemoryDocumentStore:
                 and lease > draft.updated_at
             ):
                 return False
-            self._drafts[(user_id, draft.connection_id)] = draft.model_dump_json()
+            if claim is not None:
+                job_raw = self._jobs.get(key)
+                job = PreparationJob.model_validate_json(job_raw) if job_raw else None
+                if job is None or job.attempt_id != claim:
+                    return False
+                self._jobs[key] = job.model_copy(
+                    update={"claimed": True}
+                ).model_dump_json()
+            self._drafts[key] = draft.model_dump_json()
             return True
 
     def save(
@@ -155,8 +232,108 @@ class InMemoryDocumentStore:
             return True
 
     def forget(self, *, user_id: str, connection_id: str) -> None:
+        self.objects.delete(
+            connection_prefix(user_id=user_id, connection_id=connection_id)
+        )
         with self._lock:
             key = (user_id, connection_id)
             self._rows.pop(key, None)
             self._drafts.pop(key, None)
             self._sources.pop(key, None)
+            self._jobs.pop(key, None)
+
+    def owner(self, *, connection_id: str) -> str | None:
+        with self.connections._lock, self._lock:
+            row = self.connections._rows.get(connection_id)
+            if row is None or not self._live(row.user_id, connection_id):
+                return None
+            return row.user_id if (row.user_id, connection_id) in self._drafts else None
+
+    def job(self, *, user_id: str, connection_id: str) -> PreparationJob | None:
+        with self.connections._lock, self._lock:
+            raw = (
+                self._jobs.get((user_id, connection_id))
+                if self._live(user_id, connection_id)
+                else None
+            )
+            return PreparationJob.model_validate_json(raw) if raw is not None else None
+
+    def pending(self, *, limit: int) -> list[tuple[str, str]]:
+        with self.connections._lock, self._lock:
+            rows = []
+            for key, raw in self._drafts.items():
+                draft = DocumentDraft.model_validate_json(raw)
+                job = self._jobs.get(key)
+                retry = job is not None and PreparationJob.model_validate_json(job).retry
+                if self._live(*key) and (
+                    draft.status in {"queued", "preparing"}
+                    or (draft.status == "needs_attention" and retry)
+                ):
+                    rows.append((draft.created_at, key))
+            return [key for _, key in sorted(rows)[:limit]]
+
+    def advance(
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        now: datetime,
+        expected_attempt_id: str | None,
+        job: PreparationJob,
+        draft: DocumentDraft | None = None,
+        unmarked: bool = False,
+    ) -> bool:
+        key = (user_id, connection_id)
+        with self.connections._lock, self._lock:
+            if not self._live(user_id, connection_id) or key not in self._drafts:
+                return False
+            lease = self.connections.get(
+                user_id=user_id, connection_id=connection_id
+            ).lease_until
+            raw = self._jobs.get(key)
+            current = PreparationJob.model_validate_json(raw) if raw else None
+            previous = DocumentDraft.model_validate_json(self._drafts[key])
+            if (
+                (lease is not None and lease > now)
+                or (current.attempt_id if current else None) != expected_attempt_id
+                or (unmarked and current and current.provider_call_started_at)
+                or (draft is not None and draft.version != previous.version + 1)
+                or (
+                    draft is None
+                    and job.attempt_id != expected_attempt_id
+                    and previous.version != job.draft_version
+                )
+            ):
+                return False
+            if draft is not None:
+                self._drafts[key] = draft.model_dump_json()
+            self._jobs[key] = job.model_dump_json()
+            return True
+
+    def mark_provider_call(
+        self,
+        *,
+        user_id: str,
+        connection_id: str,
+        attempt_id: str,
+        holder: str,
+        now: datetime,
+    ) -> bool:
+        key = (user_id, connection_id)
+        with self.connections._lock, self._lock:
+            raw = self._jobs.get(key)
+            job = PreparationJob.model_validate_json(raw) if raw is not None else None
+            if (
+                not self._live(user_id, connection_id, holder, now)
+                or job is None
+                or job.attempt_id != attempt_id
+            ):
+                return False
+            row = self.connections._rows[connection_id]
+            self.connections._rows[connection_id] = replace(
+                row, lease_until=now + DEFAULT_LEASE
+            )
+            self._jobs[key] = job.model_copy(
+                update={"provider_call_started_at": now}
+            ).model_dump_json()
+            return True

@@ -22,7 +22,7 @@ import {
 } from "@/lib/landing-entry";
 import {
   captureLandingIntentFromLocation,
-  currentChatPath,
+  postAuthPath,
 } from "@/lib/landing-intent";
 import { guestCaptchaConfigured } from "@/lib/guest-session";
 import { guestProfileProbeOutcome } from "@/lib/guest-account";
@@ -76,7 +76,7 @@ export default function LandingPage() {
           setIsCheckingSession(false);
           return;
         }
-        router.replace(currentChatPath());
+        router.replace(postAuthPath());
       } catch (error) {
         if (cancelled) return;
         setProfileProbeFailedClosed(
@@ -114,7 +114,7 @@ export default function LandingPage() {
       process.env.NEXT_PUBLIC_E2E_ALLOW_MOCK_SIGNUP === "true" &&
       submission.mode === "signup";
     if (isMockAuth && !allowMockSignupNetwork) {
-      router.replace(currentChatPath());
+      router.replace(postAuthPath());
       router.refresh();
       return;
     }
@@ -136,7 +136,7 @@ export default function LandingPage() {
       });
     }
 
-    router.replace(currentChatPath());
+    router.replace(postAuthPath());
     router.refresh();
   };
 
