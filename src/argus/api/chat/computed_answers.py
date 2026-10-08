@@ -116,11 +116,16 @@ def owned_computed_answer(
 
 
 def computed_answers_of_kind(
-    *, user: User, kind: str, exclude_message_id: str | None = None
+    *,
+    user: User,
+    scope: OwnerScope,
+    kind: str,
+    exclude_message_id: str | None = None,
 ) -> list[ComputedAnswerSummary]:
-    """The owner's newest computed answers of one kind, for a comparison to pick."""
+    """The owner's newest computed answers of one kind on one side, for a comparison
+    to pick."""
     rows = sorted(
-        _owned_rows_of_kind(user, kind),
+        _owned_rows_of_kind(user, scope, kind),
         key=lambda row: (row_activity(row), str(row.get("id") or "")),
         reverse=True,
     )
@@ -149,16 +154,18 @@ def computed_answers_of_kind(
     return items
 
 
-def _owned_rows_of_kind(user: User, kind: str) -> list[Mapping[str, Any]]:
+def _owned_rows_of_kind(
+    user: User, scope: OwnerScope, kind: str
+) -> list[Mapping[str, Any]]:
     if api_state.supabase_gateway is not None:
         return api_state.supabase_gateway.computed_answers_of_kind(
-            user_id=user.id, scope=PERSONAL, kind=kind, limit=MAX_LISTED_ANSWERS + 1
+            user_id=user.id, scope=scope, kind=kind, limit=MAX_LISTED_ANSWERS + 1
         )
     rows: list[Mapping[str, Any]] = []
     for conversation_id, messages in api_state.store.messages.items():
         if api_state.store.conversation_owners.get(
             conversation_id
-        ) != user.id or not memory_conversation_in_scope(conversation_id, PERSONAL):
+        ) != user.id or not memory_conversation_in_scope(conversation_id, scope):
             continue
         conversation = api_state.store.conversations.get(conversation_id)
         if conversation is None or conversation.deleted_at is not None:
