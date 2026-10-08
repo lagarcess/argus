@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import asdict
 from urllib.parse import unquote
 
@@ -9,6 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Header, Query, Request,
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from argus.api.dependencies import problem
+from argus.api.document_jobs import document_jobs
 from argus.api.documents import DocumentContext, require_document_context
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.documents.config import (
@@ -70,6 +72,23 @@ def _failure(request: Request, error: Exception) -> Exception:
         title="Document unavailable",
         detail="Document extraction is temporarily unavailable.",
         headers=NO_STORE,
+    )
+
+
+async def _prepare(
+    context: DocumentContext, connection_id: str, background_tasks: BackgroundTasks
+) -> None:
+    jobs = document_jobs()
+    if jobs is None:
+        background_tasks.add_task(
+            context.service.background_prepare,
+            user_id=context.user_id,
+            connection_id=connection_id,
+        )
+        return
+    # Recorded before the response, so a closed client cannot lose the intake.
+    await asyncio.to_thread(
+        jobs.start, user_id=context.user_id, connection_id=connection_id
     )
 
 
@@ -154,11 +173,7 @@ async def upload_document(
             proposal=destination,
         )
         if outcome.status == "queued":
-            background_tasks.add_task(
-                context.service.background_prepare,
-                user_id=context.user_id,
-                connection_id=outcome.connection_id,
-            )
+            await _prepare(context, outcome.connection_id, background_tasks)
         return asdict(outcome)
     except Exception as error:
         raise _failure(request, error) from None
@@ -179,11 +194,7 @@ async def resume_document(
             connection_id=connection_id,
             consent=consent == "true",
         )
-        background_tasks.add_task(
-            context.service.background_prepare,
-            user_id=context.user_id,
-            connection_id=connection_id,
-        )
+        await _prepare(context, connection_id, background_tasks)
         return asdict(outcome)
     except Exception as error:
         raise _failure(request, error) from None

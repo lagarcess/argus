@@ -3382,7 +3382,12 @@ existing statement connection. It is not a second ledger. `draft` stores source
 metadata, consent, preparation status, version and destination
 or split proposals. `batch` holds typed observations, receipt itemization,
 projection issues and compatible canonical candidates. It may be null before
-preparation. Legacy rows can have a batch without retained source; a duplicate
+preparation. `preparation_job` names the current preparation attempt (number,
+ID, the draft version it was dispatched for, dispatch time, when its provider
+call started, and a retry request) when `ARGUS_DOCUMENT_JOBS_ENABLED` is on.
+Only that attempt may claim the draft. The provider-call time is committed
+under the attempt's live lease before the provider can be reached. The job is
+replaced together with the draft only while no lease is live. Legacy rows can have a batch without retained source; a duplicate
 upload can attach that source without changing the frozen batch.
 
 **Retained source objects (#778, `20261008100000`).** The source file lives in

@@ -83,3 +83,27 @@ def load_document_extraction_settings() -> DocumentExtractionSettings:
                 failure_mode="ValidationError",
             )
         return _disabled_document_extraction_settings()
+
+
+class DocumentJobSettings(BaseSettings):
+    """Durable preparation jobs (#823). Off keeps FastAPI background tasks."""
+
+    model_config = SettingsConfigDict(env_prefix="ARGUS_DOCUMENT_JOBS_", extra="ignore")
+    enabled: Annotated[bool, BeforeValidator(_enabled_flag)] = False
+    workflow_task: str = ""
+    sweep_seconds: float = Field(default=30.0, gt=0, le=3600)
+
+
+def load_document_job_settings() -> DocumentJobSettings:
+    """Read job settings, or jobs off when they cannot be read."""
+
+    try:
+        return DocumentJobSettings()
+    except ValidationError:
+        logger.warning(
+            "Document job settings are invalid; preparation stays on background tasks",
+            failure_mode="ValidationError",
+        )
+        return DocumentJobSettings.model_construct(
+            enabled=False, workflow_task="", sweep_seconds=30.0
+        )
