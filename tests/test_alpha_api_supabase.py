@@ -3880,6 +3880,7 @@ def test_history_supabase_cursor_retains_original_pivot_rank(mock_gateway):
     assert second_page.status_code == 200
     assert mock_gateway.list_history_rows.call_args_list[1].kwargs == {
         "user_id": "00000000-0000-0000-0000-000000000001",
+        "scope": PERSONAL,
         "limit": 3,
         "cursor_activity_at": pivot_at,
         "cursor_id": pivot_id,
@@ -4043,6 +4044,7 @@ def test_conversation_first_middle_final_and_empty_pages(mock_gateway):
     calls = mock_gateway.list_conversations.call_args_list
     assert calls[0].kwargs == {
         "user_id": "00000000-0000-0000-0000-000000000001",
+        "scope": PERSONAL,
         "limit": 2,
         "archived": None,
         "deleted": False,
