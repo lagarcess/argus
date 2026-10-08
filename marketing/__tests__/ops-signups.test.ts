@@ -86,71 +86,163 @@ describe("notice template", () => {
   });
 });
 
+// A small stand-in for the signup table and the mail provider, so the tests
+// exercise claim-then-send as a database and Resend would actually answer.
+function backend(options: {
+  rows: Record<string, { removed?: boolean; notifiedAt?: string | null }>;
+  claimStatus?: number;
+  // The database saves the claim, then the answer is lost.
+  claimAnswerLost?: boolean;
+  mail?: (attempt: number, key: string) => Response | "throw";
+}) {
+  const rows = options.rows;
+  const events: string[] = [];
+  const sentByKey = new Map<string, Response>();
+  let mailCalls = 0;
+  const responder = (call: { url: string; init: RequestInit }): Response => {
+    if (call.init.method === "PATCH") {
+      events.push("patch");
+      if (options.claimStatus && JSON.parse(String(call.init.body)).notified_at !== null) {
+        return new Response("", { status: options.claimStatus });
+      }
+      const query = new URL(call.url).searchParams;
+      const isClaim = JSON.parse(String(call.init.body)).notified_at !== null;
+      const digest = query.get("email_digest")?.replace("eq.", "") ?? "";
+      const row = rows[digest];
+      const wantsUnnotified = query.get("notified_at") === "is.null";
+      const claimedValue = query.get("notified_at")?.replace("eq.", "");
+      // Honor the request's own filters, as PostgREST does: a request that does not
+      // ask for active rows would match a removed one.
+      const requiresActive = query.get("removed_at") === "is.null";
+      const matches =
+        !!row &&
+        (!requiresActive || !row.removed) &&
+        (!wantsUnnotified || !row.notifiedAt) &&
+        (wantsUnnotified || query.get("notified_at") === null || row.notifiedAt === claimedValue);
+      if (!matches) return Response.json([]);
+      row.notifiedAt = JSON.parse(String(call.init.body)).notified_at;
+      if (options.claimAnswerLost && isClaim) throw new DOMException("timed out", "TimeoutError");
+      return Response.json([{ email_digest: digest }]);
+    }
+    events.push("mail");
+    mailCalls += 1;
+    const key = (call.init.headers as Record<string, string>)["Idempotency-Key"];
+    const answer = options.mail ? options.mail(mailCalls, key) : Response.json({ id: "x" });
+    if (answer === "throw") throw new DOMException("timed out", "TimeoutError");
+    // The provider answers a repeated key with the original result, never a second send.
+    if (answer.ok && sentByKey.has(key)) return sentByKey.get(key)!.clone();
+    if (answer.ok) sentByKey.set(key, answer.clone());
+    return answer;
+  };
+  const { fetch: doFetch, calls } = recordingFetch(responder);
+  return { doFetch, calls, rows, events, mailCalls: () => mailCalls, delivered: () => sentByKey.size };
+}
+
+const NOW = () => new Date("2026-10-09T00:00:00Z");
+const a = row("a@example.invalid", "en");
+const b = row("b@example.invalid");
+const c = row("c@example.invalid");
+const fresh = (...list: ActiveSignup[]) => Object.fromEntries(list.map((r) => [r.email_digest, { notifiedAt: null }]));
+
 describe("notice sending", () => {
-  test("sends in the signup's language with a per-recipient idempotency key and stamps it", async () => {
-    const { fetch: doFetch, calls } = recordingFetch(() => Response.json({ id: "x" }));
-    const plan = planNotice([row("a@example.invalid", "en")], null);
-    const result = await sendNotice(ops, template, plan, doFetch, () => new Date("2026-10-09T00:00:00Z"));
-    expect(result).toEqual({ sent: 1, failed: 0, sentNotRecorded: [], stoppedEarly: false });
-    const email = JSON.parse(String(calls[0].init.body));
+  test("claims a row, then sends it in its language under a per-recipient key", async () => {
+    const { doFetch, calls, events, rows } = backend({ rows: fresh(a) });
+    const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
+    expect(result).toEqual({ sent: 1, failed: 0, skipped: 0, unknownOutcome: [], claimUncertain: [], stoppedEarly: false });
+    expect(events).toEqual(["patch", "mail"]);
+    const email = JSON.parse(String(calls[1].init.body));
     expect(email.to).toEqual(["a@example.invalid"]);
     expect(email.subject).toBe("You can try Cuadrao");
     expect(email.reply_to).toBe("hola@cuadrao.ai");
-    expect((calls[0].init.headers as Record<string, string>)["Idempotency-Key"]).toBe(
-      `notice-availability-1-${emailDigest("a@example.invalid")}`,
-    );
-    expect(calls[1].init.method).toBe("PATCH");
-    expect(JSON.parse(String(calls[1].init.body))).toEqual({ notified_at: "2026-10-09T00:00:00.000Z" });
+    expect((calls[1].init.headers as Record<string, string>)["Idempotency-Key"]).toBe(`notice-availability-1-${a.email_digest}`);
+    expect(rows[a.email_digest].notifiedAt).toBe("2026-10-09T00:00:00.000Z");
   });
 
-  test("a failed send is counted and is not stamped", async () => {
-    const { fetch: doFetch, calls } = recordingFetch(() => new Response("", { status: 422 }));
-    const result = await sendNotice(ops, template, planNotice([row("a@example.invalid")], null), doFetch);
-    expect(result).toEqual({ sent: 0, failed: 1, sentNotRecorded: [], stoppedEarly: false });
-    expect(calls).toHaveLength(1);
-  });
-
-  test("a sent message whose stamp fails is reported apart from a failed send", async () => {
-    const { fetch: doFetch, calls } = recordingFetch((call) =>
-      call.init.method === "PATCH" ? new Response("", { status: 500 }) : Response.json({ id: "x" }),
-    );
-    const result = await sendNotice(ops, template, planNotice([row("a@example.invalid")], null), doFetch);
-    expect(result).toEqual({
-      sent: 1,
-      failed: 0,
-      sentNotRecorded: [emailDigest("a@example.invalid")],
-      stoppedEarly: true,
-    });
-    expect(calls).toHaveLength(2);
-  });
-
-  test("stops at the first unrecorded stamp instead of mailing the rest", async () => {
-    const { fetch: doFetch, calls } = recordingFetch((call) =>
-      call.init.method === "PATCH" ? new Response("", { status: 503 }) : Response.json({ id: "x" }),
-    );
-    const plan = planNotice(
-      [row("a@example.invalid"), row("b@example.invalid"), row("c@example.invalid")],
-      null,
-    );
-    const result = await sendNotice(ops, template, plan, doFetch);
+  test("an address removed after the list was read is skipped and never mailed", async () => {
+    const { doFetch, events } = backend({ rows: { [a.email_digest]: { removed: true }, ...fresh(b) } });
+    const result = await sendNotice(ops, template, planNotice([a, b], null), doFetch, NOW);
+    expect(result.skipped).toBe(1);
     expect(result.sent).toBe(1);
-    expect(result.sentNotRecorded).toEqual([emailDigest("a@example.invalid")]);
+    expect(events.filter((event) => event === "mail")).toHaveLength(1);
+  });
+
+  test("an address already notified is skipped", async () => {
+    const { doFetch, mailCalls } = backend({ rows: { [a.email_digest]: { notifiedAt: "2026-10-08T00:00:00.000Z" } } });
+    const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
+    expect(result.skipped).toBe(1);
+    expect(mailCalls()).toBe(0);
+  });
+
+  test("a database that refuses the claim stops the run before anything is sent, naming that row", async () => {
+    const { doFetch, mailCalls } = backend({ rows: fresh(a, b, c), claimStatus: 503 });
+    const result = await sendNotice(ops, template, planNotice([a, b, c], null), doFetch, NOW);
+    expect(result).toEqual({ sent: 0, failed: 0, skipped: 0, unknownOutcome: [], claimUncertain: [a.email_digest], stoppedEarly: true });
+    expect(mailCalls()).toBe(0);
+  });
+
+  test("a claim saved but unanswered is named, because that row is claimed and was never mailed", async () => {
+    const { doFetch, mailCalls, rows } = backend({ rows: fresh(a, b), claimAnswerLost: true });
+    const result = await sendNotice(ops, template, planNotice([a, b], null), doFetch, NOW);
+    expect(result.claimUncertain).toEqual([a.email_digest]);
     expect(result.stoppedEarly).toBe(true);
-    // one send and one failed stamp; b and c were never mailed
-    expect(calls.map((call) => call.init.method)).toEqual(["POST", "PATCH"]);
+    expect(mailCalls()).toBe(0);
+    expect(rows[a.email_digest].notifiedAt).not.toBeNull();
+    // b was never reached and stays eligible for a rerun
+    expect(rows[b.email_digest].notifiedAt).toBeNull();
   });
 
-  test("the stamp only applies to a row that is still active", async () => {
-    const { fetch: doFetch, calls } = recordingFetch(() => Response.json({ id: "x" }));
-    await sendNotice(ops, template, planNotice([row("a@example.invalid")], null), doFetch);
-    expect(calls[1].url).toContain("&removed_at=is.null");
+  test("a plain provider refusal releases the claim so a rerun can try again", async () => {
+    const { doFetch, rows } = backend({ rows: fresh(a), mail: () => new Response("", { status: 422 }) });
+    const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
+    expect(result).toMatchObject({ sent: 0, failed: 1, unknownOutcome: [] });
+    expect(rows[a.email_digest].notifiedAt).toBeNull();
   });
 
-  test("a test send neither stamps nor shares an idempotency key with the real notice", async () => {
-    const { fetch: doFetch, calls } = recordingFetch(() => Response.json({ id: "x" }));
-    const plan = planNotice([row("a@example.invalid")], ["a@example.invalid"]);
-    await sendNotice(ops, template, plan, doFetch);
-    expect(calls).toHaveLength(1);
+  test.each([409, 500, 503])("a %d may have been processed, so the row stays claimed and is named", async (status) => {
+    const { doFetch, rows } = backend({ rows: fresh(a), mail: () => new Response("", { status }) });
+    const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
+    expect(result).toMatchObject({ sent: 0, failed: 0, unknownOutcome: [a.email_digest] });
+    expect(rows[a.email_digest].notifiedAt).not.toBeNull();
+  });
+
+  test("a lost response is retried once under the same key and delivers exactly one message", async () => {
+    const { doFetch, calls, delivered } = backend({
+      rows: fresh(a),
+      mail: (attempt) => (attempt === 1 ? "throw" : Response.json({ id: "x" })),
+    });
+    const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
+    expect(result.sent).toBe(1);
+    const keys = calls.filter((call) => call.init.method === "POST").map((call) => (call.init.headers as Record<string, string>)["Idempotency-Key"]);
+    expect(keys).toHaveLength(2);
+    expect(new Set(keys).size).toBe(1);
+    expect(delivered()).toBe(1);
+  });
+
+  test.each([422, 429])("a %d after a lost first attempt does not prove nothing was sent, so the claim stays", async (status) => {
+    const { doFetch, rows } = backend({
+      rows: fresh(a),
+      mail: (attempt) => (attempt === 1 ? "throw" : new Response("", { status })),
+    });
+    const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
+    expect(result).toMatchObject({ sent: 0, failed: 0, unknownOutcome: [a.email_digest] });
+    expect(rows[a.email_digest].notifiedAt).not.toBeNull();
+  });
+
+  test("no answer after the retry leaves the row claimed, named, and not mailed again by a rerun", async () => {
+    const database = backend({ rows: fresh(a), mail: () => "throw" });
+    const first = await sendNotice(ops, template, planNotice([a], null), database.doFetch, NOW);
+    expect(first.unknownOutcome).toEqual([a.email_digest]);
+    const callsAfterFirst = database.mailCalls();
+    const rerun = await sendNotice(ops, template, planNotice([a], null), database.doFetch, NOW);
+    expect(rerun.skipped).toBe(1);
+    expect(database.mailCalls()).toBe(callsAfterFirst);
+  });
+
+  test("a test send claims nothing and uses its own key", async () => {
+    const { doFetch, calls, events } = backend({ rows: fresh(a) });
+    const result = await sendNotice(ops, template, planNotice([a], ["a@example.invalid"]), doFetch);
+    expect(result.sent).toBe(1);
+    expect(events).toEqual(["mail"]);
     expect((calls[0].init.headers as Record<string, string>)["Idempotency-Key"]).toStartWith("notice-test-");
   });
 });
