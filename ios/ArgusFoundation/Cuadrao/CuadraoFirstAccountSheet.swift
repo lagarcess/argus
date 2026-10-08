@@ -139,9 +139,7 @@ struct CuadraoAccountEntryForm: View {
             .navigationTitle(editing ? (spanish ? "Editar cuenta" : "Edit account") : (spanish ? "Añadir cuenta" : "Add account"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(spanish ? "Cancelar" : "Cancel", action: cancel).disabled(busy).accessibilityIdentifier(ids.cancel)
-                }
+                CuadraoCancelToolbar(title: spanish ? "Cancelar" : "Cancel", disabled: busy, identifier: ids.cancel, action: cancel)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
