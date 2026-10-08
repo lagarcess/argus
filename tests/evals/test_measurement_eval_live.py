@@ -26,23 +26,24 @@ if _EVAL_ENV_FILE:
 from argus.domain.market_data.assets import clear_asset_cache
 from argus.llm.openrouter import openrouter_request_guard
 from tests.evals.live_eval_budget import (
-    PINNED,
-    BudgetLedger,
+    SpendLedger,
     budget_summary,
-    case_bound,
     live_eval_budget_usd,
+    metered_openrouter,
+    record_task,
     refuse_unbounded_rails,
-    run_budgeted_cases,
+    run_metered_cases,
 )
-from argus.domain.research.config import research_rail_enabled
 from tests.evals.measurement_eval_harness import (
-    EvalCase,
     blocking_eval_results,
     expected_fail_issue_for_result,
     load_eval_cases,
 )
 from tests.evals.measurement_eval_scorecard import FIXTURE_SETS
-from tests.evals.measurement_surface import live_eval_fixture_set, run_case_on_its_surface
+from tests.evals.measurement_surface import (
+    live_eval_fixture_sets,
+    run_case_on_its_surface,
+)
 
 
 def _assert_requested_live_eval_credentials() -> None:
@@ -54,18 +55,12 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
     if os.getenv("ARGUS_RUN_LIVE_EVALS") != "1":
         pytest.skip("set ARGUS_RUN_LIVE_EVALS=1 to spend live LLM eval calls")
     # Every refusal that needs no provider traffic comes before any traffic:
-    # the budget, the credentials, the rails the bound cannot cover, and a
-    # price for every model a bounded task can resolve to.
-    ledger = BudgetLedger(live_eval_budget_usd(os.environ))
-    fixture_set = live_eval_fixture_set(os.environ)
+    # the budget, the credentials, and every paid client a post reservation
+    # cannot cover.
+    ledger = SpendLedger(live_eval_budget_usd(os.environ))
+    fixture_sets = live_eval_fixture_sets(os.environ)
     _assert_requested_live_eval_credentials()
     refuse_unbounded_rails(os.environ)
-    turn_usd = PINNED.turn_bound_usd(
-        PINNED.task_candidates_from_env(), research_reachable=research_rail_enabled()
-    )
-    judge_usd = PINNED.judge_bound_usd(
-        PINNED.judge_candidates_from_env(os.getenv("ARGUS_EVAL_JUDGE_MODEL"))
-    )
 
     if not (os.getenv("ARGUS_ASSET_PROVIDER_MODE") or "").strip():
         asset_provider_mode = (
@@ -84,31 +79,27 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
         )
     clear_asset_cache()
 
-    provenance = build_scorecard_provenance(
-        evaluation_mode="live", fixture_set=fixture_set
-    )
-
-    def bound_for(case: EvalCase):
-        return case_bound(
-            turns=2 if case.followup_prompt else 1,
-            judged=bool(case.prose_judge_criteria),
-            turn_usd=turn_usd,
-            judge_usd=judge_usd,
+    # Every OpenRouter post any case or judge makes is reserved before it is
+    # sent; one ledger spans every fixture set the run measures.
+    measured = []
+    for fixture_set in fixture_sets:
+        provenance = build_scorecard_provenance(
+            evaluation_mode="live", fixture_set=fixture_set
         )
-
-    # The guard sees every OpenRouter post any case makes before it is sent.
-    with openrouter_request_guard(PINNED.request_guard()):
-        results = run_budgeted_cases(
-            load_eval_cases(FIXTURE_SETS[fixture_set]),
-            run_case=run_case_on_its_surface,
-            bound_for=bound_for,
-            ledger=ledger,
-        )
-    scorecard_path = write_scorecard(
-        results,
-        provenance=provenance,
-        budget=budget_summary(ledger, results),
+        with openrouter_request_guard(record_task), metered_openrouter(ledger):
+            set_results = run_metered_cases(
+                load_eval_cases(FIXTURE_SETS[fixture_set]),
+                run_case=run_case_on_its_surface,
+                ledger=ledger,
+            )
+        measured.append((provenance, set_results))
+    # Written after the whole run: a run that stopped anywhere leaves every
+    # scorecard it wrote incomplete.
+    scorecard_path = ", ".join(
+        str(write_scorecard(rows, provenance=prov, budget=budget_summary(ledger, rows)))
+        for prov, rows in measured
     )
+    results = [row for _, rows in measured for row in rows]
     failures = [
         {
             "id": result["id"],

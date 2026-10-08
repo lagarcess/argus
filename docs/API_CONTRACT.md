@@ -3523,7 +3523,9 @@ false}` and no confirmation card, tool card or run. The recovery carries
 `params: {"personal_chat": "available"}` only when the person's Personal chat
 runs that function right now (the tool is in the Personal catalog under
 today's switches, or asset discovery's search is on); the client offers a
-Personal-chat link only then. With Business chat on,
+Personal-chat link only then. The founder approved the link label "Abrir mi
+chat personal" / "Open my personal chat" on October 8, shown only where that
+function and its destination are available. With Business chat on,
 `POST /backtests/run` with a Business `conversation_id` answers 404 `not_found`,
 `tool-results/{id}/recompute` on a Business conversation answers 422
 `tool_inputs_not_editable`, `computation/refresh` answers 409

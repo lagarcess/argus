@@ -1,39 +1,101 @@
+"""The per-post spend guard, offline: a fake transport stands in for the network."""
+
 from __future__ import annotations
 
+import asyncio
 import json
+import math
+import threading
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
 from decimal import Decimal
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
+import httpx
 import pytest
-from argus.agent_runtime.turn_execution import reserve_provider_call
 from argus.llm import openrouter
+from pydantic import BaseModel
 
 from tests.evals import live_eval_budget as budget
 from tests.evals import measurement_eval_harness as harness
 from tests.evals import measurement_eval_scorecard as scorecards
 from tests.evals.live_eval_budget import (
-    PINNED,
-    BoundTable,
-    BudgetLedger,
-    CaseBound,
     LiveEvalRequestRefused,
-    TokenPrice,
-    UnpricedCallError,
+    SpendLedger,
+    metered_openrouter,
+    post_reservation_usd,
+    record_task,
+    run_metered_cases,
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
-
-# One dollar per million tokens in and out, and a thousand-byte cap, so every
-# bound below is the token arithmetic written out.
-FLAT = BoundTable(
-    prices={
-        "m": TokenPrice(Decimal("1"), Decimal("1"), "test"),
-        "n": TokenPrice(Decimal("1"), Decimal("1"), "test"),
-    },
-    input_cap_bytes=1000,
+URL = "https://openrouter.ai/api/v1/chat/completions"
+GROK = "x-ai/grok-4.3"
+HAIKU = "anthropic/claude-haiku-4.5"
+DEEPSEEK = "deepseek/deepseek-v4-flash"
+ACCEPTED = (
+    REPOSITORY_ROOT
+    / "docs/reports/evidence/current-reason-date-range/accepted-measurement"
+    / "live-measurement.json"
 )
+PAIRS = (
+    REPOSITORY_ROOT
+    / "docs/reports/evidence/live-eval-per-call-guard/input-bound-pairs.json"
+)
+
+Responder = Callable[[httpx.Request], httpx.Response]
+
+
+def _body(
+    model: str = GROK, *, max_tokens: int = 100, text: str = "hi"
+) -> dict[str, Any]:
+    return {
+        "model": model,
+        "messages": [{"role": "user", "content": text}],
+        "max_tokens": max_tokens,
+    }
+
+
+def _bytes(payload: dict[str, Any]) -> bytes:
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode()
+
+
+def _reply(cost: float | None = 0.0001, status: int = 200) -> Responder:
+    def respond(request: httpx.Request) -> httpx.Response:
+        usage: dict[str, Any] = {"prompt_tokens": 10, "completion_tokens": 5}
+        if cost is not None:
+            usage["cost"] = cost
+        content = {"choices": [{"message": {"content": "{}"}}], "usage": usage}
+        return httpx.Response(status, json=content, request=request)
+
+    return respond
+
+
+@pytest.fixture
+def network(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """The transport the guard wraps; it records what actually left."""
+    state: dict[str, Any] = {"sent": [], "respond": _reply()}
+
+    def send(self: httpx.Client, request: httpx.Request, **_: Any) -> httpx.Response:
+        if request.url.host == "openrouter.ai":
+            state["sent"].append(json.loads(request.content))
+            return state["respond"](request)
+        return httpx.Response(200, json={}, request=request)
+
+    async def asend(
+        self: httpx.AsyncClient, request: httpx.Request, **_: Any
+    ) -> httpx.Response:
+        return send(self, request)
+
+    monkeypatch.setattr(httpx.Client, "send", send)
+    monkeypatch.setattr(httpx.AsyncClient, "send", asend)
+    return state
+
+
+def _post(payload: dict[str, Any]) -> httpx.Response:
+    with httpx.Client() as client:
+        return client.post(URL, json=payload)
 
 
 @pytest.mark.parametrize("raw", ["", "   ", "0", "-1", "abc", "inf", "nan"])
@@ -48,133 +110,456 @@ def test_budget_env_reads_a_positive_decimal() -> None:
     )
 
 
-def test_post_bound_prices_every_input_byte_and_the_full_output_cap() -> None:
-    table = BoundTable(
-        prices={"x-ai/grok-4.3": TokenPrice(Decimal("1.25"), Decimal("2.50"), "test")},
-        input_cap_bytes=1000,
-    )
-    # 1000 input tokens at 1.25 plus 3200 output tokens at 2.50, per million.
-    assert table.post_bound_usd("interpretation", "x-ai/grok-4.3") == Decimal("0.00925")
-
-
-def test_post_bound_refuses_an_unlisted_task_or_unpriced_model() -> None:
-    with pytest.raises(UnpricedCallError, match="document_extraction"):
-        FLAT.post_bound_usd("document_extraction", "m")
-    with pytest.raises(UnpricedCallError, match="vendor/unpriced"):
-        FLAT.post_bound_usd("interpretation", "vendor/unpriced")
-
-
-def test_turn_bound_counts_the_research_reservations_only_when_research_is_reachable() -> (
+def test_a_reservation_is_the_request_bytes_and_its_output_cap_at_the_models_ceiling() -> (
     None
 ):
-    candidates: dict[str, tuple[str, ...]] = {
-        task: ("m",) for task in budget.BOUNDED_TASKS
-    }
-
-    # 7 x (1000 + 3200) + 2 x (1000 + 2200) + (1000 + 350) + (1000 + 600), per million.
-    assert FLAT.turn_bound_usd(candidates, research_reachable=True) == Decimal("0.03875")
-    # Research off grants neither knowledge_route nor knowledge_voicing.
-    assert FLAT.turn_bound_usd(candidates, research_reachable=False) == Decimal("0.0358")
-
-
-def test_judge_bound_is_the_candidate_ladder_posts() -> None:
-    # Two candidates, two posts each, at 1000 + 1200 tokens per post.
-    assert FLAT.judge_bound_usd(("m", "n")) == Decimal("0.0088")
-    assert FLAT.judge_bound_usd(("m",)) == Decimal("0.0044")
-
-
-def test_case_bound_counts_turns_and_the_judge_only_when_judged() -> None:
-    judged = budget.case_bound(
-        turns=2, judged=True, turn_usd=Decimal("1.5"), judge_usd=Decimal("0.25")
+    payload = _body(GROK, max_tokens=3200, text="x" * 1000)
+    size = len(_bytes(payload))
+    # Every body byte at 1.25 per million, 3,200 output tokens at 2.50.
+    assert post_reservation_usd(_bytes(payload)) == (
+        GROK,
+        (Decimal(size) * Decimal("1.25") + Decimal(3200) * Decimal("2.50")) / 1_000_000,
     )
-    unjudged = budget.case_bound(
-        turns=1, judged=False, turn_usd=Decimal("1.5"), judge_usd=Decimal("0.25")
-    )
-
-    assert judged.total_usd == Decimal("3.25")
-    assert unjudged.total_usd == Decimal("1.5")
-    assert judged.as_dict() == {
-        "turns": 2,
-        "turn_usd": "1.500000",
-        "judge_usd": "0.250000",
-        "total_usd": "3.250000",
-    }
-
-
-def test_guard_refuses_what_the_bound_does_not_cover() -> None:
-    guard = BoundTable(prices=FLAT.prices, input_cap_bytes=64).request_guard()
-    small: dict[str, object] = {
-        "model": "m",
-        "messages": [{"role": "user", "content": "hi"}],
-    }
-
-    assert guard("interpretation", small) is small
-    with pytest.raises(LiveEvalRequestRefused, match="document_extraction"):
-        guard("document_extraction", small)
-    with pytest.raises(LiveEvalRequestRefused, match="vendor/unpriced"):
-        guard("interpretation", {**small, "model": "vendor/unpriced"})
-    with pytest.raises(LiveEvalRequestRefused, match="exceeds the 64 byte input cap"):
-        guard(
-            "interpretation",
-            {**small, "messages": [{"role": "user", "content": "x" * 64}]},
-        )
-
-
-def test_receipt_charge_is_the_reported_cost_else_the_bound_else_nothing() -> None:
-    reported = {
-        "task": "interpretation",
-        "model": "m",
-        "outcome": "succeeded",
-        "usage_cost_usd": 0.0123,
-    }
-    unreported = {
-        "task": "interpretation",
-        "model": "m",
-        "outcome": "failed",
-        "usage_cost_usd": None,
-    }
-    skipped = {
-        "task": "interpretation",
-        "model": "m",
-        "outcome": "skipped",
-        "usage_cost_usd": None,
-    }
-    refused = {**unreported, "failure_mode": "LiveEvalRequestRefused"}
-
-    assert FLAT.receipt_charge_usd(reported) == Decimal("0.0123")
-    assert FLAT.receipt_charge_usd(unreported) == Decimal("0.0042")
-    assert FLAT.receipt_charge_usd(skipped) == Decimal("0")
-    assert FLAT.receipt_charge_usd(refused) == Decimal("0")
-
-
-def test_receipt_bound_violation_names_each_broken_assumption() -> None:
-    base = {
-        "task": "clarification",
-        "model": "m",
-        "outcome": "succeeded",
-        "token_usage": {"prompt_tokens": 900, "completion_tokens": 300},
-        "usage_cost_usd": 0.0012,
-    }
-
-    assert FLAT.receipt_bound_violation(base) is None
+    # deepseek once billed past max_tokens, so its output is reserved twice over.
+    _, deepseek = post_reservation_usd(_bytes(_body(DEEPSEEK, max_tokens=900)))
+    size = len(_bytes(_body(DEEPSEEK, max_tokens=900)))
     assert (
-        FLAT.receipt_bound_violation(
-            {**base, "token_usage": {"prompt_tokens": 1001, "completion_tokens": 1}}
+        deepseek == (Decimal(size) * Decimal("0.50") + 1800 * Decimal("2.00")) / 1_000_000
+    )
+    document = {**_body(HAIKU), "max_completion_tokens": 50}
+    del document["max_tokens"]
+    assert post_reservation_usd(_bytes(document))[0] == HAIKU
+
+
+@pytest.mark.parametrize(
+    ("payload", "reason"),
+    [
+        (_body("vendor/unpriced"), "has no pinned price"),
+        ({"model": GROK, "messages": []}, "no max_tokens"),
+        ({**_body(), "plugins": [{"id": "web"}]}, "web search"),
+        (_body(f"{GROK}:online"), "has no pinned price"),
+        ({**_body(), "stream": True}, "streamed"),
+    ],
+)
+def test_a_post_that_cannot_be_reserved_is_refused(
+    payload: dict[str, Any], reason: str
+) -> None:
+    with pytest.raises(LiveEvalRequestRefused, match=reason):
+        post_reservation_usd(_bytes(payload))
+
+
+def test_a_190_kb_prompt_is_reserved_at_its_real_size_and_sent(
+    network: dict[str, Any],
+) -> None:
+    # The largest committed receipt: grok interpretation, 39,522 prompt tokens
+    # billed 0.0519384 USD. At the evidence's 4.9 bytes per token its request
+    # was about 193,658 bytes.
+    payload = _body(GROK, max_tokens=3200, text="x" * 193_500)
+    size = len(_bytes(payload))
+    ledger = SpendLedger(Decimal("5.00"))
+
+    with metered_openrouter(ledger):
+        _post(payload)
+
+    (post,) = ledger.posts
+    assert size > 190_000
+    assert post["body_bytes"] == size
+    assert Decimal(post["reserved_usd"]) == Decimal("0.249981")
+    assert Decimal(post["reserved_usd"]) > Decimal("0.0519384") * 4
+    assert len(network["sent"]) == 1
+
+
+def test_a_post_the_budget_cannot_cover_is_refused_before_it_is_sent(
+    network: dict[str, Any],
+) -> None:
+    ledger = SpendLedger(Decimal("0.0001"))
+
+    with metered_openrouter(ledger), pytest.raises(LiveEvalRequestRefused):
+        _post(_body(max_tokens=3200))
+
+    assert network["sent"] == []
+    assert ledger.spent_usd == Decimal(0)
+    assert ledger.posts[0]["refused"] is True
+    assert ledger.stopped_reason is not None
+    # Once stopped, even a post the budget could cover is refused.
+    ledger.budget_usd = Decimal("10")
+    with metered_openrouter(ledger), pytest.raises(LiveEvalRequestRefused):
+        _post(_body(max_tokens=1))
+    assert network["sent"] == []
+
+
+@pytest.mark.parametrize(
+    ("respond", "charged"),
+    [
+        (_reply(cost=0.000123), "0.000123"),
+        (_reply(cost=None), "reserved"),
+        (_reply(cost=0.000123, status=500), "reserved"),
+    ],
+)
+def test_settlement_charges_the_reported_cost_else_the_whole_reservation(
+    network: dict[str, Any], respond: Responder, charged: str
+) -> None:
+    network["respond"] = respond
+    ledger = SpendLedger(Decimal("1.00"))
+
+    with metered_openrouter(ledger):
+        _post(_body())
+
+    (post,) = ledger.posts
+    expected = post["reserved_usd"] if charged == "reserved" else charged
+    assert post["charged_usd"] == expected
+    assert ledger.spent_usd.quantize(Decimal("0.000001")) == Decimal(expected)
+    assert ledger.committed_usd == ledger.spent_usd
+
+
+def test_a_post_that_never_answers_keeps_its_reservation_charged(
+    network: dict[str, Any],
+) -> None:
+    def timeout(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("slow", request=request)
+
+    network["respond"] = timeout
+    ledger = SpendLedger(Decimal("1.00"))
+
+    with metered_openrouter(ledger), pytest.raises(httpx.ReadTimeout):
+        _post(_body())
+
+    assert ledger.spent_usd == post_reservation_usd(_bytes(_body()))[1]
+
+
+def test_a_bill_above_its_reservation_stops_the_run(network: dict[str, Any]) -> None:
+    network["respond"] = _reply(cost=1.0)
+    ledger = SpendLedger(Decimal("5.00"))
+
+    with metered_openrouter(ledger):
+        _post(_body())
+
+    assert ledger.stopped_reason is not None
+    assert "over its" in ledger.stopped_reason
+
+
+def test_concurrent_reservations_never_overshoot_the_budget(
+    network: dict[str, Any],
+) -> None:
+    payload = _body(max_tokens=3200)
+    _, each = post_reservation_usd(_bytes(payload))
+    ledger = SpendLedger(each * 10 + each / 2)
+    in_flight = threading.Semaphore(0)
+    peaks: list[Decimal] = []
+
+    def slow(request: httpx.Request) -> httpx.Response:
+        peaks.append(ledger.committed_usd)
+        in_flight.release()
+        return _reply(cost=None)(request)
+
+    network["respond"] = slow
+
+    def thread_post(_: int) -> str:
+        try:
+            _post(payload)
+            return "sent"
+        except LiveEvalRequestRefused:
+            return "refused"
+
+    async def async_posts() -> list[str]:
+        async def one() -> str:
+            try:
+                async with httpx.AsyncClient() as client:
+                    await client.post(URL, json=payload)
+                return "sent"
+            except LiveEvalRequestRefused:
+                return "refused"
+
+        return list(await asyncio.gather(*(one() for _ in range(12))))
+
+    with metered_openrouter(ledger), ThreadPoolExecutor(max_workers=12) as pool:
+        threaded = pool.map(thread_post, range(12))
+        outcomes = [*asyncio.run(async_posts()), *threaded]
+
+    assert outcomes.count("sent") == 10
+    assert len(network["sent"]) == 10
+    assert max(peaks) <= ledger.budget_usd
+    assert ledger.spent_usd == each * 10 <= ledger.budget_usd
+
+
+class _Answer(BaseModel):
+    answer: str
+
+
+def test_every_fallback_and_reasoning_retry_is_its_own_reservation(
+    network: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "offline")
+    monkeypatch.setenv("ARGUS_STRUCTURED_MODEL", GROK)
+    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", HAIKU)
+    replies = iter(
+        [
+            httpx.Response(400, json={"error": "reasoning"}),
+            httpx.Response(500, json={"error": "upstream"}),
+        ]
+    )
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        try:
+            reply = next(replies)
+            return httpx.Response(reply.status_code, json=reply.json(), request=request)
+        except StopIteration:
+            content = {
+                "choices": [{"message": {"content": json.dumps({"answer": "ok"})}}],
+                "usage": {"prompt_tokens": 9, "completion_tokens": 3, "cost": 0.0002},
+            }
+            return httpx.Response(200, json=content, request=request)
+
+    network["respond"] = respond
+    ledger = SpendLedger(Decimal("5.00"))
+
+    with openrouter.openrouter_request_guard(record_task), metered_openrouter(ledger):
+        answer = asyncio.run(
+            openrouter.invoke_openrouter_json_schema(
+                task="interpretation",
+                messages=[{"role": "user", "content": "hello"}],
+                schema_model=_Answer,
+                schema_name="Answer",
+            )
         )
-        == "prompt_tokens 1001 exceeds the 1000 input cap"
-    )
-    assert (
-        FLAT.receipt_bound_violation(
-            {**base, "token_usage": {"prompt_tokens": 1, "completion_tokens": 361}}
+
+    assert isinstance(answer, _Answer)
+    assert [(post["task"], post["model"]) for post in ledger.posts] == [
+        ("interpretation", GROK),
+        ("interpretation", GROK),
+        ("interpretation", HAIKU),
+    ]
+    assert "reasoning" in network["sent"][0] and "reasoning" not in network["sent"][1]
+    charged = [post["charged_usd"] for post in ledger.posts]
+    assert charged[:2] == [post["reserved_usd"] for post in ledger.posts[:2]]
+    assert charged[2] == "0.000200"
+
+
+def test_the_prose_judge_reserves_its_post(
+    network: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("OPENROUTER_API_KEY", "offline")
+    monkeypatch.setenv("ARGUS_CHAT_MODEL", DEEPSEEK)
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        verdict = {"pass": True, "failed_criteria": [], "notes": ""}
+        content = {
+            "choices": [{"message": {"content": json.dumps(verdict)}}],
+            "usage": {"prompt_tokens": 9, "completion_tokens": 3, "cost": 0.00001},
+        }
+        return httpx.Response(200, json=content, request=request)
+
+    network["respond"] = respond
+    ledger = SpendLedger(Decimal("5.00"))
+    case = _case("judged")
+
+    with openrouter.openrouter_request_guard(record_task), metered_openrouter(ledger):
+        verdict = harness.judge_prose_quality(
+            case=case, assistant_text="An answer.", rendered_beside_reply={}
         )
-        == "completion_tokens 361 exceeds max_tokens 360"
+
+    assert verdict["pass"] is True
+    assert [(post["task"], post["model"]) for post in ledger.posts] == [
+        ("chat_composer", DEEPSEEK)
+    ]
+
+
+def test_a_post_to_another_host_passes_unmetered(network: dict[str, Any]) -> None:
+    ledger = SpendLedger(Decimal("0.0000001"))
+
+    with metered_openrouter(ledger), httpx.Client() as client:
+        client.get("https://data.alpaca.markets/v2/clock")
+
+    assert ledger.posts == []
+
+
+def _case(case_id: str) -> harness.EvalCase:
+    return harness.EvalCase(
+        id=case_id,
+        category="messy_english",
+        prompt="Explain this simply",
+        user_language="en",
+        ui_language="en",
+        expected=harness.TypedExpectations(
+            intent="conversation_followup", capability_verdict="answer_only"
+        ),
+        prose_judge_criteria=("honesty",),
     )
-    assert FLAT.receipt_bound_violation({**base, "usage_cost_usd": 0.0013}) == (
-        "cost 0.0013 exceeds the pinned rate's 0.001200"
+
+
+def _posting_case(
+    posts: int, *, status: str = "passed"
+) -> Callable[[Any], dict[str, Any]]:
+    def run(case: harness.EvalCase) -> dict[str, Any]:
+        for _ in range(posts):
+            try:
+                _post(_body(max_tokens=3200))
+            except LiveEvalRequestRefused:
+                break
+        return {
+            "id": case.id,
+            "category": case.category,
+            "status": status,
+            "failed_checks": ["intent: expected x, got y"] if status == "failed" else [],
+            "expected_fail": None,
+            "typed_outcome": {},
+            "prose_judge": None,
+            "infrastructure_errors": [],
+            "route_receipts": [],
+        }
+
+    return run
+
+
+def test_the_run_stops_at_the_first_refusal_and_is_incomplete(
+    network: dict[str, Any],
+) -> None:
+    _, each = post_reservation_usd(_bytes(_body(max_tokens=3200)))
+    network["respond"] = _reply(cost=None)
+    ledger = SpendLedger(each * 5)
+
+    with metered_openrouter(ledger):
+        results = run_metered_cases(
+            [_case("a"), _case("b"), _case("c")],
+            run_case=_posting_case(3, status="failed"),
+            ledger=ledger,
+        )
+
+    # a fails and reruns (6 posts would pass 5), so the rerun is refused.
+    assert [(r["id"], r["status"]) for r in results] == [
+        ("a", "skipped_budget"),
+        ("b", "skipped_budget"),
+        ("c", "skipped_budget"),
+    ]
+    assert results[0]["budget"]["attempts"] == 2
+    assert len(network["sent"]) == 5
+    assert ledger.spent_usd == each * 5
+    summary = budget.budget_summary(ledger, results)
+    assert summary["complete"] is False
+    assert summary["cases"]["skipped_budget"] == 3
+    assert [post["refused"] for post in summary["posts"]] == [False] * 5 + [True]
+
+
+def test_a_failed_case_reruns_once_while_the_run_goes_on(
+    network: dict[str, Any],
+) -> None:
+    calls: list[str] = []
+
+    def failing(case: harness.EvalCase) -> dict[str, Any]:
+        calls.append(case.id)
+        return _posting_case(1, status="failed")(case)
+
+    ledger = SpendLedger(Decimal("5.00"))
+    with metered_openrouter(ledger):
+        results = run_metered_cases([_case("flaky")], run_case=failing, ledger=ledger)
+
+    assert calls == ["flaky", "flaky"]
+    assert results[0]["status"] == "failed"
+    assert results[0]["budget"]["first_attempt"]["status"] == "failed"
+    assert budget.budget_summary(ledger, results)["complete"] is True
+
+
+def _live_scorecard(results: list[dict[str, Any]], budget_block: dict[str, Any]):  # noqa: ANN202
+    provenance = scorecards.EvalScorecardProvenance(
+        evaluation_mode="live",
+        market_data_provider_mode="live_provider",
+        asset_provider_mode="live_provider",
+        candidate_sha="a" * 40,
+        python_version="3.10.20",
+        fixture_sha256="b" * 64,
+        fixture_case_ids=tuple(result["id"] for result in results),
+        worktree_clean=True,
+        release_configuration={"ARGUS_CHAT_MODEL": "test/model"},
+        live_market_data_probe=scorecards.LiveMarketDataProbe(
+            symbol="SPY",
+            requested_date_range={"start": "2024-01-01", "end": "2024-01-10"},
+            effective_date_range={"start": "2024-01-02", "end": "2024-01-10"},
+            adjustment_reason="calendar_alignment",
+        ),
     )
-    assert FLAT.receipt_bound_violation({**base, "model": "vendor/unpriced"}) == (
-        "model 'vendor/unpriced' billed without a pinned price"
+    return scorecards.scorecard_for_results(
+        results, provenance=provenance, budget=budget_block
     )
+
+
+def test_promotion_and_prompt_freeze_consumers_reject_an_incomplete_run(
+    network: dict[str, Any],
+) -> None:
+    from tests.test_interpreter_prompt_freeze import assert_scorecard_measures_the_prompt
+
+    _, each = post_reservation_usd(_bytes(_body(max_tokens=3200)))
+    network["respond"] = _reply(cost=None)
+    ledger = SpendLedger(each * 2)
+    with metered_openrouter(ledger):
+        results = run_metered_cases(
+            [_case("a"), _case("b")], run_case=_posting_case(3), ledger=ledger
+        )
+    scorecard = _live_scorecard(results, budget.budget_summary(ledger, results))
+
+    with pytest.raises(ValueError, match="incomplete_run"):
+        scorecards.assert_scorecard_complete(scorecard)
+    with pytest.raises(ValueError, match="incomplete_run"):
+        assert_scorecard_measures_the_prompt(scorecard, measured_commit="a" * 40)
+
+
+def test_replaying_the_accepted_run_at_maximum_cost_never_passes_the_budget(
+    network: dict[str, Any],
+) -> None:
+    """Every recorded post, sized at four bytes per billed prompt token, bills
+    its whole reservation: the run stops before the budget, incomplete."""
+    accepted = json.loads(ACCEPTED.read_text(encoding="utf-8"))
+    recorded = {
+        result["id"]: [
+            receipt
+            for receipt in result.get("route_receipts") or []
+            if receipt.get("outcome") != "skipped"
+            and receipt.get("model") in budget.PRICE_TABLE_USD_PER_MILLION
+        ]
+        for result in accepted["results"]
+    }
+
+    def at_maximum(request: httpx.Request) -> httpx.Response:
+        _, reserved = post_reservation_usd(request.content)
+        return _reply(cost=float(reserved) * 0.999999)(request)
+
+    network["respond"] = at_maximum
+
+    def replay(case: Any) -> dict[str, Any]:
+        for receipt in recorded[case.id]:
+            tokens = (receipt.get("token_usage") or {}).get("prompt_tokens") or 1000
+            try:
+                _post(_body(receipt["model"], max_tokens=3200, text="x" * (4 * tokens)))
+            except LiveEvalRequestRefused:
+                break
+        return _posting_case(0)(case)
+
+    ledger = SpendLedger(Decimal("5.00"))
+    cases = [_case(case_id) for case_id in recorded]
+    with metered_openrouter(ledger):
+        results = run_metered_cases(cases, run_case=replay, ledger=ledger)
+
+    assert ledger.committed_usd <= Decimal("5.00")
+    assert ledger.spent_usd <= Decimal("5.00")
+    assert ledger.stopped_reason is not None
+    assert budget.budget_summary(ledger, results)["complete"] is False
+    assert sum(1 for r in results if r["status"] == "skipped_budget") > 0
+    assert len(cases) == 73
+
+
+def test_the_input_bound_covers_every_paired_committed_receipt() -> None:
+    """Regenerate with `python -m tests.evals.input_bound_proof <path>`."""
+    pairs = json.loads(PAIRS.read_text(encoding="utf-8"))
+    ratios = [pair["body_bytes"] / pair["billed_prompt_tokens"] for pair in pairs]
+
+    assert len(pairs) == 173
+    assert all(pair["body_bytes"] >= pair["billed_prompt_tokens"] for pair in pairs)
+    assert math.floor(min(ratios) * 100) / 100 == 3.62
+    assert {pair["model"] for pair in pairs} == {
+        GROK,
+        HAIKU,
+        DEEPSEEK,
+        "qwen/qwen3.5-9b",
+    }
 
 
 def _evidence_receipts() -> list[dict[str, Any]]:
@@ -199,208 +584,31 @@ def _evidence_receipts() -> list[dict[str, Any]]:
 
 
 def test_pinned_rates_dominate_every_committed_receipt() -> None:
-    """The table is a ceiling: no receipt in the committed evidence, for any
-    model it prices, bills more than the pinned rates say it could."""
-    # Prompt size was not capped when the evidence was recorded.
-    uncapped = BoundTable(prices=PINNED.prices, input_cap_bytes=10**9)
+    """The table is a ceiling: no committed receipt, for any model it prices,
+    bills more than its prompt and completion tokens at the pinned rates, so
+    the completion count carries every billed reasoning token."""
+    tolerance = Decimal("0.00001")
     receipts = [
         receipt
         for receipt in _evidence_receipts()
-        if receipt.get("model") in PINNED.prices
+        if receipt.get("model") in budget.PRICE_TABLE_USD_PER_MILLION
         and receipt.get("usage_cost_usd") is not None
         and receipt.get("token_usage")
     ]
-    # Profile max_tokens moved since the older scorecards were recorded, so
-    # the replay checks the rates alone: an unlisted task skips the output cap.
-    violations = {
-        receipt["model"]: reason
+    over = [
+        receipt
         for receipt in receipts
-        if (reason := uncapped.receipt_bound_violation({**receipt, "task": "historic"}))
-        is not None
-    }
+        if Decimal(str(receipt["usage_cost_usd"]))
+        > budget.priced_usd(
+            receipt["model"],
+            prompt_tokens=int(receipt["token_usage"].get("prompt_tokens") or 0),
+            completion_tokens=int(receipt["token_usage"].get("completion_tokens") or 0),
+        )
+        + tolerance
+    ]
 
     assert len(receipts) > 300
-    assert violations == {}
-
-
-def _case(case_id: str, *, followup: bool = False) -> harness.EvalCase:
-    return harness.EvalCase(
-        id=case_id,
-        category="messy_english",
-        prompt="Explain this simply",
-        user_language="en",
-        ui_language="en",
-        expected=harness.TypedExpectations(
-            intent="conversation_followup", capability_verdict="answer_only"
-        ),
-        followup_prompt="and then?" if followup else None,
-    )
-
-
-def _result(case: harness.EvalCase, *, status: str, cost: float | None) -> dict[str, Any]:
-    return {
-        "id": case.id,
-        "category": case.category,
-        "status": status,
-        "failed_checks": ["intent: expected x, got y"] if status == "failed" else [],
-        "expected_fail": None,
-        "typed_outcome": {},
-        "prose_judge": None,
-        "infrastructure_errors": [],
-        # No token counts, so a reported cost is taken as the provider's word.
-        "route_receipts": [
-            {
-                "task": "interpretation",
-                "model": "m",
-                "outcome": "succeeded" if cost is not None else "failed",
-                "usage_cost_usd": cost,
-                "token_usage": None,
-            }
-        ],
-    }
-
-
-def _bound(case: harness.EvalCase) -> CaseBound:
-    return CaseBound(turns=1, turn_usd=Decimal("0.60"), judge_usd=Decimal(0))
-
-
-def test_a_case_starts_only_while_the_remaining_budget_covers_its_bound() -> None:
-    ledger = BudgetLedger(Decimal("1.00"))
-
-    results = budget.run_budgeted_cases(
-        [_case("first"), _case("second")],
-        run_case=lambda case: _result(case, status="passed", cost=0.5),
-        bound_for=_bound,
-        ledger=ledger,
-        table=FLAT,
-    )
-
-    assert [(r["id"], r["status"]) for r in results] == [
-        ("first", "passed"),
-        ("second", "skipped_budget"),
-    ]
-    assert results[1]["failed_checks"] == [
-        "budget:remaining 0.500000 USD does not cover the 0.600000 USD bound"
-    ]
-    assert results[0]["budget"] == {
-        "bound": {
-            "turns": 1,
-            "turn_usd": "0.600000",
-            "judge_usd": "0.000000",
-            "total_usd": "0.600000",
-        },
-        "charged_usd": "0.500000",
-        "attempts": 1,
-        "bound_violation": None,
-    }
-    summary = budget.budget_summary(ledger, results, table=FLAT)
-    assert summary["spent_usd"] == "0.500000"
-    assert summary["remaining_usd"] == "0.500000"
-    assert summary["complete"] is False
-    assert summary["cases"] == {
-        "completed": 1,
-        "failed": 0,
-        "rerun": 0,
-        "skipped_budget": 1,
-    }
-    assert summary["sum_of_case_bounds_usd"] == "1.200000"
-    assert summary["input_cap_bytes"] == 1000
-    assert harness.blocking_eval_results(results) == [results[1]]
-
-
-def test_an_unreported_cost_is_charged_at_the_post_bound() -> None:
-    ledger = BudgetLedger(Decimal("1.00"))
-
-    results = budget.run_budgeted_cases(
-        [_case("only")],
-        run_case=lambda case: _result(case, status="passed", cost=None),
-        bound_for=_bound,
-        ledger=ledger,
-        table=FLAT,
-    )
-
-    # One interpretation post at 1000 + 3200 tokens, per million.
-    assert results[0]["budget"]["charged_usd"] == "0.004200"
-    assert ledger.spent_usd == Decimal("0.0042")
-
-
-def test_a_failed_case_reruns_once_and_only_while_the_budget_covers_it() -> None:
-    calls: list[str] = []
-
-    def always_fails(case: harness.EvalCase) -> dict[str, Any]:
-        calls.append(case.id)
-        return _result(case, status="failed", cost=0.10)
-
-    covered = BudgetLedger(Decimal("2.00"))
-    results = budget.run_budgeted_cases(
-        [_case("flaky")],
-        run_case=always_fails,
-        bound_for=_bound,
-        ledger=covered,
-        table=FLAT,
-    )
-    assert calls == ["flaky", "flaky"]
-    assert results[0]["status"] == "failed"
-    assert results[0]["budget"]["attempts"] == 2
-    assert results[0]["budget"]["first_attempt"] == {
-        "status": "failed",
-        "failed_checks": ["intent: expected x, got y"],
-        "infrastructure_errors": [],
-        "charged_usd": "0.100000",
-    }
-    assert covered.spent_usd == Decimal("0.20")
-    assert budget.budget_summary(covered, results, table=FLAT)["cases"] == {
-        "completed": 1,
-        "failed": 1,
-        "rerun": 1,
-        "skipped_budget": 0,
-    }
-
-    calls.clear()
-    tight = BudgetLedger(Decimal("0.65"))
-    results = budget.run_budgeted_cases(
-        [_case("flaky")],
-        run_case=always_fails,
-        bound_for=_bound,
-        ledger=tight,
-        table=FLAT,
-    )
-    assert calls == ["flaky"]
-    assert results[0]["budget"]["attempts"] == 1
-    assert "first_attempt" not in results[0]["budget"]
-
-
-def test_a_receipt_outside_the_bound_stops_the_run() -> None:
-    ledger = BudgetLedger(Decimal("10.00"))
-
-    def overbilled(case: harness.EvalCase) -> dict[str, Any]:
-        result = _result(case, status="passed", cost=0.5)
-        result["route_receipts"][0]["token_usage"] = {
-            "prompt_tokens": 10,
-            "completion_tokens": 10,
-        }
-        return result
-
-    results = budget.run_budgeted_cases(
-        [_case("first"), _case("second")],
-        run_case=overbilled,
-        bound_for=_bound,
-        ledger=ledger,
-        table=FLAT,
-    )
-
-    # 10 + 10 tokens at a dollar per million can never bill 0.5.
-    assert (
-        results[0]["budget"]["bound_violation"]
-        == "cost 0.5 exceeds the pinned rate's 0.000020"
-    )
-    assert results[0]["budget"]["charged_usd"] == "0.600000"
-    assert results[1]["status"] == "skipped_budget"
-    assert results[1]["failed_checks"] == [
-        "budget:first: cost 0.5 exceeds the pinned rate's 0.000020"
-    ]
-    assert ledger.stopped_reason == "first: cost 0.5 exceeds the pinned rate's 0.000020"
-    assert budget.budget_summary(ledger, results, table=FLAT)["complete"] is False
+    assert over == []
 
 
 def test_refuse_unbounded_rails(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -415,190 +623,3 @@ def test_refuse_unbounded_rails(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
     with pytest.raises(RuntimeError, match="ARGUS_RESEARCH_RAIL_ENABLED must be off"):
         budget.refuse_unbounded_rails({})
-
-
-def test_task_candidates_from_env_refuse_an_unpriced_tier(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    for name, value in {
-        "ARGUS_STRUCTURED_MODEL": "x-ai/grok-4.3",
-        "ARGUS_STRUCTURED_FALLBACK_MODEL": "anthropic/claude-haiku-4.5",
-        "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash",
-        "ARGUS_CHAT_FALLBACK_MODEL": "qwen/qwen3.5-9b",
-        "ARGUS_CONTEXT_MODEL": "openai/gpt-oss-120b",
-        "ARGUS_CONTEXT_FALLBACK_MODEL": "deepseek/deepseek-v4-flash",
-    }.items():
-        monkeypatch.setenv(name, value)
-
-    candidates = PINNED.task_candidates_from_env()
-    assert candidates["interpretation"] == ("x-ai/grok-4.3", "anthropic/claude-haiku-4.5")
-    assert candidates["capability_conflict"] == (
-        "openai/gpt-oss-120b",
-        "deepseek/deepseek-v4-flash",
-    )
-    assert PINNED.judge_candidates_from_env(None) == (
-        "deepseek/deepseek-v4-flash",
-        "qwen/qwen3.5-9b",
-    )
-    assert PINNED.judge_candidates_from_env("x-ai/grok-4.3") == ("x-ai/grok-4.3",)
-
-    monkeypatch.setenv("ARGUS_STRUCTURED_FALLBACK_MODEL", "vendor/unpriced")
-    with pytest.raises(UnpricedCallError, match="vendor/unpriced"):
-        PINNED.task_candidates_from_env()
-    with pytest.raises(UnpricedCallError, match="vendor/unpriced"):
-        PINNED.judge_candidates_from_env("vendor/unpriced")
-
-
-def test_run_eval_case_measures_inside_the_runtime_call_corridor(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """During a case the runtime's own corridor refuses the eighth permit, and
-    an installed guard refuses an unpriced post before it leaves the process."""
-    permits: list[bool] = []
-    refusals: list[str] = []
-
-    def interpret_stage(**_kwargs: Any) -> Any:
-        permits.extend(
-            reserve_provider_call("interpretation", 1.0) is not None for _ in range(8)
-        )
-        try:
-            openrouter._guard_request("interpretation", {"model": "vendor/unpriced"})
-        except LiveEvalRequestRefused as exc:
-            refusals.append(str(exc))
-        return SimpleNamespace(
-            outcome="ready_to_respond",
-            patch={"intent": "conversation_followup", "assistant_response": "ok"},
-        )
-
-    monkeypatch.setattr(harness, "interpret_stage", interpret_stage)
-    with openrouter.openrouter_request_guard(FLAT.request_guard()):
-        result = harness.run_eval_case(_case("corridor"), run_prose_judge=False)
-
-    assert permits == [True] * 7 + [False]
-    assert refusals == ["model 'vendor/unpriced' has no pinned price"]
-    assert result["status"] == "passed"
-    # Outside a case there is no corridor.
-    assert reserve_provider_call("interpretation", 1.0) is not None
-
-
-def _live_scorecard(
-    results: list[dict[str, Any]], budget_block: dict[str, Any] | None
-) -> dict[str, Any]:
-    provenance = scorecards.EvalScorecardProvenance(
-        evaluation_mode="live",
-        market_data_provider_mode="live_provider",
-        asset_provider_mode="live_provider",
-        candidate_sha="a" * 40,
-        python_version="3.10.20",
-        fixture_sha256="b" * 64,
-        fixture_case_ids=tuple(result["id"] for result in results),
-        worktree_clean=True,
-        release_configuration={"ARGUS_CHAT_MODEL": "test/model"},
-        live_market_data_probe=scorecards.LiveMarketDataProbe(
-            symbol="SPY",
-            requested_date_range={"start": "2024-01-01", "end": "2024-01-10"},
-            effective_date_range={"start": "2024-01-02", "end": "2024-01-10"},
-            adjustment_reason="calendar_alignment",
-        ),
-    )
-    return scorecards.scorecard_for_results(
-        results, provenance=provenance, budget=budget_block
-    )
-
-
-def test_an_incomplete_run_is_never_a_complete_scorecard() -> None:
-    passed = {"id": "a", "category": "messy_english", "status": "passed"}
-    skipped = {"id": "b", "category": "messy_english", "status": "skipped_budget"}
-    complete_block = {"budget_usd": "5.000000", "spent_usd": "1.000000", "complete": True}
-
-    complete = _live_scorecard([passed], complete_block)
-    assert complete["schema_version"] == 4
-    assert complete["totals"]["skipped_budget"] == 0
-    scorecards.assert_scorecard_complete(complete)
-
-    incomplete = _live_scorecard([passed, skipped], {**complete_block, "complete": False})
-    assert incomplete["totals"] == {
-        "passed": 1,
-        "failed": 0,
-        "expected_failed": 0,
-        "unexpected_pass": 0,
-        "skipped": 0,
-        "infrastructure_error": 0,
-        "skipped_budget": 1,
-    }
-    assert incomplete["category_pass_rates"]["messy_english"]["pass_rate"] == 1.0
-    with pytest.raises(ValueError, match=r"incomplete_run skipped_for_budget=\['b'\]"):
-        scorecards.assert_scorecard_complete(incomplete)
-
-    with pytest.raises(ValueError, match="live_run_requires_budget"):
-        _live_scorecard([passed], None)
-    with pytest.raises(ValueError, match="incomplete_run stopped_reason='a: over'"):
-        scorecards.assert_scorecard_complete(
-            {
-                **complete,
-                "budget": {
-                    **complete_block,
-                    "complete": False,
-                    "stopped_reason": "a: over",
-                },
-            }
-        )
-    # A schema 3 scorecard could not skip for budget and stands as written.
-    scorecards.assert_scorecard_complete(
-        {**complete, "schema_version": 3, "budget": None}
-    )
-
-
-def _judge_payload(content: str) -> dict[str, object]:
-    return {
-        "model": "m",
-        "messages": [{"role": "user", "content": content}],
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {"name": budget.JUDGE_SCHEMA_NAME, "schema": {}},
-        },
-    }
-
-
-def test_the_judge_has_its_own_cap_and_the_turn_keeps_its_own() -> None:
-    table = BoundTable(
-        prices=FLAT.prices, input_cap_bytes=1000, judge_input_cap_bytes=400
-    )
-    guard = table.request_guard()
-
-    assert guard("chat_composer", _judge_payload("x" * 200))
-    with pytest.raises(LiveEvalRequestRefused, match="exceeds the 400 byte input cap"):
-        guard("chat_composer", _judge_payload("x" * 500))
-    # The in-turn composer shares the task but not the judge's schema.
-    composer = {"model": "m", "messages": [{"role": "user", "content": "x" * 500}]}
-    assert guard("chat_composer", composer) is composer
-    # Two candidates, two posts each, at 400 + 1200 tokens per post.
-    assert table.judge_bound_usd(("m", "n")) == Decimal("0.0064")
-    unreported = {
-        "task": "chat_composer",
-        "schema_name": budget.JUDGE_SCHEMA_NAME,
-        "model": "m",
-        "outcome": "failed",
-    }
-    assert table.receipt_charge_usd(unreported) == Decimal("0.0016")
-
-
-def test_a_refused_post_makes_the_case_incomplete_not_failed_and_never_rerun() -> None:
-    calls: list[str] = []
-
-    def refused(case: harness.EvalCase) -> dict[str, Any]:
-        calls.append(case.id)
-        result = _result(case, status="failed", cost=None)
-        result["route_receipts"][0]["failure_mode"] = LiveEvalRequestRefused.__name__
-        return result
-
-    ledger = BudgetLedger(Decimal("5.00"))
-    results = budget.run_budgeted_cases(
-        [_case("long")], run_case=refused, bound_for=_bound, ledger=ledger, table=FLAT
-    )
-
-    assert calls == ["long"]
-    assert results[0]["status"] == "skipped_budget"
-    assert results[0]["failed_checks"][-1] == "budget:request_refused:interpretation"
-    assert ledger.spent_usd == Decimal(0)
-    assert budget.budget_summary(ledger, results, table=FLAT)["complete"] is False

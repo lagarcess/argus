@@ -88,16 +88,18 @@ poetry run pytest tests/evals/test_measurement_eval_live.py -q
 `ARGUS_LIVE_EVAL_BUDGET_USD` is the most the run may spend, in actual provider
 cost. The run refuses to start without it. See [Spend budget](#spend-budget).
 
-`ARGUS_EVAL_FIXTURE_SET` picks the fixture set: `personal` (the default, the
-promotion measurement) or `business`, the Business chat cases in
-`business_cases/`, each run in the chat it names. A Business scorecard records
+`ARGUS_EVAL_FIXTURE_SET` picks the fixture sets: `personal` (the default, the
+promotion measurement), `business` (the Business chat cases in
+`business_cases/`, each run in the chat it names), or `all` (both, under one
+budget, one scorecard each). A Business scorecard records
 `provenance.fixture_set: business`, so a promotion gate never reads it as the
-Personal measurement. A Business-only run:
+Personal measurement. The required run for a change to shared runtime
+behavior measures both:
 
 ```bash
 ARGUS_RUN_LIVE_EVALS=1 \
 ARGUS_LIVE_EVAL_BUDGET_USD=5.00 \
-ARGUS_EVAL_FIXTURE_SET=business \
+ARGUS_EVAL_FIXTURE_SET=all \
 ARGUS_EVAL_ENV_FILE=<path> \
 ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider \
 ARGUS_ASSET_PROVIDER_MODE=live_provider \
@@ -130,45 +132,43 @@ suite before it can spend tokens or write a scorecard.
 
 ## Spend budget
 
-A live run holds its total actual spend under `ARGUS_LIVE_EVAL_BUDGET_USD` by
-enforcing a bound before each case, not by estimating after it. The arithmetic
-lives in `tests/evals/live_eval_budget.py`; nothing in it touches model-facing
-text.
+A live run holds its total actual provider spend under
+`ARGUS_LIVE_EVAL_BUDGET_USD`, across every fixture set it measures, by
+reserving each billable post before it is sent. The guard lives in
+`tests/evals/live_eval_budget.py`; nothing in it touches model-facing text,
+production limits or models.
 
-- Each eval turn runs inside the runtime's own `turn_execution_scope`, so a
-  case can post at most the production corridor: seven permits for any task,
-  and two more for the last-resort `interpretation_repair` grant. The
-  `knowledge_route` and `knowledge_voicing` reservations are granted only on
-  the research rail, so the turn bound counts them only when research is
-  reachable when the bound is set; a budgeted run refuses the rail, so it never
-  counts them. The judge runs in its own scope.
-- A request guard sees every OpenRouter post before it is sent and refuses any
-  task outside the bounded set, any model without a pinned price, and any
-  request over its input cap: `INPUT_CAP_BYTES` (98,304 bytes) for every turn
-  post, and `JUDGE_INPUT_CAP_BYTES` (32,768 bytes) for the prose judge's post.
-  A token is at least one byte, so the cap bounds the prompt tokens a post can
-  bill; the profile's `max_tokens` bounds its output. A case with a refused
-  post measured nothing for it, so it is `skipped_budget` (incomplete), never
-  a product failure, and it is not rerun.
-- A case's bound is one turn bound per turn (two for a `followup_prompt`
-  case) plus the judge bound when the case is prose-judged. It starts only
-  while the remaining budget covers that bound; otherwise its result is
-  `skipped_budget`, which blocks the gate.
-- After a case, the budget is charged what its receipts report. A post that
-  may have billed without reporting a cost is charged its full post bound; a
-  post the guard refused, or the corridor never granted, costs nothing.
-- A case whose final status is `failed` runs once more, and only while the
-  budget still covers its bound. The first attempt stays in the result under
-  `budget.first_attempt`. An `infrastructure_error` is not rerun (#365).
-- A receipt that breaks an assumption the bound rests on (more completion
-  tokens than `max_tokens`, more prompt tokens than the cap, or a bill above
-  the pinned rate) stops the run; the remaining cases are `skipped_budget`.
+- Every httpx post to OpenRouter, sync or async, passes through the guard at
+  the transport: each candidate model, each fallback, each reasoning-400
+  retry, the prose judge and any SDK client is its own post with its own
+  reservation.
+- A post is reserved at the most it can bill, from the actual request: every
+  byte of its UTF-8 body as a prompt token (the body holds the messages,
+  system text, response schema and tools; committed receipts bill at least
+  3.62 bytes per prompt token, see
+  `docs/reports/evidence/live-eval-per-call-guard/input-bound-pairs.json`),
+  plus its `max_tokens` of output (twice that for deepseek-v4-flash, which
+  once billed past it), at the pinned ceiling price of the model it targets.
+  A request with no `max_tokens`, an unpriced model, a web-search plugin or a
+  stream is refused.
+- Reservations are taken under one lock, so concurrent posts can never
+  together reserve past the budget. A post the remaining budget cannot cover
+  is refused before it is sent: it costs nothing, its case is `skipped_budget`
+  (incomplete, never a product failure), the run stops, and no further case
+  or rerun starts.
+- After the response the reservation becomes the provider's reported cost. A
+  post with no reported cost (an error, a timeout, a missing field) keeps its
+  whole reservation charged. A bill above its reservation stops the run.
+- A case whose final status is `failed` runs once more while the run goes on.
+  An `infrastructure_error` is not rerun (#365).
+- The scorecard's `budget` block lists every post: case, task, model, body
+  bytes, reservation, reported cost and charge. A run that stopped leaves
+  every scorecard it wrote incomplete, and every consumer refuses those.
 - Prices are ceilings pinned in the repo with their source, and
   `test_live_eval_budget.py` replays every committed receipt against them.
-- The research rail, the Perplexity key, and the OpenRouter web-search
-  provider must be off: the Perplexity Agent run has no input cap in the repo
-  and its invoice never reaches a route receipt, so a budgeted run refuses to
-  start while any of them is configured.
+- Paid clients the guard cannot reserve make the run refuse to start: the
+  research rail and the Perplexity key (the Perplexity Agent, direct search
+  and memory embeddings), and the OpenRouter web-search provider.
 
 ## When to Run
 

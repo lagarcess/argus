@@ -22,19 +22,24 @@ from tests.evals.measurement_eval_scorecard import (
 __all__ = [
     "BUSINESS_FIXTURE_DIR",
     "case_surface",
-    "live_eval_fixture_set",
+    "live_eval_fixture_sets",
     "run_case_on_its_surface",
 ]
 FIXTURE_SET_ENV = "ARGUS_EVAL_FIXTURE_SET"
 
 
-def live_eval_fixture_set(environ: Mapping[str, str]) -> FixtureSet:
-    """The fixture set a live run measures: Personal unless the run names one."""
+def live_eval_fixture_sets(environ: Mapping[str, str]) -> tuple[FixtureSet, ...]:
+    """The fixture sets a live run measures, in order, under one budget:
+    Personal unless the run names `business` or `all`."""
     raw = (environ.get(FIXTURE_SET_ENV) or "personal").strip()
+    if raw == "all":
+        return tuple(FIXTURE_SETS)
     for name in FIXTURE_SETS:
         if name == raw:
-            return name
-    raise RuntimeError(f"{FIXTURE_SET_ENV} must be one of {sorted(FIXTURE_SETS)}")
+            return (name,)
+    raise RuntimeError(
+        f"{FIXTURE_SET_ENV} must be one of {sorted([*FIXTURE_SETS, 'all'])}"
+    )
 
 
 def case_surface(case: EvalCase) -> ChatSurface:

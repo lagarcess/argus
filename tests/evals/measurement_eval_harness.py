@@ -20,7 +20,6 @@ from argus.agent_runtime.state.models import (
     TaskSnapshot,
     UserState,
 )
-from argus.agent_runtime.turn_execution import turn_execution_scope
 from argus.llm.openrouter import (
     begin_openrouter_route_receipt_capture,
     end_openrouter_route_receipt_capture,
@@ -193,57 +192,55 @@ def run_eval_case(
     route_token = begin_openrouter_route_receipt_capture()
     confirm_result = clarify_result = followup_result = None
     try:
-        # Production's call corridor: one turn_execution_scope per turn.
-        with turn_execution_scope(entry_state={}):
-            interpret_result = interpret_stage(
-                state=state,
-                user=user,
-                latest_task_snapshot=case.snapshot,
-                selected_thread_metadata={
-                    "ui_language": case.ui_language,
-                    "last_stage_outcome": "await_approval",
-                    **case.thread_metadata,
-                },
-                structured_interpreter=interpreter,
+        interpret_result = interpret_stage(
+            state=state,
+            user=user,
+            latest_task_snapshot=case.snapshot,
+            selected_thread_metadata={
+                "ui_language": case.ui_language,
+                "last_stage_outcome": "await_approval",
+                **case.thread_metadata,
+            },
+            structured_interpreter=interpreter,
+        )
+        if interpret_result.outcome == "ready_for_confirmation":
+            confirm_state = _state_for_confirmation(
+                case=case,
+                interpret_patch=interpret_result.patch,
             )
-            if interpret_result.outcome == "ready_for_confirmation":
-                confirm_state = _state_for_confirmation(
-                    case=case,
-                    interpret_patch=interpret_result.patch,
-                )
-                confirm_result = confirm_stage(
-                    state=confirm_state,
-                    contract=contract,
-                    language=case.user_language,
-                )
-                if confirm_result.outcome == "needs_clarification":
-                    clarify_result = clarify_stage(
-                        state=_state_from_interpret_patch(
-                            case=case,
-                            interpret_patch={
-                                **interpret_result.patch,
-                                **confirm_result.patch,
-                            },
-                        ),
-                        contract=contract,
-                        clarification_generator=clarifier,
-                        language=case.user_language,
-                    )
-            elif interpret_result.outcome == "needs_clarification":
-                clarify_state = _state_from_interpret_patch(
-                    case=case,
-                    interpret_patch=interpret_result.patch,
-                )
+            confirm_result = confirm_stage(
+                state=confirm_state,
+                contract=contract,
+                language=case.user_language,
+            )
+            if confirm_result.outcome == "needs_clarification":
                 clarify_result = clarify_stage(
-                    state=clarify_state,
+                    state=_state_from_interpret_patch(
+                        case=case,
+                        interpret_patch={
+                            **interpret_result.patch,
+                            **confirm_result.patch,
+                        },
+                    ),
                     contract=contract,
                     clarification_generator=clarifier,
                     language=case.user_language,
-                    prefilled_assistant_prompt=(
-                        interpret_result.patch.get("assistant_response")
-                        or interpret_result.patch.get("assistant_prompt")
-                    ),
                 )
+        elif interpret_result.outcome == "needs_clarification":
+            clarify_state = _state_from_interpret_patch(
+                case=case,
+                interpret_patch=interpret_result.patch,
+            )
+            clarify_result = clarify_stage(
+                state=clarify_state,
+                contract=contract,
+                clarification_generator=clarifier,
+                language=case.user_language,
+                prefilled_assistant_prompt=(
+                    interpret_result.patch.get("assistant_response")
+                    or interpret_result.patch.get("assistant_prompt")
+                ),
+            )
         followup_result = _run_followup_turn_if_needed(
             case=case,
             user=user,
@@ -294,12 +291,11 @@ def run_eval_case(
         else:
             judge_route_token = begin_openrouter_route_receipt_capture()
             try:
-                with turn_execution_scope(entry_state={}):
-                    judge_result = judge_prose_quality(
-                        case=case,
-                        assistant_text=assistant_text,
-                        rendered_beside_reply=rendered_surface,
-                    )
+                judge_result = judge_prose_quality(
+                    case=case,
+                    assistant_text=assistant_text,
+                    rendered_beside_reply=rendered_surface,
+                )
             finally:
                 route_receipts.extend(
                     receipt.as_dict()
@@ -583,54 +579,53 @@ def _run_followup_turn_if_needed(
         ),
     )
     followup_confirm = followup_clarify = None
-    with turn_execution_scope(entry_state={}):
-        followup_interpret = interpret_stage(
-            state=state,
-            user=user,
-            latest_task_snapshot=case.snapshot
-            or _followup_snapshot(case, final_clarify_patch, clarify_result.outcome),
-            selected_thread_metadata=_followup_thread_metadata(
-                final_clarify_patch,
-                last_stage_outcome=str(clarify_result.outcome),
+    followup_interpret = interpret_stage(
+        state=state,
+        user=user,
+        latest_task_snapshot=case.snapshot
+        or _followup_snapshot(case, final_clarify_patch, clarify_result.outcome),
+        selected_thread_metadata=_followup_thread_metadata(
+            final_clarify_patch,
+            last_stage_outcome=str(clarify_result.outcome),
+        ),
+        structured_interpreter=OpenRouterStructuredInterpreter(contract=contract),
+    )
+    if followup_interpret.outcome == "ready_for_confirmation":
+        followup_confirm = confirm_stage(
+            state=_state_for_followup_confirmation(
+                prompt=case.followup_prompt,
+                interpret_patch=followup_interpret.patch,
             ),
-            structured_interpreter=OpenRouterStructuredInterpreter(contract=contract),
+            contract=contract,
+            language=case.user_language,
         )
-        if followup_interpret.outcome == "ready_for_confirmation":
-            followup_confirm = confirm_stage(
-                state=_state_for_followup_confirmation(
-                    prompt=case.followup_prompt,
-                    interpret_patch=followup_interpret.patch,
-                ),
-                contract=contract,
-                language=case.user_language,
-            )
-            if followup_confirm.outcome == "needs_clarification":
-                followup_clarify = clarify_stage(
-                    state=_state_for_followup_clarification(
-                        prompt=case.followup_prompt,
-                        interpret_patch={
-                            **followup_interpret.patch,
-                            **followup_confirm.patch,
-                        },
-                    ),
-                    contract=contract,
-                    clarification_generator=clarification_generator,
-                    language=case.user_language,
-                )
-        elif followup_interpret.outcome == "needs_clarification":
+        if followup_confirm.outcome == "needs_clarification":
             followup_clarify = clarify_stage(
                 state=_state_for_followup_clarification(
                     prompt=case.followup_prompt,
-                    interpret_patch=followup_interpret.patch,
+                    interpret_patch={
+                        **followup_interpret.patch,
+                        **followup_confirm.patch,
+                    },
                 ),
                 contract=contract,
                 clarification_generator=clarification_generator,
                 language=case.user_language,
-                prefilled_assistant_prompt=(
-                    followup_interpret.patch.get("assistant_response")
-                    or followup_interpret.patch.get("assistant_prompt")
-                ),
             )
+    elif followup_interpret.outcome == "needs_clarification":
+        followup_clarify = clarify_stage(
+            state=_state_for_followup_clarification(
+                prompt=case.followup_prompt,
+                interpret_patch=followup_interpret.patch,
+            ),
+            contract=contract,
+            clarification_generator=clarification_generator,
+            language=case.user_language,
+            prefilled_assistant_prompt=(
+                followup_interpret.patch.get("assistant_response")
+                or followup_interpret.patch.get("assistant_prompt")
+            ),
+        )
     return {
         "interpret_result": followup_interpret,
         "confirm_result": followup_confirm,
