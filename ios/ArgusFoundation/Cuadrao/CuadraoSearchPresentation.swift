@@ -192,10 +192,15 @@ struct CuadraoSearchEmptyState: View {
     }
     private var emptyDetail: String {
         switch kind {
-        case .all: spanish ? "Busca cuentas, movimientos, planes y conversaciones." : "Search accounts, activity, plans and conversations."
-        case .accounts: spanish ? "Añade una cuenta desde Inicio para encontrarla aquí." : "Add an account from Home to find it here."
+        case .all:
+            if CuadraoFirstRelease.hasAssistant {
+                spanish ? "Busca cuentas, movimientos, planes y conversaciones." : "Search accounts, activity, plans and conversations."
+            } else {
+                spanish ? "Busca cuentas, movimientos y planes." : "Search accounts, activity and plans."
+            }
+        case .accounts: spanish ? "Añade una cuenta con el botón + para encontrarla aquí." : "Add an account with the + button to find it here."
         case .activity: spanish ? "Los movimientos que registres en tus cuentas aparecerán aquí." : "Activity recorded in your accounts will appear here."
-        case .plans: spanish ? "Crea una meta, un presupuesto o un plan de deuda en Plan." : "Create a goal, budget or debt plan in Plan."
+        case .plans: spanish ? "Crea una meta, un presupuesto o un plan de deuda con el botón +." : "Create a goal, budget or debt plan with the + button."
         case .chats: spanish ? "Tus conversaciones guardadas aparecerán aquí." : "Your saved conversations will appear here."
         case .files: spanish ? "Los archivos disponibles aparecerán aquí." : "Available files will appear here."
         case .memory: spanish ? "El contexto que confirmes aparecerá aquí." : "Context you confirm will appear here."
