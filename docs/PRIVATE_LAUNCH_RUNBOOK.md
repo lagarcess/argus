@@ -917,6 +917,8 @@ What the logs and run record tell you:
   first without `--confirm`: that is a dry run that prints the step, how many
   days it has waited and its last error, and changes nothing. Then add
   `--confirm`:
+- **storage** (`account_deletion.storage_failing`, retained document sources,
+  #778): fix Storage; the next resume finishes it; not forceable.
 
 ```bash
 poetry run python scripts/ops/force_account_deletion_step.py \

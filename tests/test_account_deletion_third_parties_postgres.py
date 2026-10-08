@@ -491,7 +491,14 @@ def test_document_sources_are_erased_before_the_account_delete(lane, world):  # 
         # A week later: our own Storage gets its own alert, and no operator
         # can force the step closed.
         lines: list[str] = []
-        sink = logger.add(lambda message: lines.append(str(message)), level="ERROR")
+        metrics: list[object] = []
+        sink = logger.add(
+            lambda message: (
+                lines.append(str(message)),
+                metrics.append(message.record["extra"].get("metric")),
+            ),
+            level="ERROR",
+        )
         week = _service(
             lane,
             SqlAuthAdmin(),
@@ -504,6 +511,8 @@ def test_document_sources_are_erased_before_the_account_delete(lane, world):  # 
         finally:
             logger.remove(sink)
         assert any("fix Storage" in line for line in lines)
+        assert "account_deletion.storage_failing" in metrics
+        assert "account_deletion.needs_operator" not in metrics
         assert not any("needs an operator" in line for line in lines)
         with pytest.raises(ValueError, match="step must be one of"):
             week.force_complete_step(

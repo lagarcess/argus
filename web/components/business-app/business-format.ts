@@ -1,19 +1,42 @@
-/** A currency the owner can read without guessing which dollar it is. */
-const CURRENCY_PREFIX: Record<string, string> = { DOP: "RD$", USD: "US$" };
+import { currencyDigits, currencySymbol } from "@/lib/money-entry";
 
+const DECIMAL_AMOUNT = /^(-?)(\d+)(?:\.(\d+))?$/;
+
+function separators(locale: string): { group: string; decimal: string } {
+  try {
+    const parts = new Intl.NumberFormat(locale).formatToParts(11111.1);
+    return {
+      group: parts.find((part) => part.type === "group")?.value ?? ",",
+      decimal: parts.find((part) => part.type === "decimal")?.value ?? ".",
+    };
+  } catch {
+    return { group: ",", decimal: "." };
+  }
+}
+
+/**
+ * Reads back a saved amount from its decimal string: padded to the currency's
+ * digits and never rounded or passed through a float. The symbol names which
+ * dollar it is.
+ */
 export function formatMoney(
   amount: string | null,
   currency: string | null,
   locale: string,
 ): string {
   if (amount === null || currency === null) return "";
-  const value = Number(amount);
-  if (!Number.isFinite(value)) return `${currency} ${amount}`;
-  const number = new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
-  return `${CURRENCY_PREFIX[currency] ?? currency} ${number}`;
+  const match = DECIMAL_AMOUNT.exec(amount.trim());
+  if (!match) return `${currency} ${amount}`;
+  const [, sign, whole, fraction = ""] = match;
+  const { group, decimal } = separators(locale);
+  const digits = Math.max(currencyDigits(currency), fraction.length);
+  let grouped = "";
+  for (let index = 0; index < whole.length; index += 1) {
+    if (index > 0 && (whole.length - index) % 3 === 0) grouped += group;
+    grouped += whole[index];
+  }
+  const number = digits > 0 ? `${grouped}${decimal}${fraction.padEnd(digits, "0")}` : grouped;
+  return `${sign}${currencySymbol(currency)} ${number}`;
 }
 
 export function formatDay(day: string | null, locale: string): string {

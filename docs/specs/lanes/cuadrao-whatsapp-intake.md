@@ -17,7 +17,8 @@ on the web, then sends `CUADRAO <code>` from their own WhatsApp. A typed phone
 number proves nothing. Unknown senders get no capture and a "connect from the
 web app" reply. A new message carrying a receipt already in the owner's inbox
 gets a "duplicate" reply instead of "captured". Each reply uses one language:
-the owner's (Spanish by default, English when their profile says `en`).
+the one the web app was in when the owner asked for the link code (Spanish
+by default).
 Reply copy is **pending founder approval**. Contract: `docs/API_CONTRACT.md`.
 
 ## Proof levels
@@ -123,6 +124,6 @@ The founder chose separate Personal and Business spaces on October 8
   message settles `rejected` with `sender_link_revoked`, keeps no connection and
   gets the not-linked reply. `whatsapp_capture_same_space` refuses a captured
   row whose connection is not in the active link's space.
-- The reply language reads `profiles.language` of the destination owner, who is
-  the person that owns the space.
+- The reply language is the sender link's `reply_language`, set from the web
+  language when the person created the link code.
 - Reply copy in `whatsapp/replies.py` is **pending founder approval**.

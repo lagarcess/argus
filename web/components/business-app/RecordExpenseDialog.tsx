@@ -49,6 +49,11 @@ function RecordExpenseSurface({ onClose, onRecorded }: { onClose: () => void; on
   const key = useRef<{ payload: string; key: string } | null>(null);
   const account = accounts.find((item) => item.id === accountId);
   const valid = Boolean(accountId && amount.value && !amount.invalid && occurredOn);
+  const saving = state === "saving";
+  // Closing waits for the save, so its result always lands somewhere.
+  const close = () => {
+    if (!saving) onClose();
+  };
 
   const save = async () => {
     if (!valid || !amount.value) return;
@@ -82,15 +87,15 @@ function RecordExpenseSurface({ onClose, onRecorded }: { onClose: () => void; on
     <AdaptivePanel
       title={t("business.actions.record_expense", "Record expense")}
       closeLabel={t("common.close", "Close")}
-      onClose={onClose}
+      onClose={close}
       width="md"
       footer={
         <div className="flex justify-end gap-2 px-4 pb-4">
-          <button type="button" className={secondaryButtonClass} onClick={onClose}>
+          <button type="button" className={secondaryButtonClass} disabled={saving} onClick={close}>
             {t("common.cancel", "Cancel")}
           </button>
-          <button type="button" className={primaryButtonClass} disabled={!valid || state === "saving"} onClick={() => void save()}>
-            {state === "saving" ? t("business.review.confirming", "Saving…") : t("business.record.save", "Save expense")}
+          <button type="button" className={primaryButtonClass} disabled={!valid || saving} onClick={() => void save()}>
+            {saving ? t("business.review.confirming", "Saving…") : t("business.record.save", "Save expense")}
           </button>
         </div>
       }

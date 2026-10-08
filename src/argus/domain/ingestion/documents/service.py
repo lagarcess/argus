@@ -195,11 +195,16 @@ class DocumentsService:
         draft: DocumentDraft,
         *,
         holder: str | None = None,
+        claim: str | None = None,
         **changes: object,
     ) -> DocumentDraft:
         updated = self.revise(draft, **changes)
         if not self.store.update(
-            user_id=user_id, draft=updated, expected_version=draft.version, holder=holder
+            user_id=user_id,
+            draft=updated,
+            expected_version=draft.version,
+            holder=holder,
+            claim=claim,
         ):
             raise DocumentServiceError("document_version_conflict", retryable=True)
         return updated
@@ -411,14 +416,24 @@ class DocumentsService:
         if attempt_id is not None:
             # Checked under the lease: a reconciler cannot supersede a held lease.
             job = self.store.job(user_id=user_id, connection_id=connection_id)
-            if job is None or job.attempt_id != attempt_id:
+            if (
+                job is None
+                or job.attempt_id != attempt_id
+                or job.draft_version != draft.version
+            ):
                 repo.release(connection_id=connection_id, holder=holder)
                 raise DocumentServiceError("document_attempt_superseded")
         replayed = batch is not None
         try:
             if batch is None:
+                # The claim names the attempt; a flag-off writer names none.
                 draft = self._update(
-                    user_id, draft, holder=holder, status="preparing", error_code=None
+                    user_id,
+                    draft,
+                    holder=holder,
+                    claim=attempt_id,
+                    status="preparing",
+                    error_code=None,
                 )
                 content = await asyncio.to_thread(
                     self._read_source, user_id, connection_id

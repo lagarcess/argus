@@ -3353,10 +3353,12 @@ and is the person today; it becomes the business principal if the Business
 boundary proposal is approved.
 
 - `whatsapp_link_codes`: `destination_owner_id`, `code_digest` (unique),
-  `created_at`, `expires_at`, `consumed_at`. Single use; issuing a new code or
+  `reply_language` (`es-419` or `en`, from the web app when the code was
+  issued), `created_at`, `expires_at`, `consumed_at`. Single use; issuing a new code or
   revoking the link deletes the owner's unused ones.
 - `whatsapp_sender_links`: `destination_owner_id`, `wa_id_hash`, `last4`,
-  `status` (`active` or `revoked`), `linked_at`, `revoked_at`. Partial unique
+  `reply_language` (copied from the redeemed code; replies use it, not
+  `profiles.language`), `status` (`active` or `revoked`), `linked_at`, `revoked_at`. Partial unique
   indexes allow one active link per sender and one per destination; linking
   revokes whichever active link it replaces.
 - `whatsapp_inbound_messages`: one row per provider message, unique on

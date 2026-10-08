@@ -2342,8 +2342,12 @@
     "precision_none": "{{currency}} no lleva decimales.",
     "precision_one": "{{currency}} admite hasta {{count}} decimal.",
     "precision_other": "{{currency}} admite hasta {{count}} decimales.",
-    "maximum": "El máximo es {{maximum}}.",
     "currency_mismatch": "Este monto es en {{field}}, no en {{typed}}.",
-    "zero": "Escribe un monto mayor que 0."
+    "zero": "Escribe un monto mayor que 0.",
+    "too_long_one": "Usa como máximo {{count}} dígito antes del punto decimal.",
+    "too_long_other": "Usa como máximo {{count}} dígitos antes del punto decimal.",
+    "out_of_range": "Este monto es demasiado grande para registrarlo.",
+    "ambiguous_currency": "$ puede ser RD$ o US$. Escribe el monto sin símbolo o con RD$ o US$.",
+    "same_amount": "Mismo monto, sin conversión."
   }
 }

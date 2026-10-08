@@ -3,7 +3,6 @@
 from collections.abc import Iterator
 
 import pytest
-from argus.api.whatsapp import _profile_language
 from argus.domain.business.spaces import PostgresSpaceStore
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
 from argus.domain.ingestion.documents.service import DocumentsService
@@ -29,14 +28,7 @@ def pool() -> Iterator[ConnectionPool]:
         yield opened
 
 
-def _world(
-    pool: ConnectionPool, users: dict[str, str], language: str = "es-419"
-) -> cases.World:
-    with pool.connection() as connection:
-        connection.execute(
-            "update public.profiles set language = %s where id = any(%s)",
-            (language, [users["owner"], users["other"]]),
-        )
+def _world(pool: ConnectionPool, users: dict[str, str]) -> cases.World:
     clock = cases.Clock()
     connections = PostgresConnectionRepository(pool)
     hub = IngestionHub(connections, box=None, sink=None, clock=clock)
@@ -50,7 +42,6 @@ def _world(
         alice=users["owner"],
         bob=users["other"],
         spaces=PostgresSpaceStore(pool),
-        language_of=_profile_language(pool),
     )
 
 
@@ -61,8 +52,30 @@ async def test_intake_case_on_postgres(case, pool, users) -> None:  # noqa: ANN0
 
 
 @pytest.mark.asyncio
-async def test_english_profile_gets_english_only(pool, users) -> None:  # noqa: ANN001
-    await cases.english_owner_gets_english_only(_world(pool, users, "en"))
+async def test_english_link_gets_english_only(pool, users) -> None:  # noqa: ANN001
+    await cases.english_owner_gets_english_only(_world(pool, users))
+
+
+@pytest.mark.asyncio
+async def test_link_language_wins_over_the_default_english_profile(pool, users) -> None:  # noqa: ANN001
+    with pool.connection() as connection:
+        [profile_language] = connection.execute(
+            "select language from public.profiles where id = %s", (users["owner"],)
+        ).fetchone()
+    assert profile_language == "en"
+    world = _world(pool, users)
+    await world.link(world.alice, cases.ALICE_PHONE, "es-419")
+    assert world.transport.bodies() == [
+        "Listo. Este WhatsApp quedó conectado a tu negocio en Cuadrao. "
+        "Envía aquí la foto o el PDF de un recibo."
+    ]
+    with pool.connection() as connection:
+        [stored] = connection.execute(
+            "select reply_language from public.whatsapp_sender_links "
+            "where destination_owner_id = %s and status = 'active'",
+            (users["owner"],),
+        ).fetchone()
+    assert stored == "es-419"
 
 
 def test_clients_cannot_read_or_write_whatsapp_tables(users) -> None:  # noqa: ANN001

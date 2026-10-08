@@ -351,17 +351,18 @@ def test_capture_keeps_destination_before_preparation(client, extraction):
 
 
 @pytest.mark.parametrize(
-    "header",
+    ("header", "expected"),
     [
-        quote("Ñame recibo.png"),
-        "Ñame recibo.png".encode(),
+        (quote("Ñame recibo.png"), "Ñame recibo.png"),
+        ("Ñame recibo.png".encode(), "Ñame recibo.png"),
+        ("Ñ 50%20off.pdf".encode(), "Ñ 50%20off.pdf"),
     ],
-    ids=["percent-encoded", "raw utf-8"],
+    ids=["percent-encoded", "raw utf-8", "raw utf-8 keeps its percent"],
 )
-def test_the_filename_header_is_utf8(client, extraction, header):
+def test_the_filename_header_is_utf8(client, extraction, header, expected):
     saved = upload(client, **{"X-Document-Filename": header})
     assert saved.status_code == 200, saved.text
     draft = client.get(
         f"{DOCUMENTS}/{saved.json()['connection_id']}", headers=bearer(ALICE)
     ).json()
-    assert draft["filename"] == "Ñame recibo.png"
+    assert draft["filename"] == expected
