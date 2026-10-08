@@ -8,7 +8,11 @@ PR [#895](https://github.com/lagarcess/argus/pull/895) merged into `codex/privat
 
 PR [#903](https://github.com/lagarcess/argus/pull/903) merged as `1ffb53548` (squash, PR head `32ad2c207`, merged 2026-10-08 19:25 UTC; integration parent `f5a2007cd` after #920). It carries the read-only origin verifier, the claim-then-send availability notices and the launch record. CI was green at the head, the independent review at that head was clean with no blocking finding, and the merged tree equals the PR head on every path it touches (its 10 files; none shared with #920). Nothing is promoted, deployed, applied or sent.
 
-Review findings, none blocking, are settled in [#923](https://github.com/lagarcess/argus/pull/923) (open): the run stops after the first unknown send so an outage cannot claim the whole list; a refusal whose claim cannot be released is named separately; hand-sending an uncertain claim says to check Resend by key first and to run one notice at a time; the verifier checks a redirect's host; and the runbook, storage proof and evidence README are reconciled. Until #923 lands, no availability notice is run, and none can be before Personal signups are published.
+Review findings, none blocking, are settled in [#923](https://github.com/lagarcess/argus/pull/923) (merged, below): the run stops after the first unknown send so an outage cannot claim the whole list; a refusal whose claim cannot be released is named separately; hand-sending an uncertain claim says to check Resend by key first and to run one notice at a time; the verifier checks a redirect's host; and the runbook, storage proof and evidence README are reconciled. No availability notice is run before Personal signups are published.
+
+PR [#923](https://github.com/lagarcess/argus/pull/923) merged as `a9a30b37d` (squash, PR head `37c68ea81`, merged 2026-10-08 20:25 UTC; integration parent `b30ef3bab` after #922). It settles the #903 review notes as a code change: the notice run stops at the first unknown send, a refusal whose claim cannot be released is named separately, the hand-send advice says to check Resend and `notified_at` first, and the origin verifier checks the host of a redirect. An independent review of #923 as code was clean at `5698c7776` with no blocking finding and a second clean pass on its documentation-only delta; all 18 checks were green at the head; the merged tree equals the PR head on its paths and touches only `marketing/` and documents. Nothing is promoted, applied, deployed or sent.
+
+PR [#906](https://github.com/lagarcess/argus/pull/906) carries the privacy rewrite, the chosen mark and the brand artwork. Its own landing is recorded below once it merges.
 
 ## Lineage
 
@@ -21,8 +25,8 @@ Review findings, none blocking, are settled in [#923](https://github.com/lagarce
 | Child | State |
 | --- | --- |
 | #887 independent package | `marketing/` builds from a clean frozen install with Bun 1.3.14 on Node 24.21.0, starts with an empty environment, and renders byte-identical screenshots to the legacy pages in Chromium and WebKit at 1440 and 390 pixels, in both languages. |
-| #888 identity and metadata | One route owner drives canonical, hreflang, sitemap, redirects and navigation. Provisional Cuadrao icons replace the inherited Argus icon. Founder review of the mark is pending. |
-| #881 Business inquiries | Implemented and covered by unit and browser tests against a recording mock. The destination is now configurable (`CUADRAO_INQUIRY_TO`, no default); real receipt waits for the founder to choose it. |
+| #888 identity and metadata | One route owner drives canonical, hreflang, sitemap, redirects and navigation. The Cuadrao icon ("Lean, calm") replaces the inherited Argus icon. The founder chose it on 2026-10-08. |
+| #881 Business inquiries | Implemented and covered by unit and browser tests against a recording mock. The destination is configurable (`CUADRAO_INQUIRY_TO`, no default); the founder chose `hola@cuadrao.ai` on 2026-10-08, and real receipt is checked at hosted acceptance. |
 | #882 Personal signups | Implemented. Table contract proven against real Postgres and PostgREST locally. Hosted storage, removal and notice are not yet proven. |
 | #889 transactional email | Plan and records procedure written. Nothing read or changed in Resend or Cloudflare yet. |
 | #890 promotion and Render | Promotion diff measured and a bounded option prepared. Render settings written. Service not created. |
@@ -89,10 +93,12 @@ The founder added the DKIM record by hand and, through a zone-scoped, day-long C
 
 - Nothing is deployed. No Render service exists, no migration was applied, no email was sent, and nothing was promoted to `main`.
 - The only hosted changes so far are the `notify.cuadrao.ai` Resend domain and its four DNS records (above), and the founder's disabling of the Supabase GitHub integration.
-- Spanish copy, the privacy text (draft PR #906) and the provisional icon await founder approval.
+- The Spanish and English privacy wording was approved by the founder on 2026-10-08 as a draft, which is not permission to publish. The operator wording and the public contact and signup forms stay held until the founder confirms Cuadrao LLC is formed and operates the site. The icon is chosen.
 - Hosted acceptance (real inquiry receipt, signup, removal, public domain) has not happened.
 
-## Copy awaiting founder review
+## Copy
+
+The privacy page wording (both languages, `marketing/components/privacy-copy.ts`) was approved by the founder on 2026-10-08 as a draft, which is not permission to publish. The approval named the privacy wording only, so the form strings below, shown in the same review, are confirmed with the founder before publication.
 
 Spanish first, English follows. Only strings whose meaning changed with real delivery or storage are new. Everything else is the approved copy, unchanged.
 
@@ -114,8 +120,8 @@ Spanish first, English follows. Only strings whose meaning changed with real del
 
 Removed: the "Vista local" notices and "no se envía nada" lines on contact, and "El registro aún no está conectado" on Personal. Each stated that nothing was sent or stored, which stops being true.
 
-The privacy text states facts only the founder can confirm: the project is "en preparación de Lucas Garcés" (legal entity not named), contact messages stay in the mailbox as long as needed to reply, early-access signups stay until removal is requested, Cloudflare is named as domain manager, and Supabase is in the United States (Ohio). Confirm or correct each before publication.
+The privacy text states facts the founder confirmed: contact messages stay in the mailbox as long as needed to reply, early-access signups stay until removal is requested, Resend, Apple iCloud Mail, Supabase (United States, Ohio) and Cloudflare are the providers, and hosting may record connection data such as the IP address. It names no operator. The operator wording ("Cuadrao LLC", formation pending) is prepared in the runbook and held until the founder confirms the company is formed and operates the site; the public contact and signup forms are held with it. The text also says what the site itself keeps to slow automated submissions: the visitor's address, and the email of someone who writes, held in the server's memory for at most two hours (a timer sweeps expired keys once per window), never in a database. A removed signup keeps its digest, language and dates, as the text says. This wording changed after the founder's draft approval (the contact line no longer says "solo para responderte" because the email also keys that limit), so it is shown to the founder again before #906 merges.
 
 ## Founder inputs and approvals needed
 
-The concrete approval request, in deployment order, is posted on #880. In short: merge #903 and #906 (copy and icon approved), the website-only promotion to `main`, applying `20260920000000` alone through the consumer's reviewed applier, creating the Render service and its cost, the first inquiry and signup tests with two founder-supplied addresses, and publication.
+The concrete approval request, in deployment order, is posted on #880. It covers the website-only promotion to `main`, applying `20260920000000` alone through the consumer's reviewed applier, creating the Render service and its cost, the first inquiry and signup tests with two founder-supplied addresses, and publication. #903 and #923 are merged into integration with the founder's approval, and #906 merges after the founder approves its revised privacy wording; none of those merges authorizes any of the actions above.
