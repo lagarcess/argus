@@ -1,0 +1,17 @@
+{
+ "candidateMode": {
+  "origin": "local production build",
+  "checks": 87,
+  "failed": 0
+ },
+ "publicMode": {
+  "origin": "local production build",
+  "checks": 88,
+  "failed": 0
+ },
+ "wrongModeIsRejected": {
+  "publicBuildCheckedAsCandidate": 10,
+  "candidateBuildCheckedAsPublic": 10
+ },
+ "note": "Read-only GET/HEAD checks from marketing/scripts/verify-origin.ts. After review, robots.txt lines are matched whole, both robots.txt and sitemap.xml must return 200, and the share-image prefix comes from the route owner."
+}
