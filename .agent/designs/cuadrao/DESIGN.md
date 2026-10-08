@@ -124,7 +124,8 @@ Home, Plan, Chat results and expanded insights.
 - Home greeting: native title2 semibold system type, not a second expressive hero.
 - Navigation bars, Forms, menus and standard native controls retain system semantics.
 - Profile identity, avatar initials, icons, voice timers and the Cuadrao wordmark
-  have distinct roles. Their existence does not authorize a blanket serif migration.
+  have distinct roles; the wordmark is brand artwork, not a text style (see
+  [Brand identity](#brand-identity-mark-wordmark-and-lockup)). Their existence does not authorize a blanket serif migration.
 - Invitation artwork and estimated completion dates are not financial amount roles.
   Keep their approved treatment and ensure artwork does not hide required text.
 - Chart ticks may use native caption2. Numeric chart callouts should use a compact
@@ -132,6 +133,38 @@ Home, Plan, Chat results and expanded insights.
 
 Any new exception needs a named purpose and a gallery specimen. Don't override a
 shared money role with a local weight, design or hardcoded size.
+
+### Brand identity: mark, wordmark and lockup
+
+One source for all three lanes (iPhone, web, Business). Marketing owns the artwork;
+it lives in `marketing/brand/` and `marketing/app/icon.svg`, pinned at commit
+`73286f8cac6f8d335ad17980002590b0c0fefb60` (PR #906), with the full spec in
+`marketing/brand/README.md`. Take the SVGs as they are: do not redraw, approximate,
+re-colour or re-set them in a font.
+
+- **Wordmark.** Lowercase `cuadrao`, Space Grotesk 2.0.0, weight 700, letter-spacing
+  -0.085em, line-height 1 (the website's `.wordmark`; SIL OFL 1.1). Native code shows
+  it only as the outlined SVG, never as live text, so the font is neither shipped nor
+  approximated. Earlier icon sheets used 600 / -0.045em; that was an approximation.
+- **Lockup.** Mark and wordmark as one composition. With the wordmark's font size as
+  1 em: mark height 1 em (width 1.17 em), gap 0.25 em, the mark's centre 0.35 em above
+  the baseline, clear space 0.5 em on every side. Minimum: wordmark at 20 px font size,
+  mark alone at 16 px.
+- **Files.** `cuadrao-lockup-light.svg` / `cuadrao-lockup-dark.svg` (welcome),
+  `icon.svg` (app icon and favicon, tiled), `cuadrao-mark-light.svg` (mark alone on
+  light), `cuadrao-mark-dark.svg` (mark alone on `#172b26` only).
+- **Colours.** Light surface `#fafbf8`: wordmark `#172b26`; mark front `#2f5a49` to
+  `#1d4236`, back `#cfdccf` to `#bccdbf`, overlap `#a6e06a` to `#6fbf46`. Dark surface
+  `#172b26`: wordmark `#fafbf8`; mark front `#fffcf2` to `#e3dcc2`, back `#8fa38f` to
+  `#5b7566` at 55% opacity, overlap `#b6e87a` to `#7fcb4f`. Gradients run top-left to
+  bottom-right. The dark artwork is drawn for `#172b26`; on any other dark its
+  translucent back square changes tone, so a dark surface that shows the lockup uses
+  `#172b26`.
+- **App icon.** `icon.svg` rendered full-bleed at 1024 x 1024 with the tile corner
+  radius 0 (iOS rounds it and rejects transparency). Dark and tinted variants are not
+  designed yet; a new founder decision is needed first.
+- **Typography roles stay native.** The brand adds no text style. Buttons, headings,
+  forms and amounts keep the roles in the table above.
 
 ## 4. Components and selection
 
@@ -823,6 +856,22 @@ Do not promise that previously emailed support copies are erased. Deletion
 completion, retention and resolved successor facts belong to the connected
 contract. Ordinary leave, removal and archive keep their distinct
 history rules. Account deletion must not silently redefine them.
+
+### Welcome screen
+
+One main brand composition and the two native actions; nothing else.
+
+- The lockup is the only brand element: no repeated header lockup, no tagline.
+  Marketing's lockup SVG, at most 268 pt wide, narrowing on small screens instead of
+  clipping, centred in the space above the buttons (about 40% down a 874 pt screen).
+- Background is the website's paper `#fafbf8` on light and `#172b26` on dark. This
+  applies to the welcome screen only; other screens keep their palette backgrounds.
+- Actions keep their native treatment: `Crear cuenta` / `Create account` as the
+  filled primary and `Iniciar sesión` / `Sign in` as the outlined secondary, 56 pt
+  high, 16 pt corners, 28 pt side margins, 12 pt apart, native body semibold type that
+  follows Dynamic Type. The screen scrolls at large text sizes; nothing is clipped.
+- Accessibility: the lockup is one element labelled `cuadrao`. Identifiers:
+  `cuadrao.welcome.lockup`, `cuadrao.welcome.signup`, `cuadrao.welcome.signin`.
 
 ### Authentication and invitation purpose
 

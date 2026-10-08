@@ -61,6 +61,24 @@ final class AuthUITests: XCTestCase {
         }
     }
 
+    /// The welcome screen is one brand composition and the two native actions: no repeated header, no tagline.
+    func testWelcomeIsOneLockupAndTwoActions() throws {
+        guard ProcessInfo.processInfo.environment["ARGUS_TEST_AUTH_UI_ENABLED"] == "true" else {
+            throw XCTSkip("Requires the configured local auth build.")
+        }
+        for appearance in ["light", "dark"] {
+            app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "-appearancePreference", appearance]
+            app.launch()
+            XCTAssertTrue(app.images["cuadrao.welcome.lockup"].waitForExistence(timeout: 15), "\(appearance): the lockup is shown")
+            XCTAssertEqual(app.images.matching(identifier: "cuadrao.welcome.lockup").count, 1, "\(appearance): once")
+            XCTAssertTrue(app.buttons["cuadrao.welcome.signup"].exists)
+            XCTAssertTrue(app.buttons["cuadrao.welcome.signin"].exists)
+            XCTAssertFalse(app.staticTexts["CUADRAO"].exists, "\(appearance): no repeated header lockup")
+            XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'finances'")).firstMatch.exists, "\(appearance): no tagline")
+            app.terminate()
+        }
+    }
+
     func testConnectedSignInFilledFieldsInBothAppearances() throws {
         guard ProcessInfo.processInfo.environment["ARGUS_TEST_AUTH_UI_ENABLED"] == "true" else {
             throw XCTSkip("Requires the configured local auth build.")
