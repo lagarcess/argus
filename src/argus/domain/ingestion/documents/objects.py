@@ -9,6 +9,8 @@ owners read a source through the API, never through a signed URL.
 from __future__ import annotations
 
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from typing import Any, Protocol
 
 SOURCE_BUCKET = "financial-document-sources"
@@ -25,6 +27,10 @@ def connection_prefix(*, user_id: str, connection_id: str) -> str:
 
 def owner_prefix(user_id: str) -> str:
     return f"{user_id}/"
+
+
+class SourceStorageUnavailable(RuntimeError):
+    """Storage could not be reached or refused the call; retrying may succeed."""
 
 
 def _require_folder(prefix: str) -> None:
@@ -80,23 +86,28 @@ class SupabaseSourceObjects:
         self._bucket = storage.from_(self.bucket)
 
     def put(self, path: str, content: bytes, media_type: str) -> None:
-        self._bucket.upload(path, content, {"content-type": media_type, "upsert": "true"})
+        with _unavailable():
+            self._bucket.upload(
+                path, content, {"content-type": media_type, "upsert": "true"}
+            )
 
     def get(self, path: str) -> bytes | None:
         from storage3.exceptions import StorageApiError
 
-        try:
-            return self._bucket.download(path)
-        except StorageApiError as error:
-            if str(error.status) == "404":
-                return None
-            raise
+        with _unavailable():
+            try:
+                return self._bucket.download(path)
+            except StorageApiError as error:
+                if str(error.status) == "404":
+                    return None
+                raise
 
     def delete(self, prefix: str) -> None:
         _require_folder(prefix)
-        paths = self._paths(prefix)
-        for start in range(0, len(paths), _PAGE):
-            self._bucket.remove(paths[start : start + _PAGE])
+        with _unavailable():
+            paths = self._paths(prefix)
+            for start in range(0, len(paths), _PAGE):
+                self._bucket.remove(paths[start : start + _PAGE])
 
     def _paths(self, prefix: str) -> list[str]:
         found: list[str] = []
@@ -114,3 +125,11 @@ class SupabaseSourceObjects:
             if len(page) < _PAGE:
                 return found
             offset += _PAGE
+
+
+@contextmanager
+def _unavailable() -> Iterator[None]:
+    try:
+        yield
+    except Exception as error:
+        raise SourceStorageUnavailable(type(error).__name__) from error
