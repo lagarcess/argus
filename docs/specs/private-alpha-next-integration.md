@@ -6,7 +6,7 @@ experience and assigned-work ownership. Check current PRs and release evidence
 for landing/deployment status. The historical ledger below stops at August 2,
 2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
-Last reconciled: 2026-10-08 (PR #905, #908, #909, #913, #914 Business landings; PR #904 + PR #901 Business pilot landing; Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
+Last reconciled: 2026-10-08 (PR #905, #908, #909, #913, #914, #918 Business landings; PR #904 + PR #901 Business pilot landing; Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
 through 2026-08-02)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
@@ -18,6 +18,8 @@ Audience: Founder, Codex, external async agents, reviewers
   - [PR #909](https://github.com/lagarcess/argus/pull/909) as `fa5923529`: WhatsApp receipt intake, migration `20261008130000` (B3), with founder-approved reply copy.
   - [PR #913](https://github.com/lagarcess/argus/pull/913) as `7ec48872e`: the Business API, with no migration.
   - [PR #914](https://github.com/lagarcess/argus/pull/914) as `6022747cb`: separate Personal and Business spaces, migration `20261008140000` (B4), plus Business search, receipt next steps and the read-only scripts `business_spaces_precheck.sql` and `business_space_rows.sql`.
+
+  - [PR #918](https://github.com/lagarcess/argus/pull/918) as `20a88440c`: S4 chat separation without the model-facing tool catalog. Personal and Business chats keep separate Recents, history, search, delete-all and Compare lists. Artifact routes refuse Business chats, Business turns skip memory, and the /biz palette drops the investing filters. It has no migration and needs B4 before it deploys. Two independent reviews said ship.
 
   All are outside Build 2 and default-off. B2 to B4 are not applied anywhere hosted. Any build that reads them needs B1 to B4 applied first. Once Business data exists in hosted, the build carrying #914 is the minimum compatible code version. Evidence on #914 covers local end-to-end runs, the compatibility rehearsal, flags-off and the live read-only check. No deployment, hosted migration or flag change.
 
