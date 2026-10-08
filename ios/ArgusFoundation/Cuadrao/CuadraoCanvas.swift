@@ -111,25 +111,15 @@ struct CuadraoCanvas: View {
     }
 }
 
-/// The overlapping forms echo the provisional mark without fixing the final logo.
+/// The welcome artwork: the approved Cuadrao mark at hero size, in the frame the provisional squares used.
 struct WelcomeSquares: View {
     var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 22)
-                .fill(WelcomePalette.pine)
-                .frame(width: 116, height: 116)
-                .offset(x: 36, y: -36)
-            RoundedRectangle(cornerRadius: 22)
-                .fill(WelcomePalette.sage)
-                .frame(width: 116, height: 116)
-                .offset(x: -36, y: 36)
-            RoundedRectangle(cornerRadius: 5)
-                .fill(WelcomePalette.overlap)
-                .frame(width: 44, height: 44)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 208)
-        .accessibilityHidden(true)
+        Image("CuadraoMark")
+            .resizable()
+            .scaledToFit()
+            .frame(maxWidth: .infinity)
+            .frame(height: 208)
+            .accessibilityHidden(true)
     }
 }
 

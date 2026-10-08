@@ -1,28 +1,19 @@
 import SwiftUI
 
-/// One provisional brand lockup shared by welcome and Home.
+/// The Cuadrao lockup shared by welcome, sign-in and the invitation card. The mark is Marketing's approved
+/// "Lean, calm" artwork (marketing/brand/cuadrao-mark-light.svg for light surfaces; the tiled icon on dark).
 struct CuadraoBrand: View {
     var body: some View {
-HStack(spacing: 14) {
-                        ZStack {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(WelcomePalette.pine)
-                                .frame(width: 20, height: 20)
-                                .offset(x: 6, y: -6)
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(WelcomePalette.sage)
-                                .frame(width: 20, height: 20)
-                                .offset(x: -6, y: 6)
-                            RoundedRectangle(cornerRadius: 1)
-                                .fill(WelcomePalette.overlap)
-                                .frame(width: 8, height: 8)
-                        }
-                        .frame(width: 32, height: 32)
-                        .accessibilityHidden(true)
+        HStack(spacing: 14) {
+            Image("CuadraoMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 32, height: 32)
+                .accessibilityHidden(true)
 
-                        Text("CUADRAO")
-                            .font(.system(.title3, weight: .medium))
-                            .tracking(4)
-                    }
+            Text("CUADRAO")
+                .font(.system(.title3, weight: .medium))
+                .tracking(4)
+        }
     }
 }
