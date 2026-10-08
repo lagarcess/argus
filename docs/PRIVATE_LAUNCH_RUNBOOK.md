@@ -948,7 +948,7 @@ Do not copy production deletion credentials into CI. Record the command target,
 timestamp, final summary line, and selected or purged counts in operator
 evidence.
 
-### Applying an approved migration list (non-hosted targets only)
+### Applying an approved migration list
 
 `scripts/ops/apply_approved_migrations.py` applies an explicit, ordered list of
 migration versions to a named database and records each ledger row the way
@@ -969,16 +969,57 @@ cannot get its locks fails and rolls back. One run holds an advisory lock,
 taken before the ledger is read.
 
 It refuses any hosted Supabase host in any spelling (case, trailing dot, encoded
-dots), on the URL, on every `--allow-host` and on the connected host. The target
-URL comes from an environment variable (default `ARGUS_APPLY_DATABASE_URL`),
-never the command line. The host and database must be named with `--allow-host`
-and `--allow-database`; a DNS name also needs its resolved address on the list.
-An IP literal that happens to be a hosted database cannot be caught by name, so
-never allow-list one. The default run only prints the plan; `--execute` applies
-it. A hosted target needs a separate reviewed change and the founder's approval
-record. After a stop, everything printed as committed stays applied; recorded
-files show in the ledger, but `--unrecorded` steps leave no trace, so take each
-reported one out of the retry command.
+dots) on the URL, on every `--allow-host` and on the connected host, unless a
+hosted approval record names that host (below). The target URL comes from an
+environment variable (default `ARGUS_APPLY_DATABASE_URL`), never the command
+line. The host and database must be named with `--allow-host` and
+`--allow-database`; a DNS name also needs its resolved address on the list. A
+name check cannot tell that an IP literal is a hosted database, so never
+allow-list one. The default run only prints the plan; `--execute` applies it.
+After a stop, everything printed as committed stays applied; recorded files show
+in the ledger, but `--unrecorded` steps leave no trace, so take each reported one
+out of the retry command.
+
+**Unrecorded versions.** A version at or below the gate's reconciliation threshold
+cannot be recorded without breaking the pinned hand-reconciled history, so it runs
+with `--unrecorded` and leaves no ledger row. With no row, the ledger cannot stop a
+repeat, so each such version has a read-only effect probe in the tool. Today there
+is one: `20260505000001` (it widens `strategies_asset_class_check` and
+`backtest_runs_asset_class_check` to allow `currency_pair`; its probe reads both
+definitions with `pg_get_constraintdef`). The tool refuses an unrecorded version
+that has no probe, refuses one whose effect is already present (before anything
+runs, including in a dry run), and after the run checks the effect is visible. The
+file is also idempotent, so a repeat would end in the same state, but the tool does
+not rely on that.
+
+**Hosted targets.** Pass `--hosted-approval <path>` with a JSON record under
+`docs/release-manifests/` (the tool refuses any other path), committed on top of
+the candidate commit, and `--ssl-root-cert <CA bundle>`. It has exactly these
+keys: `id`, `project_ref`, `hosts`, `database`, `candidate_sha`,
+`versions_sha256`, `issued_at`, `expires_at`, `approved_by`,
+`approval_reference`. The tool refuses unless all of these hold:
+
+- the file is a regular tracked file (not a symlink), unmodified, and committed
+  after `--candidate-sha`; it is read from the committed blob;
+- `candidate_sha` equals `--candidate-sha`;
+- `versions_sha256` equals the digest of this exact run: the recorded versions,
+  the `--unrecorded` ones and the `--allow-mid-file-commit` ones, each sorted.
+  A different batch, or a retry with a different list after a stop, needs a new
+  record;
+- the record is valid now and for at most three days (ISO 8601 with a time zone);
+- every `hosts` entry is the project's direct host `db.<ref>.supabase.co` or a
+  Supabase pooler host; the target is one of them, names port 5432 in the URL
+  and the live connection is on 5432 (a transaction pooler breaks the run lock), carries the project ref (direct host,
+  or the pooler user `postgres.<ref>` exactly), and the database matches;
+- the connection reaches a named host and database, and the server certificate
+  is verified against `--ssl-root-cert` (verify-full, as the gate does).
+
+`--execute` also needs `--hosted-confirm <id>` repeating the record's id. The
+record is the founder's approval made reviewable. It does not authorize
+anything by existing; the founder approves the run before it is committed. A
+record never applies to a target that is not hosted. For a hosted target the
+resolved address is not on any list; the verified certificate replaces that
+check.
 
 ```bash
 ARGUS_APPLY_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/rehearsal \
