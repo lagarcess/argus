@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import unicodedata
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,6 +22,7 @@ from argus.domain.ingestion.documents.models import (
     DraftStatus,
     ExtractionBatch,
 )
+from argus.domain.ingestion.documents.objects import SourceStorageUnavailable
 from argus.domain.ingestion.documents.preparation import validate_source
 from argus.domain.ingestion.documents.store import DocumentStore
 from argus.domain.ingestion.hub import IngestionHub
@@ -42,6 +44,14 @@ class DocumentServiceError(RuntimeError):
     def __init__(self, code: str, *, retryable: bool = False) -> None:
         super().__init__(code)
         self.code, self.retryable = code, retryable
+
+
+def stored_filename(filename: str) -> str:
+    """Without control or format characters (bidi overrides included), so a
+    stored name can neither break a log line nor disguise its extension."""
+
+    kept = "".join(c for c in filename if unicodedata.category(c) not in ("Cc", "Cf"))
+    return kept[:80] or "document"
 
 
 @dataclass(frozen=True)
@@ -103,12 +113,37 @@ class DocumentsService:
             )
         return draft
 
-    def source_bytes(self, *, user_id: str, connection_id: str) -> bytes:
-        self._connection(user_id, connection_id)
-        content = self.store.source(user_id=user_id, connection_id=connection_id)
+    def _read_source(self, user_id: str, connection_id: str) -> bytes:
+        try:
+            content = self.store.source(user_id=user_id, connection_id=connection_id)
+        except SourceStorageUnavailable:
+            raise DocumentServiceError(
+                "document_storage_unavailable", retryable=True
+            ) from None
         if content is None:
             raise DocumentServiceError("document_source_unavailable")
         return content
+
+    def source_bytes(self, *, user_id: str, connection_id: str) -> bytes:
+        """A draft whose stored object is gone says so (``source_available``
+        false) instead of promising a source that cannot be read."""
+
+        self._connection(user_id, connection_id)
+        try:
+            return self._read_source(user_id, connection_id)
+        except DocumentServiceError as error:
+            if error.code == "document_source_unavailable":
+                draft = self.store.draft(user_id=user_id, connection_id=connection_id)
+                if (
+                    draft is not None
+                    and draft.source_available
+                    and draft.status != "preparing"
+                ):
+                    try:
+                        self._update(user_id, draft, source_available=False)
+                    except DocumentServiceError:
+                        pass
+            raise
 
     def _update(
         self,
@@ -168,7 +203,7 @@ class DocumentsService:
             replayed = True
         draft = DocumentDraft(
             connection_id=connection.id,
-            filename=filename[:80],
+            filename=stored_filename(filename),
             media_type=media_type,
             proposal=proposal or DraftProposal(),
             sha256=digest,
@@ -178,7 +213,13 @@ class DocumentsService:
             created_at=self.hub.clock(),
             updated_at=self.hub.clock(),
         )
-        if not self.store.capture(user_id=user_id, draft=draft, content=content):
+        try:
+            captured = self.store.capture(user_id=user_id, draft=draft, content=content)
+        except SourceStorageUnavailable:
+            raise DocumentServiceError(
+                "document_storage_unavailable", retryable=True
+            ) from None
+        if not captured:
             raise DocumentServiceError("document_disconnected")
         return self.outcome(
             user_id=user_id, connection_id=connection.id, replayed=replayed
@@ -243,9 +284,7 @@ class DocumentsService:
                     user_id, draft, holder=holder, status="preparing", error_code=None
                 )
                 batch = await self.extractor.extract(
-                    content=self.source_bytes(
-                        user_id=user_id, connection_id=connection_id
-                    ),
+                    content=self._read_source(user_id, connection_id),
                     filename=draft.filename,
                     media_type=draft.media_type,
                     connection_id=connection_id,
@@ -315,6 +354,7 @@ class DocumentsService:
                         holder=holder,
                         status="needs_attention",
                         error_code=code,
+                        source_available=code != "document_source_unavailable",
                     )
                 repo.record_failure(
                     connection_id=connection_id,

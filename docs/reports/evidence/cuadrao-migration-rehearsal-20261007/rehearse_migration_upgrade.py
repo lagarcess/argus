@@ -232,6 +232,18 @@ def main() -> int:
         [*command, "--execute"], env=env, cwd=ROOT, capture_output=True, text=True
     )
     print("second run refused:", again.returncode == 2, "|", again.stderr.strip())
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as empty:
+        json.dump([], empty)
+    repeat = subprocess.run(
+        [
+            sys.executable, str(ROOT / "scripts/ops/apply_approved_migrations.py"),
+            "--candidate-sha", CANDIDATE, "--approved-file", empty.name,
+            "--unrecorded", MISSING_OLDER, "--allow-host", "127.0.0.1",
+            "--allow-database", "rehearsal_upgrade", "--execute",
+        ],
+        env=env, cwd=ROOT, capture_output=True, text=True,
+    )  # fmt: skip
+    print("unrecorded repeat refused:", repeat.returncode == 2, "|", repeat.stderr.strip())
     after = gate_report("rehearsal_upgrade")
     print(
         "UPGRADE gate after:",
@@ -264,7 +276,9 @@ def main() -> int:
             f"{name:13} clean {len(clean[name]):4} upgrade {len(upgraded[name]):4} differences {len(only_clean) + len(only_upgrade)}"
         )
     print("TOTAL CATALOG DIFFERENCES", differences)
-    ok = after["status"] == "pass" and differences == 0 and again.returncode == 2
+    ok = (
+        after["status"] == "pass" and differences == 0 and again.returncode == 2 and repeat.returncode == 2
+    )
     print("RESULT", "PASS" if ok else "FAIL")
     return 0 if ok else 1
 

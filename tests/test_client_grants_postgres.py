@@ -547,3 +547,44 @@ def test_service_role_still_writes_backend_owned_rows(owned_rows) -> None:
                 "select status from public.backtest_jobs where id = %(job_id)s", ids
             )
             assert cursor.fetchone() == ("succeeded",)
+
+
+# Storage. Buckets no client may reach, and every storage.objects policy; an
+# empty policy list means only the service role reads or writes any object.
+
+PRIVATE_BUCKETS = frozenset({"financial-document-sources"})
+STORAGE_OBJECT_POLICIES: frozenset[str] = frozenset()
+
+
+def test_private_buckets_exist_and_are_not_public(catalog) -> None:
+    catalog.execute(
+        "select id, public from storage.buckets where id = any(%s)",
+        (list(PRIVATE_BUCKETS),),
+    )
+    assert dict(catalog.fetchall()) == dict.fromkeys(PRIVATE_BUCKETS, False)
+
+
+def test_storage_object_policies_match_the_allow_list(catalog) -> None:
+    catalog.execute(
+        "select policyname from pg_policies"
+        " where schemaname = 'storage' and tablename = 'objects'"
+    )
+    assert {row[0] for row in catalog.fetchall()} == STORAGE_OBJECT_POLICIES
+
+
+@pytest.mark.parametrize("role", CLIENT_ROLES)
+def test_client_roles_cannot_see_their_own_private_objects(owned_rows, role) -> None:
+    connection, ids = owned_rows
+    name = f"{ids['user_id']}/{uuid4()}/{'a' * 64}"
+    with connection.cursor() as cursor:
+        with connection.transaction():
+            cursor.execute(
+                "insert into storage.objects (bucket_id, name, owner_id)"
+                " values ('financial-document-sources', %s, %s)",
+                (name, ids["user_id"]),
+            )
+            _act_as(cursor, role, user_id=ids["user_id"])
+            cursor.execute(
+                "select count(*) from storage.objects where name = %s", (name,)
+            )
+            assert cursor.fetchone() == (0,)
