@@ -147,19 +147,44 @@ def test_flag_off_every_route_is_404_before_auth(client: TestClient, monkeypatch
     assert {r.headers["Cache-Control"] for r in calls} == {"no-store"}
 
 
-def test_space_routes_wait_for_the_document_surface(
+def test_document_intake_off_keeps_saved_receipts_and_owner_actions(
+    alice: Owner, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    account = alice.account()
+    receipt_id = prepared(alice)
+    monkeypatch.setenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED", "false")
+
+    assert alice.get("/space").status_code == 200
+    assert receipt_id in [r["id"] for r in alice.get("/receipts").json()["items"]]
+    source = alice.get(f"/receipts/{receipt_id}/source")
+    assert (source.status_code, source.content) == (200, RECEIPT)
+    refused = [
+        alice.upload(content=RECEIPT + b"new"),
+        alice.post(
+            f"/receipts/{receipt_id}/prepare", None, **{"X-Extraction-Consent": "true"}
+        ),
+    ]
+    assert [r.status_code for r in refused] == [404, 404]
+
+    version = alice.review(
+        receipt_id, alice.detail(receipt_id)["version"], account_id=account
+    ).json()["version"]
+    confirmed = alice.confirm(receipt_id, version, str(uuid4()))
+    assert confirmed.json()["status"] == "confirmed", confirmed.text
+
+
+def test_business_is_off_while_ingestion_is_off(
     biz: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     alice = Owner(biz, ALICE)
-    monkeypatch.setenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED", "false")
+    monkeypatch.setenv("ARGUS_INGESTION_ENABLED", "false")
     off = [
         alice.start(),
         alice.get("/space"),
+        alice.get("/receipts"),
         biz.patch(f"{BASE}/space", json={"name": "Taller"}, headers=alice.auth),
     ]
-    assert [r.status_code for r in off] == [404] * 3
-    monkeypatch.setenv("ARGUS_DOCUMENT_EXTRACTION_ENABLED", "true")
-    assert alice.get("/space").json()["code"] == "business_space_missing"
+    assert [r.status_code for r in off] == [404] * 4
 
 
 def test_flag_on_still_requires_a_registered_session(biz: TestClient) -> None:

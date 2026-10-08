@@ -1,7 +1,9 @@
 """Business pilot wiring: the default-off gate and each request's scope.
 
-Default-off behind ``ARGUS_BUSINESS_PILOT_ENABLED`` and nested inside the
-document surface, since every Business receipt is a document draft. The flag is
+Default-off behind ``ARGUS_BUSINESS_PILOT_ENABLED`` and nested inside ingestion,
+since every Business receipt is a document draft and an import. Document intake
+off stops only upload and preparation; what the owner saved stays readable and
+their review, confirm and hand entry keep working. The flag is
 checked first, before authentication, so an off surface is a 404 to everyone.
 The scope always comes from ``resolve_business_scope``, never from the client.
 Until the person starts their space every Business route except the space
@@ -20,7 +22,7 @@ from argus.api.documents import (
     NO_STORE,
     DocumentContext,
     require_document_context,
-    require_document_surface,
+    require_saved_documents,
 )
 from argus.api.ingestion import IngestionContext, require_ingestion_context
 from argus.api.whatsapp import whatsapp_runtime
@@ -58,13 +60,13 @@ class BusinessPerson:
 def require_business_person(
     request: Request,
     _surface: None = Depends(require_business_surface),  # noqa: B008
-    _documents: DocumentsService = Depends(require_document_surface),  # noqa: B008
+    documents: DocumentsService = Depends(require_saved_documents),  # noqa: B008
     context: IngestionContext = Depends(require_ingestion_context),  # noqa: B008
 ) -> BusinessPerson:
     """The signed-in person and the space store, for the space routes."""
 
     spaces = business_spaces()
-    if spaces is None:
+    if spaces is None or documents.hub is not context.hub:
         raise unavailable_problem(request)
     return BusinessPerson(context.user_id, spaces)
 
@@ -86,7 +88,11 @@ def _context(
     request: Request, documents: DocumentsService, hub: IngestionHub, user_id: str
 ) -> BusinessContext:
     spaces = business_spaces()
-    if not isinstance(hub.sink, ReconciliationService) or spaces is None:
+    if (
+        not isinstance(hub.sink, ReconciliationService)
+        or spaces is None
+        or documents.hub is not hub
+    ):
         raise unavailable_problem(request)
     scope = resolve_business_scope(spaces, user_id)
     if scope is None:
@@ -97,7 +103,7 @@ def _context(
 def require_business(
     request: Request,
     _surface: None = Depends(require_business_surface),  # noqa: B008
-    documents: DocumentsService = Depends(require_document_surface),  # noqa: B008
+    documents: DocumentsService = Depends(require_saved_documents),  # noqa: B008
     context: IngestionContext = Depends(require_ingestion_context),  # noqa: B008
 ) -> BusinessContext:
     return _context(request, documents, context.hub, context.user_id)

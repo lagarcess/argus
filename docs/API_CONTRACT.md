@@ -8837,9 +8837,12 @@ nothing is sent outside the service window.
 
 ### Business pilot (default-off)
 
-Off unless `ARGUS_BUSINESS_PILOT_ENABLED` is true and the document surface
-above is on. While the flag is off every route below answers 404
-`business_unavailable` before authentication. Every response is
+Off unless `ARGUS_BUSINESS_PILOT_ENABLED` and `ARGUS_INGESTION_ENABLED` are
+both true. While either is off every route below answers 404
+`business_unavailable`; the pilot flag is checked before authentication. With
+`ARGUS_DOCUMENT_EXTRACTION_ENABLED` off, only receipt upload and preparation
+answer 404. Saved receipts stay readable and downloadable, and review,
+confirm, hand entry, expenses and the space routes keep working. Every response is
 `Cache-Control: no-store`. The routes are registered-only and match
 `web/lib/business-api.ts`.
 
