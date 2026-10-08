@@ -81,7 +81,7 @@ struct FinancialSearchView: View {
     var body: some View {
         NavigationStack {
             CuadraoSearchContent(query: query, kind: kind,
-                kinds: CanvasSearchKind.allCases.filter { $0 != .memory }, spanish: spanish,
+                kinds: CanvasSearchKind.connected(hasAssistant: CuadraoFirstRelease.hasAssistant), spanish: spanish,
                 filterCount: filterCount, filterSummary: filterSummary, clearFilters: clearFilters,
                 focused: $focused, accessibility: .connected, loading: showsProgress,
                 refresh: { if unavailableKind == nil { await model.refresh() } }, eagerRows: true) {
