@@ -244,6 +244,33 @@ async def test_disconnect_removes_the_object_and_keeps_confirmed_activity(
     assert [o["external_id"] for o in kept["observations"]] == ["p1:r1"]
 
 
+class DisconnectDuringExtraction(StatementExtractor):
+    def __init__(self, hub: IngestionHub, owner: str) -> None:
+        self.hub, self.owner = hub, owner
+
+    async def extract(self, *, connection_id: str, **kwargs: object):
+        self.hub.disconnect(
+            user_id=self.owner, connection_id=connection_id, scope=PERSONAL
+        )
+        return await super().extract(connection_id=connection_id, **kwargs)
+
+
+@pytest.mark.asyncio
+async def test_disconnect_during_preparation_leaves_no_object_and_no_row(
+    rig: dict,
+) -> None:
+    owner, hub = rig["owner"], rig["hub"]
+    service = DocumentsService(hub, rig["store"], DisconnectDuringExtraction(hub, owner))
+    captured = await _upload(service, owner, consent=True)
+    with pytest.raises(DocumentServiceError, match="document_lease_lost"):
+        await service.resume(
+            user_id=owner, connection_id=captured.connection_id, scope=PERSONAL
+        )
+    assert _paths(rig["pool"], owner_prefix(owner)) == []
+    assert _row(rig["pool"], captured.connection_id) is None
+    assert rig["world"].recon.list(user_id=owner, states=("open",), scope=PERSONAL) == []
+
+
 @pytest.mark.asyncio
 async def test_a_crash_after_the_object_write_leaves_no_row(rig: dict) -> None:
     owner, pool = rig["owner"], rig["pool"]
