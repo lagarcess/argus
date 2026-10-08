@@ -18,9 +18,17 @@ struct CuadraoCancelToolbar: ToolbarContent {
     private var label: some View {
         Button(action: action) { Text(title).fixedSize() }
             .buttonStyle(.plain)
-            .foregroundStyle(WelcomePalette.pine)
+            .foregroundStyle(disabled ? Color.secondary : WelcomePalette.pine)
             .frame(minHeight: 44)
             .disabled(disabled)
-            .accessibilityIdentifier(identifier ?? "")
+            .modifier(OptionalIdentifier(identifier: identifier))
+    }
+}
+
+private struct OptionalIdentifier: ViewModifier {
+    let identifier: String?
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if let identifier { content.accessibilityIdentifier(identifier) } else { content }
     }
 }

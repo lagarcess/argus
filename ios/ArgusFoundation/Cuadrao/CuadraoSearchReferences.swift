@@ -20,7 +20,8 @@ extension CanvasSearchKind {
     /// What the connected Search offers. With no assistant there are no AI chats, and no files or memory
     /// either, so those chips (each an "unavailable" dead end) are not shown.
     static func connected(hasAssistant: Bool) -> [CanvasSearchKind] {
-        hasAssistant ? allCases.filter { $0 != .memory } : [.all, .accounts, .activity, .plans]
+        let withoutAssistant: Set<CanvasSearchKind> = [.chats, .files, .memory]
+        return allCases.filter { hasAssistant ? $0 != .memory : !withoutAssistant.contains($0) }
     }
 }
 
