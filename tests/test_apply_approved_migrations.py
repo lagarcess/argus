@@ -1,0 +1,449 @@
+"""The applier refuses everything it was not explicitly given."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from scripts.ops import apply_approved_migrations as applier
+from scripts.ops.production_migration_gate import CandidateMigration
+
+
+def _migration(
+    version: str, name: str, sql: str = "create table t (id int);"
+) -> CandidateMigration:
+    return CandidateMigration.from_source(
+        f"supabase/migrations/{version}_{name}.sql", sql
+    )
+
+
+CANDIDATES = [
+    _migration(
+        "20260505000001", "old_missing", "alter table t drop constraint if exists c;"
+    ),
+    _migration("20260606000001", "old_effect_exists"),
+    _migration("20260914120000", "ledger_head"),
+    _migration("20260925120000", "first_new"),
+    _migration("20260928200000", "second_new"),
+    _migration("20260929090000", "third_new"),
+]
+APPLIED = ["20260606000001", "20260914120000"]
+ALLOW = (["127.0.0.1"], ["rehearsal"])
+
+
+# --- target guard -----------------------------------------------------------------
+
+
+def test_only_the_named_local_target_is_accepted() -> None:
+    applier.check_target("postgresql://u:p@127.0.0.1:5432/rehearsal", *ALLOW, environ={})
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql://u:p@db.abcdefghijklmnopqrst.supabase.co:5432/postgres",
+        "postgresql://u:p@aws-0-us-east-1.pooler.supabase.com:5432/postgres",
+        "postgresql://u:p@127.0.0.1:5432/postgres",
+        "postgresql://u:p@10.0.0.9:5432/rehearsal",
+        "postgresql://u:p@127.0.0.1:5432/rehearsal?host=elsewhere",
+        "postgresql://u:p@127.0.0.1:5432,db.abcdefghijklmnopqrst.supabase.co:5432/rehearsal",
+        "postgresql://u:p@db.abcdefghijklmnopqrst.supabase.co,127.0.0.1/rehearsal",
+        "postgresql://u:p@DB.ABCDEFGHIJKLMNOPQRST.SUPABASE.CO:5432/rehearsal",
+        "postgresql://u:p@db.abcdefghijklmnopqrst.supabase.co.:5432/rehearsal",
+        "postgresql://u:p@db%2Eabcdefghijklmnopqrst%2Esupabase%2Eco:5432/rehearsal",
+        "postgresql://u:p@supabase.co:5432/rehearsal",
+        "postgresql://u:p@db.abcdefghijklmnopqrst.supabase.co%2C127.0.0.1:5432/rehearsal",
+    ],
+)
+def test_hosted_unlisted_and_multi_host_targets_are_refused(url: str) -> None:
+    with pytest.raises(applier.ApplyError):
+        applier.check_target(url, *ALLOW, environ={})
+
+
+@pytest.mark.parametrize(
+    "allowed",
+    [
+        "db.abcdefghijklmnopqrst.supabase.co.",
+        "DB.ABCDEFGHIJKLMNOPQRST.SUPABASE.CO",
+        "db%2Eabcdefghijklmnopqrst%2Esupabase%2Eco",
+        "aws-0-us-east-1.pooler.supabase.com",
+    ],
+)
+def test_a_hosted_name_on_the_allow_list_is_refused(allowed: str) -> None:
+    with pytest.raises(applier.ApplyError, match="hosted Supabase"):
+        applier.check_target(
+            "postgresql://u:p@127.0.0.1:5432/rehearsal",
+            ["127.0.0.1", allowed],
+            ["rehearsal"],
+            environ={},
+        )
+
+
+@pytest.mark.parametrize(
+    "name", ["PGHOSTADDR", "PGSERVICE", "PGSERVICEFILE", "PGPASSFILE"]
+)
+def test_environment_that_can_redirect_the_connection_is_refused(name: str) -> None:
+    with pytest.raises(applier.ApplyError):
+        applier.check_target(
+            "postgresql://u:p@127.0.0.1:5432/rehearsal", *ALLOW, environ={name: "x"}
+        )
+
+
+class _Row:
+    def __init__(self, value: object) -> None:
+        self.value = value
+
+    def fetchone(self) -> tuple[object, ...]:
+        return (self.value,)
+
+
+def _connected(host: str, hostaddr: str, database: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        info=SimpleNamespace(host=host, hostaddr=hostaddr),
+        execute=lambda _sql: _Row(database),
+    )
+
+
+def test_the_real_connection_is_checked_not_just_the_url() -> None:
+    applier.verify_connection(_connected("127.0.0.1", "127.0.0.1", "rehearsal"), *ALLOW)
+    for host, hostaddr, database in (
+        ("db.abcdefghijklmnopqrst.supabase.co", "", "rehearsal"),
+        ("127.0.0.1", "52.1.2.3", "rehearsal"),
+        ("127.0.0.1", "127.0.0.1", "postgres"),
+    ):
+        with pytest.raises(applier.ApplyError):
+            applier.verify_connection(_connected(host, hostaddr, database), *ALLOW)
+
+
+@pytest.mark.parametrize(
+    "host",
+    ["db.abcdefghijklmnopqrst.supabase.co.", "DB.ABCDEFGHIJKLMNOPQRST.SUPABASE.CO"],
+)
+def test_the_connected_host_is_refused_when_it_is_hosted_in_any_spelling(
+    host: str,
+) -> None:
+    with pytest.raises(applier.ApplyError, match="hosted Supabase"):
+        applier.verify_connection(
+            _connected(host, "127.0.0.1", "rehearsal"), [host, "127.0.0.1"], ["rehearsal"]
+        )
+
+
+# --- plan rules -------------------------------------------------------------------
+
+
+def test_recorded_steps_are_ordered_and_classified() -> None:
+    steps = applier.plan_steps(CANDIDATES, APPLIED, ["20260928200000", "20260925120000"])
+    assert [(s.version, s.record) for s in steps] == [
+        ("20260925120000", True),
+        ("20260928200000", True),
+    ]
+
+
+def test_a_batch_may_stop_early_but_may_not_skip() -> None:
+    assert [
+        s.version for s in applier.plan_steps(CANDIDATES, APPLIED, ["20260925120000"])
+    ] == ["20260925120000"]
+    with pytest.raises(applier.ApplyError, match="skips"):
+        applier.plan_steps(CANDIDATES, APPLIED, ["20260929090000"])
+    with pytest.raises(applier.ApplyError, match="skips"):
+        applier.plan_steps(CANDIDATES, APPLIED, ["20260925120000", "20260929090000"])
+
+
+def test_unrecorded_history_runs_without_a_ledger_row() -> None:
+    steps = applier.plan_steps(
+        CANDIDATES, APPLIED, ["20260925120000"], ["20260505000001"]
+    )
+    assert [(s.version, s.record) for s in steps] == [
+        ("20260505000001", False),
+        ("20260925120000", True),
+    ]
+    assert steps[0].classification == "destructive"
+
+
+@pytest.mark.parametrize(
+    ("approved", "unrecorded"),
+    [
+        (["20260999999999"], []),  # not a candidate
+        (["20260914120000"], []),  # already applied
+        (["20260505000001"], []),  # recorded below the threshold
+        (["20260925120000"], ["20260925120000"]),  # both lists
+        ([], ["20260925120000"]),  # unrecorded above the threshold
+        (["20260925120000", "20260925120000"], []),  # duplicate
+        ([], ["20260505000001", "20260505000001"]),  # duplicate
+    ],
+)
+def test_plan_refuses_anything_unapproved(
+    approved: list[str], unrecorded: list[str]
+) -> None:
+    with pytest.raises(applier.ApplyError):
+        applier.plan_steps(CANDIDATES, APPLIED, approved, unrecorded)
+
+
+def test_recorded_versions_must_follow_the_ledger_head() -> None:
+    candidates = [*CANDIDATES, _migration("20260915000000", "behind_head")]
+    with pytest.raises(applier.ApplyError):
+        applier.plan_steps(candidates, ["20260925120000"], ["20260915000000"])
+
+
+# --- transaction control ------------------------------------------------------------
+
+WRAPPED = "-- note\nbegin;\ncreate table a (id int);\ncreate table b (id int);\ncommit;\n"
+MID_COMMIT = (
+    "alter table r drop constraint if exists c, add constraint c check (x > 0) not valid;\n"
+    "commit;\nalter table r validate constraint c;\n"
+)
+
+
+def test_a_wrapped_file_is_one_transaction_without_its_own_begin_and_commit() -> None:
+    migration = _migration("20260925120000", "wrapped", WRAPPED)
+    segments = applier.split_segments(migration.statements)
+    assert len(segments) == 1
+    assert [s.split(";")[0].split("\n")[-1] for s in segments[0]] == [
+        "create table a (id int)",
+        "create table b (id int)",
+    ]
+    # the ledger still records the file exactly as the gate splits it, wrapper included
+    assert len(migration.statements) == 4
+
+
+def test_a_commit_in_the_middle_needs_an_explicit_flag() -> None:
+    candidates = [*CANDIDATES[:3], _migration("20260925120000", "mid", MID_COMMIT)]
+    with pytest.raises(applier.ApplyError, match="allow-mid-file-commit"):
+        applier.plan_steps(candidates, APPLIED, ["20260925120000"])
+    steps = applier.plan_steps(
+        candidates, APPLIED, ["20260925120000"], allow_mid_file_commit=["20260925120000"]
+    )
+    assert [len(segment) for segment in steps[0].segments] == [1, 1]
+
+
+@pytest.mark.parametrize(
+    "sql",
+    [
+        "create table t (id int);\nrollback;",
+        "begin;\nsavepoint a;\ncommit;",
+        "create table t (id int);\nbegin;\ncommit;",
+    ],
+)
+def test_other_transaction_control_is_refused(sql: str) -> None:
+    with pytest.raises(applier.ApplyError):
+        applier.split_segments(_migration("20260925120000", "x", sql).statements)
+
+
+# --- applying ---------------------------------------------------------------------------
+
+
+class _Transaction:
+    def __init__(self, log: list[str]) -> None:
+        self.log = log
+
+    def __enter__(self) -> None:
+        self.log.append("begin")
+
+    def __exit__(self, exc_type: object, *_: object) -> bool:
+        self.log.append("rollback" if exc_type else "commit")
+        return False
+
+
+class _Connection:
+    def __init__(self, fail_on: str | None = None) -> None:
+        self.log: list[str] = []
+        self.fail_on = fail_on
+
+    def transaction(self) -> _Transaction:
+        return _Transaction(self.log)
+
+    def execute(self, statement: str, params: object = None) -> None:
+        if self.fail_on and self.fail_on in statement:
+            raise RuntimeError("boom")
+        if params is not None and "set_config" in statement:
+            self.log.append(f"timeout={params[0]}")  # type: ignore[index]
+        else:
+            self.log.append(
+                "ledger" if params is not None else statement.strip().split("\n")[-1]
+            )
+
+
+def test_each_file_is_one_transaction_and_records_its_own_ledger_row() -> None:
+    steps = applier.plan_steps(
+        CANDIDATES, APPLIED, ["20260925120000"], ["20260505000001"]
+    )
+    connection = _Connection()
+    seen: list[str] = []
+    done = applier.apply_steps(
+        connection, steps, on_done=lambda step: seen.append(step.version)
+    )
+    assert done == seen == ["20260505000001", "20260925120000"]
+    assert connection.log == [
+        "begin", "timeout=5s", "alter table t drop constraint if exists c", "commit",
+        "begin", "timeout=5s", "create table t (id int)", "ledger", "commit",
+    ]  # fmt: skip
+
+
+def test_a_wrapped_file_runs_and_records_inside_one_transaction() -> None:
+    candidates = [*CANDIDATES[:3], _migration("20260925120000", "wrapped", WRAPPED)]
+    steps = applier.plan_steps(candidates, APPLIED, ["20260925120000"])
+    connection = _Connection()
+    applier.apply_steps(connection, steps)
+    assert connection.log == [
+        "begin", "timeout=5s", "create table a (id int)", "create table b (id int)", "ledger", "commit",
+    ]  # fmt: skip
+
+
+def test_a_mid_file_commit_records_the_ledger_row_in_the_last_transaction() -> None:
+    candidates = [*CANDIDATES[:3], _migration("20260925120000", "mid", MID_COMMIT)]
+    steps = applier.plan_steps(
+        candidates, APPLIED, ["20260925120000"], allow_mid_file_commit=["20260925120000"]
+    )
+    connection = _Connection()
+    applier.apply_steps(connection, steps)
+    assert connection.log.count("ledger") == 1
+    assert connection.log[-2:] == ["ledger", "commit"]
+    assert connection.log.count("begin") == 2
+
+
+def test_a_failing_file_rolls_back_and_stops_the_run() -> None:
+    steps = applier.plan_steps(CANDIDATES, APPLIED, ["20260925120000", "20260928200000"])
+    connection = _Connection(fail_on="create table")
+    with pytest.raises(RuntimeError):
+        applier.apply_steps(connection, steps)
+    assert connection.log == ["begin", "timeout=5s", "rollback"]
+
+
+def test_a_file_with_nothing_to_run_cannot_be_recorded() -> None:
+    candidates = [
+        *CANDIDATES[:3],
+        _migration("20260925120000", "empty", "begin; commit;"),
+    ]
+    with pytest.raises(applier.ApplyError, match="no runnable statement"):
+        applier.plan_steps(candidates, APPLIED, ["20260925120000"])
+
+
+def test_each_committed_transaction_is_reported() -> None:
+    candidates = [*CANDIDATES[:3], _migration("20260925120000", "mid", MID_COMMIT)]
+    steps = applier.plan_steps(
+        candidates, APPLIED, ["20260925120000"], allow_mid_file_commit=["20260925120000"]
+    )
+    seen: list[tuple[str, int, int]] = []
+    applier.apply_steps(
+        _Connection(), steps, on_segment=lambda s, n, t: seen.append((s.version, n, t))
+    )
+    assert seen == [("20260925120000", 1, 2), ("20260925120000", 2, 2)]
+
+
+@pytest.mark.parametrize("value", ["5s", "500ms", "1min"])
+def test_lock_timeout_accepts_plain_durations(value: str) -> None:
+    assert applier.check_lock_timeout(value) == value
+
+
+@pytest.mark.parametrize(
+    "value", ["", "0", "0s", "0ms", "05s", "5", "5 s; drop table x", "-1s", "1h"]
+)
+def test_lock_timeout_refuses_anything_else(value: str) -> None:
+    with pytest.raises(applier.ApplyError):
+        applier.check_lock_timeout(value)
+
+
+# --- the command line -----------------------------------------------------------------
+
+
+class _Cursor:
+    def __init__(self, rows: list[tuple[object, ...]]) -> None:
+        self.rows = rows
+
+    def fetchone(self) -> tuple[object, ...] | None:
+        return self.rows[0] if self.rows else None
+
+    def fetchall(self) -> list[tuple[object, ...]]:
+        return self.rows
+
+
+class _Server:
+    """Stands in for psycopg.connect against a local database."""
+
+    def __init__(self, ledger: list[str], lock_free: bool = True) -> None:
+        self.ledger, self.lock_free = ledger, lock_free
+        self.info = SimpleNamespace(host="127.0.0.1", hostaddr="127.0.0.1")
+        self.statements: list[str] = []
+
+    def __enter__(self) -> _Server:
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        return None
+
+    def transaction(self) -> _Transaction:
+        return _Transaction([])
+
+    def execute(self, sql: str, params: object = None) -> _Cursor:
+        self.statements.append(sql)
+        if "current_database" in sql:
+            return _Cursor([("rehearsal",)])
+        if "pg_try_advisory_lock" in sql:
+            return _Cursor([(self.lock_free,)])
+        if "schema_migrations order by" in sql:
+            return _Cursor([(version,) for version in self.ledger])
+        return _Cursor([])
+
+
+def _run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, server: _Server, *extra: str
+) -> int:
+    approved = tmp_path / "approved.json"
+    approved.write_text(json.dumps(["20260925120000"]))
+    monkeypatch.setenv(
+        "ARGUS_APPLY_DATABASE_URL", "postgresql://u:p@127.0.0.1:5432/rehearsal"
+    )
+    for name in applier._REFUSED_ENVIRONMENT:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr("psycopg.connect", lambda *_a, **_k: server)
+    monkeypatch.setattr(applier.gate, "read_candidate_migrations", lambda *_a: CANDIDATES)
+    return applier.main(
+        ["--candidate-sha", "x" * 40, "--approved-file", str(approved),
+         "--allow-host", "127.0.0.1", "--allow-database", "rehearsal", *extra]
+    )  # fmt: skip
+
+
+def test_the_default_run_only_prints_the_plan(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    server = _Server(APPLIED)
+    assert _run(monkeypatch, tmp_path, server) == 0
+    assert "dry run" in capsys.readouterr().out
+    assert not any("create table" in statement for statement in server.statements)
+
+
+def test_a_held_lock_refuses_the_run(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    with pytest.raises(applier.ApplyError, match="holds the migration lock"):
+        _run(monkeypatch, tmp_path, _Server(APPLIED, lock_free=False), "--execute")
+
+
+def test_the_run_lock_is_taken_before_the_ledger_is_read(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    server = _Server(APPLIED)
+    _run(monkeypatch, tmp_path, server)
+    lock = next(
+        i for i, sql in enumerate(server.statements) if "pg_try_advisory_lock" in sql
+    )
+    ledger = next(
+        i
+        for i, sql in enumerate(server.statements)
+        if "schema_migrations order by" in sql
+    )
+    assert lock < ledger
+
+
+def test_a_missing_url_is_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("ARGUS_APPLY_DATABASE_URL", raising=False)
+    with pytest.raises(applier.ApplyError, match="is not set"):
+        applier.main(
+            ["--candidate-sha", "x" * 40, "--approved-file", str(tmp_path / "a.json"),
+             "--allow-host", "127.0.0.1", "--allow-database", "rehearsal"]
+        )  # fmt: skip

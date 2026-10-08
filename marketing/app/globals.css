@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: #ffffff;
+  color: #000000;
+}
+
+:where(
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary,
+  label[for]
+) {
+  cursor: pointer;
+}
+
+:where(button:disabled, [aria-disabled="true"], input:disabled, textarea:disabled) {
+  cursor: not-allowed;
+}

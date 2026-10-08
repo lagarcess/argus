@@ -2,10 +2,7 @@ import SwiftUI
 import Observation
 
 // Navigation artwork and destination names have one owner across the canvas.
-enum CuadraoTab: Int, CaseIterable, Identifiable {
-    case home, plan, assistant, search, profile
-    var id: Self { self }
-
+extension CuadraoTab {
     func title(spanish: Bool) -> String {
         switch self {
         case .home: spanish ? "Inicio" : "Home"
@@ -47,48 +44,74 @@ enum CuadraoTab: Int, CaseIterable, Identifiable {
     }
 }
 
+extension CuadraoNavigationSlot {
+    static var current: [CuadraoNavigationSlot] { slots(hasAssistant: CuadraoFirstRelease.hasAssistant) }
+}
+
 struct CuadraoNavigationBar: View {
     @Binding var selection: CuadraoTab
     let compact: Bool
     let spanish: Bool
     var avatar: CuadraoAvatarSelection = .none
     var profileName: String = ""
+    let add: () -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(CuadraoTab.allCases) { tab in
-                Button { selection = tab } label: {
-                    Group {
-                        if tab == .profile, avatar != .none {
-                            CuadraoIdentityAvatar(selection: avatar, name: profileName, size: 28, presentation: .navigation)
-                        } else {
-                            tab.image(selected: selection == tab)
-                        }
-                    }
-                        .environment(\.symbolVariants, .none)
-                        .font(.system(size: 25, weight: .regular))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 48)
-                        .foregroundStyle(selection == tab ? WelcomePalette.pine : Color.secondary)
-                        .background {
-                            if selection == tab {
-                                Capsule().fill(WelcomePalette.pine.opacity(0.09))
-                            }
-                        }
-                        .contentShape(Capsule())
+            ForEach(CuadraoNavigationSlot.current) { slot in
+                switch slot {
+                case .tab(let tab): tabButton(tab)
+                case .add: addButton
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(tab.title(spanish: spanish))
-                // Tip-compatible ids keep UITests working; Cuadrao ordinal remains for design evidence.
-                .accessibilityIdentifier(tab.tipAccessibilityID)
-                .accessibilityAddTraits(selection == tab ? .isSelected : [])
             }
         }
         .padding(4)
         .frame(maxWidth: compact ? 270 : .infinity)
         .modifier(CuadraoNavigationMaterial())
         .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: compact)
+    }
+
+    private var addButton: some View {
+        Button(action: add) {
+            Image(systemName: "plus")
+                .font(.system(size: 25, weight: .regular))
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .foregroundStyle(WelcomePalette.pine)
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(spanish ? "Añadir movimiento" : "Add activity")
+        .accessibilityIdentifier("nav.add")
+    }
+
+    private func tabButton(_ tab: CuadraoTab) -> some View {
+        Button { selection = tab } label: {
+            Group {
+                if tab == .profile, avatar != .none {
+                    CuadraoIdentityAvatar(selection: avatar, name: profileName, size: 28, presentation: .navigation)
+                } else {
+                    tab.image(selected: selection == tab)
+                }
+            }
+                .environment(\.symbolVariants, .none)
+                .font(.system(size: 25, weight: .regular))
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+                .foregroundStyle(selection == tab ? WelcomePalette.pine : Color.secondary)
+                .background {
+                    if selection == tab {
+                        Capsule().fill(WelcomePalette.pine.opacity(0.09))
+                    }
+                }
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tab.title(spanish: spanish))
+        // Tip-compatible ids keep UITests working; Cuadrao ordinal remains for design evidence.
+        .accessibilityIdentifier(tab.tipAccessibilityID)
+        .accessibilityAddTraits(selection == tab ? .isSelected : [])
     }
 }
 

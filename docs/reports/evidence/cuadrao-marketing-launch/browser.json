@@ -1,0 +1,317 @@
+{
+  "commit": "eb7c6f59b",
+  "origin": "http://127.0.0.1:4511",
+  "capturedAt": "2026-10-07T17:26:36.988Z",
+  "pages": [
+    {
+      "path": "/",
+      "htmlLang": "es-DO",
+      "title": "Cada cuenta. En su sitio. | Cuadrao",
+      "canonical": "https://cuadrao.ai/",
+      "alternates": [
+        [
+          "es",
+          "https://cuadrao.ai"
+        ],
+        [
+          "en",
+          "https://cuadrao.ai/en"
+        ],
+        [
+          "x-default",
+          "https://cuadrao.ai"
+        ]
+      ],
+      "icons": [
+        "/favicon.ico?favicon.0t190zg80o.zy.ico",
+        "/icon.svg?icon.0m9tf1wam3quu.svg",
+        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+      ],
+      "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-es.png",
+      "cookies": "",
+      "localStorageKeys": 0,
+      "sessionStorageKeys": 0
+    },
+    {
+      "path": "/personal",
+      "htmlLang": "es-DO",
+      "title": "Tus finanzas, en orden. | Cuadrao Personal",
+      "canonical": "https://cuadrao.ai/personal",
+      "alternates": [
+        [
+          "es",
+          "https://cuadrao.ai/personal"
+        ],
+        [
+          "en",
+          "https://cuadrao.ai/en/personal"
+        ],
+        [
+          "x-default",
+          "https://cuadrao.ai/personal"
+        ]
+      ],
+      "icons": [
+        "/favicon.ico?favicon.0t190zg80o.zy.ico",
+        "/icon.svg?icon.0m9tf1wam3quu.svg",
+        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+      ],
+      "ogImage": "https://cuadrao.ai/cuadrao-site/share-personal-es.png",
+      "cookies": "",
+      "localStorageKeys": 0,
+      "sessionStorageKeys": 0
+    },
+    {
+      "path": "/contacto",
+      "htmlLang": "es-DO",
+      "title": "Hablemos de tu negocio | Cuadrao",
+      "canonical": "https://cuadrao.ai/contacto",
+      "alternates": [
+        [
+          "es",
+          "https://cuadrao.ai/contacto"
+        ],
+        [
+          "en",
+          "https://cuadrao.ai/en/contact"
+        ],
+        [
+          "x-default",
+          "https://cuadrao.ai/contacto"
+        ]
+      ],
+      "icons": [
+        "/favicon.ico?favicon.0t190zg80o.zy.ico",
+        "/icon.svg?icon.0m9tf1wam3quu.svg",
+        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+      ],
+      "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-es.png",
+      "cookies": "",
+      "localStorageKeys": 0,
+      "sessionStorageKeys": 0
+    },
+    {
+      "path": "/privacidad",
+      "htmlLang": "es-DO",
+      "title": "Privacidad | Cuadrao",
+      "canonical": "https://cuadrao.ai/privacidad",
+      "alternates": [
+        [
+          "es",
+          "https://cuadrao.ai/privacidad"
+        ],
+        [
+          "en",
+          "https://cuadrao.ai/en/privacy"
+        ],
+        [
+          "x-default",
+          "https://cuadrao.ai/privacidad"
+        ]
+      ],
+      "icons": [
+        "/favicon.ico?favicon.0t190zg80o.zy.ico",
+        "/icon.svg?icon.0m9tf1wam3quu.svg",
+        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+      ],
+      "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-es.png",
+      "cookies": "",
+      "localStorageKeys": 0,
+      "sessionStorageKeys": 0
+    },
+    {
+      "path": "/en",
+      "htmlLang": "en",
+      "title": "Every record. In its place. | Cuadrao",
+      "canonical": "https://cuadrao.ai/en",
+      "alternates": [
+        [
+          "es",
+          "https://cuadrao.ai"
+        ],
+        [
+          "en",
+          "https://cuadrao.ai/en"
+        ],
+        [
+          "x-default",
+          "https://cuadrao.ai"
+        ]
+      ],
+      "icons": [
+        "/favicon.ico?favicon.0t190zg80o.zy.ico",
+        "/icon.svg?icon.0m9tf1wam3quu.svg",
+        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+      ],
+      "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-en.png",
+      "cookies": "",
+      "localStorageKeys": 0,
+      "sessionStorageKeys": 0
+    },
+    {
+      "path": "/en/personal",
+      "htmlLang": "en",
+      "title": "Your finances, in order. | Cuadrao Personal",
+      "canonical": "https://cuadrao.ai/en/personal",
+      "alternates": [
+        [
+          "es",
+          "https://cuadrao.ai/personal"
+        ],
+        [
+          "en",
+          "https://cuadrao.ai/en/personal"
+        ],
+        [
+          "x-default",
+          "https://cuadrao.ai/personal"
+        ]
+      ],
+      "icons": [
+        "/favicon.ico?favicon.0t190zg80o.zy.ico",
+        "/icon.svg?icon.0m9tf1wam3quu.svg",
+        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+      ],
+      "ogImage": "https://cuadrao.ai/cuadrao-site/share-personal-en.png",
+      "cookies": "",
+      "localStorageKeys": 0,
+      "sessionStorageKeys": 0
+    },
+    {
+      "path": "/en/contact",
+      "htmlLang": "en",
+      "title": "Let's talk about your business | Cuadrao",
+      "canonical": "https://cuadrao.ai/en/contact",
+      "alternates": [
+        [
+          "es",
+          "https://cuadrao.ai/contacto"
+        ],
+        [
+          "en",
+          "https://cuadrao.ai/en/contact"
+        ],
+        [
+          "x-default",
+          "https://cuadrao.ai/contacto"
+        ]
+      ],
+      "icons": [
+        "/favicon.ico?favicon.0t190zg80o.zy.ico",
+        "/icon.svg?icon.0m9tf1wam3quu.svg",
+        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+      ],
+      "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-en.png",
+      "cookies": "",
+      "localStorageKeys": 0,
+      "sessionStorageKeys": 0
+    },
+    {
+      "path": "/en/privacy",
+      "htmlLang": "en",
+      "title": "Privacy | Cuadrao",
+      "canonical": "https://cuadrao.ai/en/privacy",
+      "alternates": [
+        [
+          "es",
+          "https://cuadrao.ai/privacidad"
+        ],
+        [
+          "en",
+          "https://cuadrao.ai/en/privacy"
+        ],
+        [
+          "x-default",
+          "https://cuadrao.ai/privacidad"
+        ]
+      ],
+      "icons": [
+        "/favicon.ico?favicon.0t190zg80o.zy.ico",
+        "/icon.svg?icon.0m9tf1wam3quu.svg",
+        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+      ],
+      "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-en.png",
+      "cookies": "",
+      "localStorageKeys": 0,
+      "sessionStorageKeys": 0
+    }
+  ],
+  "redirects": [
+    {
+      "from": "/business",
+      "status": 308,
+      "to": "/"
+    },
+    {
+      "from": "/business/personal",
+      "status": 308,
+      "to": "/personal"
+    },
+    {
+      "from": "/business/demo",
+      "status": 308,
+      "to": "/contacto"
+    },
+    {
+      "from": "/business/en",
+      "status": 308,
+      "to": "/en"
+    },
+    {
+      "from": "/business/en/personal",
+      "status": 308,
+      "to": "/en/personal"
+    },
+    {
+      "from": "/business/en/demo",
+      "status": 308,
+      "to": "/en/contact"
+    },
+    {
+      "from": "/es",
+      "status": 308,
+      "to": "/"
+    },
+    {
+      "from": "/es/contacto",
+      "status": 308,
+      "to": "/contacto"
+    }
+  ],
+  "icons": [
+    {
+      "path": "/icon.svg",
+      "status": 200,
+      "contentType": "image/svg+xml",
+      "bytes": 231
+    },
+    {
+      "path": "/favicon.ico",
+      "status": 200,
+      "contentType": "image/x-icon",
+      "bytes": 1424
+    },
+    {
+      "path": "/apple-icon.png",
+      "status": 200,
+      "contentType": "image/png",
+      "bytes": 3452
+    },
+    {
+      "path": "/manifest.json",
+      "status": 404,
+      "contentType": "text/html; charset=utf-8",
+      "bytes": 6315
+    }
+  ],
+  "health": {
+    "status": 200,
+    "body": {
+      "status": "ok"
+    }
+  },
+  "robots": {
+    "text": "User-Agent: *\nDisallow: /\n\n",
+    "xRobotsTag": "noindex, nofollow"
+  }
+}
