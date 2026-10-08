@@ -19,7 +19,7 @@ web app" reply. A new message carrying a receipt already in the owner's inbox
 gets a "duplicate" reply instead of "captured". Each reply uses one language:
 the one the web app was in when the owner asked for the link code (Spanish
 by default).
-Reply copy is **pending founder approval**. Contract: `docs/API_CONTRACT.md`.
+The founder approved the reply copy on October 8, 2026. Contract: `docs/API_CONTRACT.md`.
 
 ## Proof levels
 
@@ -96,14 +96,19 @@ it with Ctrl-C and delete the callback URL in the Meta dashboard.
 
 ## Cost and messaging limits
 
-- Messages a user sends to a business are not charged, and non-template
-  replies inside the 24-hour customer service window are free
-  ([Meta pricing](https://developers.facebook.com/docs/whatsapp/pricing)).
-  Every reply here answers the person's own message inside that window.
+- Messages a user sends to a business are not charged
+  ([Meta pricing](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing)).
+- Meta's pages disagree about replies. The main pricing page says non-template
+  replies inside the 24-hour customer service window are free. The
+  [pricing update page](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing/non-template-messages)
+  says service messages are charged per message from October 1, 2026. Every
+  reply here answers the person's own message inside that window, and a test
+  sends at most a handful. Check the billing panel of the test account before
+  sending; the test account has no payment method on file.
 - Meta generates the test business number automatically
   ([Meta business phone numbers](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/phone-numbers)).
-  Its recipient limit and free use were not confirmed from a primary source in
-  this lane; confirm both in the API Setup panel before the test.
+  Its recipient limit was not confirmed from a primary source; confirm it in
+  the API Setup panel before the test.
 - Outside the 24-hour window a message needs an approved template and may be
   charged. Intake never starts a conversation, so it sends none.
 - Media URLs from Meta expire after 5 minutes. A 404 or 410 records the
@@ -115,4 +120,4 @@ it with Ctrl-C and delete the callback URL in the Meta dashboard.
 - `resolve_intake_destination` in `src/argus/api/whatsapp.py` returns the
   signed-in person. Under option A it returns the business principal through an
   active owner membership, and captures land under `business_id`.
-- Reply copy in `whatsapp/replies.py` is **pending founder approval**.
+- The founder approved the reply copy in `whatsapp/replies.py` on October 8, 2026.

@@ -18,7 +18,7 @@ import httpx
 
 from argus.domain.ingestion.whatsapp.media import GRAPH_HOST
 
-# Proposed copy, pending founder approval (docs/specs/lanes/cuadrao-whatsapp-intake.md).
+# Founder-approved copy, October 8, 2026 (docs/specs/lanes/cuadrao-whatsapp-intake.md).
 _RESEND = (
     "No pudimos guardar el recibo. Envíalo de nuevo.",
     "We couldn't save the receipt. Please send it again.",
