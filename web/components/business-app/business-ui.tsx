@@ -106,7 +106,7 @@ export function useAttentionLabel() {
           unreadable: t("business.attention.unreadable", "We couldn't read this receipt. Enter the details yourself or send a clearer photo."),
           ai_unavailable: t("business.attention.ai_unavailable", "AI preparation isn't available right now. Your receipt is saved. Try again later or enter the details yourself."),
           interrupted: t("business.attention.interrupted", "Preparation stopped before it finished. Your receipt is saved. Try again or enter the details yourself."),
-          outcome_unknown: t("business.attention.outcome_unknown", "We don't know if the AI finished reading this receipt, and nothing was saved from it. Try again or enter the details yourself."),
+          outcome_unknown: t("business.attention.outcome_unknown", "We couldn't recover the AI reading result. Your receipt is still saved. Try again or enter the details yourself."),
           no_purchase_found: t("business.attention.no_purchase_found", "Cuadrao read this receipt but didn't find a purchase to save. Enter the details yourself."),
           several_purchases: t("business.attention.several_purchases", "Cuadrao couldn't match this receipt to one purchase. Enter the details yourself to save one expense."),
           source_unavailable: t("business.attention.source_unavailable", "The original file is no longer available. Enter the details yourself."),
