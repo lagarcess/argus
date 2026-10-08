@@ -2,9 +2,9 @@
 
 Label: **local services, stub extractor, replayed WhatsApp fixtures; not provider or hosted proof.**
 
-Run: 2026-10-08T01:37:45.141Z. API http://127.0.0.1:8621 (uvicorn, Supabase persistence on the local lane stack), web http://localhost:3621 (next dev). Real local Supabase Auth. Code: branch claude/business-pilot-flow at 568cff0cf. Owner ids are shown as A and B.
+Run: 2026-10-08T01:53:25.115Z. API http://127.0.0.1:8621 (uvicorn, Supabase persistence on the local lane stack), web http://localhost:3621 (next dev). Real local Supabase Auth. Code: branch claude/business-pilot-flow at 92599473a. Owner ids are shown as A and B.
 
-Files: `business-owner-pilot-journey.mp4` is the Playwright recording of owner A's browser (34 s, 1280x800, converted from the WebM with ffmpeg). The receipts are synthetic images marked SAMPLE DATA. The stub extractor returns a fixed read per receipt digest, so no model and no provider was called. WhatsApp deliveries are signed replays of the repo fixtures, with media served from local files. No message went to Meta, and outbound replies were off.
+Files: `business-owner-pilot-journey.mp4` is the Playwright recording of owner A's browser (41 s, 1280x800, converted from the WebM with ffmpeg). The receipts are synthetic images marked SAMPLE DATA. The stub extractor returns a fixed read per receipt digest, so no model and no provider was called. WhatsApp deliveries are signed replays of the repo fixtures, with media served from local files. No message went to Meta, and outbound replies were off.
 
 ## 0. Start
 
@@ -43,28 +43,28 @@ Owner A signed in through the login form and returned to /biz.
 
 HTTP:
 
-- `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/workspace -> 200`
+- `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
-- `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/workspace -> 200`
+- `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
 
 ## b. Upload with AI consent
 
-Uploaded ferreteria-oct.png (31634 bytes) with the consent box checked. The stub prepared it: status review_ready, merchant "FERRETERIA LA ESQUINA SRL", amount 3450 DOP, missing ["account_id"].
+Uploaded ferreteria-oct.png (31079 bytes) with the consent box checked. The stub prepared it: status review_ready, merchant "FERRETERIA LA ESQUINA SRL", amount 3450 DOP, missing ["account_id"].
 
 HTTP:
 
 - `browser: POST /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/workspace -> 200`
-- `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/receipts/{id} -> 200`
+- `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
 - `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
-- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2 -> 200`
+- `api: GET /business/receipts/f605c3c3-0f94-4236-9c9b-34c2bf7cbbfa -> 200`
 
 DB rows (owner A):
 
@@ -107,7 +107,7 @@ HTTP:
 - `browser: GET /api/v1/business/workspace -> 200`
 - `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
-- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2 -> 200`
+- `api: GET /business/receipts/f605c3c3-0f94-4236-9c9b-34c2bf7cbbfa -> 200`
 
 DB rows (owner A):
 
@@ -144,8 +144,8 @@ HTTP:
 - `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
-- `browser: GET /api/v1/business/receipts/{id}/source -> 200`
 - `browser: GET /api/v1/business/expenses -> 200`
+- `browser: GET /api/v1/business/receipts/{id}/source -> 200`
 - `browser: GET /api/v1/business/expenses -> 200`
 - `api: GET /business/overview -> 200`
 - `api: GET /business/expenses -> 200`
@@ -153,7 +153,7 @@ HTTP:
 - PASS: overview total after reload
 ## f. Download the original
 
-Downloaded from the review screen: sha256 a2bbcf7db98b33c3…, uploaded sha256 a2bbcf7db98b33c3…. API source: 200, 31634 bytes.
+Downloaded from the review screen: sha256 7ef599f777273bb2…, uploaded sha256 7ef599f777273bb2…. API source: 200, 31079 bytes.
 
 HTTP:
 
@@ -167,7 +167,7 @@ HTTP:
 - `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
-- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/source -> 200`
+- `api: GET /business/receipts/f605c3c3-0f94-4236-9c9b-34c2bf7cbbfa/source -> 200`
 
 - PASS: downloaded bytes match the upload
 ## g. WhatsApp delivery
@@ -246,7 +246,7 @@ HTTP:
 - `browser: GET /api/v1/business/receipts/{id} -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
 - `browser: GET /api/v1/business/receipts/{id}/source -> 200`
-- `api: GET /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75 -> 200`
+- `api: GET /business/receipts/8236f33d-db3e-4573-abde-87287e34dd8b -> 200`
 
 - PASS: WhatsApp receipt prepared after consent
 ## i. Replay and double-click
@@ -261,10 +261,10 @@ HTTP:
 - `browser: GET /api/v1/business/workspace -> 200`
 - `browser: GET /api/v1/business/receipts -> 200`
 - `browser: GET /api/v1/business/overview -> 200`
-- `api: GET /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75 -> 200`
-- `api: POST /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/confirm -> 200`
-- `api: POST /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/confirm -> 200`
-- `api: POST /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/confirm -> 200`
+- `api: GET /business/receipts/8236f33d-db3e-4573-abde-87287e34dd8b -> 200`
+- `api: POST /business/receipts/f605c3c3-0f94-4236-9c9b-34c2bf7cbbfa/confirm -> 200`
+- `api: POST /business/receipts/8236f33d-db3e-4573-abde-87287e34dd8b/confirm -> 200`
+- `api: POST /business/receipts/8236f33d-db3e-4573-abde-87287e34dd8b/confirm -> 200`
 
 DB rows (owner A):
 
@@ -292,19 +292,68 @@ As owner B, A's two receipts on detail, source, review and confirm: [404,404,404
 
 HTTP:
 
-- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2 -> 404`
-- `api: GET /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/source -> 404`
-- `api: PATCH /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/review -> 404`
-- `api: POST /business/receipts/3bd6c246-e83c-4122-b07b-91f148ab26b2/confirm -> 404`
-- `api: GET /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75 -> 404`
-- `api: GET /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/source -> 404`
-- `api: PATCH /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/review -> 404`
-- `api: POST /business/receipts/21fd7ce8-0501-4d2d-aaae-2e25945f8a75/confirm -> 404`
+- `api: GET /business/receipts/f605c3c3-0f94-4236-9c9b-34c2bf7cbbfa -> 404`
+- `api: GET /business/receipts/f605c3c3-0f94-4236-9c9b-34c2bf7cbbfa/source -> 404`
+- `api: PATCH /business/receipts/f605c3c3-0f94-4236-9c9b-34c2bf7cbbfa/review -> 404`
+- `api: POST /business/receipts/f605c3c3-0f94-4236-9c9b-34c2bf7cbbfa/confirm -> 404`
+- `api: GET /business/receipts/8236f33d-db3e-4573-abde-87287e34dd8b -> 404`
+- `api: GET /business/receipts/8236f33d-db3e-4573-abde-87287e34dd8b/source -> 404`
+- `api: PATCH /business/receipts/8236f33d-db3e-4573-abde-87287e34dd8b/review -> 404`
+- `api: POST /business/receipts/8236f33d-db3e-4573-abde-87287e34dd8b/confirm -> 404`
 - `api: GET /business/expenses -> 200`
 - `api: GET /business/receipts -> 200`
 
 - PASS: owner B gets 404 for A's receipts and sources
 - PASS: owner B sees no expenses or receipts
+## k. WhatsApp receipt declined AI, completed by hand
+
+Signed delivery -> 200; opened from the Inbox without preparing. Confirm disabled before entry: true; enabled after filling merchant, date, amount, currency, category and account: true. Saved: status confirmed, evidence null, expense {"merchant":"Panadería La Espiga","amount":"542.80","currency":"DOP","category_id":"groceries","linked_to_this_receipt":true}. Source sha256 matches the delivered media: true. Prepare with AI afterwards -> 409 document_entered_by_owner; another confirm with a new key -> 200, same expense true. Stub extractor calls during this step: 0.
+
+HTTP:
+
+- `webhook: POST /webhooks/whatsapp -> 200`
+- `browser: GET /api/v1/business/workspace -> 200`
+- `browser: GET /api/v1/business/receipts -> 200`
+- `browser: GET /api/v1/business/overview -> 200`
+- `browser: GET /api/v1/business/workspace -> 200`
+- `browser: GET /api/v1/business/receipts -> 200`
+- `browser: GET /api/v1/business/overview -> 200`
+- `browser: GET /api/v1/business/receipts/{id} -> 200`
+- `browser: GET /api/v1/business/receipts/{id} -> 200`
+- `browser: GET /api/v1/business/receipts/{id}/source -> 200`
+- `browser: GET /api/v1/business/receipts/{id}/source -> 200`
+- `browser: PATCH /api/v1/business/receipts/{id}/review -> 200`
+- `browser: POST /api/v1/business/receipts/{id}/confirm -> 200`
+- `browser: GET /api/v1/business/workspace -> 200`
+- `browser: GET /api/v1/business/receipts -> 200`
+- `browser: GET /api/v1/business/overview -> 200`
+- `api: GET /business/receipts/aeffcf8b-86c5-4e7d-943e-f946cfe5bf9a -> 200`
+- `api: GET /business/expenses -> 200`
+- `api: GET /business/receipts/aeffcf8b-86c5-4e7d-943e-f946cfe5bf9a/source -> 200`
+- `api: POST /business/receipts/aeffcf8b-86c5-4e7d-943e-f946cfe5bf9a/prepare -> 409`
+- `api: POST /business/receipts/aeffcf8b-86c5-4e7d-943e-f946cfe5bf9a/confirm -> 200`
+
+DB rows (owner A):
+
+```json
+{
+ "receipts_live": 3,
+ "document_drafts": 3,
+ "storage_objects": 3,
+ "import_events_open": 0,
+ "import_events_accepted": 3,
+ "expenses_recorded": 3,
+ "whatsapp_messages_captured": 2,
+ "whatsapp_links_active": 1,
+ "_buckets": [
+  "financial-document-sources"
+ ]
+}
+```
+
+- PASS: hand-entered receipt saved once without AI
+- PASS: hand-entered expense linked to its source
+- PASS: prepare after hand entry refused
 
 ## Final
 
@@ -312,13 +361,13 @@ DB rows (owner A):
 
 ```json
 {
- "receipts_live": 2,
- "document_drafts": 2,
- "storage_objects": 2,
+ "receipts_live": 3,
+ "document_drafts": 3,
+ "storage_objects": 3,
  "import_events_open": 0,
- "import_events_accepted": 2,
- "expenses_recorded": 2,
- "whatsapp_messages_captured": 1,
+ "import_events_accepted": 3,
+ "expenses_recorded": 3,
+ "whatsapp_messages_captured": 2,
  "whatsapp_links_active": 1,
  "_buckets": [
   "financial-document-sources"
@@ -328,4 +377,4 @@ DB rows (owner A):
 
 Stub extractor calls this run: 2.
 
-13/13 checks passed.
+16/16 checks passed.
