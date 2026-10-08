@@ -90,7 +90,8 @@ struct CuadraoAppShell<Content: View>: View {
                         })
                         .accessibilityHidden(true)
                         .accessibilityIdentifier("add.scrim")
-                    CuadraoAddTray(items: addItems, spanish: spanish, layout: atRight ? .stack : .card) { item in
+                    CuadraoAddTray(items: addItems, spanish: spanish, layout: atRight ? .stack : .card,
+                                   maxHeight: proxy.size.height - CuadraoAppShellMetrics.navigationHeight - 12) { item in
                         closeAdd()
                         item.perform()
                     }
@@ -98,7 +99,7 @@ struct CuadraoAppShell<Content: View>: View {
                     .frame(maxWidth: .infinity, alignment: atRight ? .trailing : .center)
                     // The collapsed + sits 48pt in from the edge, which is the centre of a 48pt round button.
                     .padding(.trailing, atRight ? 24 : 0)
-                    .padding(.bottom, atRight ? barBottom + 4 : barBottom - 2)
+                    .padding(.bottom, atRight ? barBottom - 10 : barBottom - 2)
                     .transition(reduceMotion ? .opacity
                         : .scale(scale: 0.3, anchor: atRight ? .bottomTrailing : .bottom).combined(with: .opacity))
                     .accessibilityAction(.escape) { closeAdd() }

@@ -43,6 +43,8 @@ struct CuadraoAddTray: View {
     let items: [CuadraoAddItem]
     let spanish: Bool
     let layout: Layout
+    /// The room above the bar. At default sizes the rows fit; large text or landscape makes the menu scroll instead of leaving the screen.
+    var maxHeight: CGFloat = .infinity
     let choose: (CuadraoAddItem) -> Void
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .body) private var glyphSize: CGFloat = 17
@@ -78,7 +80,7 @@ struct CuadraoAddTray: View {
                 cardRows.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
             }
             .scrollBounceBehavior(.basedOnSize)
-            .frame(height: contentHeight.map { min($0, 420) } ?? CGFloat(items.count) * 52)
+            .frame(height: contentHeight.map { min($0, 420, max(120, maxHeight - 40)) } ?? CGFloat(items.count) * 52)
             .padding(.vertical, 6).padding(.horizontal, 12)
             .background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 28))
             CuadraoAddNub()
@@ -107,7 +109,7 @@ struct CuadraoAddTray: View {
         Button { choose(item) } label: {
             HStack(spacing: 14) {
                 Image(systemName: item.action.symbol)
-                    .font(.system(size: glyphSize, weight: .regular))
+                    .font(.system(size: min(glyphSize, 24), weight: .regular))
                     .foregroundStyle(WelcomePalette.pine)
                     .frame(width: 34, height: 34)
                     .background(WelcomePalette.pine.opacity(0.1), in: Circle())
@@ -126,12 +128,21 @@ struct CuadraoAddTray: View {
     // MARK: Stack
 
     private var stack: some View {
-        VStack(alignment: .trailing, spacing: 12) {
-            ForEach(Array(groups.enumerated()), id: \.offset) { groupIndex, group in
-                if groupIndex > 0 { Color.clear.frame(height: 6) }
-                ForEach(group) { item in stackRow(item) }
+        // Rows nearest the + stay in view when the stack is taller than the room above the bar.
+        ScrollView {
+            VStack(alignment: .trailing, spacing: 12) {
+                ForEach(Array(groups.enumerated()), id: \.offset) { groupIndex, group in
+                    if groupIndex > 0 { Color.clear.frame(height: 6) }
+                    ForEach(group) { item in stackRow(item) }
+                }
             }
+            .padding(.vertical, 14)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .scrollClipDisabled()
+        .defaultScrollAnchor(.bottom)
+        .frame(height: contentHeight.map { min($0, max(120, maxHeight)) })
     }
 
     private func stackRow(_ item: CuadraoAddItem) -> some View {
@@ -143,7 +154,7 @@ struct CuadraoAddTray: View {
                     .background(WelcomePalette.surface, in: Capsule())
                     .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
                 Image(systemName: item.action.symbol)
-                    .font(.system(size: glyphSize + 2, weight: .regular))
+                    .font(.system(size: min(glyphSize + 2, 30), weight: .regular))
                     .foregroundStyle(WelcomePalette.pine)
                     .frame(width: 48, height: 48)
                     .background(WelcomePalette.surface, in: Circle())

@@ -26,7 +26,7 @@ extension FinancialLoopUITests {
         for row in ["account", "transaction", "plan"] {
             XCTAssertTrue(app.buttons["add.tray." + row].waitForExistence(timeout: 5), row)
         }
-        for row in ["scan", "group", "invite"] { XCTAssertFalse(app.buttons["add.tray." + row].exists, row) }
+        for row in ["scanCamera", "choosePhoto", "chooseFile", "group", "invite"] { XCTAssertFalse(app.buttons["add.tray." + row].exists, row) }
         XCTAssertLessThan(app.buttons["add.tray.transaction"].frame.maxY, add.frame.minY, "the tray sits above the bar")
         let tray = app.descendants(matching: .any)["add.tray"]
         XCTAssertTrue(tray.exists)
@@ -112,5 +112,25 @@ extension FinancialLoopUITests {
         let leftBehind = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["add.tray.plan"])
         XCTAssertEqual(XCTWaiter.wait(for: [leftBehind], timeout: 5), .completed, "changing tab closes the tray")
         XCTAssertEqual(add.label, "Add", "and the + is a + again")
+    }
+
+    /// Large text on a short landscape screen leaves little room above the bar; the + menu scrolls instead of leaving the screen.
+    func testReleaseSurfaceAddMenuStaysOnScreenAtLargeTextInLandscape() throws {
+        try signIn()
+        app.terminate()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "--cuadrao-release-gates",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        app.launch()
+        let add = app.buttons["nav.add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 20))
+        add.tap()
+        let tray = app.descendants(matching: .any)["add.tray"]
+        XCTAssertTrue(tray.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(tray.frame.minY, app.frame.minY, "the menu does not run off the top of the screen")
+        XCTAssertLessThanOrEqual(tray.frame.maxY, add.frame.minY, "and stops above the bar")
+        for row in ["account", "transaction", "plan"] { XCTAssertTrue(app.buttons["add.tray." + row].exists, row) }
+        capture("release-surface-add-menu-landscape-large-text")
     }
 }
