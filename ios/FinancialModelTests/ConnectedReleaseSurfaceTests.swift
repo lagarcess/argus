@@ -55,10 +55,20 @@ final class ConnectedReleaseSurfaceTests: XCTestCase {
         XCTAssertEqual(chosen.id, only.id)
     }
 
-    func testAddWithSeveralAccountsOpensTheFirstInThePersonsOrder() throws {
+    func testAddWithSeveralAccountsOfOneCurrencyOpensTheFirstMoneyAccountInTheirOrder() throws {
         let first = try account(), second = try account()
         guard case .record(let chosen) = ConnectedAddMovement.target(for: [first, second], loaded: true) else { return XCTFail("expected record") }
         XCTAssertEqual(chosen.id, first.id)
+    }
+
+    func testAddWithAccountsInMoreThanOneCurrencyAsksWhich() throws {
+        guard case .choose = ConnectedAddMovement.target(for: [try account(), try account(currency: "USD")], loaded: true) else { return XCTFail("expected choose") }
+    }
+
+    func testAMoneyAccountIsPreferredOverALiabilityAsTheStartingAccount() throws {
+        let card = try account(nature: "liability", type: "credit_card"), cash = try account()
+        guard case .record(let chosen) = ConnectedAddMovement.target(for: [card, cash], loaded: true) else { return XCTFail("expected record") }
+        XCTAssertEqual(chosen.id, cash.id)
     }
 
     func testAddBeforeAccountsHaveLoadedLoadsThemInsteadOfStartingAFirstAccount() throws {
@@ -66,11 +76,11 @@ final class ConnectedReleaseSurfaceTests: XCTestCase {
         guard case .loadAccounts = ConnectedAddMovement.target(for: [try account()], loaded: false) else { return XCTFail("expected loadAccounts") }
     }
 
-    private func account() throws -> FinancialAccount {
+    private func account(currency: String = "DOP", nature: String = "asset", type: String = "checking") throws -> FinancialAccount {
         let opening: [String: Any] = ["record_id": UUID().uuidString, "revision": 1, "kind": "opening", "amount_minor": 100,
             "observed_amount_minor": 100, "amount": "1.00", "as_of": "2026-10-06T08:00:00-04:00", "time_zone": "America/Santo_Domingo",
             "recorded_at": "2026-10-06T12:00:00Z", "source": "manual", "revisions": []]
-        let body: [String: Any] = ["id": UUID().uuidString, "type": "checking", "nature": "asset", "currency": "DOP",
+        let body: [String: Any] = ["id": UUID().uuidString, "type": type, "nature": nature, "currency": currency,
             "currency_fraction_digits": 2, "nickname": NSNull(), "archived": false, "ownership_share_bps": 10000, "version": 1,
             "created_at": "2026-10-06T08:00:00-04:00", "updated_at": "2026-10-06T12:00:00Z", "opening": opening,
             "balance": ["state": "known", "amount_minor": 100, "amount": "1.00", "as_of": "2026-10-06T08:00:00-04:00",

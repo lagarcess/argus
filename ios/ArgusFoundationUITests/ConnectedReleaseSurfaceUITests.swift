@@ -93,12 +93,9 @@ extension FinancialLoopUITests {
         app.buttons["tab.home"].tap()
         add.tap()
         XCTAssertTrue(app.buttons["add.tray.plan"].waitForExistence(timeout: 5))
-        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.'")).firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 10))
-        tapVisible(row)
-        app.revealConnectedTabBar()
-        XCTAssertTrue(add.waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["add.tray.plan"].exists, "a pushed detail closes the tray")
+        app.buttons["tab.search"].tap()
+        let leftBehind = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["add.tray.plan"])
+        XCTAssertEqual(XCTWaiter.wait(for: [leftBehind], timeout: 5), .completed, "changing tab closes the tray")
         XCTAssertEqual(add.label, "Add", "and the + is a + again")
     }
 }

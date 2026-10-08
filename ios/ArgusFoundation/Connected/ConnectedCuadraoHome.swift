@@ -16,6 +16,7 @@ struct ConnectedCuadraoHome: View {
     @State private var householdDestination: AppDestination = .home
     @Environment(\.locale) private var locale
     @State private var sheet: HomeSheet?
+    @State private var choosingAccount = false
     @State private var moreAccount: FinancialAccount?
     @State private var archivedID: UUID?
     @State private var accountOrder: [UUID] = []
@@ -122,6 +123,13 @@ struct ConnectedCuadraoHome: View {
             accountOrder = auth.profile.map { ConnectedAccountOrder.load(for: $0.id) } ?? []
         }
         .refreshable { await accounts.load(); await loop.refresh() }
+        .confirmationDialog("loop.chooseAccount", isPresented: $choosingAccount, titleVisibility: .visible) {
+            ForEach(activeAccounts) { account in
+                Button(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")) {
+                    loop.record(account)
+                }
+            }
+        }
         .confirmationDialog(Text(verbatim: moreAccount.map(accountName) ?? ""), isPresented: Binding(get: { moreAccount != nil }, set: { if !$0 { moreAccount = nil } }),
                             titleVisibility: .visible, presenting: moreAccount) { account in
             if !account.isOptionalAsset {
@@ -343,6 +351,7 @@ struct ConnectedCuadraoHome: View {
                 CuadraoSectionAddButton(title: spanish ? "Añadir movimiento" : "Add activity") {
                     switch ConnectedAddMovement.target(for: activeAccounts, loaded: accounts.hasLoaded) {
                     case .record(let account): loop.record(account)
+                    case .choose: choosingAccount = true
                     case .loadAccounts: Task { await accounts.load() }
                     case .createAccount: break
                     }
