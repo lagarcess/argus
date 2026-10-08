@@ -85,6 +85,8 @@ class ReceiptReview:
     # Purchases read from the document beside the owner's entry. Once the
     # owner enters the receipt by hand, none of them can become its expense.
     read_purchases: tuple[ReadPurchase, ...] = ()
+    # The purchase under review is the one the owner entered by hand.
+    owner_entry: bool = False
 
 
 def _is_receipt(batch: ExtractionBatch | None) -> bool:
@@ -202,6 +204,7 @@ def receipt_review(
         event_version=event["version"],
         expense_id=event["activity_id"],
         read_purchases=read,
+        owner_entry=bool(entered),
     )
 
 

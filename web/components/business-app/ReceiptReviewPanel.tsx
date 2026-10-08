@@ -398,7 +398,7 @@ export default function ReceiptReviewPanel({ receiptId }: { receiptId: string })
               <button
                 type="button"
                 className={primaryButtonClass}
-                disabled={busy !== null || missing.length > 0 || amountInvalid || waitingForAi}
+                disabled={busy !== null || missing.length > 0 || amountInvalid || waitingForAi || locked}
                 onClick={() => void confirm()}
               >
                 {busy === "confirm" ? t("business.review.confirming", "Saving…") : t("business.review.confirm", "Confirm expense")}

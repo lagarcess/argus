@@ -5,9 +5,11 @@ from __future__ import annotations
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from argus.api.documents import documents_service
 from argus.api.ingestion import ingestion_hub
 from argus.domain.ingestion.documents.jobs import OUTCOME_UNKNOWN
+from argus.domain.ingestion.reconcile.service import ReconciliationService
 
 from tests.business.receipt_stub import PURCHASE, ReceiptStub
 from tests.business.test_business_api import (  # noqa: F401
@@ -249,8 +251,46 @@ def test_review_with_an_account_outside_this_space_is_404(
     ] * 2
     saved = alice.upload(content=SECOND, consent=False)
     assert saved.status_code == 200, saved.text
-    by_hand = alice.review(saved.json()["id"], 0, account_id=personal)
+    saved_id = saved.json()["id"]
+    by_hand = alice.review(saved_id, 0, account_id=personal)
     assert (by_hand.status_code, by_hand.json()["code"]) == (
         404,
         "financial_account_not_found",
     )
+    untouched = alice.detail(saved_id)
+    assert (_next(untouched), untouched["version"]) == (
+        ("saved", None, True, True),
+        0,
+    )
+    assert _events(alice) == [("open", None)]
+
+
+def test_an_entry_interrupted_before_the_reads_are_set_aside_finishes_next_time(
+    alice: Owner,  # noqa: F811
+    stub: ReceiptStub,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stub.rows = [
+        PURCHASE,
+        {**PURCHASE, "row": 2, "evidence": "payment_notice", "amount": "100.00"},
+    ]
+    receipt_id = prepared(alice)
+    dismiss = ReconciliationService.dismiss
+
+    def down(self, **kwargs):  # noqa: ANN001, ANN003, ANN202
+        raise RuntimeError("review queue unavailable")
+
+    monkeypatch.setattr(ReconciliationService, "dismiss", down)
+    failed = alice.review(receipt_id, 0, merchant="Ferretería")
+    assert failed.status_code >= 500
+    entered = alice.detail(receipt_id)
+    assert (_next(entered), entered["merchant"]) == (
+        ("review_ready", None, False, False),
+        None,
+    )
+    assert _events(alice) == [("open", None)] * 3
+
+    monkeypatch.setattr(ReconciliationService, "dismiss", dismiss)
+    healed = alice.review(receipt_id, entered["version"], merchant="Ferretería")
+    assert healed.status_code == 200, healed.text
+    assert _events(alice) == [("dismissed", None), ("dismissed", None), ("open", None)]

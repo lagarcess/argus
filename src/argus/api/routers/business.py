@@ -336,7 +336,9 @@ async def review_receipt(
 
     service, scope = context.service, context.scope
     try:
-        version = await service.start_entry(scope, receipt_id, body.version)
+        version = await service.start_entry(
+            scope, receipt_id, body.version, body.fields.get("account_id")
+        )
         reviewed = await run_in_threadpool(
             service.review, scope, receipt_id, version, body.fields
         )

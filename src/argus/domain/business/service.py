@@ -204,41 +204,74 @@ class BusinessService:
         return draft.media_type, content
 
     async def start_entry(
-        self, scope: BusinessScope, receipt_id: str, version: int
+        self,
+        scope: BusinessScope,
+        receipt_id: str,
+        version: int,
+        account_id: str | None = None,
     ) -> int:
         """The version a review applies to. For a receipt with no single
         purchase, first record the owner's one purchase, then that version.
 
-        Purchases a read found are dismissed first, kept as history, so only
-        the owner's can become the expense. A repeat finds them dismissed and
-        the entry delivered, so a replay or a second tab enters one purchase.
+        A repeat delivers the same purchase, so a replay, a second tab or a
+        restart enters one. ``account_id``, the account the review will set, is
+        refused before anything is entered when it is outside the space.
         """
 
         current = await asyncio.to_thread(self.receipt, scope, receipt_id)
-        if not current.enterable:
-            return version
-        if version != current.version:
-            raise StaleEvent()
+        if current.enterable:
+            if version != current.version:
+                raise StaleEvent()
+            if account_id and account_id not in self._account_ids(scope):
+                raise ReconcileError(
+                    "financial_account_not_found", "Choose your own account."
+                )
+            await self.documents.enter(
+                user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
+            )
+            current = await asyncio.to_thread(self.receipt, scope, receipt_id)
+            version = current.version
         await asyncio.to_thread(self._set_aside, scope, current)
-        await self.documents.enter(
-            user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
-        )
-        return (await asyncio.to_thread(self.receipt, scope, receipt_id)).version
+        return version
+
+    def _account_ids(self, scope: BusinessScope) -> set[str]:
+        return {
+            stored.account.id
+            for stored in self.accounts.list_accounts(
+                user_id=scope.person_id, scope=scope.owner
+            )
+        }
 
     def _set_aside(self, scope: BusinessScope, receipt: Receipt) -> None:
+        """Beside the owner's entry, dismiss every open purchase a read found,
+        kept as history, so only the owner's can become the expense. Runs on
+        each review and confirm, so an entry interrupted before this finishes
+        on the next one."""
+
+        if not receipt.review.owner_entry:
+            return
+        person, owner = scope.person_id, scope.owner
         for read in receipt.review.read_purchases:
-            if read.state != "open":
-                continue
-            try:
-                self.imports.dismiss(
-                    user_id=scope.person_id,
-                    event_id=read.event_id,
-                    version=read.version,
-                    scope=scope.owner,
-                )
-            except StaleEvent:
-                # Another entry of this receipt changed it first.
-                continue
+            state, version = read.state, read.version
+            for _ in range(3):
+                if state != "open":
+                    break
+                try:
+                    self.imports.dismiss(
+                        user_id=person,
+                        event_id=read.event_id,
+                        version=version,
+                        scope=owner,
+                    )
+                    break
+                except StaleEvent:
+                    # A replayed delivery or another entry changed it first.
+                    seen = self.imports.detail(
+                        user_id=person, event_id=read.event_id, scope=owner
+                    )
+                    state, version = seen["state"], seen["version"]
+            else:
+                raise StaleEvent()
 
     def review(
         self,
@@ -271,6 +304,7 @@ class BusinessService:
         """
 
         current = self.receipt(scope, receipt_id)
+        self._set_aside(scope, current)
         if current.status == "confirmed":
             return current
         if current.version == version and current.missing_fields:

@@ -8845,13 +8845,14 @@ accept path recorded.
   the same accept path, and `receipt_ids` links the expense to the receipt.
   A receipt that was read but has no single purchase (`no_purchase_found`,
   `several_purchases_found`, `receipt_purchase_ambiguous`) is entered by hand
-  the same way. The read stays stored and its `evidence` stays visible. Every
-  open purchase the read created is dismissed first and kept as history, then
-  the owner's one purchase is delivered beside the read, so only it can become
-  the expense. A replay, a second tab or a restart enters one purchase and
-  confirm records one expense. An account outside the Business space, Personal
-  or another person's, is 404 `financial_account_not_found`, as on
-  POST `/expenses`.
+  the same way. The read stays stored and its `evidence` stays visible. The
+  owner's one purchase is delivered beside the read, then every open purchase
+  the read created is dismissed and kept as history, so only the owner's can
+  become the expense. Each later review and confirm repeats that dismissal, so
+  an interrupted entry finishes. A replay, a second tab or a restart enters one
+  purchase and confirm records one expense. An account outside the Business
+  space, Personal or another person's, is 404 `financial_account_not_found`,
+  as on POST `/expenses`, and is refused before anything is entered.
 - POST `/api/v1/business/receipts/{id}/confirm` (`Idempotency-Key` required)
   takes `{version}` and records the receipt as one expense through the import
   accept path. Confirm changes nothing before it claims the import. A
