@@ -63,3 +63,17 @@ describe("wordmark specification", () => {
     expect(readme).toContain("**-0.085em**");
   });
 });
+
+describe("intrinsic size", () => {
+  test.each(["cuadrao-lockup-light.svg", "cuadrao-lockup-dark.svg", "cuadrao-wordmark.svg", "cuadrao-wordmark-dark.svg"])(
+    "%s declares a width and height in the aspect of its viewBox",
+    (file) => {
+      const root = brand(file).match(/<svg[^>]*>/)?.[0] ?? "";
+      const width = Number(root.match(/ width="([\d.]+)"/)?.[1]);
+      const height = Number(root.match(/ height="([\d.]+)"/)?.[1]);
+      const [, , viewWidth, viewHeight] = (root.match(/viewBox="([^"]+)"/)?.[1] ?? "").split(" ").map(Number);
+      expect(width).toBeGreaterThan(0);
+      expect(height / width).toBeCloseTo(viewHeight / viewWidth, 3);
+    },
+  );
+});

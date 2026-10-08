@@ -24,6 +24,10 @@ TRACKING = -85  # -0.085em in a 1000-unit em
 INK, PAPER = "#172b26", "#fafbf8"
 GAP = 250  # between the mark and the wordmark, in wordmark units (1 em = 1000)
 MARK_HEIGHT = 1000
+# Intrinsic size of the lockups, so a tool that sizes an SVG by its root attributes (Xcode's
+# asset compiler) does not rasterize it at viewBox size. The art scales freely.
+LOCKUP_WIDTH = 268
+WORDMARK_WIDTH = 200
 # Bounds of the mark's three shapes inside its 64-unit grid (see brand/cuadrao-mark-light.svg).
 MARK_X0, MARK_Y0, MARK_W, MARK_H = 3.897, 8.0, 56.203, 48.0
 
@@ -61,7 +65,7 @@ def fmt(value: float) -> str:
 def wordmark_svg(fill: str) -> str:
     x0, y0, x1, y1 = ink
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{fmt(x0)} {fmt(y0)} {fmt(x1 - x0)} {fmt(y1 - y0)}">'
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{WORDMARK_WIDTH}" height="{WORDMARK_WIDTH * (y1 - y0) / (x1 - x0):.2f}" viewBox="{fmt(x0)} {fmt(y0)} {fmt(x1 - x0)} {fmt(y1 - y0)}">'
         f'<path fill="{fill}" d="{word_path}"/></svg>\n'
     )
 
@@ -82,8 +86,9 @@ def lockup_svg(mark_source: Path, fill: str) -> str:
     left, right = 0.0, mark_width + GAP + (ink[2] - ink[0])
     bottom = max(centre + MARK_HEIGHT / 2, 0)
     top = min(top, ink[1])
+    view_width, view_height = right - left, bottom - top
     return (
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="{fmt(left)} {fmt(top)} {fmt(right - left)} {fmt(bottom - top)}">{defs}'
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{LOCKUP_WIDTH}" height="{LOCKUP_WIDTH * view_height / view_width:.2f}" viewBox="{fmt(left)} {fmt(top)} {fmt(view_width)} {fmt(view_height)}">{defs}'
         f'<g transform="translate({fmt(-MARK_X0 * scale)} {fmt(centre - (MARK_Y0 + MARK_H / 2) * scale)}) scale({fmt(scale)})">{group}</g>'
         f'<path transform="translate({fmt(word_x)} 0)" fill="{fill}" d="{word_path}"/></svg>\n'
     )

@@ -37,7 +37,7 @@ Proposed geometry, in wordmark units where the wordmark's font size is 1 em. It 
 - Clear space: 0.5 em on every side.
 - Minimum size: lockup at a wordmark font size of 20 px; the mark alone down to 16 px (the favicon size).
 
-The lockup SVGs have exactly this geometry, cropped to their ink, with no clear space built in.
+The lockup SVGs have exactly this geometry, cropped to their ink, with no clear space built in. The lockups and the wordmarks carry an intrinsic `width` and `height` (268 and 200 wide, in the aspect of their viewBox) so a tool that sizes an SVG by its root attributes does not rasterize it at viewBox size; the art scales freely.
 
 ## Colours
 
