@@ -200,6 +200,7 @@ RELATIONS_WITHOUT_CLIENT_TABLE_GRANTS = frozenset(
         "public.refusal_observations",
         "public.route_receipts",
         "public.run_context_packets",
+        "public.spaces",
         "public.strategies",
         "public.usage_counters",
         "public.visitor_usage_counters",
@@ -381,6 +382,21 @@ def test_client_executable_functions_match_the_allow_list(catalog) -> None:
 
 def test_migration_owner_default_privileges_give_clients_nothing(catalog) -> None:
     assert _default_privileges(catalog) == CLIENT_DEFAULT_PRIVILEGES
+
+
+def test_business_space_is_never_client_visible(catalog) -> None:
+    connections = _column_privileges(catalog)["public.financial_source_connections"]
+    assert "owner_space_id" not in connections["authenticated"]["SELECT"]
+    catalog.execute(
+        "select role_name, has_function_privilege(role_name,"
+        " 'public.business_space_of(uuid)', 'EXECUTE')"
+        " from unnest(array['anon', 'authenticated', 'service_role']) as role_name"
+    )
+    assert dict(catalog.fetchall()) == {
+        "anon": False,
+        "authenticated": False,
+        "service_role": True,
+    }
 
 
 # Behavior on a real write. A signed-in user owns these rows and the owner
