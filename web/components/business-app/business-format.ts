@@ -1,0 +1,102 @@
+import { currencyDigits, currencySymbol } from "@/lib/money-entry";
+
+const DECIMAL_AMOUNT = /^(-?)(\d+)(?:\.(\d+))?$/;
+
+function separators(locale: string): { group: string; decimal: string } {
+  try {
+    const parts = new Intl.NumberFormat(locale).formatToParts(11111.1);
+    return {
+      group: parts.find((part) => part.type === "group")?.value ?? ",",
+      decimal: parts.find((part) => part.type === "decimal")?.value ?? ".",
+    };
+  } catch {
+    return { group: ",", decimal: "." };
+  }
+}
+
+/**
+ * Reads back a saved amount from its decimal string: padded to the currency's
+ * digits and never rounded or passed through a float. The symbol names which
+ * dollar it is.
+ */
+export function formatMoney(
+  amount: string | null,
+  currency: string | null,
+  locale: string,
+): string {
+  if (amount === null || currency === null) return "";
+  const match = DECIMAL_AMOUNT.exec(amount.trim());
+  if (!match) return `${currency} ${amount}`;
+  const [, sign, whole, fraction = ""] = match;
+  const { group, decimal } = separators(locale);
+  const digits = Math.max(currencyDigits(currency), fraction.length);
+  let grouped = "";
+  for (let index = 0; index < whole.length; index += 1) {
+    if (index > 0 && (whole.length - index) % 3 === 0) grouped += group;
+    grouped += whole[index];
+  }
+  const number = digits > 0 ? `${grouped}${decimal}${fraction.padEnd(digits, "0")}` : grouped;
+  return `${sign}${currencySymbol(currency)} ${number}`;
+}
+
+export function formatDay(day: string | null, locale: string): string {
+  if (!day) return "";
+  const date = new Date(`${day.slice(0, 10)}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return day;
+  return new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric" }).format(date);
+}
+
+export function formatRelativeTime(iso: string | null, locale: string): string {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return "";
+  const minutes = Math.round((then - Date.now()) / 60_000);
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: "auto" });
+  if (Math.abs(minutes) < 60) return rtf.format(minutes, "minute");
+  const hours = Math.round(minutes / 60);
+  if (Math.abs(hours) < 24) return rtf.format(hours, "hour");
+  return rtf.format(Math.round(hours / 24), "day");
+}
+
+export type Period = { key: "this_month" | "last_month" | "last_30_days"; from: string; to: string };
+
+function isoDay(date: Date): string {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 10);
+}
+
+export function periodRange(key: Period["key"], now = new Date()): Period {
+  if (key === "last_month") {
+    const first = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const last = new Date(now.getFullYear(), now.getMonth(), 0);
+    return { key, from: isoDay(first), to: isoDay(last) };
+  }
+  if (key === "last_30_days") {
+    const start = new Date(now);
+    start.setDate(start.getDate() - 29);
+    return { key, from: isoDay(start), to: isoDay(now) };
+  }
+  return { key, from: isoDay(new Date(now.getFullYear(), now.getMonth(), 1)), to: isoDay(now) };
+}
+
+export const RECEIPT_CATEGORY_IDS = [
+  "other",
+  "groceries",
+  "dining",
+  "transport",
+  "housing",
+  "health",
+  "shopping",
+  "interest_fees",
+] as const;
+
+/** The first period filter whose range holds `day`, if any does. */
+export function periodContaining(day: string, now = new Date()): Period["key"] | null {
+  const keys: Period["key"][] = ["this_month", "last_month", "last_30_days"];
+  return (
+    keys.find((key) => {
+      const { from, to } = periodRange(key, now);
+      return from <= day && day <= to;
+    }) ?? null
+  );
+}

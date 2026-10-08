@@ -2166,5 +2166,204 @@
         "unavailable": "This result is unavailable right now."
       }
     }
+  },
+  "business": {
+    "expenses": {
+      "title": "Expenses",
+      "subtitle": "Saved expenses from {{from}} to {{to}}.",
+      "error": "We couldn't load your expenses. Try again.",
+      "empty": "No expenses saved in this period.",
+      "no_merchant": "Expense",
+      "view_receipt": "Receipt"
+    },
+    "sample": {
+      "notice": "Design preview with sample data. Nothing here is saved, uploaded or sent."
+    },
+    "status": {
+      "saved": "Saved, not prepared",
+      "queued": "Waiting to prepare",
+      "preparing": "Preparing",
+      "review_ready": "Ready to review",
+      "needs_attention": "Needs attention",
+      "confirmed": "Expense saved",
+      "dismissed": "Dismissed"
+    },
+    "category": {
+      "none": "No category",
+      "other": "Other",
+      "groceries": "Groceries",
+      "dining": "Dining",
+      "transport": "Transport",
+      "housing": "Housing",
+      "health": "Health",
+      "shopping": "Shopping",
+      "interest_fees": "Interest and fees"
+    },
+    "attention": {
+      "unreadable": "We couldn't read this receipt. Enter the details yourself or send a clearer photo.",
+      "ai_unavailable": "AI preparation isn't available right now. Your receipt is saved. Try again later or enter the details yourself.",
+      "interrupted": "Preparation stopped before it finished. Your receipt is saved. Try again or enter the details yourself.",
+      "outcome_unknown": "We couldn't recover the AI reading result. Your receipt is still saved. Try again or enter the details yourself.",
+      "no_purchase_found": "Cuadrao read this receipt but didn't find a purchase to save. Enter the details yourself.",
+      "several_purchases": "Cuadrao couldn't match this receipt to one purchase. Enter the details yourself to save one expense.",
+      "source_unavailable": "The original file is no longer available. Enter the details yourself.",
+      "check_details": "Cuadrao couldn't read every part of this receipt. Check the details against the original before you confirm.",
+      "other": "Something went wrong with this receipt. It is still saved. Enter the details yourself."
+    },
+    "actions": {
+      "upload_receipt": "Upload receipt",
+      "record_expense": "Record expense",
+      "review_inbox_one": "Review {{count}} receipt",
+      "review_inbox_other": "Review {{count}} receipts",
+      "ask_spending": "What did I spend this month?",
+      "attach_receipt": "Add a receipt"
+    },
+    "nav": {
+      "label": "Business",
+      "overview": "Overview",
+      "inbox": "Inbox",
+      "expenses": "Expenses",
+      "updates": "Updates"
+    },
+    "home": {
+      "title": "What can we do for your business?",
+      "body": "Add a receipt, record an expense, or ask about what you've saved."
+    },
+    "receipt": {
+      "untitled": "Receipt"
+    },
+    "inbox": {
+      "title": "Inbox",
+      "subtitle": "Receipts waiting for you to review. Nothing here is an expense until you confirm it.",
+      "error": "We couldn't load your inbox. Try again.",
+      "empty_title": "You're all caught up",
+      "empty_body": "Upload a receipt or send one by WhatsApp. It will wait here for your review."
+    },
+    "review": {
+      "source_error": "We couldn't open the original receipt. It is still stored.",
+      "source": "Original receipt",
+      "download": "Download",
+      "error": "This receipt isn't available. It may have been removed.",
+      "retry": "Try again with AI",
+      "retry_consent": "Trying again sends this receipt to our AI provider.",
+      "prepare_failed": "We couldn't start preparation. Your receipt is saved. Try again.",
+      "stale": "This receipt changed since you opened it. Review the current details before confirming.",
+      "confirm_failed": "We couldn't confirm this expense. Nothing was saved twice. Try again.",
+      "needed": "Needed",
+      "saved_title": "Saved expense",
+      "title": "Review receipt",
+      "consent": "Cuadrao can read this receipt with AI and fill in the details for you to check. The receipt is sent to our AI provider only if you choose this. You can also fill in the details yourself.",
+      "prepare": "Prepare with AI",
+      "preparing": "Reading your receipt. You can leave this page; the result will wait in your inbox.",
+      "merchant": "Merchant",
+      "date": "Date",
+      "category": "Category",
+      "amount": "Total",
+      "currency": "Currency",
+      "choose": "Choose",
+      "account": "Paid from",
+      "choose_account": "Choose an account",
+      "currency_mismatch": "This account uses {{account}}. Choose an account in {{receipt}} or correct the currency.",
+      "evidence": "What the receipt says",
+      "tax": "Tax",
+      "evidence_note": "Your corrections don't change what was read from the receipt. One receipt saves one expense for its total.",
+      "saved_body": "Saved as one expense of {{amount}}.",
+      "view_expenses": "View expenses",
+      "confirming": "Saving…",
+      "confirm": "Confirm expense",
+      "missing": "Fill in the details marked Needed to save this expense."
+    },
+    "create": {
+      "label": "Create"
+    },
+    "updates": {
+      "ready": "{{name}} is ready to review",
+      "attention": "{{name}} needs attention",
+      "confirmed": "{{name}} was saved as an expense",
+      "title": "Updates",
+      "subtitle": "Processing results and anything that needs you.",
+      "error": "We couldn't load updates. Try again.",
+      "empty": "Nothing new. Results from your receipts will appear here."
+    },
+    "record": {
+      "save": "Save expense",
+      "no_accounts": "Add a business account first so we know where this expense was paid from.",
+      "amount_in": "Total in {{currency}}",
+      "failed": "We couldn't save this expense. Try again. It won't be saved twice."
+    },
+    "intake": {
+      "unsupported": "This file type isn't supported. Use a PDF, JPG or PNG.",
+      "too_large": "This file is larger than {{size}} MB. Use a smaller photo or PDF.",
+      "heic": "This is an iPhone HEIC photo. Upload it from your iPhone's browser, which converts it, or export it as JPG first.",
+      "title": "Upload receipt",
+      "saving": "Saving…",
+      "save": "Save to Inbox",
+      "formats": "PDF, JPG or PNG, up to {{size}} MB. The original stays private to you.",
+      "drop": "Drop a receipt here.",
+      "paste": "Paste",
+      "clipboard_empty": "There's no receipt image or PDF to paste. Copy one first, or choose a file.",
+      "replace": "Choose another",
+      "choose": "Choose file",
+      "camera": "Take photo",
+      "failed": "We couldn't save this receipt. Check your connection and try again. It won't be saved twice.",
+      "consent": "Prepare it with AI after saving. The receipt is sent to our AI provider to fill in the details for your review. Leave this off to fill them in yourself."
+    },
+    "period": {
+      "this_month": "This month",
+      "last_month": "Last month",
+      "last_30_days": "Last 30 days",
+      "label": "Period"
+    },
+    "overview": {
+      "title": "Your business",
+      "error": "We couldn't load your business records. Your saved receipts and expenses are safe. Try again.",
+      "in_inbox": "In your inbox",
+      "open_inbox": "Open inbox",
+      "confirmed": "Saved expenses, {{period}}",
+      "no_expenses": "No expenses saved in this period yet.",
+      "expense_count_one": "{{count}} expense",
+      "expense_count_other": "{{count}} expenses",
+      "separate_currencies": "Each currency is totaled on its own. No conversion.",
+      "attention_one": "{{count}} receipt needs your attention",
+      "attention_other": "{{count}} receipts need your attention",
+      "coverage": "Covers {{from}} to {{to}}. Last receipt {{received}}. Totals include saved expenses only, not receipts waiting for review.",
+      "never": "none yet"
+    },
+    "composer": {
+      "placeholder_ask": "Ask about your saved expenses",
+      "placeholder": "Write a message",
+      "add": "Add"
+    },
+    "composer_receipt": {
+      "saved": "Saved to Inbox",
+      "dismiss": "Dismiss"
+    },
+    "search": {
+      "placeholder": "Search expenses, receipts and chats",
+      "placeholder_records": "Search expenses and receipts",
+      "no_results_hint": "Try a merchant or a file name.",
+      "region": "Business records",
+      "loading": "Searching your business",
+      "failed": "We couldn't search your business.",
+      "receipts": "Receipts"
+    }
+  },
+  "money": {
+    "label": "{{label}} in {{currency}}",
+    "invalid": "Use digits and one decimal point.",
+    "decimal_twice": "An amount has only one decimal point.",
+    "negative": "Enter a positive amount.",
+    "grouping": "Check the thousands commas, as in 1,250.50.",
+    "decimal_comma": "Use a point for decimals, as in 1,250.50.",
+    "precision_none": "{{currency}} has no decimals.",
+    "precision_one": "{{currency}} allows up to {{count}} decimal.",
+    "precision_other": "{{currency}} allows up to {{count}} decimals.",
+    "currency_mismatch": "This amount is in {{field}}, not {{typed}}.",
+    "zero": "Enter an amount greater than 0.",
+    "too_long_one": "Use at most {{count}} digit before the decimal point.",
+    "too_long_other": "Use at most {{count}} digits before the decimal point.",
+    "out_of_range": "This amount is too large to record.",
+    "ambiguous_currency": "$ could mean RD$ or US$. Enter the amount without a symbol, or with RD$ or US$.",
+    "same_amount": "Same amount, no conversion."
   }
 }

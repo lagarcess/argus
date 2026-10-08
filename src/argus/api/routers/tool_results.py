@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 
 from argus.api.chat.tool_results import tool_cards_from_metadata
+from argus.api.conversation_surface import require_open_business_chat
 from argus.api.dependencies import current_user, problem
 from argus.api.message_store import (
     latest_message,
@@ -56,6 +57,7 @@ class ToolResultRecomputeResponse(BaseModel):
 @router.post(
     "/conversations/{conversation_id}/tool-results/{artifact_id}/recompute",
     response_model=ToolResultRecomputeResponse,
+    dependencies=[Depends(require_open_business_chat)],
 )
 async def recompute_tool_result(
     conversation_id: UUID,

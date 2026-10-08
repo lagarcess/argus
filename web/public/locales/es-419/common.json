@@ -2166,5 +2166,204 @@
         "unavailable": "Este resultado no está disponible por ahora."
       }
     }
+  },
+  "business": {
+    "actions": {
+      "ask_spending": "¿Cuánto gasté este mes?",
+      "attach_receipt": "Agregar un recibo",
+      "record_expense": "Registrar gasto",
+      "review_inbox_one": "Revisar {{count}} recibo",
+      "review_inbox_other": "Revisar {{count}} recibos",
+      "upload_receipt": "Subir recibo"
+    },
+    "category": {
+      "none": "Sin categoría",
+      "other": "Otros",
+      "groceries": "Supermercado",
+      "dining": "Comidas",
+      "transport": "Transporte",
+      "housing": "Vivienda",
+      "health": "Salud",
+      "shopping": "Compras",
+      "interest_fees": "Intereses y cargos"
+    },
+    "composer": {
+      "placeholder_ask": "Pregunta por tus gastos guardados",
+      "placeholder": "Escribe un mensaje",
+      "add": "Agregar"
+    },
+    "create": {
+      "label": "Crear"
+    },
+    "attention": {
+      "ai_unavailable": "La preparación con IA no está disponible ahora. Tu recibo está guardado. Reintenta más tarde o escribe los detalles tú mismo.",
+      "check_details": "Cuadrao no pudo leer todo este recibo. Compara los detalles con el original antes de confirmar.",
+      "interrupted": "La preparación se detuvo antes de terminar. Tu recibo está guardado. Reintenta o escribe los detalles tú mismo.",
+      "no_purchase_found": "Cuadrao leyó este recibo pero no encontró una compra para guardar. Escribe los detalles tú mismo.",
+      "other": "Algo salió mal con este recibo. Sigue guardado. Escribe los detalles tú mismo.",
+      "outcome_unknown": "No pudimos recuperar el resultado de la lectura con IA. Tu recibo sigue guardado. Reintenta o escribe los detalles tú mismo.",
+      "several_purchases": "Cuadrao no pudo asociar este recibo a una sola compra. Escribe los detalles tú mismo para guardar un gasto.",
+      "source_unavailable": "El archivo original ya no está disponible. Escribe los detalles tú mismo.",
+      "unreadable": "No pudimos leer este recibo. Escribe los detalles tú mismo o envía una foto más clara."
+    },
+    "expenses": {
+      "empty": "No hay gastos guardados en este período.",
+      "error": "No pudimos cargar tus gastos. Reintenta.",
+      "no_merchant": "Gasto",
+      "subtitle": "Gastos guardados del {{from}} al {{to}}.",
+      "title": "Gastos",
+      "view_receipt": "Recibo"
+    },
+    "home": {
+      "body": "Agrega un recibo, registra un gasto o pregunta por lo que ya guardaste.",
+      "title": "¿Qué hacemos hoy por tu negocio?"
+    },
+    "inbox": {
+      "empty_body": "Sube un recibo o envíalo por WhatsApp. Te esperará aquí para que lo revises.",
+      "empty_title": "Estás al día",
+      "error": "No pudimos cargar tu bandeja. Reintenta.",
+      "subtitle": "Recibos que esperan tu revisión. Nada aquí es un gasto hasta que lo confirmes.",
+      "title": "Bandeja"
+    },
+    "intake": {
+      "camera": "Tomar foto",
+      "choose": "Elegir archivo",
+      "consent": "Prepararlo con IA después de guardarlo. El recibo se envía a nuestro proveedor de IA para completar los detalles y que tú los revises. Déjalo desactivado para completarlos tú mismo.",
+      "drop": "Suelta un recibo aquí.",
+      "paste": "Pegar",
+      "clipboard_empty": "No hay una imagen o PDF de recibo para pegar. Copia uno primero o elige un archivo.",
+      "failed": "No pudimos guardar este recibo. Revisa tu conexión y reintenta. No se guardará dos veces.",
+      "formats": "PDF, JPG o PNG, hasta {{size}} MB. El original es privado para ti.",
+      "heic": "Esta es una foto HEIC de iPhone. Súbela desde el navegador de tu iPhone, que la convierte, o expórtala como JPG primero.",
+      "replace": "Elegir otro",
+      "save": "Guardar en la Bandeja",
+      "saving": "Guardando…",
+      "title": "Subir recibo",
+      "too_large": "Este archivo pesa más de {{size}} MB. Usa una foto o un PDF más pequeño.",
+      "unsupported": "Este tipo de archivo no es compatible. Usa un PDF, JPG o PNG."
+    },
+    "nav": {
+      "expenses": "Gastos",
+      "inbox": "Bandeja",
+      "label": "Negocio",
+      "overview": "Resumen",
+      "updates": "Novedades"
+    },
+    "overview": {
+      "attention_one": "{{count}} recibo necesita tu atención",
+      "attention_other": "{{count}} recibos necesitan tu atención",
+      "in_inbox": "En tu bandeja",
+      "confirmed": "Gastos guardados, {{period}}",
+      "coverage": "Cubre del {{from}} al {{to}}. Último recibo {{received}}. Los totales incluyen solo gastos guardados, no recibos pendientes de revisión.",
+      "error": "No pudimos cargar los registros de tu negocio. Tus recibos y gastos guardados están seguros. Reintenta.",
+      "expense_count_one": "{{count}} gasto",
+      "expense_count_other": "{{count}} gastos",
+      "never": "ninguno todavía",
+      "no_expenses": "Todavía no hay gastos guardados en este período.",
+      "open_inbox": "Abrir la bandeja",
+      "separate_currencies": "Cada moneda se suma por separado. Sin conversión.",
+      "title": "Tu negocio"
+    },
+    "period": {
+      "label": "Período",
+      "last_30_days": "Últimos 30 días",
+      "last_month": "Mes pasado",
+      "this_month": "Este mes"
+    },
+    "receipt": {
+      "untitled": "Recibo"
+    },
+    "record": {
+      "amount_in": "Total en {{currency}}",
+      "failed": "No pudimos guardar este gasto. Reintenta. No se guardará dos veces.",
+      "no_accounts": "Primero agrega una cuenta del negocio para saber desde dónde se pagó este gasto.",
+      "save": "Guardar gasto"
+    },
+    "review": {
+      "account": "Pagado desde",
+      "amount": "Total",
+      "category": "Categoría",
+      "choose": "Elegir",
+      "choose_account": "Elige una cuenta",
+      "confirm": "Confirmar gasto",
+      "confirm_failed": "No pudimos confirmar este gasto. Nada se guardó dos veces. Reintenta.",
+      "confirming": "Guardando…",
+      "consent": "Cuadrao puede leer este recibo con IA y completar los detalles para que los revises. El recibo se envía a nuestro proveedor de IA solo si eliges esta opción. También puedes completar los detalles tú mismo.",
+      "currency": "Moneda",
+      "currency_mismatch": "Esta cuenta usa {{account}}. Elige una cuenta en {{receipt}} o corrige la moneda.",
+      "date": "Fecha",
+      "download": "Descargar",
+      "error": "Este recibo no está disponible. Puede que lo hayan quitado.",
+      "evidence": "Lo que dice el recibo",
+      "evidence_note": "Tus correcciones no cambian lo que se leyó del recibo. Un recibo guarda un gasto por su total.",
+      "merchant": "Comercio",
+      "missing": "Completa los detalles marcados como Falta para guardar este gasto.",
+      "needed": "Falta",
+      "prepare": "Preparar con IA",
+      "prepare_failed": "No pudimos iniciar la preparación. Tu recibo está guardado. Reintenta.",
+      "preparing": "Leyendo tu recibo. Puedes salir de esta página; el resultado te esperará en la bandeja.",
+      "retry": "Reintentar con IA",
+      "retry_consent": "Si reintentas, el recibo se envía a nuestro proveedor de IA.",
+      "saved_body": "Guardado como un gasto de {{amount}}.",
+      "saved_title": "Gasto guardado",
+      "source": "Recibo original",
+      "source_error": "No pudimos abrir el recibo original. Sigue guardado.",
+      "stale": "Este recibo cambió desde que lo abriste. Revisa los detalles actuales antes de confirmar.",
+      "tax": "ITBIS",
+      "title": "Revisar recibo",
+      "view_expenses": "Ver gastos"
+    },
+    "sample": {
+      "notice": "Vista previa de diseño con datos de ejemplo. Aquí nada se guarda, se sube ni se envía."
+    },
+    "status": {
+      "confirmed": "Gasto guardado",
+      "dismissed": "Descartado",
+      "needs_attention": "Necesita atención",
+      "preparing": "Preparando",
+      "queued": "En espera de preparación",
+      "review_ready": "Listo para revisar",
+      "saved": "Guardado, sin preparar"
+    },
+    "updates": {
+      "attention": "{{name}} necesita atención",
+      "confirmed": "{{name}} se guardó como gasto",
+      "empty": "Nada nuevo. Aquí aparecerán los resultados de tus recibos.",
+      "error": "No pudimos cargar las novedades. Reintenta.",
+      "ready": "{{name}} está listo para revisar",
+      "subtitle": "Resultados de tus recibos y lo que necesita tu atención.",
+      "title": "Novedades"
+    },
+    "composer_receipt": {
+      "saved": "Guardado en la Bandeja",
+      "dismiss": "Descartar"
+    },
+    "search": {
+      "placeholder": "Buscar gastos, recibos y chats",
+      "placeholder_records": "Buscar gastos y recibos",
+      "no_results_hint": "Prueba con el nombre de un comercio o de un archivo.",
+      "region": "Registros del negocio",
+      "loading": "Buscando en tu negocio",
+      "failed": "No pudimos buscar en tu negocio.",
+      "receipts": "Recibos"
+    }
+  },
+  "money": {
+    "label": "{{label}} en {{currency}}",
+    "invalid": "Usa solo números y un punto decimal.",
+    "decimal_twice": "Un monto lleva un solo punto decimal.",
+    "negative": "Escribe un monto positivo.",
+    "grouping": "Revisa las comas de miles, como en 1,250.50.",
+    "decimal_comma": "Usa un punto para los decimales, como en 1,250.50.",
+    "precision_none": "{{currency}} no lleva decimales.",
+    "precision_one": "{{currency}} admite hasta {{count}} decimal.",
+    "precision_other": "{{currency}} admite hasta {{count}} decimales.",
+    "currency_mismatch": "Este monto es en {{field}}, no en {{typed}}.",
+    "zero": "Escribe un monto mayor que 0.",
+    "too_long_one": "Usa como máximo {{count}} dígito antes del punto decimal.",
+    "too_long_other": "Usa como máximo {{count}} dígitos antes del punto decimal.",
+    "out_of_range": "Este monto es demasiado grande para registrarlo.",
+    "ambiguous_currency": "$ puede ser RD$ o US$. Escribe el monto sin símbolo o con RD$ o US$.",
+    "same_amount": "Mismo monto, sin conversión."
   }
 }

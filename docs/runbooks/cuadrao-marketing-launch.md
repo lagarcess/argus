@@ -24,7 +24,7 @@ Measured 2026-10-07 with `git fetch origin`:
 - `docs/specs/cuadrao-marketing-forms-contract.md`, this runbook, the launch record and its evidence folder (new)
 - `.github/workflows/ci.yml` and `tests/test_ci_workflow.py` (the two modified files): a `marketing-checks` job and its entry in the aggregate `ci` job's `needs`, written for `main`'s simpler workflow, and the matching expectations in the workflow test, which asserts that exact `needs` list on `main`
 
-It carries no change to `web/`, `src/`, `ios/`, `render.yaml` or any other migration. Left out because they only exist, or only make sense, on integration: the Cuadrao design guide (it links five integration-only documents), the documentation-authority row and the integration-report pointer. They arrive with the normal promotion, and the package README's link to the design guide is dead on `main` until then. The migration is dated between `main`'s latest (`20260914120000`) and integration's first newer one (`20260925120000`), so a fresh replay orders it correctly on both branches. Identical content merges cleanly when integration is later promoted. The candidate was built in a separate worktree from `origin/main`; its typecheck and 112 unit tests pass there.
+It carries no change to `web/`, `src/`, `ios/`, `render.yaml` or any other migration. Left out because they only exist, or only make sense, on integration: the Cuadrao design guide (it links five integration-only documents), the documentation-authority row and the integration-report pointer. They arrive with the normal promotion, and the package README's link to the design guide is dead on `main` until then. The migration is dated between `main`'s latest (`20260914120000`) and integration's first newer one (`20260925120000`), so a fresh replay orders it correctly on both branches. Identical content merges cleanly when integration is later promoted. The candidate is built in a separate worktree from `origin/main` and its typecheck, unit tests and workflow tests are run there on each refresh.
 
 ### Production ledger and the signup migration
 
@@ -48,8 +48,8 @@ The practical consequence: the signup table can go to production alone and early
 
 ### Before any promotion
 
-1. Automatic Supabase preview branching is off and the PR 895 branch is removed (launch record, "Disable automatic previews"). On 2026-10-07 it was on.
-2. Automatic production migrations from `main` are off. The evidence says they are not wired (launch record); confirm the integration's deploy-to-production setting in the dashboard once.
+1. The Supabase GitHub integration is disabled (founder, 2026-10-08): production deploy is off and preview branching no longer runs, confirmed by behavior on three migration PRs (launch record, "Supabase GitHub integration").
+2. No paid upgrade or hosted migration is implied by anything in this runbook.
 3. Supabase stays on the Free plan; nothing here depends on a plan change.
 4. CI is terminal and green on the exact candidate, and the signup migration is not applied by promotion: the consumer's applier is the only production path.
 
@@ -85,7 +85,7 @@ Set at creation. One owner each; nothing is inherited from an Argus group.
 | `NEXT_TELEMETRY_DISABLED` | `1` | no | this runbook |
 | `RESEND_API_KEY` | key restricted to sending from `notify.cuadrao.ai` | yes | Resend |
 | `CUADRAO_INQUIRY_FROM` | `Cuadrao <website@notify.cuadrao.ai>` | no | #889 |
-| `CUADRAO_INQUIRY_TO` | the mailbox the founder chooses for inquiries; set only after that mailbox is confirmed to receive mail | no | the founder |
+| `CUADRAO_INQUIRY_TO` | `hola@cuadrao.ai` (the founder's choice, 2026-10-08) | no | the founder |
 | `SUPABASE_URL` | existing project URL | no | Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | service-role key of the existing project | yes | Supabase |
 | `CUADRAO_SITE_INDEXING` | unset on the `onrender.com` address; `public` only at cutover | no | #891 |
@@ -101,7 +101,7 @@ Not part of this launch. If chosen later, switch Auto-Deploy to "After CI Checks
 1. Candidate merged to `main` through the approved path; exact SHA and CI recorded.
 2. The signup migration is applied as part of the consumer lane's ordered batch (above) by the founder with the reviewed applier, after a recorded gate report and backup, and `public.cuadrao_early_access_signups` reads back with RLS on, no `anon`, `authenticated` or `service_role` delete, and a ledger row. A repository migration file is not production proof.
 2a. Supabase stays on the Free plan; no plan change is a precondition. Known limit: a Free project pauses when it is inactive, and while it is paused the Personal form answers its truthful unavailable state (503) and keeps the visitor's email. The operator restores the project from the Supabase dashboard. A restore is the only recovery, so check the project's state as part of hosted acceptance and before any announcement. The Business inquiry does not use Supabase.
-3. `notify.cuadrao.ai` verified in Resend (Section 6), the founder has chosen the inquiry mailbox and set `CUADRAO_INQUIRY_TO`, and one approved test message is received at that mailbox.
+3. `notify.cuadrao.ai` verified in Resend (Section 6), `CUADRAO_INQUIRY_TO=hola@cuadrao.ai` set, and one approved test message received at `hola@cuadrao.ai` (an iCloud custom-domain address; the founder confirms it exists).
 4. The founder has typed the three provider values into the Render form, and the complete form has been read back to them before Create.
 5. Rollback target named (Section 8). The first deploy has no earlier artifact, so a rollback cannot be exercised until a second deploy exists.
 6. The operator wording below is settled and published. Until the founder confirms it, the contact and signup forms are not published and no real visitor submission is taken: the privacy notice must identify who is responsible for the data those forms collect.
@@ -117,7 +117,13 @@ Cuadrao LLC is pending formation. This text is true only once the company is for
 
 ## 5. Hosted acceptance on the Render address
 
-On `https://cuadrao-marketing.onrender.com` (or the address Render assigns), with indexing off:
+On `https://cuadrao-marketing.onrender.com` (or the address Render assigns), with indexing off. First run the read-only verifier, which checks every page, redirect, icon, header, robots and sitemap against the route owner and exits non-zero on any miss:
+
+```bash
+cd marketing && bun run scripts/verify-origin.ts https://cuadrao-marketing.onrender.com
+```
+
+Then the checks it cannot make:
 
 - `/api/health` returns 200; deployed commit equals the approved SHA.
 - The per-client limit keys on the visitor, not on a shared proxy address: from one network, a request that sends a spoofed leftmost `X-Forwarded-For` is limited exactly like one that does not, and two networks are limited independently. If every visitor shares one key, set `CUADRAO_TRUSTED_CLIENT_IP_HEADER`.
@@ -130,16 +136,20 @@ On `https://cuadrao-marketing.onrender.com` (or the address Render assigns), wit
 
 ## 6. Email (#889)
 
-Read, then prepare, then apply only after approval. Do not change root MX, SPF or DKIM for `cuadrao.ai`, and never add a second SPF record.
+**Current provider, read 2026-10-08 from public DNS:** `cuadrao.ai` receives mail through **iCloud Mail** (apex MX `mx01` and `mx02.mail.icloud.com`, SPF `include:icloud.com`). Resend already sends from the root domain through CNAMEs `send` and `rsend` and a DKIM TXT at `resend._domainkey`. The founder chose `CUADRAO_INQUIRY_TO=hola@cuadrao.ai`, so inquiries arrive in the existing iCloud mailbox.
 
-1. Read Cloudflare DNS and Email Routing for `cuadrao.ai` and Resend's domain list. Save a sanitized before-state. On 2026-10-07 public DNS showed no apex records and no published Resend records although Resend listed `cuadrao.ai` as verified, and `hola@cuadrao.ai` had no MX route (see the launch record). Resolve that contradiction first; it may be a zone that is not active.
-2. Add `notify.cuadrao.ai` to Resend. Resend returns the exact records (SPF `include`, DKIM key, return-path MX). Copy them verbatim; do not invent values.
-3. Add a DMARC record for `_dmarc.notify.cuadrao.ai` (start at `p=none` with a report address the founder owns) unless one already covers the subdomain.
-4. Apply only the named records after approval; wait for Resend to show Verified; send one test message to a founder-approved address; read the received headers for SPF, DKIM and DMARC pass.
-5. The inquiry mailbox must actually receive mail. Verified sending does not prove a mailbox exists, so the test message is the proof. The public address `hola@cuadrao.ai` is shown on the pages and receives removal requests, so it needs a working route before publication whether or not it is also the inquiry mailbox.
-6. Rollback removes only the added `notify` records.
+**Do not add forwarding, Cloudflare Email Routing, or any apex MX, SPF or DKIM change.** Email Routing would replace the iCloud MX records and take over the founder's mail. Everything below adds records only under `notify.cuadrao.ai`, which does not touch the apex.
 
-Confirmation email for signups is not selected for launch (forms contract). The availability notice is sent through the operator tool, from a sender the founder chooses at that time.
+**`notify.cuadrao.ai` change set. Steps 1 and 2 are done (2026-10-08, founder-approved) and Resend shows the domain Verified; step 3 (DMARC) is not added; the sending key in step 4 and steps 5 and 6 wait for the Render step:**
+
+1. Resend: create the domain `notify.cuadrao.ai` in region `us-east-1` (the same as the root domain), open and click tracking off. This is a hosted write.
+2. Cloudflare DNS: add exactly the records Resend returns, all DNS only and all under `*.notify.cuadrao.ai`. Resend returned four records, which differ from the root domain's: a DKIM TXT at `resend._domainkey.notify`, an MX (priority 10) and an SPF TXT at `send.notify`, and a CNAME at `rsend.notify` to Resend's forge host. Copy Resend's values verbatim; do not invent them. The apex records stay as they are.
+3. DMARC: add `_dmarc.notify.cuadrao.ai` as a TXT `v=DMARC1; p=none` (optionally with a report address the founder owns). There is no apex DMARC today, and this record covers only the subdomain.
+4. Wait for Resend to show the domain Verified. Create a Resend key limited to sending from `notify.cuadrao.ai` and have the founder type it into Render with `CUADRAO_INQUIRY_FROM=Cuadrao <website@notify.cuadrao.ai>`.
+5. Send one test inquiry to `hola@cuadrao.ai` from a founder-approved address and read the received headers for SPF, DKIM and DMARC pass, and that it reached the iCloud inbox rather than junk.
+6. Rollback removes only the added `*.notify` records and the Resend domain. The root domain, its Resend records and the iCloud setup are untouched throughout.
+
+`news.cuadrao.ai` stays deferred until promotional sends are needed. Confirmation email for signups is not selected for launch (forms contract). The availability notice is sent through the operator tool from a sender the founder chooses at that time.
 
 ## 7. Domain cutover (#891)
 
@@ -149,7 +159,7 @@ After hosted acceptance and the founder's publication approval, coordinating wit
 2. In Render add `cuadrao.ai`; Render adds `www.cuadrao.ai` and redirects it to the apex automatically. Use the exact DNS targets Render displays for the apex and `www`; do not assume an apex CNAME.
 3. Keep the records DNS only (grey cloud) so Render issues and renews the certificate. If the domain has CAA records they must allow Let's Encrypt and Google Trust Services.
 4. Set `CUADRAO_SITE_INDEXING=public` and restart. If the records were instead proxied through Cloudflare, also set `CUADRAO_TRUSTED_CLIENT_IP_HEADER=CF-Connecting-IP`; behind a proxy the rightmost `X-Forwarded-For` entry would be the proxy, not the visitor.
-5. Verify HTTPS, certificate, apex/www redirect, language routes, old `/business` redirects, titles, favicon, canonical, hreflang, sitemap, robots and share previews on the public origin; repeat the inquiry and signup/removal journeys; verify Search Console ownership and submit `https://cuadrao.ai/sitemap.xml`. Record the submission; do not promise indexing.
+5. Run `bun run scripts/verify-origin.ts https://cuadrao.ai --public --www https://www.cuadrao.ai`, then verify HTTPS, certificate, apex/www redirect, language routes, old `/business` redirects, titles, favicon, canonical, hreflang, sitemap, robots and share previews on the public origin; repeat the inquiry and signup/removal journeys; verify Search Console ownership and submit `https://cuadrao.ai/sitemap.xml`. Record the submission; do not promise indexing.
 6. Rollback: set `CUADRAO_SITE_INDEXING` back to unset, remove the two Render custom domains and restore the saved DNS records. Registrations and suppression records are untouched.
 
 `app.cuadrao.ai` and `news.cuadrao.ai` are not part of this launch ([#892](https://github.com/lagarcess/argus/issues/892)).

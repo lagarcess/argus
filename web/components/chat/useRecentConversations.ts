@@ -22,6 +22,7 @@ import {
   type ConversationActivityCausalClock,
   type ConversationActivityHistorySnapshot,
 } from "@/lib/conversation-activity-state";
+import { useConversationSurface } from "./ChatWorkspace";
 
 type UseRecentConversationsOptions = Readonly<{
   guestExpiresAt?: string | null;
@@ -75,6 +76,7 @@ export function useRecentConversations({
     createConversationActivityCausalClock,
   );
   const causalClock = activityCausalClock ?? fallbackActivityCausalClock;
+  const surface = useConversationSurface();
   const [historyActivityState, setHistoryActivityState] =
     useState<RecentHistoryActivityState>({
       historyItems: [],
@@ -118,6 +120,7 @@ export function useRecentConversations({
       const activityRevision = causalClock.nextRevision();
 
       const request = listConversations({
+        surface,
         limit: 30,
         cursor: nextCursor ?? undefined,
         archived: false,
@@ -164,7 +167,7 @@ export function useRecentConversations({
       pageRequestsRef.current.set(requestKey, request);
       return request;
     },
-    [causalClock],
+    [causalClock, surface],
   );
 
   const refreshHistoryForActivity = useCallback(() => {

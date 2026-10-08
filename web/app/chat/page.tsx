@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase-server";
 import ChatInterface from "@/components/chat/ChatInterface";
+import ConversationShellGuard from "@/components/chat/ConversationShellGuard";
 import { DevModeBadge } from "@/components/ui/DevModeBadge";
 import { guestAccessEnabled } from "@/lib/private-alpha-flags";
 import { guestCaptchaConfigured } from "@/lib/guest-session";
@@ -33,6 +34,7 @@ export default async function ChatPage({
   return (
     <main className="min-h-[100dvh] bg-background text-foreground selection:bg-black/10 dark:selection:bg-white/20">
       <DevModeBadge />
+      <ConversationShellGuard />
       <ChatInterface />
     </main>
   );

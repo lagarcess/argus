@@ -34,6 +34,45 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-10-04 | Lock the Cuadrao launch shape: consumer iPhone app with personal and household only, a short invite-only TestFlight then a public launch; Cuadrao for Business as a full web service with a thin in-app business space for the first business testers only; cuadrao.ai promoting the whole suite with waitlists; Resend, Render and Supabase kept. Also partner first for live e-invoicing, Plaid kept, market-data providers parked for the pilot, Dominicans in the US added as a consumer segment, and no currency conversion or blended totals. Detailed record: [October 4 Cuadrao launch shape](#october-4-2026-cuadrao-launch-shape). | Lucas |
 | 2026-10-04 | Lock the AI providers (2:20 PM CT): OpenRouter for the chat models (GPT and Grok) and vision extraction, Grok voice for the planned chat voice-call feature, and Perplexity for finance search. All three stay behind the server and never write saved balances. Detailed record: [October 4 AI providers](#ai-providers). | Lucas |
 | 2026-10-04 | Lock the space-model timing (2:21 PM CT): the space-model change lands before TestFlight. The model itself still needs its own lock. Detailed record: [October 4 space model timing](#space-model-timing). | Lucas |
+| 2026-10-07 | Approve the connected Business workflow and offline E0 plan with task-by-task independent review. Counsel may publish and land the docs-only PR; Lucas coordinates Business implementation. Detailed record: [Business connected flow and E0](#october-7-2026-business-connected-flow-and-offline-e0-plan). | Lucas |
+
+## October 7, 2026 Business connected flow and offline E0 plan
+
+Lucas approved the [connected-flow specification](cuadrao-business-connected-flow-spec.md)
+and [E0 implementation plan](cuadrao-business-e0-implementation-plan.md), including
+task-by-task independent review. The approval was relayed from the roadmap-alignment
+conversation with his exact instruction:
+
+> Yes i approved this plan and the counsel can open a docs pr and land it when it's clean then i ill coordinate a claude worker to pick it up. it willl be the business agent that we have been working on with.
+
+Counsel may publish and merge this documentation-only change when review and
+checks are clean. This is the explicit exception to the standing no-docs-only-PR
+rule. Lucas coordinates implementation with the existing Business agent.
+The grant does not dispatch an implementation agent or authorize credentials,
+provider calls, migrations, deployment or a lane-priority change.
+
+Cuadrao owns its engine with replaceable signing and transport. E0 is synthetic,
+offline and unsigned. It preserves input evidence, exact arithmetic and actual
+validation results. P0 requires official schema bytes, dependencies, hashes and
+profile rules before Type 31 implementation. The specification owns the detailed
+resolve-first, immutable-artifact and independent-state requirements.
+
+The October 4 partner-first record remains historical live-route context.
+It is not a prerequisite for approved offline E0 development. Supplier discussions
+stay open. No vendor is selected or cancelled, and no direct live issuance route,
+certificate-custody permission or issuer eligibility is established here.
+Consumer and Marketing retain their milestones. Business retains space isolation
+and the connected owner flow; Consumer coordinates shared migration order.
+
+The approved inputs were checked before import. Repository edits update approval
+status and navigation only; the substantive design and task criteria are retained.
+The source documents' October 8 research dates remain as supplied. Publication
+uses October 7 in America/Chicago and does not re-verify those research claims.
+
+| Approved source | Library provenance | SHA-256 before repository edits |
+| --- | --- | --- |
+| `cuadrao-business-connected-flow-spec.md` | `libfile_74ecaa0fb4348191828248df60a54cc4`, version 2 | `c447bfe2a985c915424cde23d1a45abd6afb1114e9db16aed592cdbbf1ed0bba` |
+| `cuadrao-business-e0-implementation-plan.md` | `libfile_e68336b17ce481919c7a797c806f4c28`, version 1 | `691dacd42e72199a49189c1e237e0555adf12f08b2a744e09519f63f03a3b8bd` |
 
 ## Superseded coordination instructions (historical only)
 

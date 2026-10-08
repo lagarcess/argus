@@ -12,7 +12,6 @@ import { KeyboardShortcutSurfaces } from "@/components/keyboard/KeyboardShortcut
 import { useChatKeyboardShortcuts } from "@/components/keyboard/useChatKeyboardShortcuts";
 import ChatSidebar, { type SidebarMode } from "@/components/sidebar/ChatSidebar";
 import SidebarPreferenceModal from "@/components/settings/SidebarPreferenceModal";
-import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import ConversationActivityAnnouncement from "@/components/chat/ConversationActivityAnnouncement";
 import ConversationActivityRail from "@/components/chat/ConversationActivityRail";
 import { ConversationActivityPresentationProvider } from "@/components/chat/ConversationActivityIndicator";
@@ -240,7 +239,10 @@ import { SEND_BUSY_FALLBACK, SEND_GENERIC_FALLBACK, sendRefusal } from "@/lib/se
 import { useDailyCapNotice } from "./useDailyCapNotice";
 import { useChatAccountBoundary } from "./useChatAccountBoundary";
 import { authenticatedRequestHeaders, ChatAccountChangedError } from "@/lib/chat-auth-ownership";
-type View = "chat" | "settings";
+import { useChatWorkspace, visibleShellView, workspaceChatAvailable, type ChatShellView } from "./ChatWorkspace";
+import ConversationDeleteDialog from "./ConversationDeleteDialog";
+import { useChatShellBridge, WorkspaceMain, workspaceComposerProps } from "./WorkspaceMain";
+type View = ChatShellView;
 
 const JUMP_TO_LATEST_THRESHOLD_PX = 240;
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -276,7 +278,9 @@ export default function ChatInterface() {
     latestMessagesRef.current = messages;
   }, [messages]);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [currentView, setCurrentView] = useState<View>("chat");
+  const workspace = useChatWorkspace();
+  const [shellView, setCurrentView] = useState<View>(() => workspace?.initialView ?? "chat");
+  const currentView = visibleShellView(workspace, shellView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const mobileShell = useMobileShell();
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
@@ -452,7 +456,7 @@ export default function ChatInterface() {
   }, [conversationId, currentView]);
 
   const resetToEmptyChatSurface = useCallback(
-    (nextConversationId: string | null = null) => {
+    (nextConversationId: string | null = null, view: View = "chat") => {
       cancelTranscriptNavigation();
       retireActiveTranscriptPresentationForNavigation();
       if (nextConversationId) {
@@ -461,7 +465,7 @@ export default function ChatInterface() {
         const clearedRoute = clearActiveConversationPointer();
         if (clearedRoute) router.replace(clearedRoute, { scroll: false });
       }
-      synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, nextConversationId, "chat");
+      synchronizeConversationViewRefs(activeConversationIdRef, currentViewRef, nextConversationId, view);
       hasAcceptedUserInputRef.current = false;
       setConversationId(nextConversationId);
       setMessages([]);
@@ -470,7 +474,7 @@ export default function ChatInterface() {
       setShowChatOptions(false);
       setIsRenamingHeaderChat(false);
       setHeaderRenameValue("");
-      setCurrentView("chat");
+      setCurrentView(view);
     },
     [
       cancelTranscriptNavigation,
@@ -503,7 +507,7 @@ export default function ChatInterface() {
       try {
         await loadHistoryPage(null, false);
         if (!targetConversationId) return;
-        const { items } = await listConversations({ limit: 50 });
+        const { items } = await listConversations({ limit: 50, surface: workspace?.conversationSurface });
         const conversation = items.find(
           (item) => item.id === targetConversationId,
         );
@@ -586,6 +590,7 @@ export default function ChatInterface() {
       }),
     );
   }, [closeDrawer, sidebarMode]);
+  const { bridge: shellBridge, profileSlot, setProfileSlot } = useChatShellBridge({ workspace, currentView, conversationId, isBelowTablet: mobileShell.isBelowTablet, sidebarCollapsed: !(mobileShell.isBelowTablet ? true : isSidebarOpen), resetToEmptyChatSurface, closeTransientSidebar });
 
   function rememberCurrentConversationScroll(): void {
     const currentConversationId = readyTranscriptConversationIdRef.current;
@@ -787,7 +792,7 @@ export default function ChatInterface() {
     setProfileState,
     setMessages,
     setIsHydratingConversation,
-    resetToEmptyChatSurface,
+    resetToEmptyChatSurface: () => resetToEmptyChatSurface(null, workspace?.initialView),
     navigateConversationTranscript,
     cancelActiveNavigation: () => transcriptSessionCache.cancelActiveNavigation(),
   });
@@ -1038,7 +1043,7 @@ export default function ChatInterface() {
     let guestSubmissionHandedToStream = false;
     // Never decline a real message in silence; see lib/send-refusal.ts.
     const refuseSend = sendRefusal(showToast, t);
-    if (!trimmed || accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
+    if (!trimmed || !workspaceChatAvailable(workspace) || accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
     if (sendAdmissionInFlightRef.current || isStreamingResponse) {
       return false;
     }
@@ -1105,7 +1110,7 @@ export default function ChatInterface() {
 
     if (shouldCreateNewRouteConversation || (!targetConversationId && !action?.type)) {
       try {
-        const { conversation } = await createConversation(i18n.language, ownedRequest);
+        const { conversation } = await createConversation(i18n.language, ownedRequest, workspace?.conversationSurface);
         if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
         targetConversationId = conversation.id;
         shouldResetMessagesForNewConversation = shouldCreateNewRouteConversation || messages.length === 0;
@@ -1620,7 +1625,7 @@ export default function ChatInterface() {
           try {
             const retryWasVisible = canApplyVisibleStreamUpdate();
             if (retryWasVisible) clearActiveConversationPointer();
-            const { conversation } = await createConversation(i18n.language, ownedRequest);
+            const { conversation } = await createConversation(i18n.language, ownedRequest, workspace?.conversationSurface);
             if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return;
             if (!moveRequestToConversation(conversation.id)) return;
             if (retryWasVisible) {
@@ -2272,6 +2277,7 @@ export default function ChatInterface() {
         shortcutHintsSuppressed={searchOverlayOpen}
         canManageConversation={canManageConversation}
         showProfileMenu={!isGuest}
+        primaryNav={workspace?.sidebarNav(shellBridge)} footerActions={workspace?.sidebarFooter(shellBridge)} profileSlot={workspace?.profileInHeader && !mobileShell.isBelowTablet ? profileSlot : undefined}
         isGuest={guestExperience.isEstablishedGuest}
         guestExpiresAt={account?.guest?.expires_at}
       />
@@ -2315,24 +2321,11 @@ export default function ChatInterface() {
           />
         )}
 
-      <ConfirmDialog
-        isOpen={Boolean(pendingHeaderDelete)}
-        title={t("sidebar.delete_confirm.title", "Delete this conversation?")}
-        description={t(
-          "sidebar.delete_confirm.description",
-          "This moves “{{title}}” to Recently Deleted. You can restore it before permanent removal.",
-          { title: headerConversationTitle },
-        )}
-        confirmLabel={t(
-          "sidebar.delete_confirm.confirm",
-          "Delete conversation",
-        )}
-        cancelLabel={t("common.cancel", "Cancel")}
-        isBusy={isDeletingHeaderChat}
-        showKeyboardHints={pendingHeaderDelete?.showKeyboardHints}
-        onCancel={() => {
-          if (!isDeletingHeaderChat) setPendingHeaderDelete(null);
-        }}
+      <ConversationDeleteDialog
+        pending={pendingHeaderDelete}
+        title={headerConversationTitle}
+        isDeleting={isDeletingHeaderChat}
+        onCancel={() => setPendingHeaderDelete(null)}
         onConfirm={() => void handleConfirmHeaderDelete()}
       />
 
@@ -2368,7 +2361,8 @@ export default function ChatInterface() {
             </h1>
 
             {/* Action cluster (guest settings or durable owner menu) */}
-            <div className="flex shrink-0 justify-end pointer-events-auto">
+            <div className={`flex shrink-0 justify-end pointer-events-auto${workspace ? " items-center gap-2" : ""}`}>
+              {workspace?.headerActions(shellBridge)}
               {currentView === "chat" && isGuest ? (
                 <GuestHeader
                   expiresAt={account?.guest?.expires_at ?? null}
@@ -2404,8 +2398,12 @@ export default function ChatInterface() {
                   memoryChrome={memoryChrome}
                 />
               ) : null}
+              {workspace?.profileInHeader && !mobileShell.isBelowTablet ? <div ref={setProfileSlot} className="relative" /> : null}
             </div>
           </header>
+        )}
+        {currentView === "workspace" && workspace && (
+          <WorkspaceMain workspace={workspace} bridge={shellBridge} composerNotice={dailyCap.notice} disabled={conversationComposerUnavailable} onToast={showToast} onSend={handleSend} setCurrentView={setCurrentView} />
         )}
         {currentView === "chat" && (
           <div className="relative mx-auto flex h-[100dvh] w-full max-w-5xl flex-col">
@@ -2425,6 +2423,7 @@ export default function ChatInterface() {
                 onSend={handleSend}
                 onRetryGuestSubmission={retryGuestSubmission}
                 onToast={showToast}
+                workspace={workspace ? { lead: workspace.emptyChatLead(shellBridge), starterEntries: workspace.starterEntries(shellBridge), composer: workspace.composer(shellBridge) } : undefined}
               />
             ) : (
               <>
@@ -2553,6 +2552,7 @@ export default function ChatInterface() {
                       disabled={conversationComposerUnavailable}
                       placeholder={chatInputPlaceholder}
                       onToast={showToast}
+                      {...workspaceComposerProps(workspace, shellBridge)}
                     /></ReceiptSelectionComposer>
                     <ChatLegalNotice
                       expiresAt={account?.guest?.expires_at}

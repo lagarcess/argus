@@ -1,0 +1,320 @@
+import { authenticatedRequestHeaders } from "./chat-auth-ownership";
+import { apiFetch, ARGUS_API_BASE_URL, argusApiRequestHeaders } from "./argus-api-transport";
+import type { ArgusLanguage } from "./language-features";
+
+/**
+ * The Business pilot's view of `/api/v1/business`. The backend owns every
+ * fact here: statuses, totals, review fields and links. The web renders them.
+ */
+
+export type CurrencyCode = string;
+export type DecimalString = string;
+
+export type ReceiptStatus =
+  | "saved"
+  | "queued"
+  | "preparing"
+  | "review_ready"
+  | "needs_attention"
+  | "confirmed"
+  | "dismissed";
+
+export type ReceiptChannel = "web" | "whatsapp";
+
+/** Why a `needs_attention` receipt needs the owner. The backend decides it. */
+export const RECEIPT_ATTENTIONS = [
+  "unreadable",
+  "ai_unavailable",
+  "interrupted",
+  "outcome_unknown",
+  "no_purchase_found",
+  "several_purchases",
+  "source_unavailable",
+  "check_details",
+  "other",
+] as const;
+export type ReceiptAttention = (typeof RECEIPT_ATTENTIONS)[number];
+
+export type ReceiptReviewFields = {
+  merchant: string | null;
+  occurred_on: string | null;
+  amount: DecimalString | null;
+  currency: CurrencyCode | null;
+  category_id: string | null;
+  account_id: string | null;
+};
+
+export type ReceiptSummary = ReceiptReviewFields & {
+  id: string;
+  channel: ReceiptChannel;
+  filename: string | null;
+  media_type: string;
+  size_bytes: number;
+  received_at: string;
+  status: ReceiptStatus;
+  error_code: string | null;
+  attention: ReceiptAttention | null;
+  /** The owner may ask for a consented AI read now. */
+  preparable: boolean;
+  /** The owner may fill in the one purchase by hand from version 0. */
+  enterable: boolean;
+  expense_id: string | null;
+};
+
+export type ReceiptEvidenceLine = {
+  description: string;
+  amount: DecimalString | null;
+};
+
+export type ReceiptDetail = ReceiptSummary & {
+  version: number;
+  evidence: {
+    merchant: string | null;
+    occurred_on: string | null;
+    total: DecimalString | null;
+    currency: CurrencyCode | null;
+    tax: DecimalString | null;
+    tip: DecimalString | null;
+    service: DecimalString | null;
+    lines: ReceiptEvidenceLine[];
+  } | null;
+  missing_fields: (keyof ReceiptReviewFields)[];
+};
+
+export type BusinessAccount = {
+  id: string;
+  nickname: string | null;
+  type: string;
+  currency: CurrencyCode;
+};
+
+export type BusinessWorkspaceInfo = {
+  accounts: BusinessAccount[];
+  currencies: CurrencyCode[];
+  /** Whether Business conversations can answer questions about saved expenses. */
+  assistant_available: boolean;
+  /** Whether Business conversations can be started or continued at all. */
+  chat_available: boolean;
+  /** What a receipt upload accepts. The backend's document settings own it. */
+  receipt_limits: ReceiptLimits;
+};
+
+/**
+ * The one reader of `chat_available`. Closed until the backend says so, so a
+ * workspace still loading, or an older payload without the field, offers no chat.
+ */
+export function businessChatAvailable(workspace: BusinessWorkspaceInfo | null): boolean {
+  return workspace?.chat_available === true;
+}
+
+export type ReceiptLimits = {
+  max_bytes: number;
+  media_types: string[];
+};
+
+export type BusinessExpense = {
+  id: string;
+  merchant: string | null;
+  amount: DecimalString;
+  currency: CurrencyCode;
+  category_id: string | null;
+  account_id: string;
+  occurred_on: string;
+  receipt_id: string | null;
+};
+
+export type BusinessOverview = {
+  from: string;
+  to: string;
+  totals: { currency: CurrencyCode; amount: DecimalString; count: number }[];
+  needs_attention: number;
+  last_received_at: string | null;
+  last_confirmed_at: string | null;
+};
+
+export type BusinessUpdate = {
+  id: string;
+  kind: "receipt_ready" | "receipt_needs_attention" | "expense_confirmed";
+  occurred_at: string;
+  receipt_id: string | null;
+  expense_id: string | null;
+  error_code: string | null;
+  attention: ReceiptAttention | null;
+  label: string | null;
+};
+
+/**
+ * Business records matching a query, each list capped by `limit`. A receipt
+ * whose expense also matched is only under its expense, as `receipt_id`.
+ */
+export type BusinessSearchResult = {
+  expenses: BusinessExpense[];
+  receipts: ReceiptSummary[];
+  accounts: BusinessAccount[];
+};
+
+export type ExpenseInput = {
+  account_id: string;
+  amount: DecimalString;
+  occurred_on: string;
+  merchant: string | null;
+  category_id: string | null;
+};
+
+/** The owner's one Business space. Business records live only inside it. */
+export type BusinessSpace = { id: string; name: string };
+
+/**
+ * Starts the owner's Business space, or returns the one they already have.
+ * Every other Business route answers 404 until it exists. The server names a
+ * new space in `language`.
+ */
+export async function startBusinessSpace(language: ArgusLanguage): Promise<BusinessSpace> {
+  return apiFetch("/business/space", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language }),
+  });
+}
+
+export async function getBusinessWorkspace(): Promise<BusinessWorkspaceInfo> {
+  return apiFetch("/business/workspace");
+}
+
+export async function getBusinessOverview(
+  from: string,
+  to: string,
+): Promise<BusinessOverview> {
+  const query = new URLSearchParams({ from, to });
+  return apiFetch(`/business/overview?${query}`);
+}
+
+export async function listBusinessReceipts(
+  view: "inbox" | "all",
+): Promise<ReceiptSummary[]> {
+  const page = await apiFetch<{ items: ReceiptSummary[] }>(
+    `/business/receipts?view=${view}`,
+  );
+  return page.items;
+}
+
+export async function getBusinessReceipt(id: string): Promise<ReceiptDetail> {
+  return apiFetch(`/business/receipts/${encodeURIComponent(id)}`);
+}
+
+export async function listBusinessUpdates(): Promise<BusinessUpdate[]> {
+  const page = await apiFetch<{ items: BusinessUpdate[] }>("/business/updates");
+  return page.items;
+}
+
+export async function searchBusiness(q: string, limit = 5): Promise<BusinessSearchResult> {
+  const query = new URLSearchParams({ q, limit: String(limit) });
+  return apiFetch(`/business/search?${query}`);
+}
+
+export async function listBusinessExpenses(
+  from: string,
+  to: string,
+): Promise<BusinessExpense[]> {
+  const query = new URLSearchParams({ from, to });
+  const page = await apiFetch<{ items: BusinessExpense[] }>(
+    `/business/expenses?${query}`,
+  );
+  return page.items;
+}
+
+export async function uploadBusinessReceipt(
+  file: File,
+  consentToPrepare: boolean,
+  idempotencyKey: string,
+): Promise<ReceiptSummary> {
+  const authHeaders = await authenticatedRequestHeaders();
+  const headers = argusApiRequestHeaders(
+    {
+      "Content-Type": file.type,
+      "Idempotency-Key": idempotencyKey,
+      "X-Document-Filename": encodeURIComponent(file.name),
+      ...(consentToPrepare ? { "X-Extraction-Consent": "true" } : {}),
+    },
+    authHeaders,
+  );
+  const response = await fetch(`${ARGUS_API_BASE_URL}/business/receipts`, {
+    method: "POST",
+    body: file,
+    credentials: "include",
+    headers,
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => ({}))) as { code?: string };
+    const error = new Error(body.code ?? `API error ${response.status}`) as Error & {
+      status: number;
+      code: string;
+    };
+    error.status = response.status;
+    error.code = body.code ?? "unknown";
+    throw error;
+  }
+  return response.json() as Promise<ReceiptSummary>;
+}
+
+export async function fetchBusinessReceiptSource(id: string): Promise<Blob> {
+  const authHeaders = await authenticatedRequestHeaders();
+  const response = await fetch(
+    `${ARGUS_API_BASE_URL}/business/receipts/${encodeURIComponent(id)}/source`,
+    { credentials: "include", headers: authHeaders },
+  );
+  if (!response.ok) throw new Error(`API error ${response.status}`);
+  return response.blob();
+}
+
+export async function prepareBusinessReceipt(id: string): Promise<ReceiptSummary> {
+  return apiFetch(`/business/receipts/${encodeURIComponent(id)}/prepare`, {
+    method: "POST",
+    headers: { "X-Extraction-Consent": "true" },
+  });
+}
+
+export async function saveBusinessReceiptReview(
+  id: string,
+  version: number,
+  fields: Partial<ReceiptReviewFields>,
+): Promise<ReceiptDetail> {
+  return apiFetch(`/business/receipts/${encodeURIComponent(id)}/review`, {
+    method: "PATCH",
+    body: JSON.stringify({ version, fields }),
+  });
+}
+
+export async function confirmBusinessReceipt(
+  id: string,
+  version: number,
+  idempotencyKey: string,
+): Promise<ReceiptDetail> {
+  return apiFetch(`/business/receipts/${encodeURIComponent(id)}/confirm`, {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify({ version }),
+  });
+}
+
+export async function recordBusinessExpense(
+  input: ExpenseInput,
+  idempotencyKey: string,
+): Promise<BusinessExpense> {
+  return apiFetch("/business/expenses", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function createBusinessAccount(
+  input: { nickname: string; type: string; currency: CurrencyCode },
+  idempotencyKey: string,
+): Promise<BusinessAccount> {
+  return apiFetch("/business/accounts", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: JSON.stringify(input),
+  });
+}

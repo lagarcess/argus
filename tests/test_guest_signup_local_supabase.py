@@ -19,6 +19,7 @@ from argus.api import state as api_state
 from argus.api.main import app
 from argus.api.routers import agent as agent_router
 from argus.api.routers import auth as auth_router
+from argus.domain.owner_scope import PERSONAL
 from argus.domain.visitor_usage import visitor_key_for
 from fastapi.testclient import TestClient
 
@@ -817,6 +818,8 @@ def test_real_email_change_keeps_email_change_template_with_old_address() -> Non
         if user_id:
             with suppress(Exception):
                 gateway.delete_auth_user(user_id)
+
+
 def test_disabled_public_email_cannot_prepare_real_guest_signup(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -849,6 +852,7 @@ def test_disabled_public_email_cannot_prepare_real_guest_signup(
             created_at=profile.created_at,
         )
         conversation = gateway.create_conversation(
+            scope=PERSONAL,
             user_id=user_id,
             title="Disabled identity proof",
             title_source="system_default",

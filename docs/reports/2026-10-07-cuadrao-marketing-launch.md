@@ -2,13 +2,25 @@
 
 Status record for [#880](https://github.com/lagarcess/argus/issues/880) and its children. The [launch runbook](../runbooks/cuadrao-marketing-launch.md) owns settings and procedure, the [forms contract](../specs/cuadrao-marketing-forms-contract.md) owns the endpoints and data, and the [evidence folder](evidence/cuadrao-marketing-launch/README.md) holds the proof. This page only says where the launch stands. It authorizes nothing.
 
+## Landing
+
+PR [#895](https://github.com/lagarcess/argus/pull/895) merged into `codex/private-alpha-next` as `fbb6bb447` (squash, PR head `d0447a7da`); integration then stood at `5def72db1` after #899 and #894. The merged diff equals the PR diff, `marketing/` and the signup migration are byte-identical to the PR head, `web/` equals its pre-website state, and #895 shares no file with #899 or #894. Nothing is promoted, deployed, applied or sent; the signup migration is in the repository only. The issue comments on #880 record the landing in full.
+
+PR [#903](https://github.com/lagarcess/argus/pull/903) merged as `1ffb53548` (squash, PR head `32ad2c207`, merged 2026-10-08 19:25 UTC; integration parent `f5a2007cd` after #920). It carries the read-only origin verifier, the claim-then-send availability notices and the launch record. CI was green at the head, the independent review at that head was clean with no blocking finding, and the merged tree equals the PR head on every path it touches (its 10 files; none shared with #920). Nothing is promoted, deployed, applied or sent.
+
+Review findings, none blocking, are settled in [#923](https://github.com/lagarcess/argus/pull/923) (merged, below): the run stops after the first unknown send so an outage cannot claim the whole list; a refusal whose claim cannot be released is named separately; hand-sending an uncertain claim says to check Resend by key first and to run one notice at a time; the verifier checks a redirect's host; and the runbook, storage proof and evidence README are reconciled. No availability notice is run before Personal signups are published.
+
+PR [#923](https://github.com/lagarcess/argus/pull/923) merged as `a9a30b37d` (squash, PR head `37c68ea81`, merged 2026-10-08 20:25 UTC; integration parent `b30ef3bab` after #922). It settles the #903 review notes as a code change: the notice run stops at the first unknown send, a refusal whose claim cannot be released is named separately, the hand-send advice says to check Resend and `notified_at` first, and the origin verifier checks the host of a redirect. An independent review of #923 as code was clean at `5698c7776` with no blocking finding and a second clean pass on its documentation-only delta; all 18 checks were green at the head; the merged tree equals the PR head on its paths and touches only `marketing/` and documents. Nothing is promoted, applied, deployed or sent.
+
+PR [#906](https://github.com/lagarcess/argus/pull/906) carries the privacy rewrite, the chosen mark and the brand artwork. Its own landing is recorded below once it merges.
+
 ## Lineage
 
 - Lane base: `93571e593e1677561e1dd38f63b6475574942e2d` (`origin/codex/private-alpha-next`, fetched 2026-10-07).
 - Worker branch: `codex/cuadrao-marketing-launch`.
 - Candidate, reconciliation and CI state are filled in at READY (see the PR).
 
-## Prepared in this PR
+## Landed in #895
 
 | Child | State |
 | --- | --- |
@@ -34,49 +46,59 @@ Through the connected Render and Resend tools and public DNS lookups. Nothing wa
 
 - **Render.** Three workspaces: `argus-prod`, `payment-ledger`, `rag-lens`. Only `argus-prod` holds Argus: `argus-app` (Node, `web`, Starter, branch `main`, Auto-Deploy off, build `npm install -g bun && bun install --frozen-lockfile && bun run build`, start `bun run start -- -p $PORT`, no health check path) and `argus-api` (Python, Standard, Auto-Deploy off). No `cuadrao-marketing` service exists, so there is no name collision. `argus-app` shows Bun installed during build is usable at start, so either start command would work; the runbook keeps `npm run start`.
 - **Resend.** Two domains, both verified with sending enabled and receiving disabled: `cuadrao.ai` (created 2026-09-29) and `get-argus.com`. `notify.cuadrao.ai` is not registered, so nothing about it exists yet. `cuadrao.ai` lists a DKIM TXT at `resend._domainkey` and two CNAMEs, `send` and `rsend`, all marked verified.
-- **DNS, and a contradiction to resolve before any email test.** `cuadrao.ai` is registered at Cloudflare (active, expires 2028-09-29) with Cloudflare name servers, and its SOA answers. But public lookups, from two resolvers and from Cloudflare's authoritative server, show **no records for the apex** (no MX, TXT or A) and **NXDOMAIN for `resend._domainkey`, `send` and `rsend`**, although Resend reports those records verified. Cloudflare's authoritative server also answers `REFUSED` for apex record types other than SOA, which is unusual and suggests the zone is not in a normal active state. Two consequences follow if this is real: the Resend records Resend calls verified are not published, and **`hola@cuadrao.ai` has no mail route at all (no MX)**, so an inquiry addressed to it would have nowhere to be delivered. The Cloudflare connector available here covers Workers, KV, R2 and D1 only, not DNS, so the zone itself has not been read. A read of the Cloudflare DNS and Email Routing pages (or a founder readback) settles it. Inquiry delivery cannot be proven, and the Business form must not be published, until `hola@cuadrao.ai` demonstrably receives mail.
+- **DNS and the current mail provider (corrected 2026-10-08).** `cuadrao.ai` is registered at Cloudflare (active, expires 2028-09-29) with Cloudflare name servers. Read from three public resolvers and from DNS over HTTPS, which agree: the apex mail is **iCloud Mail** (MX `mx01.mail.icloud.com` and `mx02.mail.icloud.com`, priority 10; TXT `apple-domain=` verification and SPF `v=spf1 include:icloud.com ~all`). There is no apex A record and no DMARC record. Resend's records for `cuadrao.ai` are published: a DKIM TXT at `resend._domainkey` and CNAMEs `send` and `rsend` to Resend's forge hosts. `www`, `api`, `app`, `notify` and `news` have no records. **An earlier version of this record said the apex had no records and no mail route, and that `hola@cuadrao.ai` could not receive mail. That was wrong:** the first lookups returned empty answers through a path that did not hold up, and the corrected reading agrees across resolvers. Whether `hola@cuadrao.ai` exists as an address on the iCloud custom domain cannot be seen in DNS and is for the founder to confirm.
 
 ## Supabase preview branch for #895 (read-only, 2026-10-07)
 
 - **What exists.** One branch on project `qzylwjabjfophhipzoev`, name and Git branch `codex/cuadrao-marketing-launch`, PR 895, parent `lgdhvepyrzbnscqssgqq`, `persistent: false`, `with_data: false`, preview project `ACTIVE_HEALTHY`. A second branch record is the production project itself (`main`, status `MIGRATIONS_FAILED`, last updated 2026-06-04).
 - **How it was created.** Not by this lane's tools. Its creation time (17:27:22Z) is seven seconds after PR 895 was opened (17:27:15Z), and it carries the Git branch and PR number. That is the Supabase GitHub integration's automatic preview branching, which also produces the `Supabase Preview` check. The check ran schema-only: it replayed the repository's migration chain (it lists this migration at its proper place) and no production data was copied. Earlier PRs show the same check. This lane created no hosted resource.
 - **Charges.** Supabase documents no fixed fee for a branch, only usage. The connector quotes `0.01344` USD per hour for a branch (the default Micro compute), about $0.32 a day or $9.68 for a month if it ran continuously, plus egress and disk beyond the plan quota. Branch usage is not covered by the Spend Cap, and Compute Credits do not apply to it. Branching is documented as a Pro Plan feature, yet the organization (`ARGUS QUANTITATIVE`) reports the `free` plan, and the repository notes elsewhere that preview branches have hit plan quota. The connector exposes no invoice, so whether this branch is billed, and how much, is not confirmed. The Supabase usage page shows "Branching Compute Hours" and settles it.
+- **Direct API readback (2026-10-07, later).** The Management API (read-only GET with the account token from the integration worktree's local `.env`, never printed) lists exactly two branches: the production `main` record with an empty Git branch and status `MIGRATIONS_FAILED`, and `codex/cuadrao-marketing-launch` (PR 895, `FUNCTIONS_DEPLOYED`). The two integration toggles ("Automatic branching", "Deploy to production") are dashboard-only; the platform API returned 401 for the token, so they still need one look in the dashboard.
 - **Lifetime.** A non-persistent branch is removed when its PR is closed or merged, and preview branches auto-pause after inactivity.
-- **Decision.** Automatic previews are not part of the agreed spending plan. The steps below disable them and remove this branch. They have not been run; each is a hosted write that needs the founder's go.
+- **Outcome.** The branch was removed after #895 merged (a non-persistent branch goes with its PR); no one in this lane deleted it. Automatic previews are not part of the agreed spending plan and no paid upgrade is authorized, but the toggle cannot be changed on Free, so the plan is to watch rather than disable (below). The earlier "disable and delete" steps were withdrawn.
 
-### Automatic Supabase behavior before promotion (read-only evidence, 2026-10-07)
+### Supabase GitHub integration (resolved 2026-10-08)
 
-The integration's settings page cannot be read from here, so each finding rests on what the integration did.
+The founder disabled the project's Supabase GitHub integration. Supabase stays on the Free plan and no paid upgrade is authorized.
 
-| Behavior | State | Evidence |
+| Behavior | State | How known |
 | --- | --- | --- |
-| Automatic production migrations from `main` | **Off, as far as the evidence shows** | The production branch record has no Git branch (`git_branch` is empty). The `Supabase Preview` check on `main`'s promotion commit (2026-09-18) and on integration's head reads "skipped: this git branch is not associated with any Supabase Branch". The record's status has not changed since 2026-06-04 although `main` was promoted since. So a push to `main` is not wired to production migrations. |
-| Automatic preview branching | **On** | A branch was created for PR 895 seven seconds after it opened, and the check says "open a PR to create a new branch". |
+| Deploy to production from `main` | **Off** | Founder, in the dashboard; the production branch record has no Git branch |
+| Preview branching | **Gone with the integration** | Behavior, below |
 
-Promotion therefore waits on the founder disabling previews (steps below). Founder confirmation of the production-deploy setting in the dashboard is still worth one look, because the evidence is indirect.
+**Verified by behavior** (the API cannot show the connection itself): the branch list holds only the production `main` record; a probe commit pushed to a draft PR at 02:03:02 UTC carried 18 GitHub Actions checks and no Supabase check, where the previous head of the same PR had one; #905 (reopened), #908 and #909 (new PRs that change `supabase/migrations`) produced no preview, no Supabase check and no Supabase comment, read 30 seconds after each opened.
 
-### Disable automatic previews and remove this preview
+**Historic cost note, still open.** Two preview branches existed while the integration was on: the one for #895 (until it merged) and the one for #905 (about two minutes). Whether either was billed is unconfirmed; the connector quoted `0.01344` USD per branch-hour, and the usage page's "Branching Compute Hours" would settle it. The mismatch (previews created although the dashboard showed a branch limit of 0) is no longer live and was not explained.
 
-Disable first, then delete. Deleting first lets the next push recreate the branch; disabling first leaves this branch running only until step 2.
+**Effect on CI.** `Supabase Preview` was never a required check, and it no longer runs. The repository's `guest-release-gates` job replays every migration on a disposable local Supabase stack on the pinned and latest CLI, and runs every `test_*_postgres.py` proof; that is the coverage the merge decision rests on.
 
-1. **Disable automatic creation.** Supabase dashboard, project `Argus` (`lgdhvepyrzbnscqssgqq`), Project Settings, Integrations, GitHub. Turn off branching ("Enable branching" in current documentation; confirm the label in the UI, which this lane has not seen). Leave the repository connection itself alone for now; see the production-deploy check below. The same effect is available from the Management API as `DELETE /v1/projects/{ref}/branches` ("Disables preview branching"), which also needs the founder's authorization.
-2. **Remove this preview.** Dashboard, branch selector, Manage Branches, `codex/cuadrao-marketing-launch`, Delete. Equivalent: the connector's `delete_branch` for branch `4796aa2f-9428-4b26-80c5-b48c2f0da29e`. The branch holds no production data (`with_data: false`), so nothing is lost beyond its schema replay.
-3. **Verify.** Manage Branches lists only the production branch. The next push to #895 must not create a branch. Branching Compute Hours on the organization usage page stops accruing.
-4. **Check the production-deploy setting before any promotion to `main`.** The integration's production branch record has read `MIGRATIONS_FAILED` since 2026-06-04. If the integration's "Deploy to production" is on, a push to `main` can make it try to apply migrations to production on its own. Confirm it is off (or intentionally set) before any promotion, and treat that as separate from step 1.
+## `notify.cuadrao.ai` and the Cloudflare zone (2026-10-08)
 
-**Effect on CI.**
-- `Supabase Preview` is not a required check anywhere. Branch protection on `codex/private-alpha-next` requires no checks, `main` requires only `ci`, there are no rulesets, and the aggregate `ci` job does not list it. Disabling previews therefore cannot block a merge. The check simply stops appearing on new pushes; the already-posted result stays on old commits.
-- What is lost is a hosted replay of the migration chain. The repository's own `guest-release-gates` job already replays every migration on a disposable local Supabase stack, on both the pinned and the latest CLI, and runs all `test_*_postgres.py` proofs, including this table's. That is the coverage the founder's merge decision rests on, and it is unchanged.
-- `supabase/config.toml` carries a comment about preview branches failing on a Pro-only setting. It becomes stale and can be edited in a later change; it is not needed for this one.
-- If the branch is deleted without step 1, the next push or a reopened PR recreates it.
+With the founder's approval, `notify.cuadrao.ai` was created in Resend (domain `520a3906-baaf-4e70-bd3e-eff49448a9e8`, region `us-east-1`, sending on, receiving off, open and click tracking off, TLS opportunistic). Resend returned records that differ from the root domain's, so they were copied exactly:
+
+| Type | Name | Content | Priority |
+| --- | --- | --- | --- |
+| TXT | `resend._domainkey.notify` | DKIM key beginning `p=MIGfMA0GCSqG`, ending `kTSD4EQIDAQAB` | |
+| MX | `send.notify` | `feedback-smtp.us-east-1.amazonses.com` | 10 |
+| TXT | `send.notify` | `v=spf1 include:amazonses.com ~all` | |
+| CNAME | `rsend.notify` | `send.forge.rmta.net` (DNS only) | |
+
+The founder added the DKIM record by hand and, through a zone-scoped, day-long Cloudflare token he created, the other three were added by a script that first ran as a dry run, refused to write unless the DKIM matched Resend's value exactly, and read the zone back. The zone had 9 records before and 12 after; **0 of the 9 existing records changed**. The iCloud mail records (two MX, SPF, the Apple domain TXT, the `sig1._domainkey` CNAME) and Resend's root-domain records are untouched. The token has since been deleted. Resend reports the domain **Verified** with all four records verified. No email has been sent. The sending key is created by the founder, limited to this domain, and never passes through the agent.
+
+## Migration identity (for the approval record)
+
+`supabase/migrations/20260920000000_cuadrao_early_access_signups.sql`: file SHA-256 `ea2a2a010d31f1c05222561d5f90fa024df2fac46a466107c7bdf3138d11aad0`; 5 statements; statement-array SHA-256 (the gate's `_statements_sha256`) `cafee0efce903bcdbdde9f2d1e200254a1f2a2486e26b8413d8d044e7ad4fbca`. The applier's run digest for this single-version run (`versions_digest(["20260920000000"])`) is `090e86fa74fb104a0d3984653624cf72fd65faa8ac7bb2a930ed937c73fb0f8f`; it hashes the version list, not the file. The migration is applied alone and first (C0); the consumer's `20260505000001` repair runs in its own batch and is not part of this release.
 
 ## Not yet true
 
-- Nothing is deployed. No Render service exists, no DNS or Resend record was changed, no migration was applied, no test email was sent.
-- Render, Resend and Cloudflare state was not read: the Render CLI token is expired, the Claude in Chrome extension is not connected, and those dashboards need a signed-in session.
-- Spanish copy, the privacy text facts and the operator wording await founder review; the icon is chosen.
+- Nothing is deployed. No Render service exists, no migration was applied, no email was sent, and nothing was promoted to `main`.
+- The only hosted changes so far are the `notify.cuadrao.ai` Resend domain and its four DNS records (above), and the founder's disabling of the Supabase GitHub integration.
+- The Spanish and English privacy wording was approved by the founder on 2026-10-08 as a draft, which is not permission to publish. The operator wording and the public contact and signup forms stay held until the founder confirms Cuadrao LLC is formed and operates the site. The icon is chosen.
+- Hosted acceptance (real inquiry receipt, signup, removal, public domain) has not happened.
 
-## Copy awaiting founder review
+## Copy
+
+The privacy page wording (both languages, `marketing/components/privacy-copy.ts`) was approved by the founder on 2026-10-08 as a draft, which is not permission to publish. The approval named the privacy wording only, so the form strings below, shown in the same review, are confirmed with the founder before publication.
 
 Spanish first, English follows. Only strings whose meaning changed with real delivery or storage are new. Everything else is the approved copy, unchanged.
 
@@ -98,8 +120,8 @@ Spanish first, English follows. Only strings whose meaning changed with real del
 
 Removed: the "Vista local" notices and "no se envía nada" lines on contact, and "El registro aún no está conectado" on Personal. Each stated that nothing was sent or stored, which stops being true.
 
-The privacy text states facts only the founder can confirm: the project is "en preparación de Lucas Garcés" (legal entity not named), contact messages stay in the mailbox as long as needed to reply, early-access signups stay until removal is requested, Cloudflare is named as domain manager, and Supabase is in the United States (Ohio). Confirm or correct each before publication.
+The privacy text states facts the founder confirmed: contact messages stay in the mailbox as long as needed to reply, early-access signups stay until removal is requested, Resend, Apple iCloud Mail, Supabase (United States, Ohio) and Cloudflare are the providers, and hosting may record connection data such as the IP address. It names no operator. The operator wording ("Cuadrao LLC", formation pending) is prepared in the runbook and held until the founder confirms the company is formed and operates the site; the public contact and signup forms are held with it. Two uses are not in the text and are recorded here: the per-visitor rate limit keeps a visitor's address in memory for the window and forgets it on restart, and a signup's digest is kept after removal as the text says.
 
 ## Founder inputs and approvals needed
 
-Listed with the exact request in the PR. In short: Option B promotion exception, a signed-in way for read-only inspection of Render, Resend and Cloudflare (or the founder reads them back), the existing Supabase project reactivated, approved test addresses, the copy and privacy facts above, and review of the provisional icon.
+The concrete approval request, in deployment order, is posted on #880. It covers the website-only promotion to `main`, applying `20260920000000` alone through the consumer's reviewed applier, creating the Render service and its cost, the first inquiry and signup tests with two founder-supplied addresses, and publication. #903, #923 and #906 are merged into integration with the founder's approval; none of those merges authorizes any of the actions above.
