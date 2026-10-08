@@ -138,6 +138,13 @@ reserving each billable post before it is sent. The guard lives in
 `tests/evals/live_eval_budget.py`; nothing in it touches model-facing text,
 production limits or models.
 
+- Each eval turn runs inside the runtime's own `turn_execution_scope`, the
+  per-turn allowance production enforces, and the prose judge in its own
+  scope. A turn can post at most 7 ordinary permits, 1 research route, 1
+  research voicing and the 2-post shared repair pool: 11 with research on, 9
+  with research off, which a budgeted run always is
+  (`src/argus/agent_runtime/turn_execution.py`). The per-post guard does not
+  rely on that ceiling; it reserves every post either way.
 - Every httpx post to OpenRouter, sync or async, passes through the guard at
   the transport: each candidate model, each fallback, each reasoning-400
   retry, the prose judge and any SDK client is its own post with its own
