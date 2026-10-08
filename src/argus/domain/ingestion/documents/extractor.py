@@ -24,6 +24,7 @@ from argus.domain.ingestion.documents.config import (
     load_document_extraction_settings,
 )
 from argus.domain.ingestion.documents.models import (
+    RECEIPT_PURCHASE_AMBIGUOUS,
     DocumentExtractionError,
     ExtractionBatch,
     ExtractionResult,
@@ -111,7 +112,7 @@ def batch_from_result(
         ):
             receipt_ambiguous = True
     if receipt_ambiguous:
-        issues.append(ProjectionIssue(code="receipt_purchase_ambiguous"))
+        issues.append(ProjectionIssue(code=RECEIPT_PURCHASE_AMBIGUOUS))
     seen = set()
     candidates = []
     for row in result.observations:
