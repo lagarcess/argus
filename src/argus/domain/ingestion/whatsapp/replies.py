@@ -5,8 +5,9 @@ they always fall inside WhatsApp's 24-hour customer service window. Nothing
 here starts a conversation; that would need an approved template, so intake
 never sends outside the window.
 
-A reply uses one language: the linked owner's, Spanish by default and English
-when their profile says ``en``. A sender with no linked owner gets Spanish.
+A reply uses one language: the sender link's ``reply_language``, the web app's
+language when the owner asked for the link code. A sender with no active link
+gets Spanish.
 """
 
 from __future__ import annotations

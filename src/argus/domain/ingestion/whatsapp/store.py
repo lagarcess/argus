@@ -14,7 +14,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Literal, Protocol
 
-ReplyLanguage = Literal["es-419", "en"]
+ReplyLanguage = Literal["en", "es-419"]
 InboundStatus = Literal["received", "linked", "rejected", "captured", "failed"]
 SettledStatus = Literal["linked", "rejected", "captured", "failed"]
 RETRYABLE: frozenset[InboundStatus] = frozenset({"received", "failed"})

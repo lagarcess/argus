@@ -549,8 +549,12 @@ async def one_failing_message_does_not_stop_the_rest(world: World) -> None:
     world.graph.media["700000000000118"] = Media(RECEIPT_PDF, "application/pdf")
     original = world.intake.destination.capture
 
+    attempts: list[str] = []
+    failing = True
+
     async def fail_png(**kwargs):  # noqa: ANN003, ANN202
-        if kwargs["media_type"] == "image/png":
+        attempts.append(kwargs["media_type"])
+        if failing and kwargs["media_type"] == "image/png":
             raise RuntimeError("storage hiccup")
         return await original(**kwargs)
 
@@ -569,6 +573,13 @@ async def one_failing_message_does_not_stop_the_rest(world: World) -> None:
     assert world.record("wamid.CASE-BATCH-1").status == "failed"
     assert world.record("wamid.CASE-BATCH-2").status == "captured"
     assert len(world.captures(world.alice)) == 1
+
+    failing = False
+    await world.deliver(body)
+    await world.deliver(body)
+    assert attempts == ["image/png", "application/pdf", "image/png"]
+    assert world.record("wamid.CASE-BATCH-1").status == "captured"
+    assert len(world.captures(world.alice)) == 2
 
 
 async def media_urls_off_the_meta_allowlist_are_never_fetched(world: World) -> None:

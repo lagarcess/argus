@@ -14456,8 +14456,8 @@ components:
         language:
           type: string
           enum:
-          - es-419
           - en
+          - es-419
           default: es-419
       additionalProperties: false
       type: object
@@ -14508,8 +14508,8 @@ components:
           anyOf:
           - type: string
             enum:
-            - es-419
             - en
+            - es-419
           - type: 'null'
       additionalProperties: false
       type: object
@@ -16866,8 +16866,8 @@ components:
           anyOf:
           - type: string
             enum:
-            - es-419
             - en
+            - es-419
           - type: 'null'
         replace_guest_conversation_id:
           anyOf:
