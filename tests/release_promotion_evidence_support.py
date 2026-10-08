@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
 
 from tests.evals.measurement_eval_scorecard import (
@@ -44,6 +45,14 @@ _MANIFESTS_PREDATING_PROSE_AB_RULE = frozenset(
 
 
 LIVE_EVAL_RESULT_STATUSES = RESULT_STATUSES
+
+
+def assert_personal_measurement(provenance: Mapping[str, object]) -> None:
+    """Promotion measures the Personal fixture set; a scorecard of another set
+    names itself and is refused here."""
+    assert provenance.get("fixture_set", "personal") == "personal", (
+        "a Business chat scorecard is not the promotion measurement"
+    )
 
 
 def assert_main_promotion_live_eval_evidence(
@@ -83,6 +92,7 @@ def assert_main_promotion_live_eval_evidence(
     assert_scorecard_complete(scorecard)
     provenance = scorecard.get("provenance", {})
     assert provenance.get("evaluation_mode") == "live"
+    assert_personal_measurement(provenance)
     assert provenance.get("market_data_provider_mode") == "live_provider"
     assert str(provenance.get("asset_provider_mode") or "").strip()
     assert_measurement_stands_for(

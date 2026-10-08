@@ -88,6 +88,22 @@ poetry run pytest tests/evals/test_measurement_eval_live.py -q
 `ARGUS_LIVE_EVAL_BUDGET_USD` is the most the run may spend, in actual provider
 cost. The run refuses to start without it. See [Spend budget](#spend-budget).
 
+`ARGUS_EVAL_FIXTURE_SET` picks the fixture set: `personal` (the default, the
+promotion measurement) or `business`, the Business chat cases in
+`business_cases/`, each run in the chat it names. A Business scorecard records
+`provenance.fixture_set: business`, so a promotion gate never reads it as the
+Personal measurement. A Business-only run:
+
+```bash
+ARGUS_RUN_LIVE_EVALS=1 \
+ARGUS_LIVE_EVAL_BUDGET_USD=5.00 \
+ARGUS_EVAL_FIXTURE_SET=business \
+ARGUS_EVAL_ENV_FILE=<path> \
+ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider \
+ARGUS_ASSET_PROVIDER_MODE=live_provider \
+poetry run pytest tests/evals/test_measurement_eval_live.py -q
+```
+
 `ARGUS_EVAL_ENV_FILE` must name a file no tracked file feeds, such as the
 gitignored `.env`. The harness refuses the file when it, or any step on the way
 to it, is a tracked file or tracked symlink, whatever path or link reaches it, so
@@ -121,9 +137,11 @@ text.
 
 - Each eval turn runs inside the runtime's own `turn_execution_scope`, so a
   case can post at most the production corridor: seven permits for any task,
-  two more for the last-resort `interpretation_repair` grant, and the
-  `knowledge_route` and `knowledge_voicing` reservations. The judge runs in its
-  own scope.
+  and two more for the last-resort `interpretation_repair` grant. The
+  `knowledge_route` and `knowledge_voicing` reservations are granted only on
+  the research rail, so the turn bound counts them only when research is
+  reachable when the bound is set; a budgeted run refuses the rail, so it never
+  counts them. The judge runs in its own scope.
 - A request guard sees every OpenRouter post before it is sent and refuses any
   task outside the bounded set, any model without a pinned price, and any
   request over the input cap (`INPUT_CAP_BYTES`, 98,304 bytes). A token is at

@@ -222,14 +222,22 @@ class BoundTable:
             self.post_bound_usd(_JUDGE_TASK, model)
         return models
 
-    def turn_bound_usd(self, task_candidates: Mapping[str, tuple[str, ...]]) -> Decimal:
+    def turn_bound_usd(
+        self,
+        task_candidates: Mapping[str, tuple[str, ...]],
+        *,
+        research_reachable: bool,
+    ) -> Decimal:
         """The most one turn inside turn_execution_scope can bill.
 
-        The corridor grants DEFAULT_TURN_CALL_ALLOWANCE permits to any task,
+        The corridor grants DEFAULT_TURN_CALL_ALLOWANCE permits to any task and
         the last-resort repair grant adds LAST_RESORT_REPAIR_CALL_GRANT permits
-        for interpretation_repair only, and the routing and recovery
-        reservations add one knowledge_route and one knowledge_voicing permit.
-        Every post reserves one permit
+        for interpretation_repair only. The knowledge_route and
+        knowledge_voicing reservations are granted only on the research rail
+        (reserve_provider_call grants the route only while
+        research_rail_enabled(), and only the rail's no-lookup answer enters
+        research_recovery_scope), so they count only when research is
+        reachable when the bound is set. Every post reserves one permit
         (argus.agent_runtime.turn_execution.reserve_provider_call). Nothing
         else can bill: refuse_unbounded_rails keeps every other paid provider
         unreachable.
@@ -239,13 +247,14 @@ class BoundTable:
             for task, models in task_candidates.items()
             for model in models
         )
-        return (
-            Decimal(DEFAULT_TURN_CALL_ALLOWANCE) * dearest
-            + Decimal(LAST_RESORT_REPAIR_CALL_GRANT)
-            * self._dearest_post(task_candidates, _REPAIR_TASK)
-            + self._dearest_post(task_candidates, _ROUTING_RESERVED_TASK)
-            + self._dearest_post(task_candidates, _RECOVERY_RESERVED_TASK)
-        )
+        bound = Decimal(DEFAULT_TURN_CALL_ALLOWANCE) * dearest + Decimal(
+            LAST_RESORT_REPAIR_CALL_GRANT
+        ) * self._dearest_post(task_candidates, _REPAIR_TASK)
+        if research_reachable:
+            bound += self._dearest_post(
+                task_candidates, _ROUTING_RESERVED_TASK
+            ) + self._dearest_post(task_candidates, _RECOVERY_RESERVED_TASK)
+        return bound
 
     def judge_bound_usd(self, judge_candidates: tuple[str, ...]) -> Decimal:
         """The judge runs in its own turn scope, so its posts are the smaller

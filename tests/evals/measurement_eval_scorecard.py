@@ -10,13 +10,21 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Literal, Mapping
 
 import yaml  # type: ignore[import-untyped]
 
 from tests.promotion_evidence_configuration import measured_release_configuration
 
 FIXTURE_DIR = Path(__file__).with_name("measurement_cases")
+BUSINESS_FIXTURE_DIR = Path(__file__).with_name("business_cases")
+# A scorecard measures one fixture set. The Personal set is the promotion
+# measurement; the Business set measures Business chat on its own.
+FixtureSet = Literal["personal", "business"]
+FIXTURE_SETS: dict[FixtureSet, Path] = {
+    "personal": FIXTURE_DIR,
+    "business": BUSINESS_FIXTURE_DIR,
+}
 SCORECARD_DIR = Path("temp/argus_eval_scorecards")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
@@ -77,6 +85,7 @@ class EvalScorecardProvenance:
     worktree_clean: bool
     release_configuration: dict[str, str | None]
     live_market_data_probe: LiveMarketDataProbe | None = None
+    fixture_set: FixtureSet = "personal"
 
 
 @dataclass(frozen=True)
@@ -230,7 +239,7 @@ def _measurement_fixture_identity_from_entries(
 def build_scorecard_provenance(
     *,
     evaluation_mode: str,
-    fixture_dir: Path = FIXTURE_DIR,
+    fixture_set: FixtureSet = "personal",
     repository_root: Path = REPOSITORY_ROOT,
 ) -> EvalScorecardProvenance:
     if evaluation_mode not in {"live", "mocked"}:
@@ -241,7 +250,7 @@ def build_scorecard_provenance(
     asset_provider_mode = _resolved_provider_mode("ARGUS_ASSET_PROVIDER_MODE")
     candidate_sha = _candidate_sha(repository_root)
     python_version = platform.python_version()
-    fixture_identity = measurement_fixture_identity(fixture_dir)
+    fixture_identity = measurement_fixture_identity(FIXTURE_SETS[fixture_set])
     worktree_clean = _worktree_is_clean(repository_root)
     if not worktree_clean:
         raise ValueError("scorecard_provenance:worktree_clean")
@@ -263,6 +272,7 @@ def build_scorecard_provenance(
             candidate_sha, repository_root=repository_root
         ),
         live_market_data_probe=live_probe,
+        fixture_set=fixture_set,
     )
     validated_provenance_payload(provenance)
     return provenance
@@ -434,6 +444,8 @@ def validated_provenance_payload(
         raise ValueError("scorecard_provenance:fixture_case_ids")
     if provenance.worktree_clean is not True:
         raise ValueError("scorecard_provenance:worktree_clean")
+    if provenance.fixture_set not in FIXTURE_SETS:
+        raise ValueError("scorecard_provenance:fixture_set")
 
     live_probe_payload = None
     if provenance.live_market_data_probe is not None:
@@ -465,6 +477,13 @@ def validated_provenance_payload(
         "worktree_clean": provenance.worktree_clean,
         "release_configuration": dict(provenance.release_configuration),
         "live_market_data_probe": live_probe_payload,
+        # A Personal scorecard keeps its schema-4 shape; any other set names
+        # itself, so it can never be read as the promotion measurement.
+        **(
+            {}
+            if provenance.fixture_set == "personal"
+            else {"fixture_set": provenance.fixture_set}
+        ),
     }
 
 
@@ -472,7 +491,7 @@ def assert_provenance_matches_current_run(
     provenance: EvalScorecardProvenance,
 ) -> None:
     validated_provenance_payload(provenance)
-    fixture_identity = measurement_fixture_identity(FIXTURE_DIR)
+    fixture_identity = measurement_fixture_identity(FIXTURE_SETS[provenance.fixture_set])
     expected_values = {
         "market_data_provider_mode": _resolved_provider_mode(
             "ARGUS_MARKET_DATA_PROVIDER_MODE"

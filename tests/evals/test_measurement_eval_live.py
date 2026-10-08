@@ -34,13 +34,15 @@ from tests.evals.live_eval_budget import (
     refuse_unbounded_rails,
     run_budgeted_cases,
 )
+from argus.domain.research.config import research_rail_enabled
 from tests.evals.measurement_eval_harness import (
     EvalCase,
     blocking_eval_results,
     expected_fail_issue_for_result,
     load_eval_cases,
-    run_eval_case,
 )
+from tests.evals.measurement_eval_scorecard import FIXTURE_SETS
+from tests.evals.measurement_surface import live_eval_fixture_set, run_case_on_its_surface
 
 
 def _assert_requested_live_eval_credentials() -> None:
@@ -55,9 +57,12 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
     # the budget, the credentials, the rails the bound cannot cover, and a
     # price for every model a bounded task can resolve to.
     ledger = BudgetLedger(live_eval_budget_usd(os.environ))
+    fixture_set = live_eval_fixture_set(os.environ)
     _assert_requested_live_eval_credentials()
     refuse_unbounded_rails(os.environ)
-    turn_usd = PINNED.turn_bound_usd(PINNED.task_candidates_from_env())
+    turn_usd = PINNED.turn_bound_usd(
+        PINNED.task_candidates_from_env(), research_reachable=research_rail_enabled()
+    )
     judge_usd = PINNED.judge_bound_usd(
         PINNED.judge_candidates_from_env(os.getenv("ARGUS_EVAL_JUDGE_MODEL"))
     )
@@ -79,7 +84,9 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
         )
     clear_asset_cache()
 
-    provenance = build_scorecard_provenance(evaluation_mode="live")
+    provenance = build_scorecard_provenance(
+        evaluation_mode="live", fixture_set=fixture_set
+    )
 
     def bound_for(case: EvalCase):
         return case_bound(
@@ -92,8 +99,8 @@ def test_measurement_live_eval_suite_writes_scorecard(monkeypatch) -> None:
     # The guard sees every OpenRouter post any case makes before it is sent.
     with openrouter_request_guard(PINNED.request_guard()):
         results = run_budgeted_cases(
-            load_eval_cases(),
-            run_case=run_eval_case,
+            load_eval_cases(FIXTURE_SETS[fixture_set]),
+            run_case=run_case_on_its_surface,
             bound_for=bound_for,
             ledger=ledger,
         )

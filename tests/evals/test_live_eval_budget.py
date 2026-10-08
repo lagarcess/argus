@@ -64,11 +64,13 @@ def test_post_bound_refuses_an_unlisted_task_or_unpriced_model() -> None:
         FLAT.post_bound_usd("interpretation", "vendor/unpriced")
 
 
-def test_turn_bound_sums_the_corridor_the_repair_grant_and_both_reservations() -> None:
+def test_turn_bound_counts_the_research_reservations_only_when_research_is_reachable() -> None:
     candidates: dict[str, tuple[str, ...]] = {task: ("m",) for task in budget.BOUNDED_TASKS}
 
     # 7 x (1000 + 3200) + 2 x (1000 + 2200) + (1000 + 350) + (1000 + 600), per million.
-    assert FLAT.turn_bound_usd(candidates) == Decimal("0.03875")
+    assert FLAT.turn_bound_usd(candidates, research_reachable=True) == Decimal("0.03875")
+    # Research off grants neither knowledge_route nor knowledge_voicing.
+    assert FLAT.turn_bound_usd(candidates, research_reachable=False) == Decimal("0.0358")
 
 
 def test_judge_bound_is_the_candidate_ladder_posts() -> None:
