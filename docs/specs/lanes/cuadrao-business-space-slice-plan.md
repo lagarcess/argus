@@ -1,6 +1,6 @@
 # Cuadrao Business space slice: implementation plan
 
-**Status:** approved plan, revision 2, with the founder's decisions in section 8 (October 8, 2026). S1 to S3 are implemented and unmerged in the isolation PR, which depends on the Business API PR [#913](https://github.com/lagarcess/argus/pull/913). S4 and S5 are not started.
+**Status:** approved plan, revision 2, with the founder's decisions in section 8 (October 8, 2026). S1 to S3 are implemented and unmerged in [#914](https://github.com/lagarcess/argus/pull/914), which depends on the Business API PR [#913](https://github.com/lagarcess/argus/pull/913). S4 and S5 are not started.
 **Serves:** #819 (smallest additive slice), the [boundary proposal](cuadrao-business-boundary-proposal.md) and the Business owner pilot (#900).
 **Code base read:** `claude/business-pilot-flow` at `92599473a` (Business API #904, Storage #778, preparation jobs #823, WhatsApp, web #901). Line numbers are against that commit.
 **Approved by the founder (October 8):** separate Personal and Business spaces for the pilot, compatible with #819, so a connected Personal plus Business experience can come later without copying financial records. WhatsApp: the owner sends or forwards receipts from their own number to Cuadrao's one receiving number. A verified link ties that sending number to their Business space. Only owner-initiated submissions are processed, and their conversations are never read. One confirmed account-and-business deletion with an optional export.
@@ -25,7 +25,7 @@ The [connected-flow spec](../cuadrao-business-connected-flow-spec.md) (#912) own
 
 | Stage | What it covers | Status |
 | --- | --- | --- |
-| B1, capture with verified space isolation | Web and WhatsApp intake, review, one expense, reload, search and source retrieval, in an isolated Business space | In progress, default-off: [#913](https://github.com/lagarcess/argus/pull/913) and the isolation PR |
+| B1, capture with verified space isolation | Web and WhatsApp intake, review, one expense, reload, search and source retrieval, in an isolated Business space | In progress, default-off: [#913](https://github.com/lagarcess/argus/pull/913) and [#914](https://github.com/lagarcess/argus/pull/914) |
 | E0, offline fiscal engine | Synthetic customer and invoice input becomes a deterministic unsigned XML artifact with local validation evidence, per the [E0 plan](../cuadrao-business-e0-implementation-plan.md) | Approved. Starts after this B1 slice is finished (founder, October 8) |
 | B2, connected period pilot | One period of invoices, collections and expenses, plus the accountant package | Not started |
 | L, authorized live fiscal processing | Signing, submission and customer delivery, each authorized separately. No supplier is chosen | Not started |
