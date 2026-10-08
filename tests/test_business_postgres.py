@@ -104,7 +104,7 @@ def _prepared(rig: dict) -> str:
     return receipt.id
 
 
-def test_concurrent_confirms_record_one_expense(rig: dict) -> None:
+def _reviewed(rig: dict) -> tuple[str, int]:
     service, scope = rig["service"], rig["owner"]
     receipt_id = _prepared(rig)
     account, _ = service.create_account(
@@ -118,16 +118,39 @@ def test_concurrent_confirms_record_one_expense(rig: dict) -> None:
         service.receipt(scope, receipt_id).version,
         {"account_id": account["id"], "merchant": "Ferretería La Esquina"},
     )
-    keys = ["double-click", "double-click", "double-click", "other-tab"]
-    with ThreadPoolExecutor(max_workers=len(keys)) as pool:
-        results = list(
-            pool.map(
-                lambda key: service.confirm(scope, receipt_id, reviewed.version, key),
-                keys,
-            )
-        )
-    assert {(r.status, r.review.expense_id) for r in results} == {
-        ("confirmed", results[0].review.expense_id)
+    return receipt_id, reviewed.version
+
+
+def _written(rig: dict) -> int:
+    with rig["pool"].connection() as connection:
+        return connection.execute(
+            "select count(distinct activity_id) from public.financial_activity_receipts"
+            " where user_id = %s",
+            (rig["owner"].person_id,),
+        ).fetchone()[0]
+
+
+def test_an_interrupted_claim_is_finished_once_by_another_key(
+    rig: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service, scope = rig["service"], rig["owner"]
+    receipt_id, version = _reviewed(rig)
+    write = MoneyService.write
+
+    def crash_after_claim(self, **kwargs):  # noqa: ANN001, ANN003, ANN202
+        raise RuntimeError("process died after the claim")
+
+    monkeypatch.setattr(MoneyService, "write", crash_after_claim)
+    with pytest.raises(RuntimeError):
+        service.confirm(scope, receipt_id, version, "tab-a")
+    assert _written(rig) == 0
+    monkeypatch.setattr(MoneyService, "write", write)
+
+    other_tab = service.confirm(scope, receipt_id, version, "tab-b")
+    first_tab = service.confirm(scope, receipt_id, version, "tab-a")
+    later = service.confirm(scope, receipt_id, version, "later")
+    assert {(r.status, r.review.expense_id) for r in (other_tab, first_tab, later)} == {
+        ("confirmed", other_tab.review.expense_id)
     }
     [expense] = service.expenses(scope, *OCTOBER)
     assert {
@@ -138,17 +161,21 @@ def test_concurrent_confirms_record_one_expense(rig: dict) -> None:
         "currency": "DOP",
         "receipt_id": receipt_id,
     }
-    with rig["pool"].connection() as connection:
-        written = connection.execute(
-            "select count(distinct activity_id) from public.financial_activity_receipts"
-            " where user_id = %s",
-            (scope.person_id,),
-        ).fetchone()[0]
-    assert written == 1
-    assert (
-        service.confirm(scope, receipt_id, reviewed.version, "later").review.expense_id
-        == (expense["id"])
-    )
+    assert _written(rig) == 1
+
+
+def test_concurrent_confirms_in_any_order_record_one_expense(rig: dict) -> None:
+    service, scope = rig["service"], rig["owner"]
+    receipt_id, version = _reviewed(rig)
+    keys = ["double-click", "double-click", "double-click", "other-tab"]
+    with ThreadPoolExecutor(max_workers=len(keys)) as pool:
+        results = list(
+            pool.map(lambda key: service.confirm(scope, receipt_id, version, key), keys)
+        )
+    assert {(r.status, r.review.expense_id) for r in results} == {
+        ("confirmed", results[0].review.expense_id)
+    }
+    assert _written(rig) == 1
 
 
 def test_source_is_the_stored_object_and_only_its_owner_reads_it(rig: dict) -> None:

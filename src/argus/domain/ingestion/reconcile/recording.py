@@ -40,6 +40,7 @@ MAX_BATCH_KEY = 40
 MAX_BATCH = 100
 # Refusals the money service raises before it writes anything.
 _NOT_WRITTEN = (RecordingInputError, StaleVersion, AccountNotFound, ValidationError)
+_KIND_QUESTIONS = frozenset({"kind", "source_account_id", "destination_account_id"})
 _ITEM_REFUSALS = (
     *_NOT_WRITTEN,
     ReconcileError,
@@ -54,7 +55,12 @@ class Recording:
     ``clock``, ``detail``, ``_editable`` and ``_remember_account``."""
 
     def preview(
-        self, *, user_id: str, event_id: str, overrides: dict[str, Any] | None = None
+        self,
+        *,
+        user_id: str,
+        event_id: str,
+        overrides: dict[str, Any] | None = None,
+        kind: str | None = None,
     ) -> dict[str, Any]:
         detail = self.detail(user_id=user_id, event_id=event_id)
         if detail["state"] != "open":
@@ -67,7 +73,7 @@ class Recording:
             )
         try:
             request = MoneyRequest.model_validate(
-                {**self._draft(user_id, detail), **(overrides or {})}
+                {**self._draft(user_id, detail, kind), **(overrides or {})}
             )
         except ValidationError:
             raise ReconcileError(
@@ -170,16 +176,24 @@ class Recording:
         return results
 
     def accept_reviewed(
-        self, *, user_id: str, event_id: str, version: int, idempotency_key: str
+        self,
+        *,
+        user_id: str,
+        event_id: str,
+        version: int,
+        idempotency_key: str,
+        kind: str | None = None,
     ) -> dict[str, Any]:
         """Record one import as reviewed, with its preview built here.
 
-        For a client that confirms by version and key alone. A retry or a
-        concurrent confirm under the same key replays the claimed request
-        instead of previewing an import that is no longer open.
+        For a client that confirms by version and key alone; ``kind``, when
+        given, is what the client always records an import as. A retry under
+        the claiming key replays what was claimed. Another key's acceptance,
+        even an interrupted one, is finished first, so the import is recorded
+        once. A version other than the open import's is stale.
         """
 
-        for _ in range(2):
+        for _ in range(3):
             with self.store.transaction(user_id) as tx:
                 event = tx.event(event_id)
             if (
@@ -192,10 +206,21 @@ class Recording:
                     "activity": result["activity"],
                     "replayed": True,
                 }
+            if event.state == "accepting":
+                self._complete(user_id, event)
+                continue
+            if event.state == "accepted":
+                raise ReconcileError(
+                    "import_already_accepted", "This import is already recorded."
+                )
+            if event.state != "open":
+                raise ReconcileError("import_not_open", "Reopen it to record it.")
+            if event.version != version:
+                raise StaleEvent()
             try:
-                request = self._reviewed_request(user_id, event_id)
+                request = self._reviewed_request(user_id, event_id, kind)
             except ReconcileError as error:
-                # Claimed by the same key between the read and the preview.
+                # Claimed between the read and the preview; read it again.
                 if error.code != "import_not_open":
                     raise
                 continue
@@ -268,8 +293,10 @@ class Recording:
         )
         return _outcome(event_id, result["activity"]["activity_id"], result["replayed"])
 
-    def _reviewed_request(self, user_id: str, event_id: str) -> MoneyRequest:
-        preview = self.preview(user_id=user_id, event_id=event_id)["preview"]
+    def _reviewed_request(
+        self, user_id: str, event_id: str, kind: str | None = None
+    ) -> MoneyRequest:
+        preview = self.preview(user_id=user_id, event_id=event_id, kind=kind)["preview"]
         if not preview["ready"]:
             raise ReconcileError(
                 "balance_coverage_required", "Answer its balance question."
@@ -347,9 +374,15 @@ class Recording:
                     )
                 )
 
-    def _draft(self, user_id: str, detail: dict[str, Any]) -> dict[str, Any]:
+    def _draft(
+        self, user_id: str, detail: dict[str, Any], kind: str | None = None
+    ) -> dict[str, Any]:
         facts, resolution = detail["facts"], detail["resolution"]
         missing = missing_fields(detail)
+        if kind is not None and kind not in DESTINATION_ELIGIBILITY:
+            # The caller decided the kind, so the import's kind questions are moot.
+            missing = [f for f in missing if f not in _KIND_QUESTIONS]
+        kind = kind or resolution.get("kind") or facts["kind"]
         if missing:
             raise ReconcileError("import_unresolved", "Complete: " + ", ".join(missing))
         account_id = facts["account_id"]
@@ -367,7 +400,6 @@ class Recording:
                 "import_currency_mismatch",
                 "This import is in another currency than the account; nothing is converted.",
             )
-        kind = resolution.get("kind") or facts["kind"]
         zone = resolution.get("time_zone") or DEFAULT_ZONE
         draft: dict[str, Any] = {
             "kind": kind,

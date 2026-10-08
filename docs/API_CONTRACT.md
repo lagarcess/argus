@@ -8789,11 +8789,14 @@ accept path recorded.
   `null` falls back to the evidence merchant. A stale `version` is 409
   `stale_version`. A receipt with no purchase is 409 `receipt_not_prepared`.
 - POST `/api/v1/business/receipts/{id}/confirm` (`Idempotency-Key` required)
-  takes `{version}` and records through the import accept path. It refuses
-  with 422 `missing_fields`, `currency_mismatch` or a money code such as
-  `amount_precision`, or with 409 `stale_version`. A replay, a second key or a
-  concurrent confirm returns the same confirmed receipt with the same
-  `expense_id`, and one expense is recorded.
+  takes `{version}` and records the receipt as one expense through the import
+  accept path. Confirm changes nothing before it claims the import. A
+  `version` other than the open import's is 409 `stale_version`, checked
+  before any other refusal. It also refuses with 422 `missing_fields`,
+  `currency_mismatch` or a money code such as `amount_precision`. A replay, a
+  second key or a concurrent confirm returns the same confirmed receipt with
+  the same `expense_id`. An acceptance that another key claimed but did not
+  finish is finished first, and one expense is recorded.
 - GET `/api/v1/business/expenses?from&to` returns `{items: BusinessExpense[]}`.
   These are expense activities whose local date falls in `[from, to]`, newest
   first. `receipt_id` names the receipt when the expense came from exactly one.
@@ -8801,7 +8804,8 @@ accept path recorded.
   `{account_id, amount, occurred_on, merchant, category_id}` and records one
   expense through `MoneyService`, in the account's currency. A retry with the
   same key and body returns the same expense. The same key with a different
-  body is 409 `idempotency_conflict`.
+  body, or a key whose recorded activity is not an expense, is 409
+  `idempotency_conflict`.
 - GET `/api/v1/business/overview?from&to` returns per-currency `totals`
   `{currency, amount, count}`, with no conversion. It also returns
   `awaiting_review`, `needs_attention`, `last_received_at` and

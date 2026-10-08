@@ -33,6 +33,7 @@ from argus.domain.ingestion.receipt_review import RECEIPT_EVENT_STATES, receipt_
 from argus.domain.ingestion.reconcile.model import ReconcileError
 from argus.domain.ingestion.reconcile.recording import DEFAULT_ZONE
 from argus.domain.ingestion.reconcile.service import ReconciliationService
+from argus.domain.recording.errors import IdempotencyConflict
 from argus.domain.recording.money_reads import current_activities
 from argus.domain.recording.money_schemas import ELIGIBILITY, MoneyRequest
 from argus.domain.recording.schemas import CreateFinancialAccountRequest
@@ -198,64 +199,42 @@ class BusinessService:
         """Corrections become the import's resolution; the evidence is untouched."""
 
         event_id = _event_id(self.receipt(scope, receipt_id))
-        changes = {_RESOLUTION[name]: value for name, value in fields.items()}
-        self._resolve(scope, event_id, version, changes)
+        try:
+            self.imports.resolve(
+                user_id=scope.person_id,
+                event_id=event_id,
+                version=version,
+                changes={_RESOLUTION[name]: value for name, value in fields.items()},
+            )
+        except ReconcileError as error:
+            raise _renamed(error) from None
         return self.receipt(scope, receipt_id)
 
     def confirm(
         self, scope: BusinessScope, receipt_id: str, version: int, key: str
     ) -> Receipt:
-        """The import accept path. A replay or a double confirm is one expense."""
+        """The import accept path, as one expense for the receipt's total.
+
+        A replay, a second key or a concurrent confirm records one expense.
+        """
 
         current = self.receipt(scope, receipt_id)
         if current.status == "confirmed":
             return current
-        event_id = _event_id(current)
-        if current.version == version:
-            if current.missing_fields:
-                raise BusinessError("missing_fields")
-            version = self._resolve(scope, event_id, version, {})
+        if current.version == version and current.missing_fields:
+            raise BusinessError("missing_fields")
         try:
             self.imports.accept_reviewed(
                 user_id=scope.person_id,
-                event_id=event_id,
+                event_id=_event_id(current),
                 version=version,
                 idempotency_key=key,
+                kind="expense",
             )
         except ReconcileError as error:
-            if error.code not in ("import_already_accepted", "import_not_open"):
+            if error.code != "import_already_accepted":
                 raise _renamed(error) from None
-            settled = self.receipt(scope, receipt_id)
-            if settled.status != "confirmed":
-                raise _renamed(error) from None
-            return settled
         return self.receipt(scope, receipt_id)
-
-    def _resolve(
-        self, scope: BusinessScope, event_id: str, version: int, changes: dict[str, Any]
-    ) -> int:
-        """Apply ``changes`` as an expense and return the new version.
-
-        One receipt saves one expense for its total, so a purchase the
-        evidence did not call an expense is resolved as one here. With no
-        changes and nothing to resolve the version stays as it is.
-        """
-
-        facts = self.imports.detail(user_id=scope.person_id, event_id=event_id)["facts"]
-        if facts["kind"] != "expense":
-            changes = {**changes, "kind": "expense"}
-        if not changes:
-            return version
-        try:
-            event = self.imports.resolve(
-                user_id=scope.person_id,
-                event_id=event_id,
-                version=version,
-                changes=changes,
-            )
-        except ReconcileError as error:
-            raise _renamed(error) from None
-        return event["version"]
 
     # --- Expenses ---------------------------------------------------------
     def expenses(
@@ -288,8 +267,11 @@ class BusinessService:
         activity = self.imports.money.write_entered(
             user_id=scope.person_id, request=request, idempotency_key=key
         )["activity"]
-        [expense] = ledger.expenses([activity], {}, date.min, date.max)
-        return _wire(expense)
+        recorded = ledger.expenses([activity], {}, date.min, date.max)
+        if len(recorded) != 1:
+            # This key recorded something that is not an expense.
+            raise IdempotencyConflict()
+        return _wire(recorded[0])
 
     def overview(self, scope: BusinessScope, start: date, end: date) -> dict[str, Any]:
         receipts = self.receipts(scope)
