@@ -55,8 +55,10 @@ final class ConnectedReleaseSurfaceTests: XCTestCase {
         XCTAssertEqual(chosen.id, only.id)
     }
 
-    func testAddWithSeveralAccountsAsksWhich() throws {
-        guard case .choose = ConnectedAddMovement.target(for: [try account(), try account()], loaded: true) else { return XCTFail("expected choose") }
+    func testAddWithSeveralAccountsOpensTheFirstInThePersonsOrder() throws {
+        let first = try account(), second = try account()
+        guard case .record(let chosen) = ConnectedAddMovement.target(for: [first, second], loaded: true) else { return XCTFail("expected record") }
+        XCTAssertEqual(chosen.id, first.id)
     }
 
     func testAddBeforeAccountsHaveLoadedLoadsThemInsteadOfStartingAFirstAccount() throws {

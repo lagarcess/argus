@@ -15,7 +15,6 @@ struct ConnectedCuadraoShell: View {
     @State private var chat = CuadraoChatPreview(spanish: Locale.current.language.languageCode?.identifier == "es", includeExamples: false)
     @State private var chatEditing = false
     @State private var searchDetail = false
-    @State private var choosingAddAccount = false
     @State private var addNotice: AddNotice?
     @State private var creatingPlan = false
 
@@ -82,13 +81,6 @@ struct ConnectedCuadraoShell: View {
                     .preferredColorScheme(appearance.colorScheme)
                     .tint(ArgusStyle.ink)
                     .foregroundStyle(ArgusStyle.ink)
-            }
-        }
-        .confirmationDialog("loop.chooseAccount", isPresented: $choosingAddAccount, titleVisibility: .visible) {
-            ForEach(addableAccounts) { account in
-                Button(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")) {
-                    auth.financialLoop?.record(account)
-                }.accessibilityIdentifier("nav.add.account." + account.id.uuidString)
             }
         }
         .sheet(isPresented: $creatingPlan) {
@@ -209,7 +201,15 @@ struct ConnectedCuadraoShell: View {
             addNotice = AddNotice(title: loop.pendingTitle, message: "loop.pending.body")
             return
         }
-        creatingPlan = true
+        // The Plan tab's own Create needs the projection and no save in flight; without it the editor has no accounts.
+        Task {
+            if loop.plan.projection == nil { await loop.refresh() }
+            guard loop.plan.projection != nil, !loop.plan.saving else {
+                addNotice = AddNotice(title: loop.plan.homeErrorKey ?? "accounts.loading", message: nil)
+                return
+            }
+            creatingPlan = true
+        }
     }
 
     /// The "Transaction" row records a movement from any tab, through the same rule as Home's Activity "+".
@@ -230,7 +230,6 @@ struct ConnectedCuadraoShell: View {
             case .loadAccounts: addNotice = AddNotice(title: accounts.errorKey ?? "accounts.loading", message: nil)
             case .createAccount: accounts.create()
             case .record(let account): loop.record(account)
-            case .choose: choosingAddAccount = true
             }
         }
     }

@@ -50,6 +50,8 @@ struct CuadraoAppShell<Content: View>: View {
                     }
                 }
             }
+            .onChange(of: showsNavigation) { _, shown in if !shown { closeAdd() } }
+            .onChange(of: selection) { _, _ in closeAdd() }
             .cuadraoSoftScrollEdges()
             .cuadraoVoicePresentation(chat: chat, spanish: spanish, ownsPresentation: chat.voiceContextOwner == nil,
                 keyboard: {
@@ -78,6 +80,7 @@ struct CuadraoAppShell<Content: View>: View {
     }
 
     private func toggleAdd() {
+        guard !addItems.isEmpty else { return }
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { addOpen.toggle() }
     }
 

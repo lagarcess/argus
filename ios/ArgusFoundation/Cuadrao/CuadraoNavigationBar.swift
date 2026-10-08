@@ -56,7 +56,7 @@ struct CuadraoNavigationBar: View {
     var profileName: String = ""
     var addOpen = false
     let add: () -> Void
-    @State private var scrubbing: CuadraoNavigationSlot?
+    @GestureState private var scrubbing: CuadraoNavigationSlot?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let padding: CGFloat = 4
@@ -71,7 +71,7 @@ struct CuadraoNavigationBar: View {
         GeometryReader { proxy in
             let full = proxy.size.width
             let barWidth = collapsesToAdd ? slotHeight + padding * 2 : (compact ? min(full, 270) : full)
-            let inner = barWidth - padding * 2
+            let inner = max(0, barWidth - padding * 2)
             let slotWidth = collapsesToAdd ? slotHeight : inner / CGFloat(max(slots.count, 1))
             HStack(spacing: 0) {
                 ForEach(slots) { slot in
@@ -95,16 +95,14 @@ struct CuadraoNavigationBar: View {
     /// Sliding a finger across the bar follows it and chooses the slot it lifts on; a tap is a slide of no distance.
     private func slide(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0)
-            .onChanged { value in scrubbing = slot(at: value.location, width: width) }
+            .updating($scrubbing) { value, state, _ in state = slot(at: value.location, width: width) }
             .onEnded { value in
-                let chosen = slot(at: value.location, width: width)
-                scrubbing = nil
-                if let chosen { activate(chosen) }
+                if let chosen = slot(at: value.location, width: width) { activate(chosen) }
             }
     }
 
     private func slot(at location: CGPoint, width: CGFloat) -> CuadraoNavigationSlot? {
-        guard location.y > -40, location.y < 96, !slots.isEmpty else { return nil }
+        guard location.y > -40, location.y < 96, location.x > -40, location.x < width + 40, !slots.isEmpty else { return nil }
         if collapsesToAdd { return .add }
         return slots[CuadraoNavigationSlot.index(forX: location.x, width: width, count: slots.count)]
     }
