@@ -22,3 +22,8 @@ export const guestAccessEnabled = guestAccessEnabledFromEnv(
 // separate founder decision from merging it.
 export const evidenceReceiptSharingEnabled =
   process.env.NEXT_PUBLIC_EVIDENCE_RECEIPT_SHARING_ENABLED === "true";
+
+// Cuadrao Business owner pilot: overview, receipt inbox, review and expenses
+// inside the chat shell on /biz. Default off until the connected pilot passes.
+export const businessPilotEnabled =
+  process.env.NEXT_PUBLIC_BUSINESS_PILOT_ENABLED === "true";
