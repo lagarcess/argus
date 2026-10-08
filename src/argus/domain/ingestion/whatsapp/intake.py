@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Protocol
 
@@ -47,6 +47,7 @@ from argus.domain.ingestion.whatsapp.replies import (
 )
 from argus.domain.ingestion.whatsapp.store import (
     RETRYABLE,
+    ReplyLanguage,
     Settlement,
     WhatsAppStore,
 )
@@ -87,8 +88,6 @@ class IntakeDestination(Protocol):
         self, *, owner_id: str, content: bytes, filename: str, media_type: str
     ) -> Captured: ...
 
-    def language(self, owner_id: str) -> str | None: ...
-
 
 class MediaSource(Protocol):
     async def fetch(self, media_id: str) -> FetchedMedia: ...
@@ -118,8 +117,14 @@ class WhatsAppIntake:
         self.transport, self.app_origin, self.max_bytes = transport, app_origin, max_bytes
         self.processing_seconds: float = PROCESSING_SECONDS
 
-    def issue_code(self, *, destination_owner_id: str) -> IssuedCode:
-        """A new single-use code; any earlier unused code for this owner stops working."""
+    def issue_code(
+        self, *, destination_owner_id: str, reply_language: ReplyLanguage
+    ) -> IssuedCode:
+        """A new single-use code; any earlier unused code for this owner stops working.
+
+        ``reply_language`` is the web language the owner is using now. The link
+        the code creates keeps it, and every WhatsApp reply uses it.
+        """
 
         code = mint_code()
         now = self.clock()
@@ -127,6 +132,7 @@ class WhatsAppIntake:
         self.store.issue_code(
             destination_owner_id=destination_owner_id,
             code_digest=self.keys.code(code),
+            reply_language=reply_language,
             now=now,
             expires_at=expires_at,
         )
@@ -141,8 +147,14 @@ class WhatsAppIntake:
             other_numbers=delivery.other_numbers,
         )
         in_flight = False
+        first_error: Exception | None = None
         for message in delivery.messages:
-            in_flight = not await self._one(message) or in_flight
+            try:
+                in_flight = not await self._one(message) or in_flight
+            except Exception as error:
+                first_error = first_error or error
+        if first_error is not None:
+            raise first_error
         if in_flight:
             raise DeliveryInFlight()
 
@@ -202,25 +214,42 @@ class WhatsAppIntake:
     async def _decide(self, message: InboundMessage, sender: bytes) -> Settlement:
         if isinstance(message, TextMessage) and looks_like_link_attempt(message.body):
             code = link_code_in(message.body)
-            owner = None
+            linked = None
             if code is not None:
-                owner = await asyncio.to_thread(
+                linked = await asyncio.to_thread(
                     self.store.redeem_code,
                     code_digest=self.keys.code(code),
                     sender_hash=sender,
                     last4=last4(message.sender),
                     now=self.clock(),
                 )
-            if owner is None:
-                return Settlement("rejected", error_code="whatsapp_link_code_invalid")
-            return Settlement("linked", destination_owner_id=owner)
+            if linked is None:
+                current = await asyncio.to_thread(
+                    self.store.sender_link, sender_hash=sender
+                )
+                return Settlement(
+                    "rejected",
+                    error_code="whatsapp_link_code_invalid",
+                    reply_language=current.reply_language if current else None,
+                )
+            return Settlement(
+                "linked",
+                destination_owner_id=linked.destination_owner_id,
+                reply_language=linked.reply_language,
+            )
         link = await asyncio.to_thread(self.store.sender_link, sender_hash=sender)
         if link is None:
             return Settlement("rejected", error_code="whatsapp_sender_not_linked")
-        owner = link.destination_owner_id
+        owner, language = link.destination_owner_id, link.reply_language
         if isinstance(message, TextMessage):
-            return Settlement("rejected", owner, error_code="whatsapp_receipt_missing")
-        return await self._capture(message, owner)
+            return Settlement(
+                "rejected",
+                owner,
+                error_code="whatsapp_receipt_missing",
+                reply_language=language,
+            )
+        settlement = await self._capture(message, owner)
+        return replace(settlement, reply_language=language)
 
     async def _capture(self, message: MediaMessage, owner: str) -> Settlement:
         if message.mime_type not in ACCEPTED_MEDIA_TYPES:
@@ -256,15 +285,11 @@ class WhatsAppIntake:
                 log.warning("WhatsApp acknowledgement skipped: no app origin")
                 return
             url = review_url(self.app_origin, settlement.connection_id or "")
-        owner = settlement.destination_owner_id
-        language = (
-            await asyncio.to_thread(self.destination.language, owner) if owner else None
-        )
         body = compose_reply(
             reply_key(
                 settlement.status, settlement.error_code, duplicate=settlement.duplicate
             ),
-            language=language,
+            language=settlement.reply_language,
             link=url,
             limit_mb=self.max_bytes // (1024 * 1024),
         )

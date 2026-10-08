@@ -17,7 +17,8 @@ on the web, then sends `CUADRAO <code>` from their own WhatsApp. A typed phone
 number proves nothing. Unknown senders get no capture and a "connect from the
 web app" reply. A new message carrying a receipt already in the owner's inbox
 gets a "duplicate" reply instead of "captured". Each reply uses one language:
-the owner's (Spanish by default, English when their profile says `en`).
+the one the web app was in when the owner asked for the link code (Spanish
+by default).
 Reply copy is **pending founder approval**. Contract: `docs/API_CONTRACT.md`.
 
 ## Proof levels
@@ -114,7 +115,4 @@ it with Ctrl-C and delete the callback URL in the Meta dashboard.
 - `resolve_intake_destination` in `src/argus/api/whatsapp.py` returns the
   signed-in person. Under option A it returns the business principal through an
   active owner membership, and captures land under `business_id`.
-- The reply language reads `profiles.language` of the destination owner. A
-  principal has no profile, so option A should read the linking person's
-  language instead.
 - Reply copy in `whatsapp/replies.py` is **pending founder approval**.

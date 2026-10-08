@@ -98,6 +98,7 @@ class PostgresWhatsAppStore:
         *,
         destination_owner_id: str,
         code_digest: bytes,
+        reply_language: str,
         now: datetime,
         expires_at: datetime,
     ) -> None:
@@ -109,24 +110,24 @@ class PostgresWhatsAppStore:
             )
             connection.execute(
                 "insert into public.whatsapp_link_codes "
-                "(destination_owner_id, code_digest, created_at, expires_at) "
-                "values (%s, %s, %s, %s)",
-                (destination_owner_id, code_digest, now, expires_at),
+                "(destination_owner_id, code_digest, reply_language, created_at, "
+                "expires_at) values (%s, %s, %s, %s, %s)",
+                (destination_owner_id, code_digest, reply_language, now, expires_at),
             )
 
     def redeem_code(
         self, *, code_digest: bytes, sender_hash: bytes, last4: str, now: datetime
-    ) -> str | None:
+    ) -> SenderLink | None:
         with self._pool.connection() as connection, connection.transaction():
             row = connection.execute(
                 "update public.whatsapp_link_codes set consumed_at = %s "
                 "where code_digest = %s and consumed_at is null and expires_at > %s "
-                "returning destination_owner_id::text",
+                "returning destination_owner_id::text, reply_language",
                 (now, code_digest, now),
             ).fetchone()
             if row is None:
                 return None
-            owner = row[0]
+            owner, reply_language = row
             connection.execute(
                 "update public.whatsapp_sender_links "
                 "set status = 'revoked', revoked_at = %s "
@@ -135,11 +136,11 @@ class PostgresWhatsAppStore:
             )
             connection.execute(
                 "insert into public.whatsapp_sender_links "
-                "(destination_owner_id, wa_id_hash, last4, status, linked_at) "
-                "values (%s, %s, %s, 'active', %s)",
-                (owner, sender_hash, last4, now),
+                "(destination_owner_id, wa_id_hash, last4, reply_language, status, "
+                "linked_at) values (%s, %s, %s, %s, 'active', %s)",
+                (owner, sender_hash, last4, reply_language, now),
             )
-        return owner
+        return SenderLink(owner, last4, now, reply_language)
 
     def _active(self, column: str, value: object) -> SenderLink | None:
         from psycopg import sql
@@ -147,7 +148,7 @@ class PostgresWhatsAppStore:
         with self._pool.connection() as connection:
             row = connection.execute(
                 sql.SQL(
-                    "select destination_owner_id::text, last4, linked_at "
+                    "select destination_owner_id::text, last4, linked_at, reply_language "
                     "from public.whatsapp_sender_links "
                     "where {} = %s and status = 'active'"
                 ).format(sql.Identifier(column)),

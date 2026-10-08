@@ -5,6 +5,9 @@
 -- signed-in person; under the pending Business boundary it becomes the business
 -- principal. Both are auth.users rows, so the column stays neutral.
 --
+-- reply_language is the web language the owner used when asking for the link
+-- code; WhatsApp replies use it, not profiles.language (whose default is en).
+--
 -- Phone numbers and provider message ids are never stored. Both are kept as
 -- HMAC-SHA256 digests under a server key; provider message ids can embed the
 -- sender's number. Clients have no access: only the API's service role reads
@@ -14,6 +17,7 @@ create table if not exists public.whatsapp_link_codes (
     id uuid primary key default gen_random_uuid(),
     destination_owner_id uuid not null references auth.users(id) on delete cascade,
     code_digest bytea not null unique check (octet_length(code_digest) = 32),
+    reply_language text not null check (reply_language in ('es-419', 'en')),
     created_at timestamptz not null,
     expires_at timestamptz not null,
     consumed_at timestamptz,
@@ -28,6 +32,7 @@ create table if not exists public.whatsapp_sender_links (
     destination_owner_id uuid not null references auth.users(id) on delete cascade,
     wa_id_hash bytea not null check (octet_length(wa_id_hash) = 32),
     last4 text not null check (last4 ~ '^[0-9]{1,4}$'),
+    reply_language text not null check (reply_language in ('es-419', 'en')),
     status text not null check (status in ('active', 'revoked')),
     linked_at timestamptz not null,
     revoked_at timestamptz,

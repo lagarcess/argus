@@ -22,6 +22,7 @@ from argus.api.whatsapp import (
 )
 from argus.domain.ingestion.whatsapp.identity import link_message, signature_matches
 from argus.domain.ingestion.whatsapp.payload import PayloadInvalid, parse_delivery
+from argus.domain.ingestion.whatsapp.store import ReplyLanguage
 
 MAX_WEBHOOK_BYTES = 512 * 1024
 
@@ -34,6 +35,13 @@ class WebhookAck(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     received: bool
+
+
+class LinkCodeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # The web app's current i18n language; WhatsApp replies use it.
+    language: ReplyLanguage = "es-419"
 
 
 class LinkCodeResponse(BaseModel):
@@ -51,6 +59,7 @@ class LinkStatusResponse(BaseModel):
     linked: bool
     last4: str | None = None
     linked_at: datetime | None = None
+    reply_language: ReplyLanguage | None = None
 
 
 @webhook_router.get("", response_class=PlainTextResponse)
@@ -148,6 +157,7 @@ async def receive_whatsapp_webhook(
 @link_router.post("/link-codes", response_model=LinkCodeResponse, status_code=201)
 async def create_whatsapp_link_code(
     request: Request,
+    body: LinkCodeRequest | None = None,
     context: WhatsAppOwnerContext = Depends(require_whatsapp_owner),  # noqa: B008
 ) -> LinkCodeResponse:
     retry = _code_limiter.record_or_retry_after(
@@ -165,6 +175,7 @@ async def create_whatsapp_link_code(
     issued = await run_in_threadpool(
         context.runtime.intake.issue_code,
         destination_owner_id=context.destination_owner_id,
+        reply_language=(body or LinkCodeRequest()).language,
     )
     text = link_message(issued.code)
     number = context.runtime.settings.wa_me_number
@@ -186,7 +197,12 @@ async def get_whatsapp_link(
     )
     if link is None:
         return LinkStatusResponse(linked=False)
-    return LinkStatusResponse(linked=True, last4=link.last4, linked_at=link.linked_at)
+    return LinkStatusResponse(
+        linked=True,
+        last4=link.last4,
+        linked_at=link.linked_at,
+        reply_language=link.reply_language,
+    )
 
 
 @link_router.delete("/link", status_code=204)
