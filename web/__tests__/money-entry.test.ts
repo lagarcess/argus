@@ -12,6 +12,7 @@ import {
   logicalIndex,
   moneyPlaceholder,
   moneyProblemFromServer,
+  nextRenderedHistory,
   parsePasted,
   readMoney,
   textForParentValue,
@@ -480,5 +481,26 @@ describe("MoneyInput decisions", () => {
   test("the fallback caret follows normalization", () => {
     expect(fallbackEdit(".5", 1, DOP)).toEqual({ kind: "accept", display: "0.5", caret: 2, problem: null });
     expect(fallbackEdit("007", 3, DOP)).toEqual({ kind: "accept", display: "7", caret: 1, problem: null });
+  });
+});
+
+describe("rendered history", () => {
+  test("keeps the newest 20 renderings", () => {
+    let history: string[] = [];
+    for (let index = 1; index <= 25; index += 1) history = nextRenderedHistory(history, String(index), false);
+    expect(history).toEqual(Array.from({ length: 20 }, (_, index) => String(index + 6)));
+  });
+
+  test("a repeated rendering moves to the end once", () => {
+    expect(nextRenderedHistory(["1", "1,234", "12"], "1,234", false)).toEqual(["1", "12", "1,234"]);
+  });
+
+  test("an empty field clears the history", () => {
+    expect(nextRenderedHistory(["1", "1,234"], "", false)).toEqual([]);
+  });
+
+  test("a parent replacement starts over with the new text", () => {
+    expect(nextRenderedHistory(["1", "1,234"], "980.50", true)).toEqual(["980.50"]);
+    expect(nextRenderedHistory(["1", "1,234"], "", true)).toEqual([]);
   });
 });

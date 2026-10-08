@@ -383,6 +383,19 @@ export function fallbackEdit(
   return accept(parsed.logical, mapped.logical === parsed.logical ? mapped.caret : parsed.logical.length, null);
 }
 
+export const RENDERED_HISTORY_LIMIT = 20;
+
+/**
+ * The texts the field has rendered, newest last, for `fallbackEdit`'s `shown`.
+ * An empty field or a text the parent replaced starts the history over, so no
+ * earlier rendering can vouch for a later value.
+ */
+export function nextRenderedHistory(history: readonly string[], text: string, parentReplaced: boolean): string[] {
+  if (!text) return [];
+  const kept = parentReplaced ? [] : history.filter((item) => item !== text);
+  return [...kept, text].slice(-RENDERED_HISTORY_LIMIT);
+}
+
 /**
  * A currency change keeps the digits and revalidates them; nothing converts.
  * `note` says so whenever an amount was already there under another currency.

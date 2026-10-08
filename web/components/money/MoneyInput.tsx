@@ -12,6 +12,7 @@ import {
   localeUsesCommaDecimal,
   moneyPlaceholder,
   moneyProblemFromServer,
+  nextRenderedHistory,
   readMoney,
   textForParentValue,
   type MoneyEditInput,
@@ -73,24 +74,28 @@ export default function MoneyInput({
   const [text, setText] = useState(() => displayForValue(value, rules));
   const [problem, setProblem] = useState<MoneyProblem | null>(null);
   const [currencyNote, setCurrencyNote] = useState(false);
-  // Texts this field has rendered, so an undo or redo that restores one is
-  // recognized as the field's own grouping.
-  const rendered = useRef<string[]>([]);
-  useLayoutEffect(() => {
-    if (!text || rendered.current[rendered.current.length - 1] === text) return;
-    rendered.current = [...rendered.current.filter((item) => item !== text), text].slice(-20);
-  }, [text]);
-
   const [seenValue, setSeenValue] = useState(value);
+  const [parentReplacements, setParentReplacements] = useState(0);
   if (value !== seenValue) {
     setSeenValue(value);
     const replaced = textForParentValue(text, value, rules);
     if (replaced !== null) {
+      setParentReplacements((count) => count + 1);
       setText(replaced);
       setProblem(null);
       setCurrencyNote(false);
     }
   }
+
+  // Texts this field has rendered, so an undo or redo that restores one is
+  // recognized as the field's own grouping.
+  const rendered = useRef<string[]>([]);
+  const seenReplacements = useRef(0);
+  useLayoutEffect(() => {
+    const parentReplaced = seenReplacements.current !== parentReplacements;
+    seenReplacements.current = parentReplacements;
+    rendered.current = nextRenderedHistory(rendered.current, text, parentReplaced);
+  }, [text, parentReplacements]);
 
   const commit = (next: string, caret: number | null, nextProblem: MoneyProblem | null) => {
     pendingCaret.current = caret;
