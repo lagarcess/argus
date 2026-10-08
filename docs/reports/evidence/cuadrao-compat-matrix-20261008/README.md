@@ -32,9 +32,21 @@ C1 plus `20261008100000`, `20261008110000`, `20261008130000` and `20261008140000
 | Build 1 (`cad1cbe1e`) | 720 passed, 31 skipped, 3 failed |
 | Final integration (`f5a2007cd`) | 771 passed, 84 skipped, 2 failed |
 
-Failures, all read:
-- `test_asset_rollup_pair_symbol_normalization_matches_memory_contract` fails in every row: the local `scipy` import trap (#852).
-- Build 1 also fails `test_account_deletion_fk_census_postgres.py::test_sweep_names_every_user_reference_and_the_census_document_matches_it` and `test_client_grants_postgres.py::test_every_relation_is_listed_exactly_once`. Both compare Build 1's own documented table lists with the live schema and fail because B2 to B4 added tables (`spaces`, `whatsapp_*`, and user-referencing rows keyed by `owner_space_id`). They are currency checks, not a broken behavior, and the final code's versions of them pass. They are one more reason Build 1 code is not the runtime once B2 to B4 are applied: the minimum compatible code version is Build 2 or later.
+Failures, read one by one. Three kinds, kept apart:
+
+**1. Environment, not schema.** `test_asset_rollup_pair_symbol_normalization_matches_memory_contract` fails in every row: the local `scipy` import trap (#852).
+
+**2. Outdated census tests, not a demonstrated runtime incompatibility.** Build 1 also fails `test_account_deletion_fk_census_postgres.py::test_sweep_names_every_user_reference_and_the_census_document_matches_it` and `test_client_grants_postgres.py::test_every_relation_is_listed_exactly_once`. Both compare Build 1's own documented lists (the deletion foreign-key census and the client-grants relations) with the live schema, so they fail whenever the schema grows (`spaces`, `whatsapp_*`, rows keyed by `owner_space_id`). They show that Build 1 does not *know about* the B2 to B4 tables. They do not show that Build 1 fails to read or delete anything: no test here runs Build 1 code against rows in those tables. That is a gap, not a pass. The final code's versions of these two tests pass.
+
+**3. Order-dependent failure, cause unknown, production-recovery impact unknown.** The final integration code fails `test_document_jobs_postgres.py::test_two_running_instances_recover_a_dead_worker_without_restart` (`needs_attention` instead of `review_ready`). It passes alone on the same database and fails again in a full-suite run on a fresh copy. The same commit's Linux CI is green, and that alone does not settle it. Business is bisecting the earlier test that leaks state. **Before the release that carries #908, the cause must be recorded here, together with whether it can affect worker recovery in production.**
+
+**The minimum-version rule, stated by stored data.** A code version is a safe runtime only for stored data it can both read and delete:
+- Previous production code: Personal chat data only.
+- Build 1 (`cad1cbe1e`): Personal data plus the financial tables C1 added, including the financial-data deletion path. It has no knowledge of B1 to B4 data. It is not a supported runtime once any B1 to B4 table holds rows.
+- Build 2 (`64833f6d2`) and later: also documents and their Storage objects (B1), with read and delete of those, and account deletion in every state.
+- Code that reads or deletes B2 to B4 data (spaces, WhatsApp links, preparation jobs): the later integration code that carries it, as named in the enable request for each flag.
+The first hosted write of new-format data in a table sets the minimum for that table. Rolling back below the code that can read and delete it means turning that feature's flag off and fixing forward.
+
 - Final integration also fails `test_document_jobs_postgres.py::test_two_running_instances_recover_a_dead_worker_without_restart` (`needs_attention` instead of `review_ready`). It passes when run alone on the same database and fails again in a full-suite run on a fresh copy, so it is order-dependent in this local macOS run. The same commit's CI is green on Linux. Cause not found; reported to Business.
 
 ## What it shows
