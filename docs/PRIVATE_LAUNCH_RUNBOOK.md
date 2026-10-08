@@ -948,7 +948,7 @@ Do not copy production deletion credentials into CI. Record the command target,
 timestamp, final summary line, and selected or purged counts in operator
 evidence.
 
-### Applying an approved migration list (non-hosted targets only)
+### Applying an approved migration list
 
 `scripts/ops/apply_approved_migrations.py` applies an explicit, ordered list of
 migration versions to a named database and records each ledger row the way
@@ -969,16 +969,36 @@ cannot get its locks fails and rolls back. One run holds an advisory lock,
 taken before the ledger is read.
 
 It refuses any hosted Supabase host in any spelling (case, trailing dot, encoded
-dots), on the URL, on every `--allow-host` and on the connected host. The target
-URL comes from an environment variable (default `ARGUS_APPLY_DATABASE_URL`),
-never the command line. The host and database must be named with `--allow-host`
-and `--allow-database`; a DNS name also needs its resolved address on the list.
-An IP literal that happens to be a hosted database cannot be caught by name, so
-never allow-list one. The default run only prints the plan; `--execute` applies
-it. A hosted target needs a separate reviewed change and the founder's approval
-record. After a stop, everything printed as committed stays applied; recorded
-files show in the ledger, but `--unrecorded` steps leave no trace, so take each
-reported one out of the retry command.
+dots) on the URL, on every `--allow-host` and on the connected host, unless a
+hosted approval record names that host (below). The target URL comes from an
+environment variable (default `ARGUS_APPLY_DATABASE_URL`), never the command
+line. The host and database must be named with `--allow-host` and
+`--allow-database`; a DNS name also needs its resolved address on the list. A
+name check cannot tell that an IP literal is a hosted database, so never
+allow-list one. The default run only prints the plan; `--execute` applies it.
+After a stop, everything printed as committed stays applied; recorded files show
+in the ledger, but `--unrecorded` steps leave no trace, so take each reported one
+out of the retry command.
+
+**Hosted targets.** Pass `--hosted-approval <path>` with a JSON record committed
+under `docs/release-manifests/` on top of the candidate commit. It has exactly
+these keys: `id`, `project_ref`, `hosts`, `database`, `candidate_sha`,
+`versions_sha256`, `issued_at`, `expires_at`, `approved_by`,
+`approval_reference`. The tool refuses unless all of these hold:
+
+- the file is tracked, unmodified, and committed after `--candidate-sha`;
+- `candidate_sha` equals `--candidate-sha`;
+- `versions_sha256` equals the digest of this exact run (the recorded versions
+  and the `--unrecorded` ones, sorted), so a changed list needs a new record;
+- the record is valid now and for at most three days (ISO 8601 with a time zone);
+- the host is named in `hosts`, carries the project ref (in the host name, or as
+  the pooler user `postgres.<ref>`), and the database matches;
+- the connection itself reaches a named host and database, with TLS required.
+
+`--execute` also needs `--hosted-confirm <id>` repeating the record's id. The
+record is the founder's approval made reviewable. It does not authorize
+anything by existing; the founder approves the run before it is committed. A
+record never applies to a target that is not hosted.
 
 ```bash
 ARGUS_APPLY_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/rehearsal \

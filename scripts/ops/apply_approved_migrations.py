@@ -1,4 +1,4 @@
-"""Apply an explicit list of migration versions to a named non-hosted database.
+"""Apply an explicit list of migration versions to a named database.
 
 The Supabase CLI cannot do this job against production's ledger: it stops on
 local files older than the remote head and on remote rows with no local file,
@@ -7,19 +7,29 @@ tool applies only the versions it is given, in order, and records each ledger
 row exactly as ``production_migration_gate.py`` reads it (the file's own
 version and name, statements split by the gate's splitter).
 
-It never targets a hosted Supabase host. A hosted target needs its own reviewed
-change that adds the named project ref and the founder's approval record.
+A hosted Supabase host is refused unless a committed hosted approval record names
+it. The record carries the project ref, the exact host names and database, the
+candidate commit, a digest of the exact version list, an expiry and the founder's
+approval reference. The tool checks every one of them, requires the record to be
+committed after the candidate and unmodified, connects with TLS required, and only
+executes when ``--hosted-confirm`` repeats the record's id. With no record the
+behaviour is the one for local databases. A name check cannot tell that an IP
+literal is a hosted database, so an allow-listed IP literal is not recognised as
+hosted; never allow-list one.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
@@ -54,6 +64,119 @@ def _is_hosted(name: str) -> bool:
     return plain.endswith(_HOSTED_SUFFIXES) or plain in {"supabase.co", "supabase.com"}
 
 
+_REF = re.compile(r"[a-z0-9]{20}")
+_SHA = re.compile(r"[0-9a-f]{40}")
+_RECORD_KEYS = {
+    "id", "project_ref", "hosts", "database", "candidate_sha", "versions_sha256",
+    "issued_at", "expires_at", "approved_by", "approval_reference",
+}  # fmt: skip
+_MAX_VALIDITY = timedelta(days=3)
+
+
+@dataclass(frozen=True)
+class HostedApproval:
+    id: str
+    project_ref: str
+    hosts: tuple[str, ...]
+    database: str
+    candidate_sha: str
+    versions_sha256: str
+    expires_at: datetime
+
+
+def versions_digest(approved: Sequence[str], unrecorded: Sequence[str] = ()) -> str:
+    """One digest for the exact run: what is recorded and what runs without a ledger row."""
+
+    text = (
+        "recorded:"
+        + ",".join(sorted(approved))
+        + "|unrecorded:"
+        + ",".join(sorted(unrecorded))
+    )
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
+def parse_hosted_approval(
+    text: str,
+    candidate_sha: str,
+    approved: Sequence[str],
+    unrecorded: Sequence[str],
+    now: datetime,
+) -> HostedApproval:
+    """Validate a hosted approval record against this exact run, or refuse."""
+
+    try:
+        raw = json.loads(text)
+    except ValueError as error:
+        raise ApplyError("the hosted approval record is not valid JSON") from error
+    if not isinstance(raw, dict) or set(raw) != _RECORD_KEYS:
+        raise ApplyError(
+            f"the hosted approval record must have exactly the keys {sorted(_RECORD_KEYS)}"
+        )
+    if not all(
+        isinstance(raw[key], str) and raw[key] for key in _RECORD_KEYS - {"hosts"}
+    ):
+        raise ApplyError("every hosted approval field must be a non-empty string")
+    hosts = raw["hosts"]
+    if (
+        not isinstance(hosts, list)
+        or not hosts
+        or not all(isinstance(host, str) for host in hosts)
+    ):
+        raise ApplyError("the hosted approval record must list at least one host")
+    if _REF.fullmatch(raw["project_ref"]) is None:
+        raise ApplyError("the hosted approval project ref is not a Supabase project ref")
+    if not all(_is_hosted(host) for host in hosts):
+        raise ApplyError("the hosted approval hosts must be Supabase host names")
+    if (
+        _SHA.fullmatch(raw["candidate_sha"]) is None
+        or raw["candidate_sha"] != candidate_sha
+    ):
+        raise ApplyError(
+            "the hosted approval was issued for a different candidate commit"
+        )
+    if raw["versions_sha256"] != versions_digest(approved, unrecorded):
+        raise ApplyError(
+            "the hosted approval was issued for a different list of versions"
+        )
+    try:
+        issued = datetime.fromisoformat(raw["issued_at"].replace("Z", "+00:00"))
+        expires = datetime.fromisoformat(raw["expires_at"].replace("Z", "+00:00"))
+    except ValueError as error:
+        raise ApplyError(
+            "the hosted approval dates must be ISO 8601 with a time zone"
+        ) from error
+    if issued.tzinfo is None or expires.tzinfo is None:
+        raise ApplyError("the hosted approval dates must carry a time zone")
+    if expires - issued > _MAX_VALIDITY or expires <= issued:
+        raise ApplyError("the hosted approval must be valid for at most three days")
+    if not issued <= now < expires:
+        raise ApplyError("the hosted approval is not valid now")
+    return HostedApproval(
+        raw["id"], raw["project_ref"], tuple(_plain_host(host) for host in hosts),
+        raw["database"], raw["candidate_sha"], raw["versions_sha256"], expires,
+    )  # fmt: skip
+
+
+def read_committed_record(root: Path, path: str, candidate_sha: str) -> str:
+    """The record must be tracked, unmodified, and committed on top of the candidate."""
+
+    def git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *args], cwd=root, capture_output=True, text=True, check=False
+        )
+
+    if git("ls-files", "--error-unmatch", "--", path).returncode != 0:
+        raise ApplyError("the hosted approval record is not tracked by git")
+    if git("diff", "--quiet", "HEAD", "--", path).returncode != 0:
+        raise ApplyError("the hosted approval record has uncommitted changes")
+    if git("merge-base", "--is-ancestor", candidate_sha, "HEAD").returncode != 0:
+        raise ApplyError(
+            "the hosted approval record is not committed on top of the candidate"
+        )
+    return (root / path).read_text()
+
+
 class ApplyError(RuntimeError):
     """Raised before any statement runs, or to explain why a run stopped."""
 
@@ -73,8 +196,9 @@ def check_target(
     allow_hosts: Sequence[str],
     allow_databases: Sequence[str],
     environ: dict[str, str] | None = None,
+    hosted: HostedApproval | None = None,
 ) -> None:
-    """Fail closed: one named host and database, never a hosted Supabase one."""
+    """Fail closed: one named host and database; a hosted one only with its approval record."""
 
     environment = os.environ if environ is None else environ
     for name in _REFUSED_ENVIRONMENT:
@@ -88,8 +212,32 @@ def check_target(
         raise ApplyError("the database URL must not carry a query or fragment")
     if "," in host:
         raise ApplyError("a multi-host database URL is refused")
-    if not host or _is_hosted(host) or any(_is_hosted(value) for value in allow_hosts):
-        raise ApplyError("hosted Supabase targets are refused by this tool")
+    if hosted is None:
+        if (
+            not host
+            or _is_hosted(host)
+            or any(_is_hosted(value) for value in allow_hosts)
+        ):
+            raise ApplyError(
+                "hosted Supabase targets are refused without an approval record"
+            )
+    else:
+        if not _is_hosted(host):
+            raise ApplyError(
+                "a hosted approval record was given for a target that is not hosted"
+            )
+        if host not in hosted.hosts:
+            raise ApplyError("target host is not named by the hosted approval record")
+        if not {_plain_host(value) for value in allow_hosts} <= set(hosted.hosts):
+            raise ApplyError("an allowed host is not named by the hosted approval record")
+        if hosted.project_ref not in host and not (parts.username or "").endswith(
+            "." + hosted.project_ref
+        ):
+            raise ApplyError("the target does not carry the approved project ref")
+        if parts.path.lstrip("/") != hosted.database:
+            raise ApplyError(
+                "target database is not the one the hosted approval record names"
+            )
     if host not in {_plain_host(value) for value in allow_hosts}:
         raise ApplyError("target host is not on the allowed list")
     if parts.path.lstrip("/") not in set(allow_databases):
@@ -97,7 +245,10 @@ def check_target(
 
 
 def verify_connection(
-    connection: object, allow_hosts: Sequence[str], allow_databases: Sequence[str]
+    connection: object,
+    allow_hosts: Sequence[str],
+    allow_databases: Sequence[str],
+    hosted: HostedApproval | None = None,
 ) -> None:
     """Check where the connection actually went, not where the URL said."""
 
@@ -105,12 +256,18 @@ def verify_connection(
     allowed = {_plain_host(value) for value in allow_hosts}
     host = _plain_host(info.host or "")
     hostaddr = _plain_host(info.hostaddr or "")
-    if _is_hosted(host) or _is_hosted(hostaddr):
-        raise ApplyError("the connection went to a hosted Supabase host")
+    if hosted is None:
+        if _is_hosted(host) or _is_hosted(hostaddr):
+            raise ApplyError("the connection went to a hosted Supabase host")
+    elif host not in hosted.hosts:
+        raise ApplyError(
+            "the connection went to a host the hosted approval record does not name"
+        )
     if host not in allowed:
         raise ApplyError("the connection went to a host that is not on the allowed list")
     if (
-        hostaddr
+        hosted is None
+        and hostaddr
         and hostaddr not in allowed
         and not (host in _LOOPBACK and hostaddr in _LOOPBACK)
     ):
@@ -312,6 +469,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="per-transaction lock timeout such as 500ms, 5s or 1min",
     )
     parser.add_argument(
+        "--hosted-approval",
+        help="repository path of the committed hosted approval record (hosted targets only)",
+    )
+    parser.add_argument(
+        "--hosted-confirm",
+        help="the approval record's id, repeated; required to execute on a hosted target",
+    )
+    parser.add_argument(
         "--execute", action="store_true", help="apply; the default only prints the plan"
     )
     args = parser.parse_args(argv)
@@ -319,19 +484,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     url = os.environ.get(args.database_url_env, "")
     if not url:
         raise ApplyError(f"{args.database_url_env} is not set")
-    check_target(url, args.allow_host, args.allow_database)
     lock_timeout = check_lock_timeout(args.lock_timeout)
     approved = json.loads(Path(args.approved_file).read_text())
     if not isinstance(approved, list) or not all(
         isinstance(value, str) for value in approved
     ):
         raise ApplyError("the approved file must be a JSON list of version strings")
+    hosted: HostedApproval | None = None
+    if args.hosted_approval:
+        hosted = parse_hosted_approval(
+            read_committed_record(Path.cwd(), args.hosted_approval, args.candidate_sha),
+            args.candidate_sha, approved, args.unrecorded, datetime.now(timezone.utc),
+        )  # fmt: skip
+        if args.execute and args.hosted_confirm != hosted.id:
+            raise ApplyError(
+                "--hosted-confirm must repeat the hosted approval record's id to execute"
+            )
+    check_target(url, args.allow_host, args.allow_database, hosted=hosted)
     candidates = gate.read_candidate_migrations(Path.cwd(), args.candidate_sha)
 
     import psycopg
 
-    with psycopg.connect(url, autocommit=True) as connection:
-        verify_connection(connection, args.allow_host, args.allow_database)
+    sslmode = "require" if hosted else "prefer"  # prefer is libpq's own default
+    with psycopg.connect(url, autocommit=True, sslmode=sslmode) as connection:
+        verify_connection(connection, args.allow_host, args.allow_database, hosted)
         locked = connection.execute(
             "select pg_try_advisory_lock(%s)", (_ADVISORY_LOCK_KEY,)
         ).fetchone()

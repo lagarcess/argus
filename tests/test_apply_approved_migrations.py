@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -447,3 +449,279 @@ def test_a_missing_url_is_refused(
             ["--candidate-sha", "x" * 40, "--approved-file", str(tmp_path / "a.json"),
              "--allow-host", "127.0.0.1", "--allow-database", "rehearsal"]
         )  # fmt: skip
+
+
+# --- hosted approval record -------------------------------------------------------------
+
+REF = "abcdefghijklmnopqrst"
+SHA = "a" * 40
+NOW = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
+VERSIONS = ["20260925120000", "20260928200000"]
+DIRECT = f"db.{REF}.supabase.co"
+POOLER = "aws-0-us-east-2.pooler.supabase.com"
+
+
+def _record(**changes: object) -> str:
+    record: dict[str, object] = {
+        "id": "apply-2026-10-20",
+        "project_ref": REF,
+        "hosts": [DIRECT, POOLER],
+        "database": "postgres",
+        "candidate_sha": SHA,
+        "versions_sha256": applier.versions_digest(VERSIONS),
+        "issued_at": "2026-10-20T10:00:00Z",
+        "expires_at": "2026-10-21T10:00:00Z",
+        "approved_by": "founder",
+        "approval_reference": "https://github.com/lagarcess/argus/issues/833#issuecomment-1",
+    }
+    record.update(changes)
+    return json.dumps(record)
+
+
+def _approval(**changes: object) -> applier.HostedApproval:
+    return applier.parse_hosted_approval(_record(**changes), SHA, VERSIONS, (), NOW)
+
+
+def test_a_matching_record_is_accepted_and_names_its_hosts() -> None:
+    approval = _approval()
+    assert approval.hosts == (DIRECT, POOLER)
+    assert approval.id == "apply-2026-10-20"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"candidate_sha": "b" * 40},
+        {"versions_sha256": "0" * 64},
+        {"expires_at": "2026-10-20T11:00:00Z"},
+        {"issued_at": "2026-10-20T13:00:00Z", "expires_at": "2026-10-21T13:00:00Z"},
+        {"issued_at": "2026-10-01T00:00:00Z", "expires_at": "2026-10-22T00:00:00Z"},
+        {"issued_at": "2026-10-20T10:00:00", "expires_at": "2026-10-21T10:00:00"},
+        {"project_ref": "short"},
+        {"hosts": ["db.example.com"]},
+        {"hosts": []},
+        {"id": ""},
+    ],
+)
+def test_a_record_for_another_run_or_time_or_host_is_refused(
+    changes: dict[str, object],
+) -> None:
+    with pytest.raises(applier.ApplyError):
+        _approval(**changes)
+
+
+def test_a_record_with_missing_or_extra_keys_is_refused() -> None:
+    extra = json.loads(_record())
+    extra["note"] = "x"
+    for text in (json.dumps(extra), json.dumps({"id": "x"}), "not json", "[]"):
+        with pytest.raises(applier.ApplyError):
+            applier.parse_hosted_approval(text, SHA, VERSIONS, (), NOW)
+
+
+def test_the_digest_covers_which_versions_run_without_a_ledger_row() -> None:
+    assert applier.versions_digest(VERSIONS) != applier.versions_digest(
+        VERSIONS, ["20260505000001"]
+    )
+    assert applier.versions_digest(VERSIONS) == applier.versions_digest(VERSIONS[::-1])
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"postgresql://postgres:p@{DIRECT}:5432/postgres",
+        f"postgresql://postgres.{REF}:p@{POOLER}:5432/postgres",
+    ],
+)
+def test_a_named_hosted_target_is_accepted_with_its_record(url: str) -> None:
+    hosted = _approval()
+    applier.check_target(url, [DIRECT, POOLER], ["postgres"], environ={}, hosted=hosted)
+
+
+@pytest.mark.parametrize(
+    ("url", "allow_hosts", "allow_databases"),
+    [
+        ("postgresql://postgres:p@db.zzzzzzzzzzzzzzzzzzzz.supabase.co:5432/postgres", ["db.zzzzzzzzzzzzzzzzzzzz.supabase.co"], ["postgres"]),
+        (f"postgresql://postgres:p@{DIRECT}:5432/other", [DIRECT], ["other"]),
+        (f"postgresql://postgres:p@{DIRECT}:5432/postgres", [DIRECT, "db.example.supabase.co"], ["postgres"]),
+        (f"postgresql://postgres.zzzzzzzzzzzzzzzzzzzz:p@{POOLER}:5432/postgres", [POOLER], ["postgres"]),
+        ("postgresql://u:p@127.0.0.1:5432/postgres", ["127.0.0.1"], ["postgres"]),
+    ],
+)  # fmt: skip
+def test_a_hosted_target_the_record_does_not_name_is_refused(
+    url: str, allow_hosts: list[str], allow_databases: list[str]
+) -> None:
+    with pytest.raises(applier.ApplyError):
+        applier.check_target(
+            url, allow_hosts, allow_databases, environ={}, hosted=_approval()
+        )
+
+
+def test_a_trailing_dot_is_the_same_named_host() -> None:
+    applier.check_target(
+        f"postgresql://postgres:p@{DIRECT}.:5432/postgres",
+        [DIRECT],
+        ["postgres"],
+        environ={},
+        hosted=_approval(),
+    )
+
+
+def test_a_hosted_target_without_a_record_is_still_refused() -> None:
+    with pytest.raises(applier.ApplyError, match="approval record"):
+        applier.check_target(
+            f"postgresql://postgres:p@{DIRECT}:5432/postgres",
+            [DIRECT],
+            ["postgres"],
+            environ={},
+        )
+
+
+def test_the_hosted_connection_must_reach_a_named_host_and_database() -> None:
+    hosted = _approval()
+    ok = SimpleNamespace(
+        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6"),
+        execute=lambda _sql: _Row("postgres"),
+    )
+    applier.verify_connection(ok, [DIRECT, POOLER], ["postgres"], hosted)
+    elsewhere = SimpleNamespace(
+        info=SimpleNamespace(
+            host="aws-0-eu-west-1.pooler.supabase.com", hostaddr="3.4.5.6"
+        ),
+        execute=lambda _sql: _Row("postgres"),
+    )
+    with pytest.raises(applier.ApplyError):
+        applier.verify_connection(elsewhere, [DIRECT, POOLER], ["postgres"], hosted)
+    wrong_db = SimpleNamespace(
+        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6"),
+        execute=lambda _sql: _Row("other"),
+    )
+    with pytest.raises(applier.ApplyError):
+        applier.verify_connection(wrong_db, [DIRECT, POOLER], ["postgres"], hosted)
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@example.test", *args],
+        cwd=root, check=True, capture_output=True,
+    )  # fmt: skip
+
+
+def _repo(tmp_path: Path) -> tuple[Path, str]:
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "base.txt").write_text("base")
+    _git(tmp_path, "add", "base.txt")
+    _git(tmp_path, "commit", "-q", "-m", "candidate")
+    sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    return tmp_path, sha
+
+
+def test_the_record_must_be_tracked_clean_and_on_top_of_the_candidate(
+    tmp_path: Path,
+) -> None:
+    root, sha = _repo(tmp_path)
+    record = root / "approval.json"
+    record.write_text("{}")
+    with pytest.raises(applier.ApplyError, match="not tracked"):
+        applier.read_committed_record(root, "approval.json", sha)
+    _git(root, "add", "approval.json")
+    _git(root, "commit", "-q", "-m", "approval")
+    assert applier.read_committed_record(root, "approval.json", sha) == "{}"
+    record.write_text('{"edited": true}')
+    with pytest.raises(applier.ApplyError, match="uncommitted"):
+        applier.read_committed_record(root, "approval.json", sha)
+    record.write_text("{}")
+    with pytest.raises(applier.ApplyError, match="on top of the candidate"):
+        applier.read_committed_record(root, "approval.json", "c" * 40)
+
+
+class _HostedServer(_Server):
+    def __init__(self, ledger: list[str]) -> None:
+        super().__init__(ledger)
+        self.info = SimpleNamespace(host=DIRECT, hostaddr="3.4.5.6")
+
+    def execute(self, sql: str, params: object = None) -> _Cursor:
+        if "current_database" in sql:
+            self.statements.append(sql)
+            return _Cursor([("postgres",)])
+        return super().execute(sql, params)
+
+
+def _run_hosted(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    server: _Server,
+    record: str,
+    *extra: str,
+) -> int:
+    approved = tmp_path / "approved.json"
+    approved.write_text(json.dumps(["20260925120000"]))
+    monkeypatch.setenv(
+        "ARGUS_APPLY_DATABASE_URL", f"postgresql://postgres:p@{DIRECT}:5432/postgres"
+    )
+    for name in applier._REFUSED_ENVIRONMENT:
+        monkeypatch.delenv(name, raising=False)
+    seen: dict[str, object] = {}
+
+    def connect(*_a: object, **options: object) -> _Server:
+        seen.update(options)
+        return server
+
+    monkeypatch.setattr("psycopg.connect", connect)
+    monkeypatch.setattr(applier.gate, "read_candidate_migrations", lambda *_a: CANDIDATES)
+    monkeypatch.setattr(applier, "read_committed_record", lambda *_a: record)
+    monkeypatch.setattr(
+        applier,
+        "datetime",
+        SimpleNamespace(now=lambda _tz: NOW, fromisoformat=datetime.fromisoformat),
+    )
+    result = applier.main(
+        ["--candidate-sha", SHA, "--approved-file", str(approved), "--allow-host", DIRECT,
+         "--allow-database", "postgres", "--hosted-approval", "approval.json", *extra]
+    )  # fmt: skip
+    assert seen["sslmode"] == "require", "a hosted connection requires TLS"
+    return result
+
+
+def test_a_hosted_dry_run_needs_only_the_record(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    record = _record(versions_sha256=applier.versions_digest(["20260925120000"]))
+    assert _run_hosted(monkeypatch, tmp_path, _HostedServer(APPLIED), record) == 0
+    assert "dry run" in capsys.readouterr().out
+
+
+def test_a_hosted_execute_needs_the_records_id_repeated(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    record = _record(versions_sha256=applier.versions_digest(["20260925120000"]))
+    with pytest.raises(applier.ApplyError, match="--hosted-confirm"):
+        _run_hosted(monkeypatch, tmp_path, _HostedServer(APPLIED), record, "--execute")
+    with pytest.raises(applier.ApplyError, match="--hosted-confirm"):
+        _run_hosted(
+            monkeypatch,
+            tmp_path,
+            _HostedServer(APPLIED),
+            record,
+            "--execute",
+            "--hosted-confirm",
+            "other",
+        )
+    server = _HostedServer(APPLIED)
+    assert (
+        _run_hosted(
+            monkeypatch,
+            tmp_path,
+            server,
+            record,
+            "--execute",
+            "--hosted-confirm",
+            "apply-2026-10-20",
+        )
+        == 0
+    )
