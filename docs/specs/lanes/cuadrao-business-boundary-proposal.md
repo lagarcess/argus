@@ -1,9 +1,9 @@
 # Cuadrao Business pilot: ownership boundary proposal
 
-Status: **proposed, not implemented**, October 7, 2026. This proposal belongs to the
-[Business owner pilot](https://github.com/lagarcess/argus/pull/900). The founder
-holds the `space-model` decision (#819). No Personal or Household reader
-changes until it is approved.
+Status: **accepted**, October 8, 2026. The founder approved separate Personal
+and Business spaces. The [slice plan](cuadrao-business-space-slice-plan.md)
+is the detailed contract, and it wins wherever the two differ. This proposal
+belongs to the [Business owner pilot](https://github.com/lagarcess/argus/pull/900).
 
 ## Recommendation
 
@@ -100,5 +100,5 @@ Nothing is kept silently. Closing a business without deleting the account is a l
 
 ## Open items
 
-- The founder's `space-model` lock for this slice (#819).
+- The `space-model` lock for this slice (#819) was decided on October 8: separate Personal and Business spaces.
 - Hosted Realtime publication membership hasn't been checked. No migration publishes these tables.

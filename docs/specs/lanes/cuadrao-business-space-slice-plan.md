@@ -1,10 +1,9 @@
 # Cuadrao Business space slice: implementation plan
 
-**Status:** plan for review, revision 2, not implemented. October 8, 2026.
+**Status:** approved plan, revision 2, with the founder's decisions in section 8 (October 8, 2026). S1 to S3 are implemented and unmerged in the isolation PR, which depends on the Business API PR [#913](https://github.com/lagarcess/argus/pull/913). S4 and S5 are not started.
 **Serves:** #819 (smallest additive slice), the [boundary proposal](cuadrao-business-boundary-proposal.md) and the Business owner pilot (#900).
 **Code base read:** `claude/business-pilot-flow` at `92599473a` (Business API #904, Storage #778, preparation jobs #823, WhatsApp, web #901). Line numbers are against that commit.
 **Approved by the founder (October 8):** separate Personal and Business spaces for the pilot, compatible with #819, so a connected Personal plus Business experience can come later without copying financial records. WhatsApp: the owner sends or forwards receipts from their own number to Cuadrao's one receiving number. A verified link ties that sending number to their Business space. Only owner-initiated submissions are processed, and their conversations are never read. One confirmed account-and-business deletion with an optional export.
-**Still a design for review:** the technical choices below.
 
 ## Design
 
@@ -22,19 +21,18 @@ A `spaces` row of kind `business` belongs to one person (`created_by`). Rows tha
 
 ## Where receipt capture sits in the Business roadmap
 
-Receipt capture is the first Business slice. The rest of the Business roadmap stays as recorded in the [master plan](../cuadrao-master-plan.md), and this slice implements none of it.
+The [connected-flow spec](../cuadrao-business-connected-flow-spec.md) (#912) owns the Business roadmap and its stages. This plan delivers part of stage B1 and nothing beyond it.
 
-| Roadmap step | Owner document | Status |
+| Stage | What it covers | Status |
 | --- | --- | --- |
-| Receipt capture: web and WhatsApp intake, review, one expense, retrieval, expense questions | The [owner pilot scope](https://github.com/lagarcess/argus/pull/900) and this plan | In progress, default-off |
-| Business ledger: customers, non-fiscal invoices, payments, matching, Vault | Master plan, "Business ledger" stream | Not started |
-| Dominican fiscal records: tracking e-CF the owner already issues, then live e-CF issuance through a DGII-certified provider (PSFE), partner first | Master plan, fiscal route correction and "Fiscal" streams | Not started; waits on the PSFE partner (founder track) |
-| Cuadrao's own e-CF backend: XML, validation, sequencing, submission, evidence | Master plan, "Fiscal: own backend" | Parallel, lower priority |
-| Accountant handoff: an export package and time-limited accountant access | Master plan, "Business ledger", and §B2.4 accountant role | Not started; needs multi-user memberships (deferred here) |
+| B1, capture with verified space isolation | Web and WhatsApp intake, review, one expense, reload, search and source retrieval, in an isolated Business space | In progress, default-off: [#913](https://github.com/lagarcess/argus/pull/913) and the isolation PR |
+| E0, offline fiscal engine | Synthetic customer and invoice input becomes a deterministic unsigned XML artifact with local validation evidence, per the [E0 plan](../cuadrao-business-e0-implementation-plan.md) | Approved. Starts after this B1 slice is finished (founder, October 8) |
+| B2, connected period pilot | One period of invoices, collections and expenses, plus the accountant package | Not started |
+| L, authorized live fiscal processing | Signing, submission and customer delivery, each authorized separately. No supplier is chosen | Not started |
 
 Two constraints carry forward from this slice:
 - The space model keeps every later record (invoice, payment, fiscal document, accountant grant) attachable to the same Business space without copying.
-- The pilot export already includes every original receipt with its status, so it can feed the accountant handoff later.
+- The pilot export already includes every original receipt with its status, so it can feed the accountant package later.
 
 ## 1. Migration
 
@@ -235,12 +233,12 @@ Code deploys after the schema. The flag stays off until a separate enable decisi
 | A future tool writes chat artifacts in Business | The catalog is per surface, and the artifact routes are guarded. A new Business tool needs its own declaration and scorecard |
 | `create_financial_account` signature change | The new parameter defaults to null, so old callers resolve to it. S2 makes scope required in Python |
 
-## 8. Open questions
+## 8. Founder decisions (October 8)
 
-| # | Question | Needs |
+| # | Question | Decision |
 | --- | --- | --- |
-| Q1 | The Business space name: ask on first entry, or default to "Mi negocio" with rename | Founder |
-| Q2 | Do the deletion counts include archived accounts and receipts not yet confirmed? | Founder |
-| Q3 | Does the export include receipt files that have no confirmed expense? | Founder |
-| Q4 | In the pilot, Business chat has no tools until the read-only expense tool (#826/#827) exists. Ship it as a plain conversation, or hide Business chat until that tool lands? | Founder |
-| Q5 | Accept the import event `owner_space_id` copy (M4, M5) and deferring `space_memberships` as part of the #819 model | #819 owner |
+| Q1 | The Business space name | Defaults to "Mi negocio" or "My business", and the owner can rename it |
+| Q2 | Do the deletion counts include archived accounts and receipts not yet confirmed? | Yes, both |
+| Q3 | What does the export include? | Every retained receipt with its status. An export failure never blocks deletion |
+| Q4 | Business chat before the read-only expense tool exists | Ordinary Business chat keeps working under strict isolation. It tells general answers apart from answers based on saved expenses, and ships with the read-only expense tool |
+| Q5 | The import event space copy and `space_memberships` | Import records carry their space. Memberships are deferred, and the server enforces the sole owner |
