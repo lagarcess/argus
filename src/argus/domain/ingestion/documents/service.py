@@ -38,6 +38,28 @@ def entered_by_owner(batch: ExtractionBatch | None) -> bool:
     return batch is not None and batch.metadata.get("entered_by") == "owner"
 
 
+def owner_entry_id(sha256: str) -> str:
+    """The one purchase an owner enters by hand for a document, before or
+    after it was read, so a repeat delivers the same observation."""
+
+    return f"{sha256}:entered-by-owner"
+
+
+def owner_purchase(draft: DocumentDraft, now: datetime) -> ImportCandidate:
+    return ImportCandidate(
+        source=SourceRef(
+            source="statement",
+            connection_id=draft.connection_id,
+            external_id=owner_entry_id(draft.sha256),
+            observed_at=now,
+        ),
+        evidence="transaction",
+        direction="outflow",
+        kind_hint="expense",
+        uncertain=frozenset({"amount", "currency", "occurred_on"}),
+    )
+
+
 def lease_live(connection: SourceConnection, now: datetime) -> bool:
     return connection.lease_until is not None and connection.lease_until > now
 
@@ -320,20 +342,29 @@ class DocumentsService:
     async def enter(
         self, *, user_id: str, connection_id: str, scope: OwnerScope
     ) -> DocumentOutcome:
-        """The owner records this receipt by hand instead of preparing it.
+        """The owner records this document's one purchase by hand.
 
-        Saves one purchase observation with nothing read, marked entered by the
-        owner, and delivers it to review like extracted candidates; the owner's
-        values then become that import's resolution. No extractor is called.
-        Repeating it delivers the same observation again, so an interrupted
-        entry is finished. A prepared or queued document is refused.
+        Unread, it saves one purchase observation with nothing read, marked
+        entered by the owner, and delivers it to review like extracted
+        candidates. Read, the batch stays as read and the same observation is
+        delivered beside it; the caller decides that the read settled no
+        purchase. The owner's values then become that import's resolution. No
+        extractor is called. Repeating it delivers the same observation again,
+        so an interrupted entry is finished. A queued or preparing document is
+        refused.
         """
 
         draft = self.get(user_id=user_id, connection_id=connection_id, scope=scope)
+        if draft.status in ("queued", "preparing"):
+            raise DocumentServiceError("document_busy", retryable=True)
         batch = self.store.get(user_id=user_id, connection_id=connection_id)
+        if batch is not None and not entered_by_owner(batch):
+            purchase = owner_purchase(draft, self.hub.clock())
+            self._deliver(user_id, connection_id, (purchase,), scope)
+            return self.outcome(
+                user_id=user_id, connection_id=connection_id, replayed=False, scope=scope
+            )
         if batch is None:
-            if draft.status in ("queued", "preparing"):
-                raise DocumentServiceError("document_busy", retryable=True)
             holder = str(uuid.uuid4())
             repo = self.hub.connections
             if not repo.lease(
@@ -341,21 +372,8 @@ class DocumentsService:
             ):
                 raise DocumentServiceError("document_busy", retryable=True)
             try:
-                now = self.hub.clock()
-                purchase = ImportCandidate(
-                    source=SourceRef(
-                        source="statement",
-                        connection_id=connection_id,
-                        external_id=f"{draft.sha256}:entered-by-owner",
-                        observed_at=now,
-                    ),
-                    evidence="transaction",
-                    direction="outflow",
-                    kind_hint="expense",
-                    uncertain=frozenset({"amount", "currency", "occurred_on"}),
-                )
                 entered = ExtractionBatch(
-                    candidates=(purchase,),
+                    candidates=(owner_purchase(draft, self.hub.clock()),),
                     receipt=ReceiptDetails(),
                     metadata=dict(ENTERED_BY_OWNER),
                 )
@@ -363,15 +381,17 @@ class DocumentsService:
                     user_id=user_id,
                     connection_id=connection_id,
                     holder=holder,
-                    now=now,
+                    now=self.hub.clock(),
                     batch=entered,
                 ):
                     raise DocumentServiceError("document_lease_lost", retryable=True)
             finally:
                 repo.release(connection_id=connection_id, holder=holder)
-            batch = self.store.get(user_id=user_id, connection_id=connection_id)
-        if not entered_by_owner(batch):
-            raise DocumentServiceError("document_already_prepared")
+            # A read saved before the lease was taken is kept by ``save``.
+            if not entered_by_owner(
+                self.store.get(user_id=user_id, connection_id=connection_id)
+            ):
+                raise DocumentServiceError("document_already_prepared")
         return await self.resume(
             user_id=user_id, connection_id=connection_id, scope=scope
         )
@@ -470,21 +490,7 @@ class DocumentsService:
             ):
                 raise DocumentServiceError("document_lease_lost", retryable=True)
             if batch.candidates:
-                if self.hub.sink is None:
-                    raise DocumentServiceError("document_delivery_failed", retryable=True)
-                try:
-                    result = self.hub.sink.submit(
-                        user_id=user_id,
-                        connection_id=connection_id,
-                        candidates=batch.candidates,
-                        scope=scope,
-                    )
-                except Exception:
-                    raise DocumentServiceError(
-                        "document_delivery_failed", retryable=True
-                    ) from None
-                if result.ignored:
-                    raise DocumentServiceError("document_disconnected")
+                self._deliver(user_id, connection_id, batch.candidates, scope)
             if draft.source_available:
                 draft = self._update(
                     user_id,
@@ -534,6 +540,29 @@ class DocumentsService:
             raise
         finally:
             repo.release(connection_id=connection_id, holder=holder)
+
+    def _deliver(
+        self,
+        user_id: str,
+        connection_id: str,
+        candidates: tuple[ImportCandidate, ...],
+        scope: OwnerScope,
+    ) -> None:
+        if self.hub.sink is None:
+            raise DocumentServiceError("document_delivery_failed", retryable=True)
+        try:
+            result = self.hub.sink.submit(
+                user_id=user_id,
+                connection_id=connection_id,
+                candidates=candidates,
+                scope=scope,
+            )
+        except Exception:
+            raise DocumentServiceError(
+                "document_delivery_failed", retryable=True
+            ) from None
+        if result.ignored:
+            raise DocumentServiceError("document_disconnected")
 
     @staticmethod
     def _validate(batch: ExtractionBatch, connection_id: str) -> None:

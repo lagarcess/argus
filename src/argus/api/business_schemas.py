@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from argus.api.schemas import Language
+from argus.domain.business.receipts import Attention
 from argus.domain.business.spaces import MAX_NAME_LENGTH
 from argus.domain.ingestion.receipt_review import ReceiptStatus
 
@@ -75,6 +76,12 @@ class ReceiptSummary(_Wire):
     received_at: datetime
     status: ReceiptStatus
     error_code: str | None
+    # Why a needs_attention receipt needs the owner; null otherwise.
+    attention: Attention | None
+    # The owner may ask for a consented AI read now.
+    preparable: bool
+    # The owner may fill in the one purchase by hand from version 0.
+    enterable: bool
     expense_id: str | None
     merchant: str | None
     occurred_on: str | None
@@ -171,6 +178,7 @@ class BusinessUpdate(_Wire):
     receipt_id: str | None
     expense_id: str | None
     error_code: str | None
+    attention: Attention | None
     label: str | None
 
 

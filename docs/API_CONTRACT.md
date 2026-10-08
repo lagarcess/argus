@@ -8811,6 +8811,20 @@ accept path recorded.
   read lists `account_id`, `amount`, `currency` and `occurred_on`. A prepared
   receipt with no single purchase is `needs_attention`, with the blocker as
   `error_code`.
+- Every `ReceiptSummary` and `ReceiptDetail` carries the owner's next step,
+  decided by the backend. `preparable` is true when nothing was read or
+  entered, the source is stored, nothing is reading it, and another read could
+  succeed; the client then offers the consented `/prepare`. `enterable` is true
+  when there is no single purchase to review and nothing is reading it; the
+  client then offers entry by hand from `version: 0`. `attention` is null
+  unless the status is `needs_attention`, and then names why:
+  `unreadable` (the file cannot be read), `ai_unavailable`, `interrupted`,
+  `outcome_unknown` (an attempt may have reached the provider; only the
+  owner's consented retry starts another), `no_purchase_found`,
+  `several_purchases` (several or ambiguous purchases), `source_unavailable`,
+  `check_details` (a purchase is ready but the read was incomplete) or
+  `other`. `error_code` stays the precise cause. Nothing is retried
+  automatically because of it.
 - GET `/api/v1/business/receipts/{id}/source` returns the stored original
   (#778) as an attachment, with `X-Content-Type-Options: nosniff`. It is
   readable by the owner only.
@@ -8829,6 +8843,15 @@ accept path recorded.
   become its resolution, its `evidence` stays null, and no model is called.
   Unknown fields stay unknown until the owner supplies them. Confirm then uses
   the same accept path, and `receipt_ids` links the expense to the receipt.
+  A receipt that was read but has no single purchase (`no_purchase_found`,
+  `several_purchases_found`, `receipt_purchase_ambiguous`) is entered by hand
+  the same way. The read stays stored and its `evidence` stays visible. Every
+  open purchase the read created is dismissed first and kept as history, then
+  the owner's one purchase is delivered beside the read, so only it can become
+  the expense. A replay, a second tab or a restart enters one purchase and
+  confirm records one expense. An account outside the Business space, Personal
+  or another person's, is 404 `financial_account_not_found`, as on
+  POST `/expenses`.
 - POST `/api/v1/business/receipts/{id}/confirm` (`Idempotency-Key` required)
   takes `{version}` and records the receipt as one expense through the import
   accept path. Confirm changes nothing before it claims the import. A
@@ -8853,7 +8876,8 @@ accept path recorded.
   `last_confirmed_at`.
 - GET `/api/v1/business/updates` returns `{items}` derived from receipt states
   (`receipt_ready`, `receipt_needs_attention`, `expense_confirmed`), newest
-  first. Nothing is stored for them.
+  first, each with the receipt's `error_code` and `attention`. Nothing is
+  stored for them.
 
 Another person's receipt id answers 404 `receipt_not_found` on every receipt
 route. 

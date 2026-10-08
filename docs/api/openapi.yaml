@@ -10876,6 +10876,20 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        attention:
+          anyOf:
+          - type: string
+            enum:
+            - unreadable
+            - ai_unavailable
+            - interrupted
+            - outcome_unknown
+            - no_purchase_found
+            - several_purchases
+            - source_unavailable
+            - check_details
+            - other
+          - type: 'null'
         label:
           anyOf:
           - type: string
@@ -10889,6 +10903,7 @@ components:
       - receipt_id
       - expense_id
       - error_code
+      - attention
       - label
     BusinessWorkspace:
       properties:
@@ -18478,6 +18493,24 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        attention:
+          anyOf:
+          - type: string
+            enum:
+            - unreadable
+            - ai_unavailable
+            - interrupted
+            - outcome_unknown
+            - no_purchase_found
+            - several_purchases
+            - source_unavailable
+            - check_details
+            - other
+          - type: 'null'
+        preparable:
+          type: boolean
+        enterable:
+          type: boolean
         expense_id:
           anyOf:
           - type: string
@@ -18534,6 +18567,9 @@ components:
       - received_at
       - status
       - error_code
+      - attention
+      - preparable
+      - enterable
       - expense_id
       - merchant
       - occurred_on
@@ -18977,6 +19013,24 @@ components:
           anyOf:
           - type: string
           - type: 'null'
+        attention:
+          anyOf:
+          - type: string
+            enum:
+            - unreadable
+            - ai_unavailable
+            - interrupted
+            - outcome_unknown
+            - no_purchase_found
+            - several_purchases
+            - source_unavailable
+            - check_details
+            - other
+          - type: 'null'
+        preparable:
+          type: boolean
+        enterable:
+          type: boolean
         expense_id:
           anyOf:
           - type: string
@@ -19016,6 +19070,9 @@ components:
       - received_at
       - status
       - error_code
+      - attention
+      - preparable
+      - enterable
       - expense_id
       - merchant
       - occurred_on

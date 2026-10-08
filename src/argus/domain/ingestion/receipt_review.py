@@ -8,7 +8,7 @@ stores a copy of any of them.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from functools import cache
 from typing import Any, Literal, get_args
@@ -19,6 +19,7 @@ from argus.domain.ingestion.documents.models import (
     DraftStatus,
     ExtractionBatch,
 )
+from argus.domain.ingestion.documents.service import entered_by_owner, owner_entry_id
 from argus.domain.ingestion.documents.store import DocumentStore
 from argus.domain.ingestion.reconcile.matching import ACTIVITY_EVIDENCE
 from argus.domain.ingestion.reconcile.model import EventState
@@ -59,6 +60,15 @@ class ReceiptFields:
 
 
 @dataclass(frozen=True)
+class ReadPurchase:
+    """An import event a preparation read from the document."""
+
+    event_id: str
+    version: int
+    state: str
+
+
+@dataclass(frozen=True)
 class ReceiptReview:
     receipt_id: str
     status: ReceiptStatus
@@ -72,6 +82,9 @@ class ReceiptReview:
     event_id: str | None
     event_version: int | None
     expense_id: str | None
+    # Purchases read from the document beside the owner's entry. Once the
+    # owner enters the receipt by hand, none of them can become its expense.
+    read_purchases: tuple[ReadPurchase, ...] = ()
 
 
 def _is_receipt(batch: ExtractionBatch | None) -> bool:
@@ -79,11 +92,19 @@ def _is_receipt(batch: ExtractionBatch | None) -> bool:
 
 
 def _from_receipt(
-    source: str, live: bool, connection_id: str, is_receipt: Callable[[str], bool]
+    o: Mapping[str, Any],
+    is_receipt: Callable[[str], bool],
+    entry_id: Callable[[str], str | None],
 ) -> bool:
-    """The one test for an observation that a receipt document still holds."""
+    """The one test for an observation that a receipt document still holds:
+    read from a receipt, or the purchase its owner entered by hand."""
 
-    return live and source == "statement" and is_receipt(connection_id)
+    connection_id = o["connection_id"]
+    return bool(
+        o["live"]
+        and o["source"] == "statement"
+        and (is_receipt(connection_id) or o["external_id"] == entry_id(connection_id))
+    )
 
 
 def receipt_review(
@@ -93,21 +114,39 @@ def receipt_review(
 ) -> ReceiptReview:
     """``events`` are import event views listed with ``RECEIPT_EVENT_STATES``."""
 
+    entry = owner_entry_id(draft.sha256)
+
     def this_receipt(connection_id: str) -> bool:
         return connection_id == draft.connection_id and _is_receipt(batch)
 
-    purchases = [
-        event
-        for event in events
-        if event["evidence"] in ACTIVITY_EVIDENCE
-        and any(
-            _from_receipt(o["source"], o["live"], o["connection_id"], this_receipt)
+    def this_entry(connection_id: str) -> str | None:
+        return entry if connection_id == draft.connection_id else None
+
+    def held(event: dict[str, Any], external_id: str | None) -> bool:
+        return any(
+            o["live"]
+            and o["connection_id"] == draft.connection_id
+            and (external_id is None or o["external_id"] == external_id)
             for o in event["observations"]
         )
+
+    activity = [e for e in events if e["evidence"] in ACTIVITY_EVIDENCE]
+    entered = [e for e in activity if held(e, entry)]
+    read = tuple(
+        ReadPurchase(e["id"], e["version"], e["state"])
+        for e in activity
+        if held(e, None) and e not in entered
+    )
+    purchases = entered or [
+        event
+        for event in activity
+        if any(_from_receipt(o, this_receipt, this_entry) for o in event["observations"])
     ]
     blocker: Blocker | None = None
     if batch is None:
         blocker = "not_prepared"
+    elif entered:
+        blocker = None
     elif any(issue.code == RECEIPT_PURCHASE_AMBIGUOUS for issue in batch.issues):
         blocker = RECEIPT_PURCHASE_AMBIGUOUS
     elif not purchases:
@@ -134,14 +173,20 @@ def receipt_review(
             event_id=None,
             event_version=None,
             expense_id=None,
+            read_purchases=read,
         )
     [event] = purchases
     facts = event["facts"]
-    status = _EVENT_STATUS.get(event["state"], draft.status)
+    # The owner's entry after a read replaces what the read could not settle;
+    # the read's findings stay in the batch and in ``evidence``.
+    after_read = bool(entered) and not entered_by_owner(batch)
+    status = _EVENT_STATUS.get(
+        event["state"], "review_ready" if after_read else draft.status
+    )
     return ReceiptReview(
         receipt_id=draft.connection_id,
         status=status,
-        error_code=draft.error_code,
+        error_code=None if after_read else draft.error_code,
         fields=ReceiptFields(
             note=recorded_note(event),
             occurred_on=facts["occurred_on"],
@@ -156,6 +201,7 @@ def receipt_review(
         event_id=event["id"],
         event_version=event["version"],
         expense_id=event["activity_id"],
+        read_purchases=read,
     )
 
 
@@ -175,6 +221,11 @@ def receipt_ids(
     def is_receipt(connection_id: str) -> bool:
         return _is_receipt(documents.get(user_id=user_id, connection_id=connection_id))
 
+    @cache
+    def entry_id(connection_id: str) -> str | None:
+        draft = documents.draft(user_id=user_id, connection_id=connection_id)
+        return owner_entry_id(draft.sha256) if draft is not None else None
+
     events = tx.activity_links()
     found = {}
     for activity_id in activity_ids:
@@ -184,7 +235,7 @@ def receipt_ids(
         held = {
             o.connection_id
             for o in tx.observations(event_id)
-            if _from_receipt(o.source, o.live, o.connection_id, is_receipt)
+            if _from_receipt(vars(o), is_receipt, entry_id)
         }
         if len(held) == 1:
             found[activity_id] = held.pop()

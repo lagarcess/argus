@@ -206,18 +206,39 @@ class BusinessService:
     async def start_entry(
         self, scope: BusinessScope, receipt_id: str, version: int
     ) -> int:
-        """The version a review applies to; for a receipt nobody has read, first
-        record its one purchase as entered by the owner, then that version."""
+        """The version a review applies to. For a receipt with no single
+        purchase, first record the owner's one purchase, then that version.
+
+        Purchases a read found are dismissed first, kept as history, so only
+        the owner's can become the expense. A repeat finds them dismissed and
+        the entry delivered, so a replay or a second tab enters one purchase.
+        """
 
         current = await asyncio.to_thread(self.receipt, scope, receipt_id)
         if not current.enterable:
             return version
         if version != current.version:
             raise StaleEvent()
+        await asyncio.to_thread(self._set_aside, scope, current)
         await self.documents.enter(
             user_id=scope.person_id, connection_id=receipt_id, scope=scope.owner
         )
         return (await asyncio.to_thread(self.receipt, scope, receipt_id)).version
+
+    def _set_aside(self, scope: BusinessScope, receipt: Receipt) -> None:
+        for read in receipt.review.read_purchases:
+            if read.state != "open":
+                continue
+            try:
+                self.imports.dismiss(
+                    user_id=scope.person_id,
+                    event_id=read.event_id,
+                    version=read.version,
+                    scope=scope.owner,
+                )
+            except StaleEvent:
+                # Another entry of this receipt changed it first.
+                continue
 
     def review(
         self,

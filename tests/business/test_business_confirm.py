@@ -76,7 +76,7 @@ def test_a_same_key_confirm_inside_another_records_one_expense(
     """Confirm changes nothing before it claims, so a same-key confirm that
     lands first leaves the outer one a replay rather than a stale version."""
 
-    stub.purchase = {**PURCHASE, "direction": "unknown", "kind_hint": "unknown"}
+    stub.rows = [{**PURCHASE, "direction": "unknown", "kind_hint": "unknown"}]
     receipt_id = prepared(alice)
     account = alice.account()
     service = BusinessService(documents_service(), ingestion_hub().sink, frozenset)

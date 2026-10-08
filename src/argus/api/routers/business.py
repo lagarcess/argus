@@ -69,7 +69,7 @@ from argus.domain.ingestion.reconcile.model import (
     ReconcileError,
     StaleEvent,
 )
-from argus.domain.recording.errors import StaleVersion
+from argus.domain.recording.errors import AccountNotFound, StaleVersion
 from argus.domain.recording.schemas import CreateFinancialAccountRequest
 
 
@@ -112,6 +112,12 @@ def _problem(request: Request, error: Exception) -> HTTPException:
             detail="This receipt changed since you opened it. Reload and try again.",
             headers=NO_STORE,
         )
+    if (
+        isinstance(error, (BusinessError, ReconcileError))
+        and error.code == "financial_account_not_found"
+    ):
+        # An account outside this space is not found, as on POST /expenses.
+        return domain_problem(request, AccountNotFound())
     if isinstance(error, (BusinessError, ReconcileError)):
         return problem(
             request,

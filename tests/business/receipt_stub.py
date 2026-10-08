@@ -12,7 +12,11 @@ from typing import Any
 
 from argus.domain.ingestion.contract import Attachment
 from argus.domain.ingestion.documents.extractor import batch_from_result
-from argus.domain.ingestion.documents.models import ExtractionBatch, ExtractionResult
+from argus.domain.ingestion.documents.models import (
+    DocumentExtractionError,
+    ExtractionBatch,
+    ExtractionResult,
+)
 
 PURCHASE: dict[str, Any] = {
     "page": 1,
@@ -41,13 +45,18 @@ DETAILS: dict[str, Any] = {
 
 
 class ReceiptStub:
+    """``rows`` replaces the one purchase; ``failure`` makes the next read raise
+    that extraction code, the way the real extractor fails."""
+
     def __init__(
         self,
         purchase: dict[str, Any] | None = None,
         details: dict[str, Any] | None = None,
     ) -> None:
-        self.purchase = purchase or PURCHASE
+        self.rows: list[dict[str, Any]] = [purchase or PURCHASE]
         self.details = details or DETAILS
+        self.readable = True
+        self.failure: str | None = None
         self.calls: list[str] = []
 
     async def extract(
@@ -60,13 +69,16 @@ class ReceiptStub:
         observed_at: datetime,
     ) -> ExtractionBatch:
         self.calls.append(connection_id)
+        if self.failure is not None:
+            code, self.failure = self.failure, None
+            raise DocumentExtractionError(code)
         digest = hashlib.sha256(content).hexdigest()
         result = ExtractionResult.model_validate(
             {
                 "complete": True,
-                "readable": True,
+                "readable": self.readable,
                 "pages_read": [1],
-                "observations": [self.purchase],
+                "observations": self.rows,
                 "receipt": self.details,
             }
         )

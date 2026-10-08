@@ -21,7 +21,7 @@ from argus.domain.business.service import BusinessService
 from argus.domain.business.spaces import PostgresSpaceStore
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.connections_postgres import PostgresConnectionRepository
-from argus.domain.ingestion.documents.objects import owner_prefix
+from argus.domain.ingestion.documents.objects import SourceObjects, owner_prefix
 from argus.domain.ingestion.documents.service import (
     DocumentServiceError,
     DocumentsService,
@@ -39,7 +39,7 @@ from argus.domain.recording.service import FinancialAccountService
 from psycopg_pool import ConnectionPool
 
 from tests import test_financial_accounts_postgres as shared
-from tests.business.receipt_stub import ReceiptStub
+from tests.business.receipt_stub import PURCHASE, ReceiptStub
 from tests.document_sources_support import LOCAL_STORAGE, source_objects, stored_paths
 
 pytestmark = pytest.mark.skipif(
@@ -67,20 +67,15 @@ def rig() -> Iterator[dict]:
                 (user, f"business-{user}@example.test"),
             )
     objects = source_objects()
-    connections = PostgresConnectionRepository(pool)
-    accounts = FinancialAccountService(PostgresFinancialAccountRepository(pool), _now)
-    imports = ReconciliationService(
-        PostgresImportStore(pool), MoneyService(accounts), _now, connections=connections
-    )
-    hub = IngestionHub(connections, box=None, sink=imports, clock=_now)
-    documents = DocumentsService(hub, PostgresDocumentStore(pool, objects), ReceiptStub())
     spaces = PostgresSpaceStore(pool)
     try:
         yield {
             "pool": pool,
             "owner": _started(spaces, owner),
             "other": _started(spaces, other),
-            "service": BusinessService(documents, imports, lambda _: frozenset()),
+            "service": _service(pool, objects),
+            # A new process over the same database and storage.
+            "restart": lambda: _service(pool, objects),
         }
     finally:
         for user in (owner, other):
@@ -90,6 +85,17 @@ def rig() -> Iterator[dict]:
                 "delete from auth.users where id = any(%s)", ([owner, other],)
             )
         pool.close()
+
+
+def _service(pool: ConnectionPool, objects: SourceObjects) -> BusinessService:
+    connections = PostgresConnectionRepository(pool)
+    accounts = FinancialAccountService(PostgresFinancialAccountRepository(pool), _now)
+    imports = ReconciliationService(
+        PostgresImportStore(pool), MoneyService(accounts), _now, connections=connections
+    )
+    hub = IngestionHub(connections, box=None, sink=imports, clock=_now)
+    documents = DocumentsService(hub, PostgresDocumentStore(pool, objects), ReceiptStub())
+    return BusinessService(documents, imports, lambda _: frozenset())
 
 
 def _started(spaces: PostgresSpaceStore, person: str) -> BusinessScope:
@@ -255,3 +261,66 @@ def test_a_receipt_entered_by_hand_is_saved_once_and_linked(rig: dict) -> None:
         ).fetchone()[0]
     assert (events, _written(rig)) == (1, 1)
     assert service.source(scope, receipt.id) == ("image/png", RECEIPT)
+
+
+def test_entry_by_hand_after_a_read_records_one_expense_across_tabs_and_a_restart(
+    rig: dict,
+) -> None:
+    service, scope = rig["service"], rig["owner"]
+    service.documents.extractor.rows = [
+        PURCHASE,
+        {**PURCHASE, "row": 2, "evidence": "payment_notice", "amount": "100.00"},
+    ]
+    receipt_id = _prepared(rig)
+    read = service.receipt(scope, receipt_id)
+    assert (read.attention, read.enterable, read.preparable, read.version) == (
+        "several_purchases",
+        True,
+        False,
+        0,
+    )
+    account, _ = service.create_account(
+        scope,
+        CreateFinancialAccountRequest(type="cash", currency="DOP", nickname="Caja"),
+        "acct",
+    )
+
+    def enter(_: int) -> int:
+        return asyncio.run(service.start_entry(scope, receipt_id, 0))
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        list(pool.map(enter, range(2)))
+    current = service.receipt(scope, receipt_id)
+    entered = service.review(
+        scope,
+        receipt_id,
+        current.version,
+        {
+            "merchant": "Ferretería La Esquina",
+            "occurred_on": "2026-10-06",
+            "amount": "3450.00",
+            "currency": "DOP",
+            "account_id": account["id"],
+        },
+    )
+    assert (entered.status, entered.attention, entered.missing_fields) == (
+        "review_ready",
+        None,
+        [],
+    )
+    assert entered.detail()["evidence"]["total"] == "3450.00"
+
+    restarted = rig["restart"]()
+    assert asyncio.run(restarted.start_entry(scope, receipt_id, 0)) == 0
+    first = restarted.confirm(scope, receipt_id, entered.version, "by-hand")
+    second = rig["restart"]().confirm(scope, receipt_id, entered.version, "other-tab")
+    assert first.review.expense_id == second.review.expense_id
+    [expense] = restarted.expenses(scope, *OCTOBER)
+    assert (expense["receipt_id"], expense["amount"]) == (receipt_id, "3450.00")
+    with rig["pool"].connection() as connection:
+        states = connection.execute(
+            "select state, count(*) from public.financial_import_events"
+            " where user_id = %s group by state order by state",
+            (scope.person_id,),
+        ).fetchall()
+    assert (states, _written(rig)) == ([("accepted", 1), ("dismissed", 2)], 1)
