@@ -84,6 +84,7 @@ class Media:
     host: str = "lookaside.fbsbx.com"
     content_length: str | None = None
     file_size: int | None = None
+    url: str | None = None
 
 
 @dataclass
@@ -105,7 +106,8 @@ class FakeGraph:
                 200,
                 json={
                     "messaging_product": "whatsapp",
-                    "url": f"https://{item.host}/whatsapp_business/attachments/?mid={media_id}",
+                    "url": item.url
+                    or f"https://{item.host}/whatsapp_business/attachments/?mid={media_id}",
                     "mime_type": item.mime_type,
                     "sha256": hashlib.sha256(item.content).hexdigest(),
                     "file_size": item.file_size

@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import copy
-from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from itertools import count
@@ -74,8 +73,11 @@ class World:
         raw = encode(body, sent_at or self.clock.now)
         await self.intake.handle(parse_delivery(raw, phone_number_id=PHONE_NUMBER_ID))
 
-    async def link(self, owner: str, phone: str) -> None:
-        issued = self.intake.issue_code(destination_owner_id=owner)
+    def issue(self, owner: str, language: str = "es-419"):  # noqa: ANN201
+        return self.intake.issue_code(destination_owner_id=owner, reply_language=language)
+
+    async def link(self, owner: str, phone: str, language: str = "es-419") -> None:
+        issued = self.issue(owner, language)
         await self.deliver(
             fixture(
                 "text_link_code.json",
@@ -104,7 +106,6 @@ def build_world(
     clock: Clock,
     alice: str,
     bob: str,
-    language_of: Callable[[str], str | None] = lambda _owner: None,
 ) -> World:
     graph, transport = FakeGraph(), RecordingTransport()
     # A key per world keeps message digests unique across runs on a shared database.
@@ -118,7 +119,7 @@ def build_world(
             graph_api_version="v23.0",
             max_bytes=MAX_BYTES,
         ),
-        destination=DocumentsDestination(documents, language_of),
+        destination=DocumentsDestination(documents),
         clock=clock,
         transport=transport,
         app_origin=ORIGIN,
@@ -216,7 +217,7 @@ async def unknown_sender_is_rejected_without_capture(world: World) -> None:
 
 
 async def expired_and_reused_codes_are_refused(world: World) -> None:
-    expired = world.intake.issue_code(destination_owner_id=world.alice)
+    expired = world.issue(world.alice)
     world.clock.now += timedelta(minutes=11)
     await world.deliver(
         fixture(
@@ -225,7 +226,7 @@ async def expired_and_reused_codes_are_refused(world: World) -> None:
             text=f"CUADRAO {expired.code}",
         )
     )
-    fresh = world.intake.issue_code(destination_owner_id=world.alice)
+    fresh = world.issue(world.alice)
     await world.deliver(
         fixture(
             "text_link_code.json", id="wamid.CASE-FIRST", text=f"cuadrao {fresh.code}"
@@ -255,8 +256,8 @@ async def expired_and_reused_codes_are_refused(world: World) -> None:
 
 
 async def superseded_code_is_refused(world: World) -> None:
-    first = world.intake.issue_code(destination_owner_id=world.alice)
-    world.intake.issue_code(destination_owner_id=world.alice)
+    first = world.issue(world.alice)
+    world.issue(world.alice)
     await world.deliver(
         fixture("text_link_code.json", id="wamid.CASE-OLD", text=f"CUADRAO {first.code}")
     )
@@ -377,7 +378,7 @@ async def revoke_and_relink(world: World) -> None:
 
 
 async def english_owner_gets_english_only(world: World) -> None:
-    await world.link(world.alice, ALICE_PHONE)
+    await world.link(world.alice, ALICE_PHONE, "en")
     world.graph.media["700000000000115"] = Media(RECEIPT_PNG, "image/png")
     await world.deliver(image("700000000000115", "wamid.CASE-ENGLISH"))
     await world.deliver(image("700000000000115", "wamid.CASE-ENGLISH-AGAIN"))
@@ -495,7 +496,7 @@ async def slow_processing_times_out_as_failed_and_recovers(world: World) -> None
 
 
 async def revoking_also_ends_unused_codes(world: World) -> None:
-    pending = world.intake.issue_code(destination_owner_id=world.alice)
+    pending = world.issue(world.alice)
     world.store.revoke(destination_owner_id=world.alice, now=world.clock())
     await world.deliver(
         fixture(
@@ -596,6 +597,87 @@ async def forwarded_and_captioned_messages_capture_like_a_direct_send(
     assert RefusingExtractor.calls == 0
 
 
+async def a_failed_code_answers_in_the_senders_linked_language(world: World) -> None:
+    await world.link(world.alice, ALICE_PHONE, "en")
+    await world.deliver(
+        fixture(
+            "text_link_code.json", id="wamid.CASE-BAD-LINKED", text="CUADRAO ZZZZ2222"
+        )
+    )
+    await world.deliver(
+        fixture(
+            "text_link_code.json",
+            id="wamid.CASE-BAD-STRANGER",
+            sender=STRANGER_PHONE,
+            text="CUADRAO ZZZZ2222",
+        )
+    )
+    assert world.transport.bodies()[-2:] == [
+        "That code has expired or was already used. Create a new one in Cuadrao.",
+        "Ese código venció o ya se usó. Crea uno nuevo en Cuadrao.",
+    ]
+
+
+async def one_failing_message_does_not_stop_the_rest(world: World) -> None:
+    await world.link(world.alice, ALICE_PHONE)
+    world.graph.media["700000000000117"] = Media(RECEIPT_PNG, "image/png")
+    world.graph.media["700000000000118"] = Media(RECEIPT_PDF, "application/pdf")
+    original = world.intake.destination.capture
+
+    attempts: list[str] = []
+    failing = True
+
+    async def fail_png(**kwargs):  # noqa: ANN003, ANN202
+        attempts.append(kwargs["media_type"])
+        if failing and kwargs["media_type"] == "image/png":
+            raise RuntimeError("storage hiccup")
+        return await original(**kwargs)
+
+    world.intake.destination.capture = fail_png
+    body = image("700000000000117", "wamid.CASE-BATCH-1")
+    second = fixture(
+        "document_message.json",
+        id="wamid.CASE-BATCH-2",
+        document={"mime_type": "application/pdf", "id": "700000000000118"},
+    )
+    messages = body["entry"][0]["changes"][0]["value"]["messages"]
+    messages.append(second["entry"][0]["changes"][0]["value"]["messages"][0])
+
+    with pytest.raises(RuntimeError, match="storage hiccup"):
+        await world.deliver(body)
+    assert world.record("wamid.CASE-BATCH-1").status == "failed"
+    assert world.record("wamid.CASE-BATCH-2").status == "captured"
+    assert len(world.captures(world.alice)) == 1
+
+    failing = False
+    await world.deliver(body)
+    await world.deliver(body)
+    assert attempts == ["image/png", "application/pdf", "image/png"]
+    assert world.record("wamid.CASE-BATCH-1").status == "captured"
+    assert len(world.captures(world.alice)) == 2
+
+
+async def media_urls_off_the_meta_allowlist_are_never_fetched(world: World) -> None:
+    await world.link(world.alice, ALICE_PHONE)
+    untrusted = {
+        "700000000000121": "http://lookaside.fbsbx.com/whatsapp_business/attachments/",
+        "700000000000122": "https://attacker.example/whatsapp_business/attachments/",
+        "700000000000123": "https://lookaside.fbsbx.com.attacker.example/x",
+        "700000000000124": "https://lookaside.fbsbx.com:8443/whatsapp_business/",
+        "700000000000125": "https://user:pw@lookaside.fbsbx.com/whatsapp_business/",
+    }
+    for media_id, url in untrusted.items():
+        world.graph.media[media_id] = Media(RECEIPT_PNG, "image/png", url=url)
+        await world.deliver(image(media_id, f"wamid.CASE-HOST-{media_id}"))
+        record = world.record(f"wamid.CASE-HOST-{media_id}")
+        assert (record.status, record.error_code) == (
+            "failed",
+            "whatsapp_media_untrusted",
+        )
+    assert world.graph.hosts() == {"graph.facebook.com"}
+    assert world.captures(world.alice) == []
+
+
 CASES = (
     linked_image_is_saved_unqueued_and_replay_converges,
     document_message_is_captured,
@@ -613,4 +695,7 @@ CASES = (
     no_reply_outside_the_service_window,
     same_bytes_in_a_new_message_get_the_duplicate_reply,
     forwarded_and_captioned_messages_capture_like_a_direct_send,
+    a_failed_code_answers_in_the_senders_linked_language,
+    one_failing_message_does_not_stop_the_rest,
+    media_urls_off_the_meta_allowlist_are_never_fetched,
 )

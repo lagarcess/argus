@@ -8946,6 +8946,13 @@ paths:
       tags:
       - financial-accounts
       - whatsapp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              anyOf:
+              - $ref: '#/components/schemas/LinkCodeRequest'
+              - type: 'null'
       responses:
         '201':
           description: Successful Response
@@ -8953,6 +8960,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LinkCodeResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '503':
           $ref: '#/components/responses/AuthSessionVerificationUnavailable'
         '500':
@@ -15154,6 +15167,16 @@ components:
       required:
       - version
       - activity_id
+    LinkCodeRequest:
+      properties:
+        language:
+          type: string
+          enum:
+          - en
+          - es-419
+          default: es-419
+      additionalProperties: false
+      type: object
     LinkCodeResponse:
       properties:
         code:
@@ -15196,6 +15219,13 @@ components:
           anyOf:
           - type: string
             format: date-time
+          - type: 'null'
+        reply_language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
           - type: 'null'
       additionalProperties: false
       type: object

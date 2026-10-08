@@ -9,6 +9,7 @@ from argus.domain.ingestion.documents.service import DocumentsService
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
 from argus.domain.ingestion.whatsapp.identity import link_code_in, signature_matches
+from argus.domain.ingestion.whatsapp.media import trusted_download_url
 from argus.domain.ingestion.whatsapp.payload import (
     MediaMessage,
     PayloadInvalid,
@@ -34,7 +35,7 @@ from tests.ingestion.whatsapp_support import (
 )
 
 
-def _world(language_of=lambda _owner: None) -> cases.World:  # noqa: ANN001
+def _world() -> cases.World:
     clock = cases.Clock()
     connections = InMemoryConnectionRepository()
     hub = IngestionHub(connections, box=None, sink=None, clock=clock)
@@ -47,7 +48,6 @@ def _world(language_of=lambda _owner: None) -> cases.World:  # noqa: ANN001
         clock=clock,
         alice=str(uuid4()),
         bob=str(uuid4()),
-        language_of=language_of,
     )
 
 
@@ -58,8 +58,8 @@ async def test_intake_case(case) -> None:  # noqa: ANN001
 
 
 @pytest.mark.asyncio
-async def test_english_owner_gets_english_only() -> None:
-    await cases.english_owner_gets_english_only(_world(lambda _owner: "en"))
+async def test_english_link_gets_english_only() -> None:
+    await cases.english_owner_gets_english_only(_world())
 
 
 def test_signature_is_hmac_of_the_raw_body() -> None:
@@ -174,3 +174,18 @@ def test_reply_uses_one_language_spanish_unless_the_owner_is_english() -> None:
         "type": "text",
         "text": {"preview_url": False, "body": "Hola"},
     }
+
+
+def test_trusted_download_url_is_https_on_a_meta_cdn_host_only() -> None:
+    assert trusted_download_url("https://lookaside.fbsbx.com/whatsapp_business/a?mid=1")
+    assert trusted_download_url("https://scontent.xx.fbcdn.net/v/t1/a.jpg")
+    for url in (
+        "http://lookaside.fbsbx.com/a",
+        "https://attacker.example/a",
+        "https://lookaside.fbsbx.com.attacker.example/a",
+        "https://fbcdn.net.attacker.example/a",
+        "https://lookaside.fbsbx.com:8443/a",
+        "https://user:pw@lookaside.fbsbx.com/a",
+        "https://user@lookaside.fbsbx.com/a",
+    ):
+        assert not trusted_download_url(url), url

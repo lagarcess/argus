@@ -168,6 +168,7 @@ def test_link_capture_status_and_revoke_over_http(
         "linked": False,
         "last4": None,
         "linked_at": None,
+        "reply_language": None,
     }
     assert post(
         wa_client, fixture("text_link_code.json", text=issued["message_text"])
@@ -318,3 +319,16 @@ def test_access_log_redacts_only_the_webhook_query() -> None:
     )
     other = "/api/v1/financial-documents?limit=5"
     assert line(other) == f'127.0.0.1:5000 - "GET {other} HTTP/1.1" 200'
+
+
+def test_link_code_carries_the_web_language_to_the_link(wa_client: TestClient) -> None:
+    refused = wa_client.post(CODES, json={"language": "fr"}, headers=bearer(ALICE))
+    assert refused.status_code == 422
+    issued = wa_client.post(CODES, json={"language": "en"}, headers=bearer(ALICE))
+    assert issued.status_code == 201
+    post(wa_client, fixture("text_link_code.json", text=issued.json()["message_text"]))
+    assert wa_client.get(LINK, headers=bearer(ALICE)).json()["reply_language"] == "en"
+
+    relink = wa_client.post(CODES, headers=bearer(ALICE)).json()["message_text"]
+    post(wa_client, fixture("text_link_code.json", id="wamid.RELINK", text=relink))
+    assert wa_client.get(LINK, headers=bearer(ALICE)).json()["reply_language"] == "es-419"

@@ -14,6 +14,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Literal, Protocol
 
+ReplyLanguage = Literal["en", "es-419"]
 InboundStatus = Literal["received", "linked", "rejected", "captured", "failed"]
 SettledStatus = Literal["linked", "rejected", "captured", "failed"]
 RETRYABLE: frozenset[InboundStatus] = frozenset({"received", "failed"})
@@ -44,8 +45,10 @@ class Settlement:
     destination_owner_id: str | None = None
     connection_id: str | None = None
     error_code: str | None = None
-    # Not stored: the destination already held these bytes, which picks the reply.
+    # Not stored; they choose the reply. ``duplicate``: the destination already
+    # held these bytes. ``reply_language``: the sender link's, if any.
     duplicate: bool = False
+    reply_language: str | None = None
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,7 @@ class SenderLink:
     destination_owner_id: str
     last4: str
     linked_at: datetime
+    reply_language: ReplyLanguage
 
 
 class WhatsAppStore(Protocol):
@@ -81,13 +85,16 @@ class WhatsAppStore(Protocol):
         *,
         destination_owner_id: str,
         code_digest: bytes,
+        reply_language: ReplyLanguage,
         now: datetime,
         expires_at: datetime,
     ) -> None: ...
 
     def redeem_code(
         self, *, code_digest: bytes, sender_hash: bytes, last4: str, now: datetime
-    ) -> str | None: ...
+    ) -> SenderLink | None:
+        """Consume the code and make its sender link active, carrying its language."""
+        ...
 
     def sender_link(self, *, sender_hash: bytes) -> SenderLink | None: ...
 
@@ -105,6 +112,7 @@ class WhatsAppStore(Protocol):
 @dataclass
 class _Code:
     owner: str
+    reply_language: ReplyLanguage
     expires_at: datetime
     consumed: bool = False
 
@@ -115,6 +123,7 @@ class _Link:
     sender: bytes
     last4: str
     linked_at: datetime
+    reply_language: ReplyLanguage
     active: bool = True
 
 
@@ -198,6 +207,7 @@ class InMemoryWhatsAppStore:
         *,
         destination_owner_id: str,
         code_digest: bytes,
+        reply_language: ReplyLanguage,
         now: datetime,
         expires_at: datetime,
     ) -> None:
@@ -208,11 +218,13 @@ class InMemoryWhatsAppStore:
                 if c.owner == destination_owner_id and not c.consumed
             ]:
                 del self._codes[digest]
-            self._codes[code_digest] = _Code(destination_owner_id, expires_at)
+            self._codes[code_digest] = _Code(
+                destination_owner_id, reply_language, expires_at
+            )
 
     def redeem_code(
         self, *, code_digest: bytes, sender_hash: bytes, last4: str, now: datetime
-    ) -> str | None:
+    ) -> SenderLink | None:
         with self._lock:
             code = self._codes.get(code_digest)
             if code is None or code.consumed or code.expires_at <= now:
@@ -223,13 +235,16 @@ class InMemoryWhatsAppStore:
                     link.sender == sender_hash or link.owner == code.owner
                 ):
                     link.active = False
-            self._links.append(_Link(code.owner, sender_hash, last4, now))
-            return code.owner
+            link = _Link(code.owner, sender_hash, last4, now, code.reply_language)
+            self._links.append(link)
+            return SenderLink(link.owner, link.last4, link.linked_at, link.reply_language)
 
     def _active(self, predicate) -> SenderLink | None:  # noqa: ANN001
         for link in self._links:
             if link.active and predicate(link):
-                return SenderLink(link.owner, link.last4, link.linked_at)
+                return SenderLink(
+                    link.owner, link.last4, link.linked_at, link.reply_language
+                )
         return None
 
     def sender_link(self, *, sender_hash: bytes) -> SenderLink | None:

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Callable
 from dataclasses import dataclass
 
 import httpx
@@ -86,12 +85,8 @@ _REJECTED_CAPTURE = {
 class DocumentsDestination:
     """Saves the bytes as a document draft with ``consent=False``; never queues."""
 
-    def __init__(
-        self,
-        documents: DocumentsService,
-        language_of: Callable[[str], str | None] = lambda _owner: None,
-    ) -> None:
-        self.documents, self._language_of = documents, language_of
+    def __init__(self, documents: DocumentsService) -> None:
+        self.documents = documents
 
     async def capture(
         self, *, owner_id: str, content: bytes, filename: str, media_type: str
@@ -112,9 +107,6 @@ class DocumentsDestination:
             raise CaptureFailed("whatsapp_capture_failed") from None
         return Captured(outcome.connection_id, already_held=outcome.replayed)
 
-    def language(self, owner_id: str) -> str | None:
-        return self._language_of(owner_id)
-
 
 @dataclass(frozen=True)
 class WhatsAppRuntime:
@@ -134,24 +126,12 @@ def configure_whatsapp(runtime: WhatsAppRuntime | None) -> None:
     _runtime = runtime
 
 
-def _profile_language(pool) -> Callable[[str], str | None]:  # noqa: ANN001
-    def read(owner_id: str) -> str | None:
-        with pool.connection() as connection:
-            row = connection.execute(
-                "select language from public.profiles where id = %s", (owner_id,)
-            ).fetchone()
-        return row[0] if row else None
-
-    return read
-
-
 def build_whatsapp(
     settings: WhatsAppSettings,
     *,
     documents: DocumentsService,
     store,  # noqa: ANN001
     client: httpx.AsyncClient,
-    language_of: Callable[[str], str | None] = lambda _owner: None,
     app_origin: str | None = None,
 ) -> WhatsAppRuntime:
     access_token = settings.access_token.get_secret_value()
@@ -173,7 +153,7 @@ def build_whatsapp(
             graph_api_version=settings.graph_api_version,
             max_bytes=max_bytes,
         ),
-        destination=DocumentsDestination(documents, language_of),
+        destination=DocumentsDestination(documents),
         clock=documents.hub.clock,
         transport=transport,
         app_origin=app_origin,
@@ -190,7 +170,6 @@ def start_whatsapp(app: object) -> None:
         return
     try:
         pool = getattr(getattr(app, "state", None), "financial_accounts_pool", None)
-        language_of: Callable[[str], str | None] = lambda _owner: None  # noqa: E731
         if api_state.PERSISTENCE_MODE == "supabase":
             if pool is None:
                 configure_whatsapp(None)
@@ -200,7 +179,6 @@ def start_whatsapp(app: object) -> None:
             )
 
             store = PostgresWhatsAppStore(pool)
-            language_of = _profile_language(pool)
         else:
             store = InMemoryWhatsAppStore()
         configure_whatsapp(
@@ -209,7 +187,6 @@ def start_whatsapp(app: object) -> None:
                 documents=documents,
                 store=store,
                 client=httpx.AsyncClient(),
-                language_of=language_of,
                 app_origin=(os.getenv("ARGUS_APP_ORIGIN") or "").strip() or None,
             )
         )

@@ -8730,19 +8730,22 @@ is the signed-in person; it is pending the Business boundary decision.
   `whatsapp_webhook_retry`, and Meta's redelivery resumes that record. A
   replayed message never captures twice or replies twice. The webhook query
   string is redacted from uvicorn access logs.
-- POST `/api/v1/whatsapp/link-codes` (registered-only) returns 201
-  `{code, message_text, expires_at, wa_me_url}`. The code is single use, lives
+- POST `/api/v1/whatsapp/link-codes` (registered-only) takes an optional
+  `{language}`, the web app's current language (`es-419` or `en`, default
+  `es-419`; anything else is 422), and returns 201
+  `{code, message_text, expires_at, wa_me_url}`. The link the code creates keeps
+  that language for every WhatsApp reply. The code is single use, lives
   10 minutes and replaces any unused code for the same destination.
   `message_text` is `CUADRAO <code>`; `wa_me_url` is null until
   `ARGUS_WHATSAPP_DISPLAY_PHONE_NUMBER` is set. Five codes per 10 minutes, then
   429 `whatsapp_link_code_rate_limited`.
-- GET `/api/v1/whatsapp/link` returns `{linked, last4, linked_at}`.
+- GET `/api/v1/whatsapp/link` returns `{linked, last4, linked_at, reply_language}`.
 - DELETE `/api/v1/whatsapp/link` revokes the active link and every unused code
   for the destination, and answers 204, also when nothing was linked.
 
 Replies are sent only when `ARGUS_WHATSAPP_OUTBOUND_ENABLED` is true, always as
-a free-form answer to the person's own message, in one language: the linked
-owner's (Spanish by default, English when the profile says `en`). A new message
+a free-form answer to the person's own message, in one language: the sender
+link's `reply_language`, or Spanish for a sender with no active link. A new message
 whose bytes the owner's inbox already holds gets the duplicate reply. A message whose WhatsApp
 timestamp is more than 24 hours old is still captured but gets no reply, so
 nothing is sent outside the service window.
