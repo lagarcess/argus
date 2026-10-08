@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useConversationSurface } from "@/components/chat/ChatWorkspace";
 import {
   listConversations,
   type HistoryItem,
@@ -47,6 +48,7 @@ export function useActiveConversationTitle({
   const [fallbackTitleConversation, setFallbackTitleConversation] =
     useState<FallbackTitleConversation | null>(null);
   const fallbackTitleFetchedForRef = useRef<string | null>(null);
+  const surface = useConversationSurface();
 
   useEffect(() => {
     setFallbackTitleConversation((prev) =>
@@ -66,7 +68,7 @@ export function useActiveConversationTitle({
     if (fallbackTitleFetchedForRef.current === conversationId) return;
     fallbackTitleFetchedForRef.current = conversationId;
     let cancelled = false;
-    listConversations({ limit: 50 })
+    listConversations({ limit: 50, surface })
       .then(({ items }) => {
         if (cancelled) return;
         const conversation = items.find((item) => item.id === conversationId);
@@ -81,7 +83,7 @@ export function useActiveConversationTitle({
     return () => {
       cancelled = true;
     };
-  }, [conversationId, activeHistoryChat, messageCount, isStreamingResponse]);
+  }, [conversationId, activeHistoryChat, messageCount, isStreamingResponse, surface]);
 
   const activeTitleRecord =
     activeHistoryChat ??

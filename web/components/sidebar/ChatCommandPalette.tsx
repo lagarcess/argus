@@ -100,7 +100,7 @@ import {
   type LayoutMode,
 } from "./command-palette/paletteLayout";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
-import { useChatWorkspace } from "@/components/chat/ChatWorkspace";
+import { useChatWorkspace, useConversationSurface } from "@/components/chat/ChatWorkspace";
 import { moveWorkspaceFocus, useWorkspaceSearch, WorkspaceSearchResults } from "./command-palette/WorkspaceSearchResults";
 
 type ChatCommandPaletteProps = {
@@ -267,6 +267,15 @@ function ChatCommandPaletteSurface({
   onConversationRemoved,
 }: ChatCommandPaletteProps) {
   const { t, i18n } = useTranslation();
+  const surface = useConversationSurface();
+  // Business chats hold no saved decisions or result dossiers, so its palette has no
+  // decision filters and no preview pane: a row opens its chat.
+  const hasPreviewPane = surface === "personal";
+  const searchSurface = useCallback(
+    (params: Parameters<typeof searchGlobal>[0]) =>
+      searchGlobal({ ...params, surface, includeLedgerGroups: surface === "personal" && params.includeLedgerGroups }),
+    [surface],
+  );
   const [query, setQuery] = useState("");
   const [recentItems, setRecentItems] = useState<HistoryItem[]>([]);
   const [searchResults, setSearchResults] = useState<SearchItem[]>([]);
@@ -298,7 +307,7 @@ function ChatCommandPaletteSurface({
   const paletteOverlayId = useId();
   const paletteRef = useRef<HTMLDivElement>(null);
   const [isDossierSheetOpen, setIsDossierSheetOpen] = useState(false);
-  const effectiveLayoutMode = effectivePaletteLayout(layoutMode, isBelowTablet);
+  const effectiveLayoutMode = hasPreviewPane ? effectivePaletteLayout(layoutMode, isBelowTablet) : "collapsed";
   const rowActionVariant = paletteRowActionVariant(isBelowDesktop);
   const shortcutLegend = useCommandPaletteShortcutLegend();
   const [dossierPaneState, setDossierPaneState] = useState<DossierPaneState>(
@@ -345,12 +354,12 @@ function ChatCommandPaletteSurface({
       });
     void (async () => {
       try {
-        const { items } = await listHistory({ limit: 50 });
+        const { items } = await listHistory({ limit: 50, surface });
         if (!isCurrent()) return;
         const visibleRecents = items.filter((item) => item.type === "chat");
         const response = await loadCommandPaletteRecentRecall({
           recentItems: visibleRecents,
-          fetchRecall: searchGlobal,
+          fetchRecall: searchSurface,
           isCurrent,
         });
         if (!response || !isCurrent()) return;
@@ -370,7 +379,7 @@ function ChatCommandPaletteSurface({
         }
       }
     })();
-  }, [isGuest, isRecentsMode, retryNonce]);
+  }, [isGuest, isRecentsMode, retryNonce, searchSurface, surface]);
 
   const clearSearchAndLedger = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -423,7 +432,7 @@ function ChatCommandPaletteSurface({
           currentRequestId: ledgerBrowseRequestIdRef.current,
         });
       try {
-        const { items, next_cursor, ledger_groups } = await searchGlobal({
+        const { items, next_cursor, ledger_groups } = await searchSurface({
           q: "",
           limit: 100,
           decisionState: nextDecisionState,
@@ -443,7 +452,7 @@ function ChatCommandPaletteSurface({
         }
       }
     },
-    [],
+    [searchSurface],
   );
 
   useEffect(() => {
@@ -489,7 +498,7 @@ function ChatCommandPaletteSurface({
           currentSignature: searchSignatureRef.current,
           currentRequestId: searchRequestIdRef.current,
         });
-      searchGlobal({
+      searchSurface({
         q: trimmed,
         limit: 30,
         includeLedgerGroups: true,
@@ -515,7 +524,7 @@ function ChatCommandPaletteSurface({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [decisionStateFilter, isLedgerMode, query, retryNonce]);
+  }, [decisionStateFilter, isLedgerMode, query, retryNonce, searchSurface]);
 
   const workspaceSearch = useChatWorkspace()?.search ?? null;
   const workspaceResults = useWorkspaceSearch(isLedgerMode ? null : workspaceSearch, query);
@@ -698,10 +707,10 @@ function ChatCommandPaletteSurface({
         currentQuery === "" && !currentLedgerMode
           ? await loadCommandPaletteRecentRecall({
               recentItems,
-              fetchRecall: searchGlobal,
+              fetchRecall: searchSurface,
               isCurrent: () => !isStale(),
             })
-          : await searchGlobal({
+          : await searchSurface({
               q: currentQuery,
               limit: commandPaletteCanonicalRecallLimit(
                 currentQuery,
@@ -728,7 +737,7 @@ function ChatCommandPaletteSurface({
       );
       setReadError(null);
     },
-    [isGuest, recentItems],
+    [isGuest, recentItems, searchSurface],
   );
 
   const refreshAfterCanonicalMutation = useCallback(
@@ -866,7 +875,7 @@ function ChatCommandPaletteSurface({
     setIsLoadingMoreSearch(true);
     setLoadMoreFailed(false);
     try {
-      const { items, next_cursor } = await searchGlobal({
+      const { items, next_cursor } = await searchSurface({
         q: trimmed,
         limit: isLedgerMode ? 100 : 30,
         cursor: searchNextCursor,
@@ -1073,7 +1082,7 @@ function ChatCommandPaletteSurface({
       item: CommandPaletteDisplayItem,
       options: { navigationDisabled: boolean; openAtLeftOff?: boolean },
     ) => {
-      if (isBelowDesktop) {
+      if (isBelowDesktop && hasPreviewPane) {
         setPreviewItem(item);
         setIsDossierSheetOpen(true);
         return;
@@ -1085,7 +1094,7 @@ function ChatCommandPaletteSurface({
       }
       activateItem(item, options.openAtLeftOff);
     },
-    [activateItem, isBelowDesktop, setPreviewItem],
+    [activateItem, hasPreviewPane, isBelowDesktop, setPreviewItem],
   );
 
   const askText = onAsk && isFiltering && !isWaitingForIndexableQuery && !isLedgerMode && !isSearching && !readError && displayItems.length === 0 && !assetRollupDisplay && workspaceResults.quiet ? query.trim() : null;
@@ -1816,7 +1825,7 @@ function ChatCommandPaletteSurface({
           isFiltering={isFiltering}
           isLedgerMode={isLedgerMode}
           layoutMode={effectiveLayoutMode}
-          onToggleLayout={isBelowTablet ? undefined : toggleLayout}
+          onToggleLayout={isBelowTablet || !hasPreviewPane ? undefined : toggleLayout}
           shortcutLegendVisible={shortcutLegend.isVisible}
           usesCommandKey={shortcutLegend.usesCommandKey}
         />
