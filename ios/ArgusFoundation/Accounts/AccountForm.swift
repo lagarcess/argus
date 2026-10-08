@@ -68,10 +68,9 @@ struct AccountForm: View {
             .navigationTitle(Text(model.draft?.mode == .create ? "accounts.add" : "accounts.form.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("accounts.cancel") { model.discard() }.disabled(model.busy || model.openingUncertain)
-                        .frame(minHeight: 44).accessibilityIdentifier("accounts.cancel")
-                }
+                CuadraoCancelToolbar(title: NSLocalizedString("accounts.cancel", comment: ""),
+                                     disabled: model.busy || model.openingUncertain,
+                                     identifier: "accounts.cancel") { model.discard() }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
                     Button("accounts.keyboard.done") { focusedField = nil }

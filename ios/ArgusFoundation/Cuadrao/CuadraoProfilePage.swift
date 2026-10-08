@@ -215,9 +215,11 @@ struct CuadraoProfilePage: View {
 
     private var privacy: some View {
         Group {
-            Section {
-                link(.memory); link(.files); link(.conversations)
-            } header: { Text(spanish ? "Tus datos" : "Your data") }
+            if CuadraoFirstRelease.shows(.memory) || CuadraoFirstRelease.shows(.files) || CuadraoFirstRelease.shows(.conversations) {
+                Section {
+                    link(.memory); link(.files); link(.conversations)
+                } header: { Text(spanish ? "Tus datos" : "Your data") }
+            }
             if CuadraoFirstRelease.shows(.shared) || CuadraoFirstRelease.shows(.removed) {
                 Section {
                     link(.shared); link(.removed)
