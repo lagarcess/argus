@@ -50,12 +50,14 @@ def in_flight(
     now: datetime,
 ) -> bool:
     """The one liveness oracle: a held lease, or a queued draft whose dispatch
-    (or, before any dispatch, whose queueing) is younger than the window."""
+    (or, before any dispatch, whose queueing) is younger than the window. An
+    attempt dispatched for an older draft version can never claim, so it is
+    not in flight."""
     if lease_live(connection, now):
         return True
-    if draft.status != "queued":
+    if draft.status != "queued" or (job is not None and not dispatched(draft, job)):
         return False
-    anchor = job.dispatched_at if dispatched(draft, job) else draft.updated_at
+    anchor = job.dispatched_at if job is not None else draft.updated_at
     return anchor + DISPATCH_WINDOW > now
 
 
@@ -131,18 +133,18 @@ class PreparationJobs:
             reason = "retryable_failure"
         else:
             return
-        if (
-            draft.status == "preparing"
-            and job is not None
-            and job.provider_call_started_at is not None
-            and store.get(user_id=user_id, connection_id=connection_id) is None
+        if draft.status == "preparing" and not (
+            # Only the current attempt, unmarked, provably wrote this state.
+            job is not None
+            and draft.version == job.draft_version + 1
+            and job.provider_call_started_at is None
         ):
             if self._settle(user_id, connection_id, now, job, draft, OUTCOME_UNKNOWN):
                 report.outcome_unknown.append(connection_id)
                 logger.warning(
                     "Document preparation outcome unknown; waiting for the owner",
                     connection_id=connection_id,
-                    attempt=job.attempt,
+                    attempt=job.attempt if job is not None else None,
                     reason=reason,
                 )
             return
@@ -150,7 +152,14 @@ class PreparationJobs:
         attempt = 1 if fresh or job is None else job.attempt + 1
         if attempt <= MAX_ATTEMPTS:
             if self._advance(
-                user_id, connection_id, now, job, draft, attempt=attempt, requeue=True
+                user_id,
+                connection_id,
+                now,
+                job,
+                draft,
+                attempt=attempt,
+                requeue=True,
+                unmarked=not fresh,
             ):
                 report.redispatched.append(connection_id)
                 logger.info(
@@ -182,20 +191,27 @@ class PreparationJobs:
         user_id: str,
         connection_id: str,
         now: datetime,
-        job: PreparationJob,
+        job: PreparationJob | None,
         draft: DocumentDraft,
         code: str,
     ) -> bool:
         """End automatic work on this attempt; the owner decides what is next."""
+        settled = (
+            None
+            if draft.status == "needs_attention"
+            else self.service.revise(draft, status="needs_attention", error_code=code)
+        )
+        if job is None:
+            return settled is not None and self.service.store.update(
+                user_id=user_id, draft=settled, expected_version=draft.version
+            )
         return self.service.store.advance(
             user_id=user_id,
             connection_id=connection_id,
             now=now,
             expected_attempt_id=job.attempt_id,
             job=job.model_copy(update={"retry": False}),
-            draft=None
-            if draft.status == "needs_attention"
-            else self.service.revise(draft, status="needs_attention", error_code=code),
+            draft=settled,
         )
 
     def _advance(
@@ -208,6 +224,7 @@ class PreparationJobs:
         *,
         attempt: int,
         requeue: bool,
+        unmarked: bool = False,
     ) -> bool:
         """Make a new attempt current, then hand it to a worker. A sweep also
         returns an interrupted or failed draft to ``queued``."""
@@ -229,6 +246,7 @@ class PreparationJobs:
             expected_attempt_id=job.attempt_id if job is not None else None,
             job=nxt,
             draft=requeued,
+            unmarked=unmarked,
         ):
             return False
         try:

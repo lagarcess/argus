@@ -5,10 +5,8 @@ enabled anywhere. No hosted service, flag or paid run changed.
 
 ## Problem
 
-`POST /financial-documents` and `/prepare` or `/resume` run preparation as a
-FastAPI background task. When that task dies, the draft stays `queued` or
-`preparing` until the person explicitly calls `/prepare` or `/resume`. Nothing
-detects a dead worker while the API is up.
+Preparation ran as a FastAPI background task; a dead task left the draft stuck
+until an explicit `/prepare` or `/resume`, and nothing noticed while the API was up.
 
 ## Settings
 
@@ -64,8 +62,8 @@ plus one sweep interval after its last claim or dispatch. A worker that dies
 after releasing its lease, such as a cancelled task, is detected on the next
 sweep.
 
-Backtest reconciliation runs only on reads, backpressure and operator runs.
-Documents reuse its dispatch plumbing, not its cadence: a closed app makes no reads.
+Backtest reconciliation runs only on reads, backpressure and operator runs;
+documents reuse its dispatch plumbing, not its cadence.
 
 ## Attempt and lease model
 
@@ -87,21 +85,24 @@ they dispatch nothing.
 ## Provider-call marker
 
 After claiming and reading the source, and before calling the extractor, the
-worker commits `provider_call_started_at` under its live lease
-(`mark_provider_call`). No marker proves the provider was never reached.
+worker commits `provider_call_started_at` under its live lease and renews the
+lease (`mark_provider_call`). No marker proves the provider was never reached.
+An attempt may claim only the draft version it was dispatched for.
 
 ## Retry and spend bounds
 
 An expired attempt is never billed again automatically. The sweep decides:
 
-- Dead with no marker (`unclaimed`, or `interrupted` before the call), or a
-  retryable failure reported before the marker: re-dispatch, at most
+- Dead and unclaimed, dead `preparing` written by the current attempt
+  (`draft.version == draft_version + 1`) with no marker, or a retryable failure
+  reported before the marker: re-dispatch, at most
   `MAX_ATTEMPTS = 3` per explicit preparation. Past the bound the draft is
   `needs_attention` with `document_preparation_interrupted`.
-- Dead with a marker and no saved preparation: `needs_attention` with
+- Any other dead `preparing` draft (a marker, no job, or a stale job, which
+  covers a flag-off writer killed mid-call): `needs_attention` with
   `document_preparation_outcome_unknown`. Nothing is re-dispatched.
-- Dead with a marker and a saved preparation: re-dispatch, which replays
-  delivery without a provider call.
+- A re-dispatch is refused if a marker or a newer draft version lands after
+  the sweep read the attempt.
 - A failure reported after the marker keeps its code and is not retried.
 
 So automatic work never makes a second provider call for one explicit

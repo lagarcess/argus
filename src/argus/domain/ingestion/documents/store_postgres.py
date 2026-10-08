@@ -14,6 +14,7 @@ from datetime import datetime
 from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
 
+from argus.domain.ingestion.connections import DEFAULT_LEASE
 from argus.domain.ingestion.documents.models import (
     DocumentDraft,
     ExtractionBatch,
@@ -252,7 +253,16 @@ class PostgresDocumentStore:
         expected_attempt_id: str | None,
         job: PreparationJob,
         draft: DocumentDraft | None = None,
+        unmarked: bool = False,
     ) -> bool:
+        # A new attempt without a draft write must still match the draft version.
+        version = (
+            draft.version - 1
+            if draft
+            else job.draft_version
+            if job.attempt_id != expected_attempt_id
+            else None
+        )
         with self._pool.connection() as connection, connection.transaction():
             row = connection.execute(
                 "select lease_until from public.financial_source_connections "
@@ -267,6 +277,7 @@ class PostgresDocumentStore:
                 "set preparation_job=%s, draft=coalesce(%s::jsonb, draft) "
                 "where connection_id=%s and user_id=%s and draft is not null "
                 "and preparation_job->>'attempt_id' is not distinct from %s::text "
+                "and (not %s or preparation_job->>'provider_call_started_at' is null) "
                 "and (%s::integer is null or (draft->>'version')::integer=%s) "
                 "returning connection_id",
                 (
@@ -275,8 +286,9 @@ class PostgresDocumentStore:
                     connection_id,
                     user_id,
                     expected_attempt_id,
-                    draft.version - 1 if draft else None,
-                    draft.version - 1 if draft else None,
+                    unmarked,
+                    version,
+                    version,
                 ),
             ).fetchone()
         return changed is not None
@@ -292,11 +304,11 @@ class PostgresDocumentStore:
     ) -> bool:
         with self._pool.connection() as connection, connection.transaction():
             leased = connection.execute(
-                "select id from public.financial_source_connections "
+                "update public.financial_source_connections set lease_until=%s "
                 "where id=%s and user_id=%s and source='statement' "
                 "and status <> 'disconnected' and lease_holder=%s and lease_until > %s "
-                "for update",
-                (connection_id, user_id, holder, now),
+                "returning id",
+                (now + DEFAULT_LEASE, connection_id, user_id, holder, now),
             ).fetchone()
             if leased is None:
                 return False

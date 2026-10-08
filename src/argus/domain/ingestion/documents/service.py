@@ -303,7 +303,11 @@ class DocumentsService:
         if attempt_id is not None:
             # Checked under the lease: a reconciler cannot supersede a held lease.
             job = self.store.job(user_id=user_id, connection_id=connection_id)
-            if job is None or job.attempt_id != attempt_id:
+            if (
+                job is None
+                or job.attempt_id != attempt_id
+                or job.draft_version != draft.version
+            ):
                 repo.release(connection_id=connection_id, holder=holder)
                 raise DocumentServiceError("document_attempt_superseded")
         replayed = batch is not None

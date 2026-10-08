@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import hashlib
 import threading
+from dataclasses import replace
 from datetime import datetime
 from typing import Protocol
 
 from argus.domain.ingestion.connections import (
+    DEFAULT_LEASE,
     LIVE,
     ConnectionNotFound,
     InMemoryConnectionRepository,
@@ -63,8 +65,8 @@ class DocumentStore(Protocol):
         holder: str,
         now: datetime,
     ) -> bool:
-        """Record that ``attempt_id`` may now reach the provider, only while
-        ``holder`` holds the live lease and the attempt is still current."""
+        """Record that ``attempt_id`` may now reach the provider and renew the
+        lease, only while ``holder`` holds it and the attempt is current."""
         ...
 
     def advance(
@@ -76,9 +78,13 @@ class DocumentStore(Protocol):
         expected_attempt_id: str | None,
         job: PreparationJob,
         draft: DocumentDraft | None = None,
+        unmarked: bool = False,
     ) -> bool:
-        """Replace the job (and draft) only while no lease is live, the current
-        attempt is ``expected_attempt_id`` and the draft version is unchanged."""
+        """Replace the job (and draft) only while no lease is live and the current
+        attempt is ``expected_attempt_id``. With a draft, its version moves by
+        one; installing a new attempt without one requires the draft to still be
+        the version that attempt is for. ``unmarked`` also requires the current
+        attempt never to have marked a provider call."""
         ...
 
 
@@ -260,6 +266,7 @@ class InMemoryDocumentStore:
         expected_attempt_id: str | None,
         job: PreparationJob,
         draft: DocumentDraft | None = None,
+        unmarked: bool = False,
     ) -> bool:
         key = (user_id, connection_id)
         with self.connections._lock, self._lock:
@@ -268,17 +275,19 @@ class InMemoryDocumentStore:
             lease = self.connections.get(
                 user_id=user_id, connection_id=connection_id
             ).lease_until
-            current = self._jobs.get(key)
-            current_id = (
-                PreparationJob.model_validate_json(current).attempt_id
-                if current is not None
-                else None
-            )
+            raw = self._jobs.get(key)
+            current = PreparationJob.model_validate_json(raw) if raw else None
             previous = DocumentDraft.model_validate_json(self._drafts[key])
             if (
                 (lease is not None and lease > now)
-                or current_id != expected_attempt_id
+                or (current.attempt_id if current else None) != expected_attempt_id
+                or (unmarked and current and current.provider_call_started_at)
                 or (draft is not None and draft.version != previous.version + 1)
+                or (
+                    draft is None
+                    and job.attempt_id != expected_attempt_id
+                    and previous.version != job.draft_version
+                )
             ):
                 return False
             if draft is not None:
@@ -305,6 +314,10 @@ class InMemoryDocumentStore:
                 or job.attempt_id != attempt_id
             ):
                 return False
+            row = self.connections._rows[connection_id]
+            self.connections._rows[connection_id] = replace(
+                row, lease_until=now + DEFAULT_LEASE
+            )
             self._jobs[key] = job.model_copy(
                 update={"provider_call_started_at": now}
             ).model_dump_json()
