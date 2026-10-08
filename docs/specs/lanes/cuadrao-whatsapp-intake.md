@@ -121,8 +121,9 @@ The founder chose separate Personal and Business spaces on October 8
 ([slice plan, PR #910](https://github.com/lagarcess/argus/pull/910)).
 
 - Intake is on only while the Business pilot is on. Linking needs the person's
-  Business space: the link routes answer 404 `business_space_missing` until the
-  person starts it. The sender link stores `destination_space_id`, filled from
+  Business space: link codes and link status answer 404 `business_space_missing`
+  until the person starts it. Unlinking (`DELETE /api/v1/whatsapp/link`) is never
+  gated, so a person can end their link with the pilot or intake off. The sender link stores `destination_space_id`, filled from
   `public.business_space_of` when the link is created.
 - A capture resolves the owner's space with `resolve_business_scope` and saves
   the document in that space. If the link ends before the capture settles, the
