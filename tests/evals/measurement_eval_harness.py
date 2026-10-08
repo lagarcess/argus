@@ -62,6 +62,7 @@ LOCKED_EVAL_CATEGORIES = {
     "dca_capital_semantics",
     "ordinary_conversation",
 }
+BUSINESS_EVAL_CATEGORIES = {"business_chat_surface"}
 
 
 @dataclass(frozen=True)
@@ -153,7 +154,7 @@ def load_eval_cases(path: Path = FIXTURE_DIR) -> list[EvalCase]:
     cases: list[EvalCase] = []
     for fixture_path, payload in measurement_fixture_documents(path):
         category = str(payload["category"])
-        if category not in LOCKED_EVAL_CATEGORIES:
+        if category not in LOCKED_EVAL_CATEGORIES | BUSINESS_EVAL_CATEGORIES:
             raise ValueError(f"unknown eval category: {category}")
         if fixture_path.stem != category:
             raise ValueError(f"fixture filename must match category: {fixture_path}")
