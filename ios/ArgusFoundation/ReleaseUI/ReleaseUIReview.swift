@@ -42,7 +42,7 @@ struct ReleaseUIReview: View {
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .bottom) {
                 if path.isEmpty {
-                    CuadraoNavigationBar(selection: $tab, compact: false, spanish: spanish, avatar: avatar, profileName: "Alex")
+                    CuadraoNavigationBar(selection: $tab, compact: false, spanish: spanish, avatar: avatar, profileName: "Alex", add: {})
                         .padding(.horizontal, 20).padding(.bottom, 8)
                 }
             }
