@@ -11,6 +11,7 @@ from argus.domain.ingestion.whatsapp.store_postgres import PostgresWhatsAppStore
 from psycopg_pool import ConnectionPool
 
 from tests import test_financial_accounts_postgres as shared
+from tests.document_sources_support import source_objects
 from tests.ingestion import whatsapp_cases as cases
 from tests.ingestion.whatsapp_support import RefusingExtractor
 
@@ -30,7 +31,9 @@ def _world(pool: ConnectionPool, users: dict[str, str]) -> cases.World:
     clock = cases.Clock()
     connections = PostgresConnectionRepository(pool)
     hub = IngestionHub(connections, box=None, sink=None, clock=clock)
-    documents = DocumentsService(hub, PostgresDocumentStore(pool), RefusingExtractor())
+    documents = DocumentsService(
+        hub, PostgresDocumentStore(pool, source_objects()), RefusingExtractor()
+    )
     return cases.build_world(
         documents=documents,
         store=PostgresWhatsAppStore(pool),
