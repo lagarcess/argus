@@ -441,8 +441,9 @@ def _currency_pair_checks_present(rows: Sequence[Sequence[object]]) -> bool:
 # effect. The probe refuses an accidental repeat before the run and verifies the effect after it.
 _EFFECT_PROBES = {
     "20260505000001": (
-        "select conname, pg_get_constraintdef(oid) from pg_constraint"
-        " where conname in ('strategies_asset_class_check', 'backtest_runs_asset_class_check')"
+        "select conname, pg_catalog.pg_get_constraintdef(oid) from pg_catalog.pg_constraint"
+        " where conrelid in ('public.strategies'::regclass, 'public.backtest_runs'::regclass)"
+        " and conname in ('strategies_asset_class_check', 'backtest_runs_asset_class_check')"
         " order by conname",
         _currency_pair_checks_present,
     ),
@@ -570,6 +571,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not url:
         raise ApplyError(f"{args.database_url_env} is not set")
     lock_timeout = check_lock_timeout(args.lock_timeout)
+    for version in args.unrecorded:
+        if version not in _EFFECT_PROBES:
+            raise ApplyError(
+                f"unrecorded version {version} has no effect probe, so a repeat could not be detected"
+            )
     approved = json.loads(Path(args.approved_file).read_text())
     if not isinstance(approved, list) or not all(
         isinstance(value, str) for value in approved

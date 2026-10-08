@@ -831,3 +831,27 @@ def test_an_unrecorded_version_without_a_probe_is_refused() -> None:
 def test_recorded_steps_need_no_probe() -> None:
     steps = applier.plan_steps(CANDIDATES, APPLIED, ["20260925120000"])
     applier.check_unrecorded_effects(_EffectConnection(NEW), steps)
+
+
+def test_an_unrecorded_version_without_a_probe_is_refused_before_connecting(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    approved = tmp_path / "approved.json"
+    approved.write_text("[]")
+    monkeypatch.setenv(
+        "ARGUS_APPLY_DATABASE_URL", "postgresql://u:p@127.0.0.1:5432/rehearsal"
+    )
+    monkeypatch.setattr("psycopg.connect", lambda *_a, **_k: pytest.fail("connected"))
+    with pytest.raises(applier.ApplyError, match="no effect probe"):
+        applier.main(
+            ["--candidate-sha", "x" * 40, "--approved-file", str(approved), "--unrecorded", "20260101000001",
+             "--allow-host", "127.0.0.1", "--allow-database", "rehearsal"]
+        )  # fmt: skip
+
+
+def test_the_probe_is_scoped_to_the_two_tables() -> None:
+    query, _ = applier._EFFECT_PROBES["20260505000001"]
+    assert (
+        "public.strategies'::regclass" in query
+        and "public.backtest_runs'::regclass" in query
+    )
