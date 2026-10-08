@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hmac
-from datetime import datetime
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query, Request, Response
@@ -12,11 +12,14 @@ from fastapi.responses import PlainTextResponse
 from loguru import logger
 from pydantic import BaseModel, ConfigDict
 
-from argus.api.dependencies import problem
+from argus.api import state as api_state
+from argus.api.dependencies import current_user, problem
 from argus.api.rate_limits import SlidingWindowLimiter
+from argus.api.schemas import User
 from argus.api.whatsapp import (
     WhatsAppOwnerContext,
     WhatsAppRuntime,
+    link_store,
     require_whatsapp_owner,
     require_whatsapp_surface,
 )
@@ -207,12 +210,25 @@ async def get_whatsapp_link(
 
 @link_router.delete("/link", status_code=204)
 async def revoke_whatsapp_link(
-    context: WhatsAppOwnerContext = Depends(require_whatsapp_owner),  # noqa: B008
+    request: Request,
+    user: User = Depends(current_user),  # noqa: B008
 ) -> Response:
-    intake = context.runtime.intake
-    await run_in_threadpool(
-        intake.store.revoke,
-        destination_owner_id=context.destination_owner_id,
-        now=intake.clock(),
-    )
+    """Never gated: a person can always end their own sender link and its
+    unused codes, whatever the Business and intake flags say."""
+
+    store = link_store()
+    if store is not None:
+        await run_in_threadpool(
+            store.revoke,
+            destination_owner_id=user.id,
+            now=datetime.now(timezone.utc),
+        )
+    elif api_state.PERSISTENCE_MODE == "supabase":
+        raise problem(
+            request,
+            status_code=503,
+            code="whatsapp_link_unavailable",
+            title="Service Unavailable",
+            detail="The WhatsApp link could not be reached. Retry.",
+        )
     return Response(status_code=204)

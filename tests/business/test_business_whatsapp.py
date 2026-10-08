@@ -82,11 +82,11 @@ def test_linking_waits_for_the_space(wa_biz) -> None:  # noqa: ANN001
     calls = [
         client.post("/api/v1/whatsapp/link-codes", headers=alice.auth),
         client.get("/api/v1/whatsapp/link", headers=alice.auth),
-        client.delete("/api/v1/whatsapp/link", headers=alice.auth),
     ]
     assert [(r.status_code, r.json()["code"]) for r in calls] == [
         (404, "business_space_missing")
-    ] * 3
+    ] * 2
+    assert client.delete("/api/v1/whatsapp/link", headers=alice.auth).status_code == 204
 
 
 def test_whatsapp_is_off_while_business_is_off(wa_biz, monkeypatch) -> None:  # noqa: ANN001

@@ -9110,6 +9110,9 @@ paths:
       tags:
       - financial-accounts
       - whatsapp
+      description: 'Never gated: a person can always end their own sender link and its
+
+        unused codes, whatever the Business and intake flags say.'
       responses:
         '204':
           description: Successful Response

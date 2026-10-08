@@ -102,10 +102,39 @@ def test_flag_off_answers_404_everywhere(client: TestClient) -> None:
         client.post(WEBHOOK, content=raw, headers={"X-Hub-Signature-256": sign(raw)}),
         client.post(CODES, headers=bearer(ALICE)),
         client.get(LINK, headers=bearer(ALICE)),
-        client.delete(LINK, headers=bearer(ALICE)),
     ]
-    assert [r.status_code for r in responses] == [404] * 5
+    assert [r.status_code for r in responses] == [404] * 4
     assert {r.json()["code"] for r in responses} == {"whatsapp_unavailable"}
+    # Unlinking is never gated; with intake off nothing here holds a link.
+    assert client.delete(LINK, headers=bearer(ALICE)).status_code == 204
+
+
+@pytest.mark.parametrize(
+    "flag", ["ARGUS_BUSINESS_PILOT_ENABLED", "ARGUS_WHATSAPP_INTAKE_ENABLED"]
+)
+def test_unlink_ends_the_link_and_unused_codes_while_off(
+    wa_client: TestClient, monkeypatch, flag: str
+) -> None:
+    link_alice(wa_client)
+    unused = wa_client.post(CODES, headers=bearer(ALICE)).json()["message_text"]
+    monkeypatch.setenv(flag, "false")
+    raw = encode(fixture("image_message.json"))
+    gated = [
+        wa_client.post(CODES, headers=bearer(ALICE)),
+        wa_client.get(LINK, headers=bearer(ALICE)),
+        wa_client.post(WEBHOOK, content=raw, headers={"X-Hub-Signature-256": sign(raw)}),
+    ]
+    assert [(r.status_code, r.json()["code"]) for r in gated] == [
+        (404, "whatsapp_unavailable")
+    ] * 3
+
+    assert wa_client.delete(LINK, headers=bearer(ALICE)).status_code == 204
+    assert wa_client.delete(LINK).status_code == 401
+
+    monkeypatch.setenv(flag, "true")
+    assert wa_client.get(LINK, headers=bearer(ALICE)).json()["linked"] is False
+    post(wa_client, fixture("text_link_code.json", id="wamid.LATE", text=unused))
+    assert wa_client.get(LINK, headers=bearer(ALICE)).json()["linked"] is False
 
 
 def test_verify_challenge(wa_client: TestClient) -> None:

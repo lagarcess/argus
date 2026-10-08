@@ -8756,8 +8756,8 @@ uncertain fields, and more than 18 digits leaves the amount unresolved.
 ### WhatsApp receipt intake (default-off)
 
 Off unless `ARGUS_WHATSAPP_INTAKE_ENABLED` is true, its credentials are set and
-the document surface above is on. While off, every route below answers 404
-`whatsapp_unavailable`. A WhatsApp receipt becomes a document draft with
+the document surface above is on. While off, every route below except
+`DELETE /api/v1/whatsapp/link` answers 404 `whatsapp_unavailable`. A WhatsApp receipt becomes a document draft with
 `consent: false` and `status: saved`; AI preparation still waits for the
 owner's consent on the web. Spec and activation:
 [cuadrao-whatsapp-intake](specs/lanes/cuadrao-whatsapp-intake.md).
@@ -8773,8 +8773,8 @@ contacts or profiles.
 
 Intake is on only while the Business pilot (below) is on too. A receipt lands
 in the owner's Business space, read through `resolve_business_scope`; it never
-appears in Personal documents or imports. The link routes answer 404
-`business_space_missing` until the person starts their space. A capture whose
+appears in Personal documents or imports. Link codes and link status answer
+404 `business_space_missing` until the person starts their space. A capture whose
 sender link ended before it settled is recorded `rejected` with
 `sender_link_revoked`, keeps no connection, and gets the not-linked reply.
 
@@ -8803,8 +8803,13 @@ sender link ended before it settled is recorded `rejected` with
   `ARGUS_WHATSAPP_DISPLAY_PHONE_NUMBER` is set. Five codes per 10 minutes, then
   429 `whatsapp_link_code_rate_limited`.
 - GET `/api/v1/whatsapp/link` returns `{linked, last4, linked_at, reply_language}`.
-- DELETE `/api/v1/whatsapp/link` revokes the active link and every unused code
-  for the destination, and answers 204, also when nothing was linked.
+- DELETE `/api/v1/whatsapp/link` revokes the signed-in person's active link and
+  every unused code, and answers 204, also when nothing was linked. It is never
+  gated: it works with the Business pilot, intake or the document surface off,
+  and before a space exists, so a person can always unlink. With intake off it
+  writes the WhatsApp tables directly. It answers 503 `whatsapp_link_unavailable`
+  only when Postgres cannot be reached; in memory mode without intake nothing
+  holds a link and it answers 204. Unauthenticated calls answer 401.
 
 Replies are sent only when `ARGUS_WHATSAPP_OUTBOUND_ENABLED` is true, always as
 a free-form answer to the person's own message, in one language: the sender

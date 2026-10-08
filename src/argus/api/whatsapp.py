@@ -3,7 +3,7 @@
 Default-off behind ``ARGUS_WHATSAPP_INTAKE_ENABLED`` and nested inside the
 document surface and the Business pilot: a WhatsApp receipt is a saved document
 draft in the owner's Business space, so intake cannot be on while either is
-off. Every route answers 404 when off.
+off. Every route but unlinking answers 404 when off.
 """
 
 from __future__ import annotations
@@ -47,6 +47,7 @@ from argus.domain.ingestion.whatsapp.replies import CloudApiTransport
 from argus.domain.ingestion.whatsapp.store import (
     SENDER_LINK_REVOKED,
     InMemoryWhatsAppStore,
+    WhatsAppStore,
 )
 
 WEBHOOK_PATH = "/api/v1/webhooks/whatsapp"
@@ -239,6 +240,25 @@ def require_whatsapp_surface(request: Request) -> WhatsAppRuntime:
     ):
         raise unavailable_problem(request)
     return runtime
+
+
+def link_store() -> WhatsAppStore | None:
+    """Where a person's sender link lives, whatever the flags say.
+
+    The running intake's store when intake is up. Otherwise the durable tables
+    through deletion's own small pool, since unlinking removes data like
+    deletion does. None in memory mode without intake: nothing here holds a
+    link. None as well when Postgres cannot be reached."""
+
+    runtime = whatsapp_runtime()
+    if runtime is not None:
+        return runtime.intake.store
+    if api_state.PERSISTENCE_MODE != "supabase" or not api_state.DATABASE_URL:
+        return None
+    from argus.api.account_deletion_runtime import deletion_pool
+    from argus.domain.ingestion.whatsapp.store_postgres import PostgresWhatsAppStore
+
+    return PostgresWhatsAppStore(deletion_pool(api_state.DATABASE_URL))
 
 
 @dataclass(frozen=True)
