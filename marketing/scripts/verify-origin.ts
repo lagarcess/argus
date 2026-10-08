@@ -1,5 +1,5 @@
 // Read-only acceptance check for a running marketing origin: a Render address,
-// the public apex or a local build. It only issues GET and HEAD requests, so it
+// the public apex or a local build. It only issues GET requests, so it
 // never sends a message, stores a signup or changes anything.
 //
 //   bun run scripts/verify-origin.ts https://cuadrao-marketing.onrender.com
@@ -78,12 +78,13 @@ async function main(): Promise<void> {
   for (const redirect of nextRedirects()) {
     const response = await get(redirect.source);
     const location = response.headers.get("location") ?? "";
-    const pathname = new URL(location, origin).pathname;
-    record(`redirect ${redirect.source}`, response.status === 308 && pathname === redirect.destination, `got ${response.status} to ${location}`);
+    const target = new URL(location, origin);
+    record(`redirect ${redirect.source}`, response.status === 308 && target.origin === origin && target.pathname === redirect.destination, `got ${response.status} to ${location}`);
   }
   for (const [from, to] of [["/EN", "/en"], ["/en/Personal", "/en/personal"]]) {
     const response = await get(from);
-    record(`case redirect ${from}`, response.status === 308 && new URL(response.headers.get("location") ?? "", origin).pathname === to, `got ${response.status}`);
+    const target = new URL(response.headers.get("location") ?? "", origin);
+    record(`case redirect ${from}`, response.status === 308 && target.origin === origin && target.pathname === to, `got ${response.status}`);
   }
   record("unknown path is 404", (await get("/no-such-page")).status === 404);
 

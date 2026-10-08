@@ -145,16 +145,21 @@ export function planNotice(pending: ActiveSignup[], only: string[] | null): Noti
 
 export type NoticeResult = {
   sent: number;
-  // Sent nothing: the provider answered with a refusal, and the claim was released.
+  // Sent nothing: the provider answered with a plain refusal. The claim was released
+  // unless the row is also in releaseFailed.
   failed: number;
   // Not eligible any more when its turn came (removed or already notified).
   skipped: number;
   // The send's outcome is unknown after a retry. The row stays claimed so no rerun
   // can mail it again; the operator checks the provider by this digest.
   unknownOutcome: string[];
+  // The provider refused (nothing was sent) but the claim could not be released: the
+  // row stays claimed and unsent, so a rerun skips it until the operator clears it.
+  releaseFailed: string[];
   // A claim got no usable answer. That row may be claimed but unsent; the run stopped.
   claimUncertain: string[];
-  // The run stopped before sending anything further.
+  // The run stopped before sending anything further: a claim got no usable answer, or
+  // a send's outcome was unknown (a provider outage would otherwise claim every row).
   stoppedEarly: boolean;
 };
 
@@ -171,7 +176,15 @@ export async function sendNotice(
   doFetch: typeof fetch,
   now: () => Date = () => new Date(),
 ): Promise<NoticeResult> {
-  const result: NoticeResult = { sent: 0, failed: 0, skipped: 0, unknownOutcome: [], claimUncertain: [], stoppedEarly: false };
+  const result: NoticeResult = {
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    unknownOutcome: [],
+    releaseFailed: [],
+    claimUncertain: [],
+    stoppedEarly: false,
+  };
 
   const patch = async (query: string, body: Record<string, unknown>, returning: boolean) =>
     checked(
@@ -250,11 +263,15 @@ export async function sendNotice(
           await patch(`${active}&notified_at=eq.${encodeURIComponent(claimedAt)}`, { notified_at: null }, false);
         } catch {
           // Could not release: the row stays claimed, which is the safe direction.
-          result.unknownOutcome.push(row.email_digest);
+          result.releaseFailed.push(row.email_digest);
         }
       }
     } else {
+      // Unknown outcome. Stop, so one bad stretch with the provider cannot claim every
+      // remaining row and leave each of them to be checked by hand.
       result.unknownOutcome.push(row.email_digest);
+      result.stoppedEarly = true;
+      break;
     }
   }
   return result;

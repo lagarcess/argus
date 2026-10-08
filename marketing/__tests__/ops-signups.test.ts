@@ -93,6 +93,8 @@ function backend(options: {
   claimStatus?: number;
   // The database saves the claim, then the answer is lost.
   claimAnswerLost?: boolean;
+  // The database refuses to release a claim (the update that sets notified_at back to null).
+  releaseStatus?: number;
   mail?: (attempt: number, key: string) => Response | "throw";
 }) {
   const rows = options.rows;
@@ -102,6 +104,9 @@ function backend(options: {
   const responder = (call: { url: string; init: RequestInit }): Response => {
     if (call.init.method === "PATCH") {
       events.push("patch");
+      if (options.releaseStatus && JSON.parse(String(call.init.body)).notified_at === null) {
+        return new Response("", { status: options.releaseStatus });
+      }
       if (options.claimStatus && JSON.parse(String(call.init.body)).notified_at !== null) {
         return new Response("", { status: options.claimStatus });
       }
@@ -148,7 +153,7 @@ describe("notice sending", () => {
   test("claims a row, then sends it in its language under a per-recipient key", async () => {
     const { doFetch, calls, events, rows } = backend({ rows: fresh(a) });
     const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
-    expect(result).toEqual({ sent: 1, failed: 0, skipped: 0, unknownOutcome: [], claimUncertain: [], stoppedEarly: false });
+    expect(result).toEqual({ sent: 1, failed: 0, skipped: 0, unknownOutcome: [], releaseFailed: [], claimUncertain: [], stoppedEarly: false });
     expect(events).toEqual(["patch", "mail"]);
     const email = JSON.parse(String(calls[1].init.body));
     expect(email.to).toEqual(["a@example.invalid"]);
@@ -176,7 +181,15 @@ describe("notice sending", () => {
   test("a database that refuses the claim stops the run before anything is sent, naming that row", async () => {
     const { doFetch, mailCalls } = backend({ rows: fresh(a, b, c), claimStatus: 503 });
     const result = await sendNotice(ops, template, planNotice([a, b, c], null), doFetch, NOW);
-    expect(result).toEqual({ sent: 0, failed: 0, skipped: 0, unknownOutcome: [], claimUncertain: [a.email_digest], stoppedEarly: true });
+    expect(result).toEqual({
+      sent: 0,
+      failed: 0,
+      skipped: 0,
+      unknownOutcome: [],
+      releaseFailed: [],
+      claimUncertain: [a.email_digest],
+      stoppedEarly: true,
+    });
     expect(mailCalls()).toBe(0);
   });
 
@@ -196,6 +209,22 @@ describe("notice sending", () => {
     const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
     expect(result).toMatchObject({ sent: 0, failed: 1, unknownOutcome: [] });
     expect(rows[a.email_digest].notifiedAt).toBeNull();
+  });
+
+  test("a refusal whose claim cannot be released stays claimed and is named as refused, not unknown", async () => {
+    const { doFetch, rows } = backend({ rows: fresh(a), releaseStatus: 500, mail: () => new Response("", { status: 422 }) });
+    const result = await sendNotice(ops, template, planNotice([a], null), doFetch, NOW);
+    expect(result).toMatchObject({ sent: 0, failed: 1, unknownOutcome: [], releaseFailed: [a.email_digest], stoppedEarly: false });
+    expect(rows[a.email_digest].notifiedAt).not.toBeNull();
+  });
+
+  test("the first send with no usable answer stops the run, so an outage cannot claim every row", async () => {
+    const { doFetch, rows, mailCalls } = backend({ rows: fresh(a, b, c), mail: () => new Response("", { status: 503 }) });
+    const result = await sendNotice(ops, template, planNotice([a, b, c], null), doFetch, NOW);
+    expect(result).toMatchObject({ sent: 0, unknownOutcome: [a.email_digest], stoppedEarly: true });
+    expect(mailCalls()).toBe(1);
+    expect(rows[b.email_digest].notifiedAt).toBeNull();
+    expect(rows[c.email_digest].notifiedAt).toBeNull();
   });
 
   test.each([409, 500, 503])("a %d may have been processed, so the row stays claimed and is named", async (status) => {

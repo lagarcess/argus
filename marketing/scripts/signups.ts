@@ -79,12 +79,24 @@ if (command === "summary") {
     }
     if (result.claimUncertain.length > 0) {
       console.error(
-        "A claim got no usable answer, so each of these rows is either claimed (notified_at set, never mailed) or not claimed (notified_at empty). Check notified_at for each digest. If it is empty, the claim did not save: do NOT send by hand, a rerun will send it. If it is set, the row is claimed and unsent: send it by hand, a rerun will skip it:\n" +
+        "A claim got no usable answer, so each of these rows is either claimed (notified_at set, never mailed) or not claimed (notified_at empty). Check notified_at for each digest. If it is empty, the claim did not save: do NOT send by hand, a rerun will send it. If it is set, the row is claimed and may be unsent: check Resend by the idempotency key (notice-<template id>-<digest>) first, because a second notice run may already have mailed it, then send it by hand if it was not; a rerun will skip it. Run only one notice at a time:\n" +
           result.claimUncertain.join("\n"),
       );
     }
-    if (result.stoppedEarly) console.error("Stopped: the database did not confirm a claim, so nothing further was sent. Fix the database and rerun; claimed rows are not repeated.");
-    if (result.failed > 0 || result.unknownOutcome.length > 0 || result.claimUncertain.length > 0 || result.stoppedEarly) process.exit(1);
+    if (result.releaseFailed.length > 0) {
+      console.error(
+        "The provider refused these rows (nothing was sent) but the claim could not be released, so they stay claimed and a rerun will skip them. Set notified_at to empty for each digest to try again, or send by hand:\n" +
+          result.releaseFailed.join("\n"),
+      );
+    }
+    if (result.stoppedEarly) {
+      console.error(
+        result.claimUncertain.length > 0
+          ? "Stopped: the database did not confirm a claim, so nothing further was sent. Fix the database and rerun; claimed rows are not repeated."
+          : "Stopped: a send had no usable answer, so nothing further was sent. Check the row named above, fix the cause and rerun; claimed rows are not repeated.",
+      );
+    }
+    if (result.failed > 0 || result.unknownOutcome.length > 0 || result.releaseFailed.length > 0 || result.claimUncertain.length > 0 || result.stoppedEarly) process.exit(1);
   }
 } else {
   fail("Commands: summary | remove <email> | notice --template <file> [--only a,b] [--send] [--expect N]");
