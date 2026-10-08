@@ -171,6 +171,7 @@ def test_scorecard_excludes_outages_from_quality_denominator(
     scorecard = scorecards.scorecard_for_results(
         results,
         provenance=_valid_scorecard_provenance(*(r["id"] for r in results)),
+        budget={"budget_usd": "5.000000", "spent_usd": "0.000000", "complete": True},
     )
     bucket = scorecard["category_pass_rates"]["capability_honesty"]
     assert bucket["infrastructure_error"] == 1
