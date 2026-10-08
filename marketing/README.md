@@ -27,6 +27,7 @@ Provider settings are optional locally. Without them each form shows its unavail
 | `lib/ops/`, `scripts/signups.ts` | Operator removal and availability notice |
 | `components/` | Pages, copy and styles moved from `web/components/business` |
 | `app/icon.svg`, `scripts/make-icons.mjs` | Cuadrao mark ("Lean, calm") and the PNG/ICO files rendered from it |
+| `brand/cuadrao-mark-light.svg` | The same mark without its tile, in the light-surface colours, for light backgrounds. A test keeps its shapes identical to `app/icon.svg` |
 
 Spanish is unprefixed (`/`, `/personal`, `/contacto`, `/privacidad`); English is under `/en`. The App Router tree is `/[locale]/[[...slug]]`; a rewrite serves Spanish from the unprefixed path and the internal `/es` tree redirects to it.
 
