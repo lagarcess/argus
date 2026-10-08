@@ -260,3 +260,37 @@ async def test_marked_attempt_that_saved_its_batch_is_replayed_without_a_call(ri
     assert service.get(user_id="owner", connection_id=connection).status == (
         "review_ready"
     )
+
+
+@pytest.mark.asyncio
+async def test_foreign_claim_of_a_recovered_attempt_waits_for_the_owner(rig):
+    service, jobs, clock, extractor, dispatched = rig
+    connection = await queued(service)
+    original, holds = service.store.source, [1]
+
+    def source(**kwargs: Any) -> bytes | None:
+        if holds:
+            holds.pop()
+            raise WorkerKilled()
+        return original(**kwargs)
+
+    service.store.source = source  # type: ignore[method-assign]
+    jobs.start(user_id="owner", connection_id=connection)
+    [first] = dispatched
+    with pytest.raises(WorkerKilled):
+        await run_attempt(service, connection, first)
+    assert service.store.job(user_id="owner", connection_id=connection).claimed
+
+    assert jobs.sweep().redispatched == [connection]
+    second = service.store.job(user_id="owner", connection_id=connection)
+    assert (second.attempt, second.claimed) == (2, False)
+    die_while_preparing(service, connection)
+
+    clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
+    report = jobs.sweep()
+
+    draft = service.get(user_id="owner", connection_id=connection)
+    assert report.outcome_unknown == [connection]
+    assert draft.error_code == OUTCOME_UNKNOWN
+    assert len(dispatched) == 2
+    assert extractor.calls == 0

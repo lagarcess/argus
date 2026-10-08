@@ -103,8 +103,8 @@ An expired attempt is never billed again automatically. The sweep decides:
 - Any other dead `preparing` draft (a marker, no job, or a claim that does not
   name the current attempt, such as a flag-off writer killed mid-call):
   `needs_attention` with `document_preparation_outcome_unknown`.
-- A re-dispatch is refused if a marker or a newer draft version lands after
-  the sweep read the attempt.
+- After the sweep reads an attempt, a newer draft version refuses any re-dispatch;
+  a marker refuses one except a saved-result replay (`unmarked=False`).
 - A failure reported after the marker keeps its code and is not retried.
 
 Automatic work never makes a second provider call for one explicit
