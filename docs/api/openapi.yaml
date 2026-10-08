@@ -1009,6 +1009,89 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/business/space:
+    get:
+      tags:
+      - financial-accounts
+      - business
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessSpaceInfo'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+      - financial-accounts
+      - business
+      description: 'Idempotent: an existing space is returned unchanged, with 200.'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartBusinessSpace'
+        required: true
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessSpaceInfo'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    patch:
+      tags:
+      - financial-accounts
+      - business
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameBusinessSpace'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessSpaceInfo'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          $ref: '#/components/responses/AuthSessionVerificationUnavailable'
+        '500':
+          description: An unexpected server error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/business/updates:
     get:
       tags:
@@ -10744,6 +10827,17 @@ components:
       - needs_attention
       - last_received_at
       - last_confirmed_at
+    BusinessSpaceInfo:
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+      additionalProperties: false
+      type: object
+      required:
+      - id
+      - name
     BusinessUpdate:
       properties:
         id:
@@ -19024,6 +19118,16 @@ components:
       - admitted
       - outcome
       - kind
+    RenameBusinessSpace:
+      properties:
+        name:
+          type: string
+          maxLength: 80
+          minLength: 1
+      additionalProperties: false
+      type: object
+      required:
+      - name
     ReplaceAccountGrantsRequest:
       properties:
         expected_version:
@@ -20300,6 +20404,24 @@ components:
       - accounts
       - activities
       - positions
+    StartBusinessSpace:
+      properties:
+        name:
+          anyOf:
+          - type: string
+            maxLength: 80
+            minLength: 1
+          - type: 'null'
+        language:
+          anyOf:
+          - type: string
+            enum:
+            - en
+            - es-419
+          - type: 'null'
+      additionalProperties: false
+      type: object
+      description: No name starts the space with the default name in ``language``.
     StarterPromptsResponse:
       properties:
         prompts:

@@ -8,6 +8,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
+from argus.api.schemas import Language
 from argus.domain.business.spaces import MAX_NAME_LENGTH
 from argus.domain.ingestion.receipt_review import ReceiptStatus
 
@@ -33,7 +34,7 @@ class StartBusinessSpace(_Wire):
     """No name starts the space with the default name in ``language``."""
 
     name: SpaceName | None = None
-    language: Literal["es-419", "en"] | None = None
+    language: Language | None = None
 
 
 class RenameBusinessSpace(_Wire):
