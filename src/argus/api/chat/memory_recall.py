@@ -21,6 +21,7 @@ from argus.api.personalization_memory import (
     personalization_memory_exposed,
 )
 from argus.api.schemas import User
+from argus.domain.chat_surface import record_surface_gate
 from argus.domain.owner_scope import PERSONAL
 from argus.memory.contracts import MemoryUsePurpose
 from argus.memory.subject import (
@@ -61,6 +62,8 @@ def memory_recalls_for_turn(
             user_id=account.user_id, conversation_id=conversation_id
         )
         if scope != PERSONAL:
+            if scope is not None:
+                record_surface_gate("memory_recall", surface="business")
             return None
         retrieved = service.retrieve(
             subject,

@@ -15,7 +15,8 @@ from typing import TypeVar
 from fastapi import APIRouter, Depends, Request, Response
 
 from argus.api.conversation_surface import (
-    evidence_source_conversation_id,
+    SourceArtifactTable,
+    artifact_source_conversation_id,
     is_business_conversation,
     message_conversation_id,
 )
@@ -53,6 +54,7 @@ from argus.api.personalization_memory_schemas import (
     RetrievedMemoryOut,
 )
 from argus.api.schemas import User
+from argus.domain.chat_surface import record_surface_gate
 from argus.memory.contracts import (
     MemoryCandidateDraft,
     MemoryEdit,
@@ -96,27 +98,39 @@ def _restricted_content_problem(request: Request):
 ResultT = TypeVar("ResultT")
 
 
+_ARTIFACT_SOURCES: dict[MemorySourceKind, SourceArtifactTable] = {
+    MemorySourceKind.EVIDENCE_ARTIFACT: "evidence_artifacts",
+    MemorySourceKind.DECISION_NOTE: "decision_notes",
+    MemorySourceKind.IDEA: "ideas",
+    MemorySourceKind.IDEA_VERSION: "idea_versions",
+}
+
+
+def _source_conversation_id(*, user_id: str, ref: MemoryProvenance) -> str | None:
+    if ref.source_kind is MemorySourceKind.CONVERSATION:
+        return ref.source_id
+    if ref.source_kind is MemorySourceKind.MESSAGE:
+        return message_conversation_id(user_id=user_id, message_id=ref.source_id)
+    return artifact_source_conversation_id(
+        table=_ARTIFACT_SOURCES[ref.source_kind],
+        user_id=user_id,
+        artifact_id=ref.source_id,
+    )
+
+
 def _provenance_names_business_conversation(
     *, user_id: str, provenance: Iterable[MemoryProvenance]
 ) -> bool:
     """Whether a memory source is a Business conversation, one of its messages, or
-    evidence it produced. Memory stays Personal."""
+    an artifact it produced. Memory stays Personal."""
 
-    for ref in provenance:
-        conversation_id: str | None = None
-        if ref.source_kind is MemorySourceKind.CONVERSATION:
-            conversation_id = ref.source_id
-        elif ref.source_kind is MemorySourceKind.MESSAGE:
-            conversation_id = message_conversation_id(
-                user_id=user_id, message_id=ref.source_id
-            )
-        elif ref.source_kind is MemorySourceKind.EVIDENCE_ARTIFACT:
-            conversation_id = evidence_source_conversation_id(
-                user_id=user_id, artifact_id=ref.source_id
-            )
-        if is_business_conversation(user_id=user_id, conversation_id=conversation_id):
-            return True
-    return False
+    return any(
+        is_business_conversation(
+            user_id=user_id,
+            conversation_id=_source_conversation_id(user_id=user_id, ref=ref),
+        )
+        for ref in provenance
+    )
 
 
 def _refuse_business_provenance(
@@ -126,6 +140,7 @@ def _refuse_business_provenance(
     if _provenance_names_business_conversation(
         user_id=ctx.subject.owner_id, provenance=provenance
     ):
+        record_surface_gate("memory_source", surface="business")
         raise _invalid_memory_request(request)
 
 

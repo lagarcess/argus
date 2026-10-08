@@ -19,6 +19,7 @@ from argus.agent_runtime.stages.launch_validation_recovery import (  # noqa: F40
     _validate_launch_envelope,
     _with_unsupported_constraint,
 )
+from argus.agent_runtime.stages.tool_execution import surface_tool_refusal
 from argus.agent_runtime.state.models import RunState, StrategySummary
 from argus.agent_runtime.strategy_contract import (
     canonical_strategy_type,
@@ -32,6 +33,8 @@ from argus.domain.backtesting.confirmation_preflight import (
     materialize_confirmation_strategy,
     prepare_confirmation_launch,
 )
+from argus.domain.capability_registry import surface_declares
+from argus.domain.chat_surface import turn_surface
 from argus.domain.engine_launch.models import (
     LaunchBacktestRequest,
     launch_request_error_code,
@@ -55,6 +58,8 @@ def confirm_stage(
     language: str | None = None,
 ) -> StageResult:
     logger.debug("Confirm stage started")
+    if not surface_declares(turn_surface(), "backtest", gate="backtest_confirmation"):
+        return surface_tool_refusal(language)
     strategy = _strategy_payload(state.candidate_strategy_draft)
     strategy = _strategy_with_runtime_language(strategy, language=language)
     strategy = _strategy_with_explicit_date_intent(strategy)

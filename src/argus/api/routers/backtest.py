@@ -14,7 +14,7 @@ from argus.api.chat.backtest_jobs import (
 )
 from argus.api.chat.confirmation import public_confirmation_projection
 from argus.api.chat.research_jobs import RESEARCH_OPERATION_SCOPE
-from argus.api.conversation_surface import refuse_closed_chat
+from argus.api.conversation_surface import conversation_not_found, refuse_closed_chat
 from argus.api.dependencies import current_user, problem
 from argus.api.guest_access import account_context, client_identity
 from argus.api.memory_ownership import memory_object_visible
@@ -33,6 +33,7 @@ from argus.domain.backtest_finalization import (
     BacktestFinalizationError,
     stable_backtest_run_id,
 )
+from argus.domain.capability_registry import surface_declares
 from argus.domain.supabase_gateway import QuotaExceededError
 from argus.domain.usage_limits import (
     GUEST_SIMULATION_VISITOR_LIMITS,
@@ -93,6 +94,8 @@ def run_backtest(
                 detail="Conversation not found.",
             )
         refuse_closed_chat(request, conversation.surface)
+        if not surface_declares(conversation.surface, "backtest", gate="tool_call"):
+            raise conversation_not_found(request)
 
     data = payload.model_dump(exclude_none=True)
     if payload.strategy_id:

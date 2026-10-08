@@ -43,10 +43,15 @@ RecoveryMessageCode = Literal[
     "discovery_suggestions_unavailable",
     "research_lookup_failed",
     "research_lookup_unavailable",
+    "business_chat_tool_unavailable",
 ]
 
 
 RECOVERY_FALLBACK_MESSAGES: dict[RecoveryMessageCode, str] = {
+    "business_chat_tool_unavailable": (
+        "That isn't available in your business chat. You can do it from your "
+        "personal chat."
+    ),
     "interpreter_unavailable": (
         "I saved your message, but I could not reliably understand your question. "
         "Please retry in a moment."

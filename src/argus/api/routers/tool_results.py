@@ -10,7 +10,10 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, ValidationError
 
 from argus.api.chat.tool_results import tool_cards_from_metadata
-from argus.api.conversation_surface import require_open_business_chat
+from argus.api.conversation_surface import (
+    require_open_business_chat,
+    stored_conversation_surface,
+)
 from argus.api.dependencies import current_user, problem
 from argus.api.message_store import (
     latest_message,
@@ -19,6 +22,7 @@ from argus.api.message_store import (
     update_message_artifact,
 )
 from argus.api.schemas import Message, User
+from argus.domain.chat_surface import ChatSurface, record_surface_gate
 from argus.domain.computation_marker import computation_from_tool_cards
 from argus.domain.pending_artifacts import (
     DeadPendingArtifactError,
@@ -34,10 +38,10 @@ from argus.domain.tool_declaration import ToolCatalog
 router = APIRouter(prefix="/api/v1", tags=["tool-results"])
 
 
-def get_tool_catalog() -> ToolCatalog:
+def get_tool_catalog(surface: ChatSurface) -> ToolCatalog:
     from argus.domain.capability_registry import get_tool_catalog as catalog
 
-    return catalog()
+    return catalog(surface=surface)
 
 
 class ToolResultRecomputeRequest(BaseModel):
@@ -113,7 +117,11 @@ async def recompute_tool_result(
         )
     if card.input_revision != payload.input_revision:
         raise _changed(request)
-    declaration = get_tool_catalog().get(card.tool_name)
+    surface = stored_conversation_surface(user_id=user.id, conversation_id=conversation)
+    catalog = get_tool_catalog(surface)
+    declaration = catalog.get(card.tool_name)
+    if declaration is None and surface != "personal":
+        record_surface_gate("tool_call", surface=surface, tools=[card.tool_name])
     if declaration is None or (declaration.card.card_type, declaration.card.version) != (
         card.card_type,
         card.card_version,
@@ -150,7 +158,7 @@ async def recompute_tool_result(
     documents = [item.model_dump(mode="json") for item in current]
     # The marker is derived from every current card by its one owner, so a
     # decision saved after this edit stores every option's current inputs.
-    computation = computation_from_tool_cards(current, catalog=get_tool_catalog())
+    computation = computation_from_tool_cards(current, catalog=catalog)
     metadata: dict[str, JsonValue] = {"tool_result_cards": documents}
     if computation is not None:
         metadata["computation"] = computation.model_dump(mode="json")

@@ -29,15 +29,23 @@ def test_effective_catalog_derives_research_availability_from_shared_flag(
 
     research_handlers = {item.handler for item in get_research_declarations()}
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")
-    disabled = get_tool_catalog()
-    assert not research_handlers.intersection(item.handler for item in disabled.declarations)
+    disabled = get_tool_catalog(surface="personal")
+    assert not research_handlers.intersection(
+        item.handler for item in disabled.declarations
+    )
     assert research_handlers.issubset(
-        item.handler for item in get_tool_catalog(include_unavailable=True).declarations
+        item.handler
+        for item in get_tool_catalog(
+            surface="personal", include_unavailable=True
+        ).declarations
     )
 
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
-    enabled = get_tool_catalog()
+    enabled = get_tool_catalog(surface="personal")
     assert research_handlers.issubset(item.handler for item in enabled.declarations)
 
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "false")
-    assert get_tool_catalog().capability_text() == disabled.capability_text()
+    assert (
+        get_tool_catalog(surface="personal").capability_text()
+        == disabled.capability_text()
+    )

@@ -27,6 +27,7 @@ from argus.domain.calculations.answer_request import (
     ANSWER_CALCULATION_INSTRUCTIONS,
     calculation_kinds_clause,
 )
+from argus.domain.chat_surface import surface_allows
 from argus.domain.research.cache import DataClass, data_class_for
 from argus.domain.research.contracts import CapabilityClass, QuestionShape
 
@@ -126,8 +127,11 @@ SCENARIO_RETRIEVAL_INSTRUCTIONS = (
 
 
 def research_rail_enabled() -> bool:
-    """Default-off kill switch; the founder flips it at promotion."""
-    return os.getenv("ARGUS_RESEARCH_RAIL_ENABLED", "").strip().lower() in TRUE_VALUES
+    """Default-off kill switch; the founder flips it at promotion. A Business
+    chat's turn never researches, whatever the switch says."""
+    if os.getenv("ARGUS_RESEARCH_RAIL_ENABLED", "").strip().lower() not in TRUE_VALUES:
+        return False
+    return surface_allows("research")
 
 
 class RetrievalLocation(BaseModel):

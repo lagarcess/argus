@@ -184,7 +184,7 @@ def test_calculation_guards_do_not_log_model_supplied_context(
     notes = []
     calculation.resolve_calculation(
         request,
-        catalog=get_tool_catalog(),
+        catalog=get_tool_catalog(surface="personal"),
         retrieved=[],
         currency="USD",
         subject_symbol=None,

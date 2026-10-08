@@ -7,6 +7,10 @@ from dataclasses import dataclass, field
 from typing import Any
 from uuid import uuid4
 
+from argus.agent_runtime.recovery_messages import (
+    recovery_message,
+    recovery_state_stage_patch,
+)
 from argus.agent_runtime.stages.interpret_types import StageOutcome, StageResult
 from argus.agent_runtime.state.models import (
     ArtifactReference,
@@ -15,6 +19,7 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.substage_events import emit_tool_progress
+from argus.domain.chat_surface import record_surface_gate, turn_surface
 from argus.domain.tool_contracts import (
     MAX_TOOL_CALLS,
     ToolCall,
@@ -87,9 +92,13 @@ async def execute_tool_calls_async(
     if catalog is None:
         from argus.domain.capability_registry import get_tool_catalog
 
-        catalog = get_tool_catalog()
-    if any(catalog.get(call.tool_name) is None for call in calls):
-        return _rejected_batch("unknown_tool")
+        catalog = get_tool_catalog(surface=turn_surface())
+    undeclared = sorted({c.tool_name for c in calls if catalog.get(c.tool_name) is None})
+    if undeclared:
+        if turn_surface() == "personal":
+            return _rejected_batch("unknown_tool")
+        record_surface_gate("tool_call", surface=turn_surface(), tools=undeclared)
+        return surface_tool_refusal(language)
 
     patch: dict[str, Any] = {
         "tool_calls": [],
@@ -240,6 +249,24 @@ def _with_cards(
     if references:
         patch["artifact_references"] = references
     return StageResult(outcome=outcome, stage_patch=patch)
+
+
+def surface_tool_refusal(language: str | None) -> StageResult:
+    """The turn's chat does not declare the tool: say so, with no card or call."""
+    return StageResult(
+        outcome="ready_to_respond",
+        stage_patch={
+            "tool_calls": [],
+            "tool_call_records": [],
+            "tool_effects": [],
+            "assistant_response": recovery_message(
+                "business_chat_tool_unavailable", language=language
+            ),
+            **recovery_state_stage_patch(
+                "business_chat_tool_unavailable", language=language, retryable=False
+            ),
+        },
+    )
 
 
 def _rejected_batch(code: str) -> StageResult:

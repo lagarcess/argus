@@ -51,7 +51,7 @@ def test_a_calculation_card_declares_its_kind_inputs_and_symbols() -> None:
 
 
 def test_backtest_and_research_cards_declare_no_marker() -> None:
-    catalog = get_tool_catalog(include_unavailable=True)
+    catalog = get_tool_catalog(surface="personal", include_unavailable=True)
     research = catalog.get("balanced_lookup")
     assert research is not None
     call = ToolCall(tool_name="balanced_lookup", call_id="c", arguments={"request": "x"})
@@ -201,7 +201,7 @@ def test_the_chat_turn_stamps_the_marker_derived_from_its_card(monkeypatch) -> N
 
 
 def test_a_turn_without_a_free_calculation_card_carries_no_marker(monkeypatch) -> None:
-    catalog = get_tool_catalog(include_unavailable=True)
+    catalog = get_tool_catalog(surface="personal", include_unavailable=True)
     research = catalog.get("balanced_lookup")
     call = ToolCall(tool_name="balanced_lookup", call_id="c1", arguments={"request": "x"})
     outcome = ToolOutcome(

@@ -1,7 +1,7 @@
 """Memory is Personal: a proposal whose source is a Business chat is refused.
 
-The source can be named as the conversation, one of its messages, or evidence
-it produced. Each is refused before the assessor or the service runs, and the
+The source can be named as the conversation, one of its messages, or the
+evidence, idea, idea version or decision note it produced. Each is refused before the assessor or the service runs, and the
 same proposal from a Personal chat still reaches the service.
 """
 
@@ -12,7 +12,6 @@ from typing import cast
 import pytest
 from argus.api.personalization_memory import configure_memory_service
 from argus.api.personalization_memory_assessor import configure_sensitivity_classifier
-from argus.api.schemas import EvidenceArtifact
 from argus.domain.owner_scope import PERSONAL, BusinessSpace
 from argus.llm.memory_sensitivity import MemorySensitivityVerdict
 from argus.memory.service import MemoryService
@@ -21,7 +20,12 @@ from argus.memory.store import InMemoryCanonicalMemoryStore
 BUSINESS_CHAT = "00000000-0000-4000-8000-0000000000b1"
 PERSONAL_CHAT = "00000000-0000-4000-8000-0000000000a1"
 BUSINESS_MESSAGE = "00000000-0000-4000-8000-0000000000b2"
-BUSINESS_EVIDENCE = "00000000-0000-4000-8000-0000000000b3"
+BUSINESS_ARTIFACTS = {
+    "evidence_artifact": "00000000-0000-4000-8000-0000000000b3",
+    "idea": "00000000-0000-4000-8000-0000000000b4",
+    "idea_version": "00000000-0000-4000-8000-0000000000b5",
+    "decision_note": "00000000-0000-4000-8000-0000000000b6",
+}
 
 
 def _propose(memory_api, source_kind: str, source_id: str):  # noqa: ANN001, ANN202
@@ -58,19 +62,9 @@ def live_memory(memory_api, monkeypatch: pytest.MonkeyPatch):  # noqa: ANN001, A
     gateway.message_conversation_id.side_effect = lambda *, user_id, message_id: (
         BUSINESS_CHAT if message_id == BUSINESS_MESSAGE else PERSONAL_CHAT
     )
-    gateway.get_evidence_artifact.side_effect = lambda *, user_id, artifact_id: (
-        EvidenceArtifact.model_validate(
-            {
-                "id": artifact_id,
-                "idea_id": "idea",
-                "idea_version_id": "version",
-                "source_conversation_id": BUSINESS_CHAT,
-                "title": "Saved result",
-                "digest": "digest",
-                "payload": {},
-                "created_at": "2026-10-08T00:00:00Z",
-                "updated_at": "2026-10-08T00:00:00Z",
-            }
+    gateway.artifact_source_conversation_id.side_effect = (
+        lambda *, table, user_id, artifact_id: (
+            BUSINESS_CHAT if artifact_id in BUSINESS_ARTIFACTS.values() else PERSONAL_CHAT
         )
     )
     return memory_api
@@ -81,7 +75,7 @@ def live_memory(memory_api, monkeypatch: pytest.MonkeyPatch):  # noqa: ANN001, A
     [
         ("conversation", BUSINESS_CHAT),
         ("message", BUSINESS_MESSAGE),
-        ("evidence_artifact", BUSINESS_EVIDENCE),
+        *BUSINESS_ARTIFACTS.items(),
     ],
 )
 def test_a_business_source_is_refused(live_memory, source_kind, source_id) -> None:  # noqa: ANN001
@@ -91,8 +85,16 @@ def test_a_business_source_is_refused(live_memory, source_kind, source_id) -> No
     assert response.json()["code"] == "invalid_memory_request"
 
 
-def test_a_personal_source_still_reaches_the_service(live_memory) -> None:  # noqa: ANN001
-    response = _propose(live_memory, "conversation", PERSONAL_CHAT)
+@pytest.mark.parametrize(
+    ("source_kind", "source_id"),
+    [("conversation", PERSONAL_CHAT), ("idea", "00000000-0000-4000-8000-0000000000a4")],
+)
+def test_a_personal_source_still_reaches_the_service(
+    live_memory,
+    source_kind,
+    source_id,  # noqa: ANN001
+) -> None:
+    response = _propose(live_memory, source_kind, source_id)
 
     assert response.status_code == 200, response.text
     assert response.json()["created"] is True

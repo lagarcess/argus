@@ -97,7 +97,7 @@ def surface(monkeypatch):
         rules=(ExactlyOneUnknown(fields=("known", "unknown")),),
     )
     monkeypatch.setattr(
-        tool_results, "get_tool_catalog", lambda: ToolCatalog((declaration,))
+        tool_results, "get_tool_catalog", lambda _surface: ToolCatalog((declaration,))
     )
     client = TestClient(app)
     client.post("/api/v1/dev/reset")

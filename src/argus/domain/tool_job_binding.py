@@ -29,8 +29,9 @@ class ToolJobBinding(BaseModel):
 def bind_tool_job_call(*, call: ToolCall, artifact_id: str) -> dict[str, Any]:
     """Freeze a validated admitted call before its provider job is dispatched."""
     from argus.domain.capability_registry import get_tool_catalog
+    from argus.domain.chat_surface import turn_surface
 
-    declaration = get_tool_catalog().get(call.tool_name)
+    declaration = get_tool_catalog(surface=turn_surface()).get(call.tool_name)
     if declaration is None:
         raise ValueError("Unknown tool job declaration")
     arguments = declaration.validate_arguments(call.arguments).model_dump(mode="json")
@@ -49,9 +50,12 @@ def tool_card_for_job_completion(
 ) -> ToolResultCard:
     """Resolve a persisted binding even when new admissions have been disabled."""
     from argus.domain.capability_registry import get_tool_catalog
+    from argus.domain.chat_surface import turn_surface
 
     source = ToolJobBinding.model_validate(binding)
-    declaration = get_tool_catalog(include_unavailable=True).get(source.call.tool_name)
+    declaration = get_tool_catalog(surface=turn_surface(), include_unavailable=True).get(
+        source.call.tool_name
+    )
     if declaration is not None and (
         declaration.card.card_type,
         declaration.card.version,

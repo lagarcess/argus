@@ -3494,8 +3494,8 @@ fork routes answer 404 `not_found` ("Conversation not found.") for a Business
 conversation, or for evidence a Business conversation produced. A Business
 chat turn recalls no saved memory, and `POST /memory/candidates` and
 `POST /memory/candidates/saved-decision` answer 400 `invalid_memory_request`
-when a source is a Business conversation, one of its messages, or evidence it
-produced.
+when a source is a Business conversation, one of its messages, or the
+evidence, idea, idea version or decision note it produced.
 
 **Business chat.** `ARGUS_BUSINESS_CHAT_ENABLED` is a default-off flag nested
 inside `ARGUS_BUSINESS_PILOT_ENABLED`; Business chat stays off until Business
@@ -3512,6 +3512,21 @@ conversations keep working, so their owner can see and delete them. Every
 `POST` under `/conversations/{conversation_id}` must declare its side, Business
 chat or Personal only; `tests/test_business_chat_flag.py` enforces this.
 `GET /business/workspace` reports the flag as `chat_available`.
+
+**Business chat tools.** A turn reads its side from the stored conversation,
+never from the request. A Business turn sees only Business-declared tools,
+which today is none: no backtest, calculation or research tool, and research
+is off for the turn whatever `ARGUS_RESEARCH_RAIL_ENABLED` says. A Business
+turn that asks for a Personal tool gets `ready_to_respond` with the assistant
+text and `recovery: {"code": "business_chat_tool_unavailable", "retryable":
+false}` and no confirmation card, tool card or run. With Business chat on,
+`POST /backtests/run` with a Business `conversation_id` answers 404 `not_found`,
+`tool-results/{id}/recompute` on a Business conversation answers 422
+`tool_inputs_not_editable`, `computation/refresh` answers 409
+`nothing_to_refresh`, and the `confirmations/{id}/peer-assets` and
+`confirmations/{id}/direct-edit` routes answer 404 `not_found`. The
+`/market/session` demonstrated-interest count reads only Personal runs. The Personal side is
+unchanged: the same tools, the same model-facing text.
 
 ## `GET /conversations`
 

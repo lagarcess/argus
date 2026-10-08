@@ -27,7 +27,9 @@ from argus.api.dependencies import current_user, problem
 from argus.api.schemas import ConversationSurface, User
 from argus.domain.business.config import business_chat_enabled, business_pilot_enabled
 from argus.domain.business.scope import resolve_business_scope
+from argus.domain.chat_surface import ChatSurface, record_surface_gate
 from argus.domain.owner_scope import PERSONAL, OwnerScope, holds, scope_of
+from argus.domain.supabase_space_reads import SourceArtifactTable
 
 
 def refuse_closed_chat(request: Request, surface: ConversationSurface) -> None:
@@ -90,6 +92,14 @@ def is_business_conversation(*, user_id: str, conversation_id: str | None) -> bo
     return scope is not None and scope != PERSONAL
 
 
+def stored_conversation_surface(*, user_id: str, conversation_id: str) -> ChatSurface:
+    """The chat a stored conversation belongs to; what a turn on it may use."""
+
+    if is_business_conversation(user_id=user_id, conversation_id=conversation_id):
+        return "business"
+    return "personal"
+
+
 def conversation_not_found(request: Request) -> HTTPException:
     return problem(
         request,
@@ -108,6 +118,7 @@ def require_personal_conversation(
     """404 for a Business conversation; anything else reaches the route unchanged."""
 
     if is_business_conversation(user_id=user.id, conversation_id=conversation_id):
+        record_surface_gate("personal_route", surface="business")
         raise conversation_not_found(request)
 
 
@@ -132,18 +143,32 @@ def _uuid_text(value: str) -> str | None:
         return None
 
 
-def evidence_source_conversation_id(*, user_id: str, artifact_id: str) -> str | None:
-    stored = api_state.store.evidence_artifacts.get(artifact_id)
+_ARTIFACT_OWNERS: dict[SourceArtifactTable, str] = {
+    "evidence_artifacts": "evidence_artifact_owners",
+    "ideas": "idea_owners",
+    "idea_versions": "idea_version_owners",
+    "decision_notes": "decision_note_owners",
+}
+
+
+def artifact_source_conversation_id(
+    *, table: SourceArtifactTable, user_id: str, artifact_id: str
+) -> str | None:
+    """The conversation the person's saved artifact came from, or None."""
+
+    stored = getattr(api_state.store, table).get(artifact_id)
     if stored is not None:
-        if api_state.store.evidence_artifact_owners.get(artifact_id) != user_id:
+        if getattr(api_state.store, _ARTIFACT_OWNERS[table]).get(artifact_id) != user_id:
             return None
-        return stored.source_conversation_id
+        source: str | None = stored.source_conversation_id
+        return source
     gateway = api_state.supabase_gateway
     canonical = _uuid_text(artifact_id)
     if gateway is None or canonical is None:
         return None
-    fetched = gateway.get_evidence_artifact(user_id=user_id, artifact_id=canonical)
-    return fetched.source_conversation_id if fetched is not None else None
+    return gateway.artifact_source_conversation_id(
+        table=table, user_id=user_id, artifact_id=canonical
+    )
 
 
 def require_personal_evidence_artifact(
@@ -153,8 +178,11 @@ def require_personal_evidence_artifact(
 ) -> None:
     """The same 404 for an evidence artifact a Business conversation produced."""
 
-    source = evidence_source_conversation_id(user_id=user.id, artifact_id=artifact_id)
+    source = artifact_source_conversation_id(
+        table="evidence_artifacts", user_id=user.id, artifact_id=artifact_id
+    )
     if is_business_conversation(user_id=user.id, conversation_id=source):
+        record_surface_gate("personal_route", surface="business")
         raise conversation_not_found(request)
 
 

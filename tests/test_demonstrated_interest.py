@@ -86,33 +86,57 @@ def test_durable_history_is_read_for_the_caller_alone(
     gateway.count_completed_runs.assert_called_once_with(user_id=owner)
 
 
-def test_the_durable_count_filters_on_the_owner_and_completion() -> None:
-    calls: list[tuple] = []
+def test_the_durable_count_keeps_the_owners_completed_personal_runs() -> None:
+    queries: list[list[tuple]] = []
 
     class Query:
+        def __init__(self) -> None:
+            self.calls: list[tuple] = []
+            self.not_ = self
+
         def select(self, *columns, **options):
-            calls.append(("select", columns, options))
+            self.calls.append(("select", columns, options))
             return self
 
         def eq(self, column, value):
-            calls.append(("eq", column, value))
+            self.calls.append(("eq", column, value))
+            return self
+
+        def is_(self, column, value):
+            self.calls.append(("not_is", column, value))
             return self
 
         def execute(self):
-            return SimpleNamespace(count=1, data=[])
+            in_business = ("not_is", "conversations.owner_space_id", "null")
+            return SimpleNamespace(count=1 if in_business in self.calls else 3, data=[])
 
     def table(name):
-        calls.append(("table", name))
-        return Query()
+        query = Query()
+        query.calls.append(("table", name))
+        queries.append(query.calls)
+        return query
 
     gateway = SupabaseGateway.__new__(SupabaseGateway)
     gateway.client = SimpleNamespace(table=table)
     owner = fake.uuid4()
 
-    assert gateway.count_completed_runs(user_id=owner) == 1
-    assert ("table", "backtest_runs") in calls
-    assert ("eq", "user_id", owner) in calls
-    assert ("eq", "status", "completed") in calls
+    assert gateway.count_completed_runs(user_id=owner) == 2
+    filters = [("table", "backtest_runs"), ("eq", "user_id", owner)]
+    filters.append(("eq", "status", "completed"))
+    assert all(all(item in calls for item in filters) for calls in queries)
+    assert sorted(calls[1][1] for calls in queries) == [
+        ("id",),
+        ("id, conversations!inner(owner_space_id)",),
+    ]
+
+
+def test_a_run_in_a_business_chat_shows_no_market_interest() -> None:
+    owner = fake.uuid4()
+    _seed_run(owner, status="completed")
+    (run,) = api_state.store.backtest_runs.values()
+    api_state.store.conversation_spaces[run.conversation_id] = fake.uuid4()
+
+    assert demonstrated_interest(owner).markets is False
 
 
 def test_the_session_response_carries_the_callers_interest(
