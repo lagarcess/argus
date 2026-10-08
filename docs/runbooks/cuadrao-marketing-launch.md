@@ -104,6 +104,16 @@ Not part of this launch. If chosen later, switch Auto-Deploy to "After CI Checks
 3. `notify.cuadrao.ai` verified in Resend (Section 6), `CUADRAO_INQUIRY_TO=hola@cuadrao.ai` set, and one approved test message received at `hola@cuadrao.ai` (an iCloud custom-domain address; the founder confirms it exists).
 4. The founder has typed the three provider values into the Render form, and the complete form has been read back to them before Create.
 5. Rollback target named (Section 8). The first deploy has no earlier artifact, so a rollback cannot be exercised until a second deploy exists.
+6. The operator wording below is settled and published. Until the founder confirms it, the contact and signup forms are not published and no real visitor submission is taken: the privacy notice must identify who is responsible for the data those forms collect.
+
+### Operator wording (prepared, not published)
+
+The privacy notice has no responsible-operator section yet, on purpose. Prepared text, Spanish first, for the founder's approval:
+
+- ES, "Quién es responsable": "Cuadrao LLC es responsable de los datos que se reciben en este sitio. Para cualquier consulta sobre ellos, escribe a hola@cuadrao.ai."
+- EN, "Who is responsible": "Cuadrao LLC is responsible for the data received on this site. For any question about it, write to hola@cuadrao.ai."
+
+Cuadrao LLC is pending formation. This text is true only once the company is formed and operates the site; do not publish it before the founder confirms both. It names no individual. If the forms must go live before then, the notice has to name the actual current responsible party, and the founder chooses that wording. Publishing the section means adding it to `marketing/components/privacy-copy.ts` in both languages and removing the matching hold in `marketing/__tests__/privacy-copy.test.ts`.
 
 ## 5. Hosted acceptance on the Render address
 
@@ -130,10 +140,10 @@ Then the checks it cannot make:
 
 **Do not add forwarding, Cloudflare Email Routing, or any apex MX, SPF or DKIM change.** Email Routing would replace the iCloud MX records and take over the founder's mail. Everything below adds records only under `notify.cuadrao.ai`, which does not touch the apex.
 
-**`notify.cuadrao.ai` change set. Steps 1 to 3 are done (2026-10-08, founder-approved); steps 4 to 6 wait for the Render step:**
+**`notify.cuadrao.ai` change set. Steps 1 and 2 are done (2026-10-08, founder-approved) and Resend shows the domain Verified; step 3 (DMARC) is not added; the sending key in step 4 and steps 5 and 6 wait for the Render step:**
 
 1. Resend: create the domain `notify.cuadrao.ai` in region `us-east-1` (the same as the root domain), open and click tracking off. This is a hosted write.
-2. Cloudflare DNS: add exactly the records Resend returns, all DNS only and all under `*.notify.cuadrao.ai`. Expect the same shape as the root domain: a DKIM TXT at `resend._domainkey.notify` and CNAMEs at `send.notify` and `rsend.notify` to Resend's forge hosts. Copy Resend's values verbatim; do not invent them. The apex records stay as they are.
+2. Cloudflare DNS: add exactly the records Resend returns, all DNS only and all under `*.notify.cuadrao.ai`. Resend returned four records, which differ from the root domain's: a DKIM TXT at `resend._domainkey.notify`, an MX (priority 10) and an SPF TXT at `send.notify`, and a CNAME at `rsend.notify` to Resend's forge host. Copy Resend's values verbatim; do not invent them. The apex records stay as they are.
 3. DMARC: add `_dmarc.notify.cuadrao.ai` as a TXT `v=DMARC1; p=none` (optionally with a report address the founder owns). There is no apex DMARC today, and this record covers only the subdomain.
 4. Wait for Resend to show the domain Verified. Create a Resend key limited to sending from `notify.cuadrao.ai` and have the founder type it into Render with `CUADRAO_INQUIRY_FROM=Cuadrao <website@notify.cuadrao.ai>`.
 5. Send one test inquiry to `hola@cuadrao.ai` from a founder-approved address and read the received headers for SPF, DKIM and DMARC pass, and that it reached the iCloud inbox rather than junk.
@@ -164,4 +174,4 @@ After hosted acceptance and the founder's publication approval, coordinating wit
 
 ## 9. Open founder inputs
 
-Batched in the launch record: Spanish copy approvals, the privacy text facts (retention wording, legal entity, processors), the Option B exception, provider access for read-only inspection, and the approved test addresses.
+Batched in the launch record: Spanish copy approvals, the privacy text facts (retention wording, processors) and the confirmation that Cuadrao LLC is formed and operates the site (operator wording above), the Option B exception, provider access for read-only inspection, and the approved test addresses.

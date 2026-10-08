@@ -1,7 +1,7 @@
 import { businessContactEmail } from "./site-copy";
 import type { BusinessLocale } from "@/lib/site-routes";
 
-type Section = { title: string; paragraphs?: string[]; items?: string[] };
+type Section = { id: string; title: string; paragraphs?: string[]; items?: string[] };
 
 type PrivacyCopy = {
   eyebrow: string;
@@ -15,50 +15,52 @@ const email = businessContactEmail;
 
 const es: PrivacyCopy = {
   eyebrow: "PRIVACIDAD",
-  title: "Qué datos recibimos y para qué.",
+  title: "Tu privacidad en Cuadrao.",
   intro:
-    "Cuadrao es un proyecto en preparación de Lucas Garcés. Este sitio recibe datos solo cuando escribes por el formulario de contacto o dejas tu correo para el acceso anticipado.",
-  updated: "Actualizado el 7 de octubre de 2026",
+    "Usamos los datos que compartes para responder tus consultas y avisarte cuando esté disponible el acceso anticipado. Aquí explicamos qué información recibimos, cómo la usamos y cómo puedes solicitar su eliminación.",
+  updated: "Actualizado el 8 de octubre de 2026",
   sections: [
     {
-      title: "Si nos escribes",
+      id: "data",
+      title: "Qué datos recibimos",
       paragraphs: [
-        "Recibimos tu nombre, tu correo, el comentario opcional y el idioma de la página. Los usamos solo para responderte.",
-        "El mensaje llega por correo electrónico a la cuenta de iCloud Mail de Cuadrao (hola@cuadrao.ai). No lo guardamos en otra base de datos y no lo usamos para enviarte publicidad.",
+        "Si nos escribes: tu nombre, tu correo, el comentario opcional y el idioma de la página. Los usamos para responderte.",
+        "Si pides acceso anticipado a Cuadrao Personal: tu correo, el idioma de la página, la fecha del registro y la versión de este texto que aceptaste. Los usamos solo para avisarte cuando haya acceso disponible. Registrarte no crea una cuenta ni garantiza acceso inmediato.",
+        "Cuando visitas el sitio: el proveedor de alojamiento puede registrar datos técnicos de la conexión, como la dirección IP.",
+        "Para frenar envíos automáticos, el sitio guarda tu dirección IP y, si nos escribes, tu correo en la memoria del servidor, no en una base de datos. Se olvidan en un máximo de dos horas, o antes si el servicio se reinicia.",
       ],
     },
     {
-      title: "Si pides acceso anticipado a Cuadrao Personal",
+      id: "not-used",
+      title: "Qué no usamos",
       paragraphs: [
-        "Recibimos tu correo, el idioma de la página, la fecha del registro y la versión de este texto que aceptaste. Los usamos solo para avisarte cuando haya acceso disponible. Registrarte no crea una cuenta ni garantiza acceso inmediato.",
-      ],
-    },
-    {
-      title: "Qué no recopilamos",
-      paragraphs: [
-        "Este sitio no usa cookies, herramientas de analítica ni seguimiento publicitario, y no guarda datos en tu navegador. Las tipografías se sirven desde el mismo sitio.",
+        "Este sitio no usa cookies, herramientas de analítica ni seguimiento publicitario, y no guarda datos en tu navegador. Las tipografías se sirven desde el mismo sitio. No usamos tus datos de contacto para enviarte publicidad.",
         "Te pedimos que no escribas documentos, números de cuenta ni información financiera privada en el formulario.",
       ],
     },
     {
-      title: "Quién procesa los datos",
+      id: "providers",
+      title: "Proveedores que intervienen",
       items: [
-        "Render aloja el sitio y puede registrar datos técnicos de la conexión, como la dirección IP.",
-        "Resend envía el correo con tu mensaje a la cuenta de iCloud Mail de Cuadrao y, más adelante, el aviso de acceso anticipado a quienes se registraron. Puede conservar sus propios registros de envío.",
-        "Apple (iCloud Mail) recibe y guarda los correos que llegan a hola@cuadrao.ai, incluidos los mensajes del formulario y las solicitudes de retiro.",
+        "Render aloja el sitio.",
+        "Resend envía por correo los mensajes del formulario y, más adelante, el aviso de acceso anticipado. Puede conservar sus propios registros de envío.",
+        `Apple (iCloud Mail) recibe y guarda los correos que llegan a ${email}, incluidos los mensajes del formulario y las solicitudes de retiro.`,
         "Supabase guarda los registros de acceso anticipado en servidores de Estados Unidos (Ohio).",
         "Cloudflare administra el dominio cuadrao.ai.",
       ],
     },
     {
+      id: "retention",
       title: "Cuánto tiempo los conservamos",
       paragraphs: [
-        "Tu mensaje permanece en la cuenta de iCloud Mail de Cuadrao mientras haga falta para responderte y dar seguimiento a la conversación.",
-        "Tu registro de acceso anticipado permanece hasta que pidas retirarlo. Al retirarlo borramos tu correo y conservamos solo una huella técnica de la dirección, sin la dirección misma, para no volver a registrarte ni escribirte.",
+        "Tu mensaje se conserva en nuestro correo mientras haga falta para responderte y dar seguimiento a la conversación.",
+        "Tu registro de acceso anticipado permanece hasta que pidas retirarlo. Al retirarlo borramos tu correo y conservamos una huella técnica de la dirección, sin la dirección misma, junto con el idioma y las fechas del registro y del retiro, para no volver a registrarte ni escribirte.",
+        "Los registros técnicos de la conexión los conserva el proveedor de alojamiento según sus propias reglas.",
       ],
     },
     {
-      title: "Tus opciones",
+      id: "choices",
+      title: "Tus opciones y contacto",
       paragraphs: [
         `Puedes pedirnos ver, corregir o eliminar tus datos, o retirar tu registro, escribiendo a ${email}. Atendemos esas solicitudes manualmente.`,
       ],
@@ -68,50 +70,52 @@ const es: PrivacyCopy = {
 
 const en: PrivacyCopy = {
   eyebrow: "PRIVACY",
-  title: "What data we receive and why.",
+  title: "Your privacy at Cuadrao.",
   intro:
-    "Cuadrao is a project in preparation by Lucas Garcés. This site receives data only when you write through the contact form or leave your email for early access.",
-  updated: "Updated October 7, 2026",
+    "We use the data you share to answer your inquiries and to tell you when early access is available. This page explains what information we receive, how we use it and how you can ask us to delete it.",
+  updated: "Updated October 8, 2026",
   sections: [
     {
-      title: "If you write to us",
+      id: "data",
+      title: "What data we receive",
       paragraphs: [
-        "We receive your name, your email, the optional comment and the page language. We use them only to reply to you.",
-        "The message arrives by email in Cuadrao's iCloud Mail account (hola@cuadrao.ai). We do not store it in another database and we do not use it to send you advertising.",
+        "If you write to us: your name, your email, the optional comment and the page language. We use them to reply to you.",
+        "If you request Cuadrao Personal early access: your email, the page language, the signup date and the version of this text you accepted. We use them only to tell you when access is available. Signing up does not create an account or guarantee immediate access.",
+        "When you visit the site: the hosting provider may record technical connection data, such as the IP address.",
+        "To slow down automated submissions, the site keeps your IP address and, if you write to us, your email in the server's memory, not in a database. They are forgotten after at most two hours, or sooner if the service restarts.",
       ],
     },
     {
-      title: "If you request Cuadrao Personal early access",
+      id: "not-used",
+      title: "What we do not use",
       paragraphs: [
-        "We receive your email, the page language, the signup date and the version of this text you accepted. We use them only to tell you when access is available. Signing up does not create an account or guarantee immediate access.",
-      ],
-    },
-    {
-      title: "What we do not collect",
-      paragraphs: [
-        "This site does not use cookies, analytics tools or advertising tracking, and it does not store data in your browser. Fonts are served from the site itself.",
+        "This site does not use cookies, analytics tools or advertising tracking, and it does not store data in your browser. Fonts are served from the site itself. We do not use your contact details to send you advertising.",
         "Please do not enter documents, account numbers or private financial information in the form.",
       ],
     },
     {
-      title: "Who processes the data",
+      id: "providers",
+      title: "Providers involved",
       items: [
-        "Render hosts the site and may log technical connection data, such as the IP address.",
-        "Resend sends the email with your message to Cuadrao's iCloud Mail account and, later, the early-access notice to people who signed up. It may keep its own sending logs.",
-        "Apple (iCloud Mail) receives and stores the email sent to hola@cuadrao.ai, including form messages and removal requests.",
+        "Render hosts the site.",
+        "Resend sends the form messages by email and, later, the early-access notice. It may keep its own sending logs.",
+        `Apple (iCloud Mail) receives and stores the email sent to ${email}, including form messages and removal requests.`,
         "Supabase stores early-access signups on servers in the United States (Ohio).",
         "Cloudflare manages the cuadrao.ai domain.",
       ],
     },
     {
+      id: "retention",
       title: "How long we keep it",
       paragraphs: [
-        "Your message stays in Cuadrao's iCloud Mail account for as long as it is needed to reply and follow up.",
-        "Your early-access signup stays until you ask to remove it. When you remove it we delete your email and keep only a technical fingerprint of the address, not the address itself, so we do not register or email you again.",
+        "Your message is kept in our email for as long as it is needed to reply and follow up.",
+        "Your early-access signup stays until you ask to remove it. When you remove it we delete your email and keep a technical fingerprint of the address, not the address itself, along with the language and the signup and removal dates, so we do not register or email you again.",
+        "Technical connection records are kept by the hosting provider under its own rules.",
       ],
     },
     {
-      title: "Your choices",
+      id: "choices",
+      title: "Your choices and contact",
       paragraphs: [
         `You can ask us to show, correct or delete your data, or to remove your signup, by writing to ${email}. We handle these requests by hand.`,
       ],
