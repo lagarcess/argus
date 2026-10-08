@@ -29,7 +29,7 @@ from argus.domain.ingestion.documents.service import (
     DocumentServiceError,
     DocumentsService,
 )
-from argus.domain.ingestion.receipt_review import receipt_ids
+from argus.domain.ingestion.receipt_review import RECEIPT_EVENT_STATES, receipt_ids
 from argus.domain.ingestion.reconcile.model import ReconcileError
 from argus.domain.ingestion.reconcile.recording import DEFAULT_ZONE
 from argus.domain.ingestion.reconcile.service import ReconciliationService
@@ -37,7 +37,6 @@ from argus.domain.recording.money_reads import current_activities
 from argus.domain.recording.money_schemas import ELIGIBILITY, MoneyRequest
 from argus.domain.recording.schemas import CreateFinancialAccountRequest
 
-EVENT_STATES = ("open", "accepting", "accepted", "dismissed")
 EXPENSE_ACCOUNT_TYPES = ELIGIBILITY["expense"]
 # A review field and the import resolution it sets. The merchant is the note
 # ``accept`` records (``recorded_note``); clearing it falls back to the evidence.
@@ -119,7 +118,7 @@ class BusinessService:
     # --- Receipts --------------------------------------------------------
     def receipts(self, scope: BusinessScope) -> list[Receipt]:
         person = scope.person_id
-        events = self.imports.list(user_id=person, states=EVENT_STATES)
+        events = self.imports.list(user_id=person, states=RECEIPT_EVENT_STATES)
         whatsapp = self.captured(person)
         found = []
         for connection in self.documents.hub.connections.list(user_id=person):
@@ -135,7 +134,7 @@ class BusinessService:
     def receipt(self, scope: BusinessScope, receipt_id: str) -> Receipt:
         person = scope.person_id
         draft = self.documents.get(user_id=person, connection_id=receipt_id)
-        events = self.imports.list(user_id=person, states=EVENT_STATES)
+        events = self.imports.list(user_id=person, states=RECEIPT_EVENT_STATES)
         return compose(
             draft,
             self.documents.store.get(user_id=person, connection_id=receipt_id),
@@ -265,7 +264,7 @@ class BusinessService:
         activities = self._activities(scope)
         ids = [item["activity_id"] for item in ledger.expense_activities(activities)]
         with self.imports.store.transaction(scope.person_id) as tx:
-            receipt_of = receipt_ids(tx, ids)
+            receipt_of = receipt_ids(tx, self.documents.store, scope.person_id, ids)
         return [
             _wire(item) for item in ledger.expenses(activities, receipt_of, start, end)
         ]

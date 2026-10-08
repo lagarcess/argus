@@ -105,7 +105,7 @@ def review_fields(review: ReceiptReview) -> dict[str, str | None]:
     if fields is None:
         return dict.fromkeys(REVIEW_FIELDS)
     return {
-        "merchant": fields.merchant,
+        "merchant": fields.note,
         "occurred_on": fields.occurred_on,
         "amount": fields.amount,
         "currency": fields.currency,
