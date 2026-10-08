@@ -25,3 +25,20 @@ def business_pilot_enabled() -> bool:
         return BusinessPilotSettings().enabled
     except ValidationError:
         return False
+
+
+class BusinessChatSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_prefix="ARGUS_BUSINESS_CHAT_", extra="ignore")
+    enabled: Annotated[bool, BeforeValidator(enabled_flag)] = False
+
+
+def business_chat_enabled() -> bool:
+    """Nested inside the pilot. Off until Business turns have their own tool
+    restrictions; reading and deleting Business chats never depends on it."""
+
+    if not business_pilot_enabled():
+        return False
+    try:
+        return BusinessChatSettings().enabled
+    except ValidationError:
+        return False

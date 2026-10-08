@@ -18,10 +18,11 @@ import {
   type ChatShellView,
   type ChatWorkspace,
 } from "@/components/chat/ChatWorkspace";
-import type {
-  BusinessOverview,
-  BusinessWorkspaceInfo,
-  ReceiptSummary,
+import {
+  businessChatAvailable,
+  type BusinessOverview,
+  type BusinessWorkspaceInfo,
+  type ReceiptSummary,
 } from "@/lib/business-api";
 import { normalizeEnabledLanguage } from "@/lib/language-features";
 import { withBusinessSpace, type BusinessDataSource } from "./business-data";
@@ -214,8 +215,10 @@ export function BusinessWorkspaceProvider({
     [actions, attachedReceipt, bridge, openPanel, panel, period, records, reload, revision, source],
   );
 
+  const chatAvailable = businessChatAvailable(records.workspace);
   const businessSearch = useBusinessSearch({
     source,
+    chatAvailable,
     accounts: records.workspace?.accounts ?? NO_ACCOUNTS,
     openPanel,
     setPeriod: setPeriodKey,
@@ -229,6 +232,7 @@ export function BusinessWorkspaceProvider({
     return {
       id: "business",
       conversationSurface: "business",
+      chatAvailable,
       initialView,
       profileInHeader: true,
       panelHasComposer: panel.kind === "overview",
@@ -259,7 +263,7 @@ export function BusinessWorkspaceProvider({
       },
       onShellChange: (shell) => setBridge(shell),
     };
-  }, [actions.starterEntries, composerPlaceholder, draftRevision, initialView, panel.kind, businessSearch]);
+  }, [actions.starterEntries, chatAvailable, composerPlaceholder, draftRevision, initialView, panel.kind, businessSearch]);
 
   return (
     <BusinessContext.Provider value={value}>

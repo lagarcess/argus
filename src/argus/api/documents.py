@@ -16,8 +16,15 @@ from argus.api.document_jobs import (
     start_document_jobs,
     stop_document_jobs,
 )
+from argus.api.financial_accounts import (
+    FinancialAccountsContext,
+    require_financial_accounts_context,
+)
 from argus.api.ingestion import (
     IngestionContext,
+    connection_problem,
+    ingestion_enabled,
+    ingestion_hub,
     require_ingestion_context,
     require_ingestion_surface,
     unavailable_problem,
@@ -26,6 +33,7 @@ from argus.api.rate_limits import SlidingWindowLimiter
 from argus.domain.ingestion.connections import ConnectionNotFound
 from argus.domain.ingestion.documents.config import (
     SOURCE_MEDIA_TYPES,
+    DocumentExtractionSettings,
     load_document_extraction_settings,
     load_document_job_settings,
 )
@@ -37,7 +45,7 @@ from argus.domain.ingestion.documents.service import (
 )
 from argus.domain.ingestion.documents.store import InMemoryDocumentStore
 from argus.domain.ingestion.hub import IngestionHub
-from argus.domain.owner_scope import OwnerScope
+from argus.domain.owner_scope import PERSONAL, OwnerScope
 
 NO_STORE = {"Cache-Control": "no-store"}
 _service: DocumentsService | None = None
@@ -72,26 +80,60 @@ def start_documents(app: object, hub: IngestionHub | None) -> None:
 
 
 def _start_documents(app: object, hub: IngestionHub) -> None:
+    # Register cleanup even when extraction is off, so disconnect still erases it.
+    service = _service_over(app, hub, DocumentExtractor())
+    configure_documents(service)
+    jobs = load_document_job_settings()
+    if service is not None and jobs.enabled:
+        start_document_jobs(service, jobs)
+
+
+def start_saved_documents(app: object, hub: IngestionHub | None) -> None:
+    """Ingestion is off: reading and removal only. No job starts and the
+    extractor is switched off, so nothing here can reach a model."""
+
+    configure_documents(
+        None
+        if hub is None
+        else _service_over(
+            app, hub, DocumentExtractor(DocumentExtractionSettings(enabled=False))
+        )
+    )
+
+
+def _service_over(
+    app: object, hub: IngestionHub, extractor: DocumentExtractor
+) -> DocumentsService | None:
     pool = getattr(getattr(app, "state", None), "financial_accounts_pool", None)
     if api_state.PERSISTENCE_MODE == "supabase":
         gateway = api_state.supabase_gateway
         if pool is None or gateway is None:
-            configure_documents(None)
-            return
+            return None
         from argus.domain.ingestion.documents.objects import SupabaseSourceObjects
         from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
 
         store = PostgresDocumentStore(pool, SupabaseSourceObjects(gateway.client.storage))
     else:
         store = InMemoryDocumentStore(hub.connections)
-    # Register cleanup even when extraction is off, so disconnect still erases it.
-    jobs = load_document_job_settings()
-    service = DocumentsService(
-        hub, store, DocumentExtractor(), jobs_recover_interruptions=jobs.enabled
+    # With jobs on, an expired attempt waits for the job reconciler, which
+    # resumes it once intake is back; a read never settles it.
+    return DocumentsService(
+        hub,
+        store,
+        extractor,
+        jobs_recover_interruptions=load_document_job_settings().enabled,
     )
-    configure_documents(service)
-    if jobs.enabled:
-        start_document_jobs(service, jobs)
+
+
+def require_saved_documents(request: Request) -> DocumentsService:
+    """Reading and removing what the owner saved outlives every intake flag.
+
+    Checked before authentication, so a missing service looks absent."""
+
+    service = documents_service()
+    if service is None:
+        raise unavailable_problem(request)
+    return service
 
 
 def require_document_surface(
@@ -112,6 +154,42 @@ def require_document_surface(
 class DocumentContext:
     service: DocumentsService
     user_id: str
+
+
+def require_saved_document_context(
+    service: DocumentsService = Depends(require_saved_documents),  # noqa: B008
+    accounts: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
+) -> DocumentContext:
+    return DocumentContext(service, accounts.user_id)
+
+
+def require_removal_surface(request: Request) -> tuple[IngestionHub, bool]:
+    """The hub a disconnect goes through, and whether it may end only a
+    document: with ingestion off no connector is running to revoke a grant."""
+
+    hub = ingestion_hub()
+    if ingestion_enabled() and hub is not None:
+        return hub, False
+    return require_saved_documents(request).hub, True
+
+
+def require_connection_removal(
+    request: Request,
+    connection_id: str,
+    surface: tuple[IngestionHub, bool] = Depends(require_removal_surface),  # noqa: B008
+    accounts: FinancialAccountsContext = Depends(require_financial_accounts_context),  # noqa: B008
+) -> IngestionContext:
+    hub, documents_only = surface
+    if documents_only:
+        try:
+            row = hub.connections.get(
+                user_id=accounts.user_id, connection_id=connection_id, scope=PERSONAL
+            )
+        except ConnectionNotFound as error:
+            raise connection_problem(request, error) from None
+        if row.source != DocumentsService.source:
+            raise unavailable_problem(request)
+    return IngestionContext(hub=hub, user_id=accounts.user_id)
 
 
 def require_document_context(

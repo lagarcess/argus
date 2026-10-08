@@ -54,6 +54,7 @@ def _user(request: Request) -> User:
 @pytest.fixture
 def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     monkeypatch.setenv("ARGUS_BUSINESS_PILOT_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BUSINESS_CHAT_ENABLED", "true")
     previous_spaces = business_spaces()
     api_state.store.reset()
     app.dependency_overrides[current_user] = _user

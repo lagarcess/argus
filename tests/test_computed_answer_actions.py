@@ -536,6 +536,7 @@ def test_a_continued_business_answer_stays_in_business(client, monkeypatch) -> N
     from argus.domain.business.spaces import InMemorySpaceStore
 
     monkeypatch.setenv("ARGUS_BUSINESS_PILOT_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BUSINESS_CHAT_ENABLED", "true")
     previous = business_spaces()
     spaces = InMemorySpaceStore()
     configure_business_spaces(spaces)
@@ -576,6 +577,7 @@ def test_the_picker_lists_only_the_answers_on_its_own_side(client, monkeypatch) 
     from argus.domain.business.spaces import InMemorySpaceStore
 
     monkeypatch.setenv("ARGUS_BUSINESS_PILOT_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BUSINESS_CHAT_ENABLED", "true")
     previous = business_spaces()
     spaces = InMemorySpaceStore()
     configure_business_spaces(spaces)

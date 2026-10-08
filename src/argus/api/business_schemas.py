@@ -58,6 +58,7 @@ class BusinessWorkspace(_Wire):
     accounts: list[BusinessAccount]
     currencies: list[str]
     assistant_available: bool
+    chat_available: bool
     receipt_limits: ReceiptLimits
 
 

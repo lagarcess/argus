@@ -98,6 +98,7 @@ def rig(monkeypatch: pytest.MonkeyPatch) -> Iterator[Rig]:
     monkeypatch.setenv("ARGUS_MOCK_AUTH", "false")
     monkeypatch.setenv("ARGUS_DEV_MEMORY_FALLBACK", "false")
     monkeypatch.setenv("ARGUS_BUSINESS_PILOT_ENABLED", "true")
+    monkeypatch.setenv("ARGUS_BUSINESS_CHAT_ENABLED", "true")
     gateway = local_supabase_gateway()
     created: list[str] = []
     previous_spaces = business_spaces()

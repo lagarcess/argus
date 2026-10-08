@@ -100,7 +100,7 @@ import {
   type LayoutMode,
 } from "./command-palette/paletteLayout";
 import CommandPaletteLoadMoreControl from "./CommandPaletteLoadMoreControl";
-import { useChatWorkspace, useConversationSurface } from "@/components/chat/ChatWorkspace";
+import { useChatAvailable, useChatWorkspace, useConversationSurface } from "@/components/chat/ChatWorkspace";
 import { moveWorkspaceFocus, useWorkspaceSearch, WorkspaceSearchResults } from "./command-palette/WorkspaceSearchResults";
 
 type ChatCommandPaletteProps = {
@@ -268,6 +268,7 @@ function ChatCommandPaletteSurface({
 }: ChatCommandPaletteProps) {
   const { t, i18n } = useTranslation();
   const surface = useConversationSurface();
+  const chatAvailable = useChatAvailable();
   // Business chats hold no saved decisions or result dossiers, so its palette has no
   // decision filters and no preview pane: a row opens its chat.
   const hasPreviewPane = surface === "personal";
@@ -341,6 +342,10 @@ function ChatCommandPaletteSurface({
     ) {
       return;
     }
+    if (!chatAvailable) {
+      setIsColdStartLoading(false);
+      return;
+    }
     const requestId = ++historyRequestIdRef.current;
     const capturedSignature = RECENTS_SEARCH_SIGNATURE;
     setIsColdStartLoading(true);
@@ -379,7 +384,7 @@ function ChatCommandPaletteSurface({
         }
       }
     })();
-  }, [isGuest, isRecentsMode, retryNonce, searchSurface, surface]);
+  }, [chatAvailable, isGuest, isRecentsMode, retryNonce, searchSurface, surface]);
 
   const clearSearchAndLedger = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -468,7 +473,7 @@ function ChatCommandPaletteSurface({
     setIsLoadingMoreSearch(false);
     setLoadMoreFailed(false);
     setPreviewItem(null);
-    if (!trimmed) {
+    if (!trimmed || !chatAvailable) {
       searchRequestIdRef.current += 1;
       if (!isLedgerMode) {
         setSearchResults([]);
@@ -524,7 +529,7 @@ function ChatCommandPaletteSurface({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [decisionStateFilter, isLedgerMode, query, retryNonce, searchSurface]);
+  }, [chatAvailable, decisionStateFilter, isLedgerMode, query, retryNonce, searchSurface]);
 
   const workspaceSearch = useChatWorkspace()?.search ?? null;
   const workspaceResults = useWorkspaceSearch(isLedgerMode ? null : workspaceSearch, query);
@@ -532,6 +537,8 @@ function ChatCommandPaletteSurface({
   const isWaitingForIndexableQuery =
     isFiltering && !searchQueryIsIndexable(query);
   const isResultMode = isFiltering || isLedgerMode;
+  // Without chat there is nothing to list before a query, so the palette is just its field.
+  const isFieldOnly = !chatAvailable && !isFiltering;
   const assetRollup = useMemo(
     () =>
       isFiltering
@@ -1097,7 +1104,7 @@ function ChatCommandPaletteSurface({
     [activateItem, hasPreviewPane, isBelowDesktop, setPreviewItem],
   );
 
-  const askText = onAsk && isFiltering && !isWaitingForIndexableQuery && !isLedgerMode && !isSearching && !readError && displayItems.length === 0 && !assetRollupDisplay && workspaceResults.quiet ? query.trim() : null;
+  const askText = chatAvailable && onAsk && isFiltering && !isWaitingForIndexableQuery && !isLedgerMode && !isSearching && !readError && displayItems.length === 0 && !assetRollupDisplay && workspaceResults.quiet ? query.trim() : null;
   const paletteKeys = useCommandPaletteKeys({
     askText,
     onAsk,
@@ -1360,7 +1367,9 @@ function ChatCommandPaletteSurface({
         className={`relative flex max-h-[calc(100dvh-1.5rem)] flex-col overflow-hidden rounded-[18px] border border-black/10 bg-white transition-all duration-300 dark:border-white/10 dark:bg-[#1b1d20] ${
           effectiveLayoutMode === "expanded"
             ? "h-[78dvh] w-[94vw] max-w-6xl"
-            : "h-[60dvh] w-full max-w-lg"
+            : isFieldOnly
+              ? "mt-[calc(20dvh-0.75rem)] w-full max-w-lg self-start sm:mt-[calc(20dvh-1.5rem)]"
+              : "h-[60dvh] w-full max-w-lg"
         }`}
       >
         <div className="flex items-center gap-3 border-b border-black/5 px-5 py-3.5 dark:border-white/5">
@@ -1515,7 +1524,7 @@ function ChatCommandPaletteSurface({
               </div>
             ) : displayItems.length === 0 &&
               !assetRollupDisplay &&
-              !isLedgerMode ? (workspaceResults.quiet &&
+              !isLedgerMode ? (workspaceResults.quiet && !isFieldOnly &&
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Search className="mb-3 h-8 w-8 text-black/10 dark:text-white/10" />
                 <p className="text-[14px] text-black/30 dark:text-white/30">
@@ -1819,16 +1828,18 @@ function ChatCommandPaletteSurface({
           </CommandPaletteDossierSheet>
         ) : null}
 
-        <CommandPaletteFooter
-          footerCount={footerCount}
-          hasManageActions={selectedCanManageShortcutActions}
-          isFiltering={isFiltering}
-          isLedgerMode={isLedgerMode}
-          layoutMode={effectiveLayoutMode}
-          onToggleLayout={isBelowTablet || !hasPreviewPane ? undefined : toggleLayout}
-          shortcutLegendVisible={shortcutLegend.isVisible}
-          usesCommandKey={shortcutLegend.usesCommandKey}
-        />
+        {isFieldOnly ? null : (
+          <CommandPaletteFooter
+            footerCount={footerCount}
+            hasManageActions={selectedCanManageShortcutActions}
+            isFiltering={isFiltering}
+            isLedgerMode={isLedgerMode}
+            layoutMode={effectiveLayoutMode}
+            onToggleLayout={isBelowTablet || !hasPreviewPane ? undefined : toggleLayout}
+            shortcutLegendVisible={shortcutLegend.isVisible}
+            usesCommandKey={shortcutLegend.usesCommandKey}
+          />
+        )}
         <ConfirmDialog
           isOpen={Boolean(pendingDeleteItem)}
           title={t("sidebar.delete_confirm.title", "Delete this conversation?")}

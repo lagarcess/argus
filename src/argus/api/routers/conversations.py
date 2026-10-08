@@ -23,7 +23,12 @@ from argus.api.client_capabilities import (
 )
 from argus.api.conversation_activity import conversation_activity_service
 from argus.api.conversation_previews import conversation_previews
-from argus.api.conversation_surface import memory_conversation_in_scope, surface_scope
+from argus.api.conversation_surface import (
+    memory_conversation_in_scope,
+    refuse_closed_chat,
+    require_open_business_chat,
+    surface_scope,
+)
 from argus.api.decision_message_reads import owned_message_decisions
 from argus.api.dependencies import (
     current_user,
@@ -176,6 +181,7 @@ def create_conversation(
     user: User = Depends(current_user),  # noqa: B008
 ) -> ConversationResponse:
     scope = surface_scope(request, user_id=user.id, surface=payload.surface)
+    refuse_closed_chat(request, payload.surface)
     title = payload.title or "New idea"
     title_source = "user_renamed" if payload.title else "system_default"
     language = payload.language or user.language
@@ -867,6 +873,7 @@ def list_messages(
 @router.post(
     "/conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets",
     response_model=ConfirmationPeerAssetsResponse,
+    dependencies=[Depends(require_open_business_chat)],
 )
 def add_confirmation_peer_assets(
     conversation_id: str,
@@ -1108,6 +1115,7 @@ def add_confirmation_peer_assets(
 @router.post(
     "/conversations/{conversation_id}/confirmations/{confirmation_id}/direct-edit",
     response_model=ConfirmationDirectEditResponse,
+    dependencies=[Depends(require_open_business_chat)],
 )
 def direct_edit_confirmation(
     conversation_id: str,

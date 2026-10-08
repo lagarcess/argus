@@ -15,6 +15,7 @@ from zoneinfo import ZoneInfo
 
 from argus.domain import financial_search
 from argus.domain.business import ledger
+from argus.domain.business.config import business_chat_enabled
 from argus.domain.business.receipts import (
     AWAITING_REVIEW,
     CLOSED,
@@ -83,6 +84,8 @@ class BusinessService:
             # An expense is saved in its account's currency; nothing converts.
             "currencies": sorted({account["currency"] for account in accounts}),
             "assistant_available": False,
+            # Whether /biz offers a composer, New chat and Recents at all.
+            "chat_available": business_chat_enabled(),
             "receipt_limits": {
                 "max_bytes": load_document_extraction_settings().max_bytes,
                 "media_types": list(SOURCE_MEDIA_TYPES),

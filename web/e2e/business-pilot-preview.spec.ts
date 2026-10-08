@@ -479,3 +479,117 @@ test.describe("A conversation opens in the shell of its own surface", () => {
     await expect(page).toHaveURL(/\/chat\?conversation=conversation-alpha$/);
   });
 });
+
+test.describe("Business preview while its chat is off", () => {
+  test.use({ viewport: { width: 1280, height: 800 } });
+  const CHAT_OFF = `${PREVIEW}?chat=off`;
+
+  async function openLoaded(page: Page, url = CHAT_OFF) {
+    await openPreview(page, url, { emptyChat: false });
+    await expect(panelHeading(page, "Your business")).toBeVisible();
+    // The inbox chip comes with the workspace payload, so chat_available has been read.
+    await expect(
+      page.getByTestId("workspace-panel-region").getByRole("button", { name: /^Review \d+ receipts/ }),
+    ).toBeVisible();
+  }
+
+  test("the shell keeps its records and offers no way into a chat", async ({ page }) => {
+    await openLoaded(page, PREVIEW);
+    await expect(page.getByTestId("chat-input")).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /^New chat/ })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: /^Recents/ })).toHaveCount(1);
+
+    await openLoaded(page);
+    await expect(page.getByTestId("chat-input")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^New chat/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Recents/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "What did I spend this month?" })).toHaveCount(0);
+
+    await page.keyboard.press("ControlOrMeta+Shift+Period");
+    await page.keyboard.press("ControlOrMeta+Shift+Comma");
+    await expect(page.getByTestId("chat-input")).toHaveCount(0);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(panelHeading(page, "Your business")).toBeVisible();
+
+    await page.getByTestId("business-create").click();
+    await expect(page.getByRole("menu", { name: "Create" }).getByRole("menuitem")).toHaveText([
+      "Upload receipt",
+      "Record expense",
+    ]);
+    await page.keyboard.press("Escape");
+
+    for (const [label, heading] of [
+      ["Inbox", "Inbox"],
+      ["Expenses", "Expenses"],
+      ["Updates", "Updates"],
+      ["Overview", "Your business"],
+    ]) {
+      await nav(page).getByRole("button", { name: new RegExp(`^${label}`) }).click();
+      await expect(panelHeading(page, heading)).toBeVisible();
+      await expect(page.getByTestId("chat-input")).toHaveCount(0);
+    }
+  });
+
+  test("search finds Business records and no chats", async ({ page }) => {
+    await page.route("**/api/v1/search?**", (route) =>
+      route.fulfill({ json: { items: [], next_cursor: null, ledger_groups: [] } }),
+    );
+    await openLoaded(page);
+    await page.getByRole("button", { name: /^Search/ }).first().click();
+    const input = page.getByPlaceholder("Search expenses and receipts");
+    await expect(input).toBeFocused();
+    await expect(page.getByText("No conversations yet")).toHaveCount(0);
+    await expect(page.locator("[data-palette-row-index]")).toHaveCount(0);
+
+    await input.fill("nube hosting");
+    const expenses = page.getByTestId("workspace-search-results").getByRole("group", { name: "Expenses" });
+    await expect(expenses.getByRole("button")).toContainText("Nube Hosting");
+    await expect(page.locator("[data-palette-row-index]")).toHaveCount(0);
+
+    await input.fill("no such merchant anywhere");
+    await expect(page.getByText("No results found")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Ask/ })).toHaveCount(0);
+  });
+
+  test("a chat link lands on the workspace panel", async ({ page }) => {
+    await page.route("**/api/v1/conversations/*/messages?**", (route) =>
+      route.fulfill({
+        json: {
+          items: [
+            {
+              id: "message-1",
+              conversation_id: "conversation-alpha",
+              role: "user",
+              content: "Lunch with the supplier",
+              created_at: "2026-10-08T12:00:00Z",
+              metadata: {},
+            },
+          ],
+          next_cursor: null,
+          surface: "business",
+        },
+      }),
+    );
+    for (const url of [`${CHAT_OFF}&conversation=conversation-alpha`, `${CHAT_OFF}&view=chat`]) {
+      await openLoaded(page, url);
+      await expect(page.getByTestId("chat-input")).toHaveCount(0);
+      await expect(page.getByText("Lunch with the supplier")).toHaveCount(0);
+    }
+  });
+});
+
+test.describe("Business preview on a phone while its chat is off", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("the drawer keeps the destinations and Create, with no New chat or Recents", async ({ page }) => {
+    await openPreview(page, `${PREVIEW}?chat=off`);
+    await expect(panelHeading(page, "Your business")).toBeVisible();
+    await page.getByTestId("chat-shell-menu-trigger").click();
+    for (const label of ["Overview", "Inbox", "Expenses", "Updates"]) {
+      await expect(nav(page).getByText(label, { exact: true })).toBeVisible();
+    }
+    await expect(page.getByTestId("business-create").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: /^New chat/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Recents/ })).toHaveCount(0);
+  });
+});

@@ -3965,7 +3965,10 @@ paths:
       tags:
       - financial-accounts
       - financial-connections
-      description: 'Idempotent: disconnecting an ended connection returns it unchanged.'
+      description: 'Idempotent: disconnecting an ended connection returns it unchanged.
+
+
+        With ingestion off only a saved document can be disconnected.'
       parameters:
       - name: connection_id
         in: path
@@ -9107,6 +9110,9 @@ paths:
       tags:
       - financial-accounts
       - whatsapp
+      description: 'Never gated: a person can always end their own sender link and its
+
+        unused codes, whatever the Business and intake flags say.'
       responses:
         '204':
           description: Successful Response
@@ -11032,6 +11038,8 @@ components:
           type: array
         assistant_available:
           type: boolean
+        chat_available:
+          type: boolean
         receipt_limits:
           $ref: '#/components/schemas/ReceiptLimits'
       additionalProperties: false
@@ -11040,6 +11048,7 @@ components:
       - accounts
       - currencies
       - assistant_available
+      - chat_available
       - receipt_limits
     CallbackRequest:
       properties:

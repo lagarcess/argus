@@ -1832,7 +1832,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain("const isRecentsMode =");
     expect(historyEffect).toContain("!isRecentsMode");
     expect(historyEffect).toContain(
-      "[isGuest, isRecentsMode, retryNonce, searchSurface, surface]",
+      "[chatAvailable, isGuest, isRecentsMode, retryNonce, searchSurface, surface]",
     );
     expect(historyRequestStart).toBeLessThan(
       palette.indexOf("const trimmed = query.trim()"),

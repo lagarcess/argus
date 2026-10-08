@@ -3497,6 +3497,22 @@ chat turn recalls no saved memory, and `POST /memory/candidates` and
 when a source is a Business conversation, one of its messages, or evidence it
 produced.
 
+**Business chat.** `ARGUS_BUSINESS_CHAT_ENABLED` is a default-off flag nested
+inside `ARGUS_BUSINESS_PILOT_ENABLED`; Business chat stays off until Business
+turns have their own tool restrictions. While it is off (or the pilot is off),
+`POST /conversations` with `surface: business` and every turn or card action on
+a Business conversation answer 404 `business_chat_unavailable` with
+`Cache-Control: no-store`, before any model or provider work:
+`POST /chat/stream`, `POST /backtests/run` with its `conversation_id`, and the
+`continue`, `computation/refresh`, `tool-results/{id}/recompute`,
+`confirmations/{id}/peer-assets` and `confirmations/{id}/direct-edit` routes.
+The pilot flag is checked first, so creating with the pilot off still answers
+`business_unavailable`. Reading, renaming and deleting existing Business
+conversations keep working, so their owner can see and delete them. Every
+`POST` under `/conversations/{conversation_id}` must declare its side, Business
+chat or Personal only; `tests/test_business_chat_flag.py` enforces this.
+`GET /business/workspace` reports the flag as `chat_available`.
+
 ## `GET /conversations`
 
 **Query Params:**
@@ -8242,6 +8258,10 @@ re-authorization or disconnect. Credentials, cursors and sync leases are never r
   unreviewed drafts from that connection are removed; confirmed activity stays.
   Repeating the call returns the ended connection with `not_applicable` and `0`.
   Another person's or an unknown id answers 404 `financial_connection_not_found`.
+  While `ARGUS_INGESTION_ENABLED` is off this route still disconnects a saved
+  document (`statement`) and erases its stored original, so a person can
+  always delete one. Any other source answers 404
+  `financial_connections_unavailable`, since no connector runs to revoke it.
 
 ### Plaid connector (default-off)
 
@@ -8510,11 +8530,16 @@ accepts the same true values as the other default-off surfaces (`1`, `true`,
 unrecognized value leaves the document surface off. A document setting that
 cannot be read, including a non-integer or out-of-range max-bytes value (0,
 negative, or above the 10 MiB cap), also leaves it off, with one warning per
-process. While the document surface is off, every `/api/v1/financial-documents`
-route answers 404 `financial_connections_unavailable` with
-`Cache-Control: no-store` and no extraction runs. Plaid,
-Gmail, Shortcuts, disconnect, and `GET /api/v1/financial-connections` keep
-their own gates.
+process. While the document surface is off, intake stops: upload, `prepare`,
+`resume` and `PATCH .../proposal` answer 404 `financial_connections_unavailable`
+with `Cache-Control: no-store` and no extraction runs; with preparation jobs on,
+a queued draft waits, unchanged, until extraction is back. What the owner already
+saved stays theirs: list, `GET /financial-documents/{connection_id}`, its
+`/source` and disconnect keep working. They also keep working while
+`ARGUS_INGESTION_ENABLED` is off, as long as financial accounts are on; then
+no preparation job starts and no model can be called. Without financial
+accounts every route answers 404 `financial_connections_unavailable`. Plaid,
+Gmail, Shortcuts and `GET /api/v1/financial-connections` keep their own gates.
 
 Capture responds with `{connection_id,status,replayed,candidate_count}`. Every
 upload answer, success or problem, is `Cache-Control: no-store`. The stored
@@ -8748,8 +8773,8 @@ uncertain fields, and more than 18 digits leaves the amount unresolved.
 ### WhatsApp receipt intake (default-off)
 
 Off unless `ARGUS_WHATSAPP_INTAKE_ENABLED` is true, its credentials are set and
-the document surface above is on. While off, every route below answers 404
-`whatsapp_unavailable`. A WhatsApp receipt becomes a document draft with
+the document surface above is on. While off, every route below except
+`DELETE /api/v1/whatsapp/link` answers 404 `whatsapp_unavailable`. A WhatsApp receipt becomes a document draft with
 `consent: false` and `status: saved`; AI preparation still waits for the
 owner's consent on the web. Spec and activation:
 [cuadrao-whatsapp-intake](specs/lanes/cuadrao-whatsapp-intake.md).
@@ -8765,8 +8790,8 @@ contacts or profiles.
 
 Intake is on only while the Business pilot (below) is on too. A receipt lands
 in the owner's Business space, read through `resolve_business_scope`; it never
-appears in Personal documents or imports. The link routes answer 404
-`business_space_missing` until the person starts their space. A capture whose
+appears in Personal documents or imports. Link codes and link status answer
+404 `business_space_missing` until the person starts their space. A capture whose
 sender link ended before it settled is recorded `rejected` with
 `sender_link_revoked`, keeps no connection, and gets the not-linked reply.
 
@@ -8795,8 +8820,13 @@ sender link ended before it settled is recorded `rejected` with
   `ARGUS_WHATSAPP_DISPLAY_PHONE_NUMBER` is set. Five codes per 10 minutes, then
   429 `whatsapp_link_code_rate_limited`.
 - GET `/api/v1/whatsapp/link` returns `{linked, last4, linked_at, reply_language}`.
-- DELETE `/api/v1/whatsapp/link` revokes the active link and every unused code
-  for the destination, and answers 204, also when nothing was linked.
+- DELETE `/api/v1/whatsapp/link` revokes the signed-in person's active link and
+  every unused code, and answers 204, also when nothing was linked. It is never
+  gated: it works with the Business pilot, intake or the document surface off,
+  and before a space exists, so a person can always unlink. With intake off it
+  writes the WhatsApp tables directly. It answers 503 `whatsapp_link_unavailable`
+  only when Postgres cannot be reached; in memory mode without intake nothing
+  holds a link and it answers 204. Unauthenticated calls answer 401.
 
 Replies are sent only when `ARGUS_WHATSAPP_OUTBOUND_ENABLED` is true, always as
 a free-form answer to the person's own message, in one language: the sender
@@ -8807,9 +8837,12 @@ nothing is sent outside the service window.
 
 ### Business pilot (default-off)
 
-Off unless `ARGUS_BUSINESS_PILOT_ENABLED` is true and the document surface
-above is on. While the flag is off every route below answers 404
-`business_unavailable` before authentication. Every response is
+Off unless `ARGUS_BUSINESS_PILOT_ENABLED` and `ARGUS_INGESTION_ENABLED` are
+both true. While either is off every route below answers 404
+`business_unavailable`; the pilot flag is checked before authentication. With
+`ARGUS_DOCUMENT_EXTRACTION_ENABLED` off, only receipt upload and preparation
+answer 404. Saved receipts stay readable and downloadable, and review,
+confirm, hand entry, expenses and the space routes keep working. Every response is
 `Cache-Control: no-store`. The routes are registered-only and match
 `web/lib/business-api.ts`.
 
@@ -8839,10 +8872,12 @@ by `receipt_review`. Its expense is the canonical activity that the import
 accept path recorded.
 
 - GET `/api/v1/business/workspace` returns `{accounts, currencies,
-  assistant_available: false, receipt_limits: {max_bytes, media_types}}`.
-  `accounts` lists unarchived cash, checking, savings and credit card accounts.
-  `currencies` lists their currencies. The limits come from the document
-  settings.
+  assistant_available: false, chat_available, receipt_limits: {max_bytes,
+  media_types}}`. `accounts` lists unarchived cash, checking, savings and credit
+  card accounts. `currencies` lists their currencies. The limits come from the
+  document settings. `chat_available` is true only while
+  `ARGUS_BUSINESS_CHAT_ENABLED` is on; while it is false `/biz` shows no
+  composer, no New chat and no Business Recents.
 - POST `/api/v1/business/accounts` (`Idempotency-Key` required) takes
   `{nickname, type, currency}` and answers 201, or 200 with the same account on
   an exact replay.
