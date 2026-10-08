@@ -340,16 +340,32 @@ export function textForParentValue(text: string, value: string | null, rules: Mo
 
 /**
  * An edit the browser did not announce as cancellable (word deletion, undo, an
- * IME commit) arrives as the whole new text. The field's own grouping commas
- * are not the user's, so they are dropped before the text is read.
+ * IME commit, autofill) arrives as the whole new text. Only the commas that
+ * were already in the field are its grouping; a comma in the changed segment is
+ * the user's and follows the same rules as an announced insert.
  */
-export function fallbackEdit(raw: string, caret: number, rules: MoneyRules): MoneyEdit {
+export function fallbackEdit(current: string, raw: string, caret: number, rules: MoneyRules): MoneyEdit {
+  let prefix = 0;
+  while (prefix < current.length && prefix < raw.length && current[prefix] === raw[prefix]) prefix += 1;
+  let suffix = 0;
+  while (
+    suffix < current.length - prefix &&
+    suffix < raw.length - prefix &&
+    current[current.length - 1 - suffix] === raw[raw.length - 1 - suffix]
+  ) {
+    suffix += 1;
+  }
+  const inserted = raw.slice(prefix, raw.length - suffix);
+  if (inserted.includes(",")) {
+    return editMoney(current, prefix, current.length - suffix, { type: "insert", text: inserted }, rules);
+  }
   const logical = ungroup(raw);
   if (!logical.trim()) return { kind: "accept", display: "", caret: 0, problem: null };
   const parsed = parsePasted(logical, rules);
   if ("problem" in parsed) return { kind: "reject", problem: parsed.problem };
-  const display = group(parsed.logical);
-  return { kind: "accept", display, caret: displayIndex(display, logicalIndex(raw, caret)), problem: null };
+  const mapped = normalize(logical, logicalIndex(raw, caret), true);
+  const logicalCaret = mapped.logical === parsed.logical ? mapped.caret : parsed.logical.length;
+  return accept(parsed.logical, logicalCaret, null);
 }
 
 /**

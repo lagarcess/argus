@@ -425,14 +425,30 @@ describe("MoneyInput decisions", () => {
 
   test("the onChange fallback reads past the field's own grouping", () => {
     // A non-cancellable insert of "0" after "1,250" arrives as the raw text "1,2500".
-    expect(fallbackEdit("1,2500", 6, DOP)).toEqual({ kind: "accept", display: "12,500", caret: 6, problem: null });
+    expect(fallbackEdit("1,250", "1,2500", 6, DOP)).toEqual({ kind: "accept", display: "12,500", caret: 6, problem: null });
     // A word deletion leaves a grouped remainder.
-    expect(fallbackEdit("1,250.", 6, DOP)).toEqual({ kind: "accept", display: "1,250.", caret: 6, problem: null });
-    expect(fallbackEdit("", 0, DOP)).toEqual({ kind: "accept", display: "", caret: 0, problem: null });
-    expect(fallbackEdit("1,25x", 5, DOP)).toEqual({ kind: "reject", problem: { code: "invalid" } });
-    expect(fallbackEdit("1,250.505", 9, DOP)).toEqual({
+    expect(fallbackEdit("1,250.50", "1,250.", 6, DOP)).toEqual({ kind: "accept", display: "1,250.", caret: 6, problem: null });
+    expect(fallbackEdit("12", "", 0, DOP)).toEqual({ kind: "accept", display: "", caret: 0, problem: null });
+    expect(fallbackEdit("1,25", "1,25x", 5, DOP)).toEqual({ kind: "reject", problem: { code: "invalid" } });
+    expect(fallbackEdit("1,250.50", "1,250.505", 9, DOP)).toEqual({
       kind: "reject",
       problem: { code: "precision", currency: "DOP", digits: 2 },
     });
+  });
+
+  test("a comma the user enters through the fallback is never dropped", () => {
+    // An IME types "," between 1 and 5 on a comma-decimal device: the decimal point.
+    expect(fallbackEdit("15", "1,5", 2, COMMA_DEVICE)).toEqual({ kind: "accept", display: "1.5", caret: 2, problem: null });
+    // An IME commits ",5" after 12 on a dot-decimal device: refused, not read as 125.
+    expect(fallbackEdit("12", "12,5", 4, DOP)).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+    // Autofill replaces the text with commas in the wrong places: refused, not read as 1,234.
+    expect(fallbackEdit("", "1,2,3,4", 7, DOP)).toEqual({ kind: "reject", problem: { code: "grouping" } });
+    expect(fallbackEdit("1,234", "1,2,3,4", 7, DOP)).toEqual({ kind: "reject", problem: { code: "grouping" } });
+    expect(fallbackEdit("", "1,2,3,4", 7, COMMA_DEVICE)).toEqual({ kind: "reject", problem: { code: "decimal_comma" } });
+  });
+
+  test("the fallback caret follows normalization", () => {
+    expect(fallbackEdit("", ".5", 1, DOP)).toEqual({ kind: "accept", display: "0.5", caret: 2, problem: null });
+    expect(fallbackEdit("", "007", 3, DOP)).toEqual({ kind: "accept", display: "7", caret: 1, problem: null });
   });
 });
