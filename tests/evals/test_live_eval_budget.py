@@ -64,8 +64,12 @@ def test_post_bound_refuses_an_unlisted_task_or_unpriced_model() -> None:
         FLAT.post_bound_usd("interpretation", "vendor/unpriced")
 
 
-def test_turn_bound_counts_the_research_reservations_only_when_research_is_reachable() -> None:
-    candidates: dict[str, tuple[str, ...]] = {task: ("m",) for task in budget.BOUNDED_TASKS}
+def test_turn_bound_counts_the_research_reservations_only_when_research_is_reachable() -> (
+    None
+):
+    candidates: dict[str, tuple[str, ...]] = {
+        task: ("m",) for task in budget.BOUNDED_TASKS
+    }
 
     # 7 x (1000 + 3200) + 2 x (1000 + 2200) + (1000 + 350) + (1000 + 600), per million.
     assert FLAT.turn_bound_usd(candidates, research_reachable=True) == Decimal("0.03875")
@@ -543,3 +547,58 @@ def test_an_incomplete_run_is_never_a_complete_scorecard() -> None:
     scorecards.assert_scorecard_complete(
         {**complete, "schema_version": 3, "budget": None}
     )
+
+
+def _judge_payload(content: str) -> dict[str, object]:
+    return {
+        "model": "m",
+        "messages": [{"role": "user", "content": content}],
+        "response_format": {
+            "type": "json_schema",
+            "json_schema": {"name": budget.JUDGE_SCHEMA_NAME, "schema": {}},
+        },
+    }
+
+
+def test_the_judge_has_its_own_cap_and_the_turn_keeps_its_own() -> None:
+    table = BoundTable(
+        prices=FLAT.prices, input_cap_bytes=1000, judge_input_cap_bytes=400
+    )
+    guard = table.request_guard()
+
+    assert guard("chat_composer", _judge_payload("x" * 200))
+    with pytest.raises(LiveEvalRequestRefused, match="exceeds the 400 byte input cap"):
+        guard("chat_composer", _judge_payload("x" * 500))
+    # The in-turn composer shares the task but not the judge's schema.
+    composer = {"model": "m", "messages": [{"role": "user", "content": "x" * 500}]}
+    assert guard("chat_composer", composer) is composer
+    # Two candidates, two posts each, at 400 + 1200 tokens per post.
+    assert table.judge_bound_usd(("m", "n")) == Decimal("0.0064")
+    unreported = {
+        "task": "chat_composer",
+        "schema_name": budget.JUDGE_SCHEMA_NAME,
+        "model": "m",
+        "outcome": "failed",
+    }
+    assert table.receipt_charge_usd(unreported) == Decimal("0.0016")
+
+
+def test_a_refused_post_makes_the_case_incomplete_not_failed_and_never_rerun() -> None:
+    calls: list[str] = []
+
+    def refused(case: harness.EvalCase) -> dict[str, Any]:
+        calls.append(case.id)
+        result = _result(case, status="failed", cost=None)
+        result["route_receipts"][0]["failure_mode"] = LiveEvalRequestRefused.__name__
+        return result
+
+    ledger = BudgetLedger(Decimal("5.00"))
+    results = budget.run_budgeted_cases(
+        [_case("long")], run_case=refused, bound_for=_bound, ledger=ledger, table=FLAT
+    )
+
+    assert calls == ["long"]
+    assert results[0]["status"] == "skipped_budget"
+    assert results[0]["failed_checks"][-1] == "budget:request_refused:interpretation"
+    assert ledger.spent_usd == Decimal(0)
+    assert budget.budget_summary(ledger, results, table=FLAT)["complete"] is False

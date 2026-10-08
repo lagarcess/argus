@@ -62,18 +62,20 @@ def _bound_for(turn: Decimal, judge: Decimal):  # noqa: ANN202
 
 def test_release_profile_bounds_with_research_off(release_models: None) -> None:
     turn, judge = _bounds(research_reachable=False)
-    assert (turn, judge) == (Decimal("1.23992"), Decimal("0.206208"))
+    # 7 x 0.13888 (haiku interpretation) + 2 x 0.13388 (haiku repair grant).
+    assert turn == Decimal("1.23992")
+    # 4 judge posts x 0.018784 (deepseek, 32,768 input + 1,200 output tokens).
+    assert judge == Decimal("0.075136")
     assert _bounds(research_reachable=True)[0] == Decimal("1.414902")
 
     per_case = [_bound_for(turn, judge)(case).total_usd for case in BUSINESS_CASES]
-    assert sorted(set(per_case)) == [Decimal("1.23992"), Decimal("1.446128")]
-    assert sum(per_case) == Decimal("19.627168")
+    assert sorted(set(per_case)) == [Decimal("1.23992"), Decimal("1.315056")]
+    assert sum(per_case) == Decimal("18.185376")
     # Every case may run once more after a failure.
-    assert 2 * sum(per_case) == Decimal("39.254336")
+    assert 2 * sum(per_case) == Decimal("36.370752")
     personal = load_eval_cases()
-    assert sum(_bound_for(turn, judge)(case).total_usd for case in personal) == Decimal(
-        "111.788320"
-    )
+    personal_total = sum(_bound_for(turn, judge)(case).total_usd for case in personal)
+    assert personal_total == Decimal("108.511520")
 
 
 def test_the_live_run_names_its_fixture_set() -> None:
@@ -167,7 +169,7 @@ def test_a_complete_business_run_is_a_complete_business_scorecard(
 def test_a_business_run_the_budget_cut_short_is_incomplete_and_refused(
     release_models: None,
 ) -> None:
-    # Covers an unjudged case's 1.23992 bound but no judged case's 1.446128.
+    # Covers an unjudged case's 1.23992 bound but no judged case's 1.315056.
     ledger = BudgetLedger(Decimal("1.30"))
     results = run_budgeted_cases(
         BUSINESS_CASES,

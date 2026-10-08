@@ -39,6 +39,13 @@ _RECEIPT_TOLERANCE_USD = Decimal("0.00001")
 # (x-ai/grok-4.3 and anthropic/claude-haiku-4.5 wire payloads): 61,734 bytes,
 # 3.9 to 4.9 bytes per billed prompt token in the accepted measurement.
 INPUT_CAP_BYTES = 98_304
+# The prose judge posts its rubric, the case prompt, the reply and what renders
+# beside it; across every committed receipt its task's prompt peaks at 2,519
+# tokens, about 12,300 bytes at 4.9 bytes per token. The cap is 2.6 times that.
+# A judge request over it is refused before it is sent, and the case is then
+# incomplete, never a pass.
+JUDGE_INPUT_CAP_BYTES = 32_768
+JUDGE_SCHEMA_NAME = "ArgusProseJudgeResponse"
 
 # A candidate model is posted once, and once more without `reasoning` after a
 # 400 (argus.llm.openrouter._post_openrouter_json_schema).
@@ -185,10 +192,18 @@ class BoundTable:
 
     prices: Mapping[str, TokenPrice]
     input_cap_bytes: int
+    judge_input_cap_bytes: int | None = None
 
-    def post_bound_usd(self, task: str, model: str) -> Decimal:
+    def cap_bytes(self, *, judge: bool) -> int:
+        """The input cap of a judge post or of any turn post."""
+        if judge and self.judge_input_cap_bytes is not None:
+            return self.judge_input_cap_bytes
+        return self.input_cap_bytes
+
+    def post_bound_usd(self, task: str, model: str, *, judge: bool = False) -> Decimal:
         """The most one post of `task` to `model` can bill: every input byte
-        billed as a token, and the profile's max_tokens of output."""
+        under its cap billed as a token, and the profile's max_tokens of
+        output."""
         bounded_task = _bounded_task(task)
         if bounded_task is None:
             raise UnpricedCallError(f"task {task!r} is outside the bounded task set")
@@ -197,7 +212,9 @@ class BoundTable:
             raise UnpricedCallError(f"model {model!r} has no pinned price")
         max_tokens = OPENROUTER_PROFILES[bounded_task].max_tokens
         return _token_cost(
-            prompt_tokens=self.input_cap_bytes, completion_tokens=max_tokens, price=price
+            prompt_tokens=self.cap_bytes(judge=judge),
+            completion_tokens=max_tokens,
+            price=price,
         )
 
     def task_candidates_from_env(self) -> dict[str, tuple[str, ...]]:
@@ -263,7 +280,8 @@ class BoundTable:
             DEFAULT_TURN_CALL_ALLOWANCE, POSTS_PER_CANDIDATE * len(judge_candidates)
         )
         return Decimal(posts) * max(
-            self.post_bound_usd(_JUDGE_TASK, model) for model in judge_candidates
+            self.post_bound_usd(_JUDGE_TASK, model, judge=True)
+            for model in judge_candidates
         )
 
     def request_guard(self) -> Callable[[str, dict[str, object]], dict[str, object]]:
@@ -279,10 +297,12 @@ class BoundTable:
             if model not in self.prices:
                 raise LiveEvalRequestRefused(f"model {model!r} has no pinned price")
             size = request_size_bytes(payload)
-            if size > self.input_cap_bytes:
+            cap = self.cap_bytes(
+                judge=task == _JUDGE_TASK and _schema_name(payload) == JUDGE_SCHEMA_NAME
+            )
+            if size > cap:
                 raise LiveEvalRequestRefused(
-                    f"request of {size} bytes exceeds the {self.input_cap_bytes} "
-                    "byte input cap"
+                    f"request of {size} bytes exceeds the {cap} byte input cap"
                 )
             return payload
 
@@ -302,7 +322,9 @@ class BoundTable:
                 return Decimal(str(raw_cost))
             except InvalidOperation:
                 pass
-        return self.post_bound_usd(str(receipt.get("task")), str(receipt.get("model")))
+        return self.post_bound_usd(
+            str(receipt.get("task")), str(receipt.get("model")), judge=_judged(receipt)
+        )
 
     def receipt_bound_violation(self, receipt: Mapping[str, Any]) -> str | None:
         """Why a receipt shows the bound's assumptions broken, or None.
@@ -319,8 +341,9 @@ class BoundTable:
         usage = receipt.get("token_usage") or {}
         prompt_tokens = int(usage.get("prompt_tokens") or 0)
         completion_tokens = int(usage.get("completion_tokens") or 0)
-        if prompt_tokens > self.input_cap_bytes:
-            return f"prompt_tokens {prompt_tokens} exceeds the {self.input_cap_bytes} input cap"
+        cap = self.cap_bytes(judge=_judged(receipt))
+        if prompt_tokens > cap:
+            return f"prompt_tokens {prompt_tokens} exceeds the {cap} input cap"
         bounded_task = _bounded_task(task)
         if bounded_task is not None:
             max_tokens = OPENROUTER_PROFILES[bounded_task].max_tokens
@@ -343,6 +366,7 @@ class BoundTable:
     def as_dict(self) -> dict[str, Any]:
         return {
             "input_cap_bytes": self.input_cap_bytes,
+            "judge_input_cap_bytes": self.cap_bytes(judge=True),
             "price_table_usd_per_million": {
                 model: {
                     "input": str(price.input_usd_per_million),
@@ -359,7 +383,11 @@ class BoundTable:
         return max(self.post_bound_usd(task, model) for model in task_candidates[task])
 
 
-PINNED = BoundTable(prices=PRICE_TABLE_USD_PER_MILLION, input_cap_bytes=INPUT_CAP_BYTES)
+PINNED = BoundTable(
+    prices=PRICE_TABLE_USD_PER_MILLION,
+    input_cap_bytes=INPUT_CAP_BYTES,
+    judge_input_cap_bytes=JUDGE_INPUT_CAP_BYTES,
+)
 
 
 @dataclass(frozen=True)
@@ -515,6 +543,22 @@ def _charged_attempt(
         charged = max(charged, bound.total_usd)
         ledger.stop(f"{result['id']}: {violation}")
     ledger.charge(charged, case_id=str(result["id"]), attempt=attempt)
+    refused = sorted(
+        {
+            str(r.get("task"))
+            for r in receipts
+            if r.get("failure_mode") == LiveEvalRequestRefused.__name__
+        }
+    )
+    if refused:
+        # A post the bound would not cover never ran, so the case measured
+        # nothing for it: incomplete, never a product failure or a pass, and
+        # never rerun.
+        result["status"] = SKIPPED_BUDGET_STATUS
+        result["failed_checks"] = [
+            *result.get("failed_checks", []),
+            *(f"budget:request_refused:{task}" for task in refused),
+        ]
     result["budget"] = {
         "bound": bound.as_dict(),
         "charged_usd": _money(charged),
@@ -557,6 +601,21 @@ def _skipped_for_budget(
             "skipped_reason": reason,
         },
     }
+
+
+def _schema_name(payload: Mapping[str, object]) -> str | None:
+    response_format = payload.get("response_format")
+    if not isinstance(response_format, Mapping):
+        return None
+    schema = response_format.get("json_schema")
+    return str(schema.get("name")) if isinstance(schema, Mapping) else None
+
+
+def _judged(receipt: Mapping[str, Any]) -> bool:
+    return (
+        receipt.get("task") == _JUDGE_TASK
+        and receipt.get("schema_name") == JUDGE_SCHEMA_NAME
+    )
 
 
 def _bounded_task(task: str) -> OpenRouterTask | None:

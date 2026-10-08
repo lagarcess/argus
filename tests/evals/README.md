@@ -144,9 +144,12 @@ text.
   counts them. The judge runs in its own scope.
 - A request guard sees every OpenRouter post before it is sent and refuses any
   task outside the bounded set, any model without a pinned price, and any
-  request over the input cap (`INPUT_CAP_BYTES`, 98,304 bytes). A token is at
-  least one byte, so the cap bounds the prompt tokens a post can bill; the
-  profile's `max_tokens` bounds its output.
+  request over its input cap: `INPUT_CAP_BYTES` (98,304 bytes) for every turn
+  post, and `JUDGE_INPUT_CAP_BYTES` (32,768 bytes) for the prose judge's post.
+  A token is at least one byte, so the cap bounds the prompt tokens a post can
+  bill; the profile's `max_tokens` bounds its output. A case with a refused
+  post measured nothing for it, so it is `skipped_budget` (incomplete), never
+  a product failure, and it is not rerun.
 - A case's bound is one turn bound per turn (two for a `followup_prompt`
   case) plus the judge bound when the case is prose-judged. It starts only
   while the remaining budget covers that bound; otherwise its result is
