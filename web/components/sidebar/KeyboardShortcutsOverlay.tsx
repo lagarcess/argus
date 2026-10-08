@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Keyboard, X } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useModalSurface } from "@/components/layout/useModalSurface";
+import { useChatAvailable } from "@/components/chat/ChatWorkspace";
 import {
   KEYBOARD_SHORTCUTS,
   keyboardShortcutDisplay,
@@ -40,9 +41,9 @@ const CHAT_HELP_ORDER: readonly KeyboardShortcutId[] = [
   "delete_focused_chat",
 ];
 
-function shortcutsForHelpGroup(group: KeyboardShortcutGroup) {
+function shortcutsForHelpGroup(group: KeyboardShortcutGroup, chatAvailable: boolean) {
   const shortcuts = KEYBOARD_SHORTCUTS.filter(
-    (shortcut) => shortcut.group === group,
+    (shortcut) => shortcut.group === group && (chatAvailable || !shortcut.needsChat),
   );
   if (group !== "chat") return shortcuts;
   return [...shortcuts].sort(
@@ -59,6 +60,7 @@ export function KeyboardShortcutsOverlaySurface({
   // Reachable from the drawer, so it owns Escape, focus, and system back.
   useModalSurface({ isOpen: true, overlayId, containerRef: modalRef, onDismiss: onClose });
   const { t } = useTranslation();
+  const chatAvailable = useChatAvailable();
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const [showCommandKey, setShowCommandKey] = useState(false);
 
@@ -126,7 +128,8 @@ export function KeyboardShortcutsOverlaySurface({
 
         <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
           {HELP_GROUPS.map((group) => {
-            const shortcuts = shortcutsForHelpGroup(group.id);
+            const shortcuts = shortcutsForHelpGroup(group.id, chatAvailable);
+            if (shortcuts.length === 0) return null;
             return (
               <div
                 key={group.id}

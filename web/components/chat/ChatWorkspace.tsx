@@ -74,6 +74,12 @@ export type ChatWorkspace = Readonly<{
   id: string;
   /** Whose chats the shell lists, creates, searches and deletes. */
   conversationSurface: ConversationSurface;
+  /**
+   * Whether this workspace offers conversations now. False removes every way
+   * into a chat: New chat, Recents, conversation search, Ask, the composers
+   * and the chat shortcuts. The shell then stays on the workspace panel.
+   */
+  chatAvailable: boolean;
   initialView: ChatShellView;
   profileInHeader: boolean;
   /** Whether the current panel keeps the composer at its bottom edge. */
@@ -95,6 +101,20 @@ export const ChatWorkspaceProvider = ChatWorkspaceContext.Provider;
 
 export function useChatWorkspace(): ChatWorkspace | null {
   return useContext(ChatWorkspaceContext);
+}
+
+/** Personal outside a workspace, and Personal always has chat. */
+export function workspaceChatAvailable(workspace: ChatWorkspace | null): boolean {
+  return workspace === null || workspace.chatAvailable;
+}
+
+export function useChatAvailable(): boolean {
+  return workspaceChatAvailable(useContext(ChatWorkspaceContext));
+}
+
+/** The view the shell shows: a workspace without chat never shows a conversation. */
+export function visibleShellView(workspace: ChatWorkspace | null, view: ChatShellView): ChatShellView {
+  return view === "chat" && !workspaceChatAvailable(workspace) ? "workspace" : view;
 }
 
 /** Personal outside a workspace, so /chat keeps its own history. */

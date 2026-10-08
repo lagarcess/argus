@@ -17,11 +17,13 @@ import type { BusinessPanelState } from "./BusinessWorkspace";
  */
 export function useBusinessSearch({
   source,
+  chatAvailable,
   accounts,
   openPanel,
   setPeriod,
 }: {
   source: BusinessDataSource;
+  chatAvailable: boolean;
   accounts: readonly BusinessAccount[];
   openPanel: (panel: BusinessPanelState) => void;
   setPeriod: (key: Period["key"]) => void;
@@ -35,7 +37,9 @@ export function useBusinessSearch({
     const line = (...parts: (string | null | undefined)[]) => parts.filter(Boolean).join(" · ");
     return {
       copy: {
-        placeholder: t("business.search.placeholder", "Search expenses, receipts and chats"),
+        placeholder: chatAvailable
+          ? t("business.search.placeholder", "Search expenses, receipts and chats")
+          : t("business.search.placeholder_records", "Search expenses and receipts"),
         noResultsHint: t("business.search.no_results_hint", "Try a merchant or a file name."),
         region: t("business.search.region", "Business records"),
         loading: t("business.search.loading", "Searching your business"),
@@ -80,5 +84,5 @@ export function useBusinessSearch({
         ];
       },
     };
-  }, [accounts, locale, openPanel, setPeriod, source, statusLabel, t]);
+  }, [accounts, chatAvailable, locale, openPanel, setPeriod, source, statusLabel, t]);
 }

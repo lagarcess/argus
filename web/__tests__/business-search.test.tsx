@@ -96,6 +96,7 @@ async function businessSearch(found: BusinessSearchResult) {
   function Probe() {
     built = useBusinessSearch({
       source,
+      chatAvailable: true,
       accounts: [{ id: "acct-1", nickname: "Caja", type: "cash", currency: "DOP" }],
       openPanel: (panel) => opened.push(panel),
       setPeriod: (key) => periods.push(key),

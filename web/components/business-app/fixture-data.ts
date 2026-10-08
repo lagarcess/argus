@@ -271,7 +271,11 @@ function matches(query: string, text: string): boolean {
 
 const delay = (ms = 240) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export function createFixtureBusinessDataSource(): BusinessDataSource {
+export type FixtureOptions = Readonly<{ chatAvailable: boolean }>;
+
+export function createFixtureBusinessDataSource(
+  { chatAvailable }: FixtureOptions = { chatAvailable: true },
+): BusinessDataSource {
   let receipts = seedReceipts();
   let expenses = seedExpenses();
   let counter = 0;
@@ -301,6 +305,7 @@ export function createFixtureBusinessDataSource(): BusinessDataSource {
         accounts: ACCOUNTS,
         currencies: ["DOP", "USD"],
         assistant_available: true,
+        chat_available: chatAvailable,
         receipt_limits: {
           max_bytes: 10 * 1024 * 1024,
           media_types: ["application/pdf", "image/jpeg", "image/png"],

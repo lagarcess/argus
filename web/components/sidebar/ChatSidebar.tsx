@@ -5,7 +5,7 @@ import { conversationPreviewText } from "@/lib/conversation-preview-display";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { useConversationSurface, type ChatShellView } from "@/components/chat/ChatWorkspace";
+import { useChatAvailable, useConversationSurface, type ChatShellView } from "@/components/chat/ChatWorkspace";
 import {
   ChevronDown,
   History,
@@ -196,6 +196,7 @@ export default function ChatSidebar({
 }: ChatSidebarProps) {
   const { t, i18n } = useTranslation();
   const surface = useConversationSurface();
+  const chatAvailable = useChatAvailable();
   const { selectPresentation, selectAggregatePresentation, selectOperationLabel } =
     useConversationActivityPresentation();
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -363,6 +364,7 @@ export default function ChatSidebar({
   );
   const { isQuickJumpActive, numberFor } = useQuickJump({
     enabled:
+      chatAvailable &&
       isOpen &&
       isRecentsExpanded &&
       renamingId === null &&
@@ -516,17 +518,19 @@ export default function ChatSidebar({
 
       <div className="flex flex-1 flex-col overflow-y-auto overflow-x-hidden px-[6px] pb-4 pt-2">
         {/* Main Navigation */}
-        <SidebarNavButton
-          icon={MessageCirclePlus}
-          label={t("chat.new_chat")}
-          collapsed={!isOpen}
-          shortcutHint={keyboardShortcutHintDisplay("new_chat", usesCommandKey)}
-          showShortcutHint={shortcutHintsVisible}
-          onClick={() => {
-            onNewChat();
-          }}
-          iconSize={20}
-        />
+        {chatAvailable && (
+          <SidebarNavButton
+            icon={MessageCirclePlus}
+            label={t("chat.new_chat")}
+            collapsed={!isOpen}
+            shortcutHint={keyboardShortcutHintDisplay("new_chat", usesCommandKey)}
+            showShortcutHint={shortcutHintsVisible}
+            onClick={() => {
+              onNewChat();
+            }}
+            iconSize={20}
+          />
+        )}
 
         {omnisearchEnabled && (
           <SidebarNavButton
@@ -543,320 +547,322 @@ export default function ChatSidebar({
         {primaryNav}
 
         {/* Recents Accordion */}
-        <div className="mb-2 mt-2">
-          <SidebarNavButton
-            icon={History}
-            label={t("common.recents")}
-            collapsed={!isOpen}
-            activityPresentation={aggregateActivityPresentation}
-            shortcutHint={keyboardShortcutHintDisplay(
-              "expand_sidebar_recents",
-              usesCommandKey,
-            )}
-            showShortcutHint={shortcutHintsVisible}
-            onClick={() => {
-              if (!isOpen) {
-                // When collapsed: expand sidebar + open recents
-                onToggle();
-                if (!isRecentsExpanded) onToggleRecents();
-              } else {
-                onToggleRecents();
-              }
-            }}
-            trailing={
-              <ChevronDown
-                className={`h-4 w-4 text-black/40 transition-transform duration-200 dark:text-white/40 ${
-                  isRecentsExpanded ? "rotate-180" : ""
-                }`}
-              />
-            }
-          />
-
-          {isRecentsExpanded && isOpen && (
-            <div className="max-h-[50vh] overflow-y-auto pb-2">
-              <div className="flex flex-col gap-4 pb-2">
-              {chatItems.length === 0 ? (
-                <div className="px-11 py-6">
-                  <p className="text-[13px] leading-relaxed text-black/30 dark:text-white/30">
-                    {t("chat.no_recent_activity")}
-                  </p>
-                </div>
-              ) : (
-                <>
-                  {groupedHistory.map((group) => {
-                    const groupLabel = t(`chat.history.${group.key}`);
-                    const groupHeadingId = `recents-${group.key}-heading`;
-                    const groupItemsId = `recents-${group.key}-items`;
-                    const isGroupExpanded = expandedRecentGroups.has(group.key);
-                    const canToggleGroup =
-                      !group.isPinned &&
-                      group.items.length > RECENTS_INITIAL_GROUP_LIMIT;
-                    const visibleItems = getVisibleRecentChats(group, {
-                      expanded: isGroupExpanded,
-                      selectedConversationId: conversationId,
-                    });
-
-                    return (
-                      <section
-                        key={group.key}
-                        aria-labelledby={groupHeadingId}
-                        className="flex flex-col"
-                      >
-                        <div className="px-11 py-2">
-                          <h3
-                            id={groupHeadingId}
-                            className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40"
-                          >
-                            {group.isPinned && (
-                              <Pin className="h-3 w-3" />
-                            )}
-                            {groupLabel}
-                          </h3>
-                        </div>
-                        <div id={groupItemsId}>
-                        {visibleItems.map((item) => {
-                        const itemConversationId = historyConversationId(item);
-                        const isActiveConversation = conversationId === itemConversationId;
-                        const isUnread = conversationActivity.hasEffectiveUnread(itemConversationId);
-                        const isReadMutationPending = isUnread
-                          ? conversationActivity.isMutationPending(itemConversationId, "mark_read")
-                          : conversationActivity.isMutationPending(itemConversationId, "mark_unread");
-                        const itemActivityPresentation = selectPresentation(itemConversationId);
-                        const itemOperationLabel = selectOperationLabel(itemConversationId);
-                        const displayTitle = conversationDisplayTitle(
-                          item,
-                          t("chat.new_chat", "New chat"),
-                        );
-                        const activityLabel = conversationActivityLabelDescriptor(
-                          itemActivityPresentation,
-                          itemOperationLabel,
-                        );
-                        const rowAriaLabel = activityLabel
-                          ? `${displayTitle}. ${t(activityLabel.key, activityLabel.defaultValue)}.`
-                          : displayTitle;
-                        const conversationActionItem =
-                          item.id === itemConversationId ? item : { ...item, id: itemConversationId };
-                        const expiresAt = item.expires_at ?? guestExpiresAt;
-                        const quickJumpNumber = numberFor(itemConversationId);
-                        const quickJumpHint =
-                          isQuickJumpActive && quickJumpNumber !== null ? (
-                            <span
-                              data-quick-jump-hint={quickJumpNumber}
-                              className="pointer-events-none flex h-[22px] items-center justify-end"
-                            >
-                              <QuickJumpBadge
-                                number={quickJumpNumber}
-                                presentation="shortcut_hint"
-                                usesCommandKey={usesCommandKey}
-                              />
-                            </span>
-                          ) : null;
-
-                        return (
-                          <div
-                            key={`chat:${item.id}`}
-                            role="button"
-                            tabIndex={0}
-                            aria-label={rowAriaLabel}
-                            aria-current={isActiveConversation ? "page" : undefined}
-                            data-active-conversation={isActiveConversation ? "true" : undefined}
-                            data-conversation-id={itemConversationId}
-                            onClick={(e) => {
-                              // Only navigate if click was on this element or its text children,
-                              // not on nested interactive elements (three-dot menu)
-                              const target = e.target as HTMLElement;
-                              if (target.closest('[data-actions]')) return;
-                              if (renamingId !== item.id) {
-                                onOpenItem(item);
-                              }
-                            }}
-                            onKeyDown={(e) => {
-                              if (
-                                (e.key === "Enter" || e.key === " ") &&
-                                e.target === e.currentTarget &&
-                                renamingId !== item.id
-                              ) {
-                                e.preventDefault();
-                                onOpenItem(item);
-                              }
-                            }}
-                            className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-offset-1 dark:hover:bg-white/5 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-[#141517] ${
-                              isActiveConversation ? "bg-black/5 dark:bg-white/5" : ""
-                            }`}
-                          >
-                          <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center">
-                            <ConversationActivityIndicator
-                              presentation={itemActivityPresentation}
-                            />
-                          </div>
-                          <div
-                            className={`min-w-0 flex-1 pl-3 ${
-                              quickJumpHint ? "pr-[104px]" : "pr-10"
-                            }`}
-                          >
-                            {renamingId === item.id ? (
-                              <>
-                                <input
-                                  autoFocus
-                                  type="text"
-                                  value={renameValue}
-                                  onChange={(e) => setRenameValue(e.target.value.slice(0, 80))}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      void handleSaveRename();
-                                    } else if (e.key === "Escape") {
-                                      handleCancelRename();
-                                    }
-                                  }}
-                                  onBlur={() => void handleSaveRename()}
-                                  onClick={(e) => e.stopPropagation()}
-                                  aria-invalid={Boolean(renameError)}
-                                  className="w-full rounded-md border border-black/20 bg-transparent px-1.5 py-0.5 text-[14px] font-medium outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/40"
-                                  maxLength={80}
-                                />
-                                {renameError && (
-                                  <p className={`mt-1 text-[11px] font-medium ${inlineFailureTextClass}`} role="alert">
-                                    {renameError}
-                                  </p>
-                                )}
-                              </>
-                            ) : (
-                              <>
-                                <span
-                                  key={displayTitle}
-                                  className="font-display block truncate text-[14px] font-medium tracking-tight text-black dark:text-white animate-in fade-in duration-300"
-                                >
-                                  {displayTitle}
-                                </span>
-                                <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
-                                  {conversationPreviewText(item.preview, t)}
-                                </span>
-                                {isGuest && expiresAt ? (
-                                  <time
-                                    dateTime={expiresAt}
-                                    title={expiresAt}
-                                    className="mt-0.5 block truncate text-[11px] text-black/35 dark:text-white/35"
-                                  >
-                                    {t("guest.history.expires_at", {
-                                      defaultValue: "Available until {{date}}",
-                                      date: new Intl.DateTimeFormat(
-                                        i18n.resolvedLanguage ?? i18n.language,
-                                        {
-                                          dateStyle: "medium",
-                                          timeStyle: "short",
-                                        },
-                                      ).format(new Date(expiresAt)),
-                                    })}
-                                  </time>
-                                ) : null}
-                              </>
-                            )}
-                          </div>
-                          {renamingId !== item.id &&
-                            (canManageConversation || quickJumpHint) && (
-                              <div className="absolute right-2 top-1/2 flex h-11 w-[88px] -translate-y-1/2 items-center justify-end">
-                                {canManageConversation ? (
-                                  <RecentChatActions
-                                    item={conversationActionItem}
-                                    onPin={handlePin}
-                                    onRename={handleStartRename}
-                                    onArchive={handleArchive}
-                                    onDelete={handleRequestDelete}
-                                    isUnread={isUnread}
-                                    isReadMutationPending={isReadMutationPending}
-                                    onToggleUnread={() =>
-                                      isUnread
-                                        ? conversationActivity.markRead(itemConversationId, conversationActivity.selectAttentionCursor(itemConversationId))
-                                        : conversationActivity.markUnread(itemConversationId)
-                                    }
-                                    quickJumpHint={quickJumpHint}
-                                  />
-                                ) : (
-                                  quickJumpHint
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                        })}
-                        </div>
-                        {canToggleGroup && (
-                          <button
-                            type="button"
-                            aria-controls={groupItemsId}
-                            aria-expanded={isGroupExpanded}
-                            aria-label={t(
-                              isGroupExpanded
-                                ? "chat.history.show_less_in"
-                                : "chat.history.show_more_in",
-                              { group: groupLabel },
-                            )}
-                            onClick={() => toggleRecentGroup(group.key)}
-                            className="mx-11 flex min-h-11 items-center rounded-lg text-left text-[12px] font-medium text-black/55 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 motion-reduce:transition-none dark:text-white/55 dark:hover:text-white dark:focus-visible:ring-white/40"
-                          >
-                            {t(
-                              isGroupExpanded
-                                ? "chat.history.show_less"
-                                : "chat.history.show_more",
-                            )}
-                          </button>
-                        )}
-                      </section>
-                    );
-                  })}
-                </>
+        {chatAvailable && (
+          <div className="mb-2 mt-2">
+            <SidebarNavButton
+              icon={History}
+              label={t("common.recents")}
+              collapsed={!isOpen}
+              activityPresentation={aggregateActivityPresentation}
+              shortcutHint={keyboardShortcutHintDisplay(
+                "expand_sidebar_recents",
+                usesCommandKey,
               )}
-                  {historyNextCursor && (
-                    <div className="px-11">
-                      <button
-                        type="button"
-                        disabled={isLoadingMoreHistory}
-                        aria-busy={isLoadingMoreHistory}
-                        onClick={onLoadMoreHistory}
-                        className="flex min-h-11 w-full items-center rounded-lg text-left text-[12px] font-medium text-black/55 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:text-black/30 motion-reduce:transition-none dark:text-white/55 dark:hover:text-white dark:focus-visible:ring-white/40 dark:disabled:text-white/30"
-                      >
-                        {t(
-                          isLoadingMoreHistory
-                            ? "chat.history.loading_older"
-                            : "chat.history.load_older",
-                        )}
-                      </button>
-                    </div>
-                  )}
-                  {!historyNextCursor &&
-                    hasRequestedOlderHistory &&
-                    !historyLoadMoreError && (
+              showShortcutHint={shortcutHintsVisible}
+              onClick={() => {
+                if (!isOpen) {
+                  // When collapsed: expand sidebar + open recents
+                  onToggle();
+                  if (!isRecentsExpanded) onToggleRecents();
+                } else {
+                  onToggleRecents();
+                }
+              }}
+              trailing={
+                <ChevronDown
+                  className={`h-4 w-4 text-black/40 transition-transform duration-200 dark:text-white/40 ${
+                    isRecentsExpanded ? "rotate-180" : ""
+                  }`}
+                />
+              }
+            />
+
+            {isRecentsExpanded && isOpen && (
+              <div className="max-h-[50vh] overflow-y-auto pb-2">
+                <div className="flex flex-col gap-4 pb-2">
+                {chatItems.length === 0 ? (
+                  <div className="px-11 py-6">
+                    <p className="text-[13px] leading-relaxed text-black/30 dark:text-white/30">
+                      {t("chat.no_recent_activity")}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {groupedHistory.map((group) => {
+                      const groupLabel = t(`chat.history.${group.key}`);
+                      const groupHeadingId = `recents-${group.key}-heading`;
+                      const groupItemsId = `recents-${group.key}-items`;
+                      const isGroupExpanded = expandedRecentGroups.has(group.key);
+                      const canToggleGroup =
+                        !group.isPinned &&
+                        group.items.length > RECENTS_INITIAL_GROUP_LIMIT;
+                      const visibleItems = getVisibleRecentChats(group, {
+                        expanded: isGroupExpanded,
+                        selectedConversationId: conversationId,
+                      });
+
+                      return (
+                        <section
+                          key={group.key}
+                          aria-labelledby={groupHeadingId}
+                          className="flex flex-col"
+                        >
+                          <div className="px-11 py-2">
+                            <h3
+                              id={groupHeadingId}
+                              className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-black/40 dark:text-white/40"
+                            >
+                              {group.isPinned && (
+                                <Pin className="h-3 w-3" />
+                              )}
+                              {groupLabel}
+                            </h3>
+                          </div>
+                          <div id={groupItemsId}>
+                          {visibleItems.map((item) => {
+                          const itemConversationId = historyConversationId(item);
+                          const isActiveConversation = conversationId === itemConversationId;
+                          const isUnread = conversationActivity.hasEffectiveUnread(itemConversationId);
+                          const isReadMutationPending = isUnread
+                            ? conversationActivity.isMutationPending(itemConversationId, "mark_read")
+                            : conversationActivity.isMutationPending(itemConversationId, "mark_unread");
+                          const itemActivityPresentation = selectPresentation(itemConversationId);
+                          const itemOperationLabel = selectOperationLabel(itemConversationId);
+                          const displayTitle = conversationDisplayTitle(
+                            item,
+                            t("chat.new_chat", "New chat"),
+                          );
+                          const activityLabel = conversationActivityLabelDescriptor(
+                            itemActivityPresentation,
+                            itemOperationLabel,
+                          );
+                          const rowAriaLabel = activityLabel
+                            ? `${displayTitle}. ${t(activityLabel.key, activityLabel.defaultValue)}.`
+                            : displayTitle;
+                          const conversationActionItem =
+                            item.id === itemConversationId ? item : { ...item, id: itemConversationId };
+                          const expiresAt = item.expires_at ?? guestExpiresAt;
+                          const quickJumpNumber = numberFor(itemConversationId);
+                          const quickJumpHint =
+                            isQuickJumpActive && quickJumpNumber !== null ? (
+                              <span
+                                data-quick-jump-hint={quickJumpNumber}
+                                className="pointer-events-none flex h-[22px] items-center justify-end"
+                              >
+                                <QuickJumpBadge
+                                  number={quickJumpNumber}
+                                  presentation="shortcut_hint"
+                                  usesCommandKey={usesCommandKey}
+                                />
+                              </span>
+                            ) : null;
+
+                          return (
+                            <div
+                              key={`chat:${item.id}`}
+                              role="button"
+                              tabIndex={0}
+                              aria-label={rowAriaLabel}
+                              aria-current={isActiveConversation ? "page" : undefined}
+                              data-active-conversation={isActiveConversation ? "true" : undefined}
+                              data-conversation-id={itemConversationId}
+                              onClick={(e) => {
+                                // Only navigate if click was on this element or its text children,
+                                // not on nested interactive elements (three-dot menu)
+                                const target = e.target as HTMLElement;
+                                if (target.closest('[data-actions]')) return;
+                                if (renamingId !== item.id) {
+                                  onOpenItem(item);
+                                }
+                              }}
+                              onKeyDown={(e) => {
+                                if (
+                                  (e.key === "Enter" || e.key === " ") &&
+                                  e.target === e.currentTarget &&
+                                  renamingId !== item.id
+                                ) {
+                                  e.preventDefault();
+                                  onOpenItem(item);
+                                }
+                              }}
+                              className={`group relative flex w-full cursor-pointer items-center gap-3 rounded-[14px] px-0 py-2 transition-all duration-200 hover:bg-black/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 focus-visible:ring-offset-1 dark:hover:bg-white/5 dark:focus-visible:ring-white/40 dark:focus-visible:ring-offset-[#141517] ${
+                                isActiveConversation ? "bg-black/5 dark:bg-white/5" : ""
+                              }`}
+                            >
+                            <div className="flex h-6 w-11 flex-shrink-0 items-center justify-center">
+                              <ConversationActivityIndicator
+                                presentation={itemActivityPresentation}
+                              />
+                            </div>
+                            <div
+                              className={`min-w-0 flex-1 pl-3 ${
+                                quickJumpHint ? "pr-[104px]" : "pr-10"
+                              }`}
+                            >
+                              {renamingId === item.id ? (
+                                <>
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={renameValue}
+                                    onChange={(e) => setRenameValue(e.target.value.slice(0, 80))}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") {
+                                        e.preventDefault();
+                                        void handleSaveRename();
+                                      } else if (e.key === "Escape") {
+                                        handleCancelRename();
+                                      }
+                                    }}
+                                    onBlur={() => void handleSaveRename()}
+                                    onClick={(e) => e.stopPropagation()}
+                                    aria-invalid={Boolean(renameError)}
+                                    className="w-full rounded-md border border-black/20 bg-transparent px-1.5 py-0.5 text-[14px] font-medium outline-none focus:border-black/40 dark:border-white/20 dark:focus:border-white/40"
+                                    maxLength={80}
+                                  />
+                                  {renameError && (
+                                    <p className={`mt-1 text-[11px] font-medium ${inlineFailureTextClass}`} role="alert">
+                                      {renameError}
+                                    </p>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <span
+                                    key={displayTitle}
+                                    className="font-display block truncate text-[14px] font-medium tracking-tight text-black dark:text-white animate-in fade-in duration-300"
+                                  >
+                                    {displayTitle}
+                                  </span>
+                                  <span className="mt-0.5 block truncate text-[12px] text-black/40 dark:text-white/40">
+                                    {conversationPreviewText(item.preview, t)}
+                                  </span>
+                                  {isGuest && expiresAt ? (
+                                    <time
+                                      dateTime={expiresAt}
+                                      title={expiresAt}
+                                      className="mt-0.5 block truncate text-[11px] text-black/35 dark:text-white/35"
+                                    >
+                                      {t("guest.history.expires_at", {
+                                        defaultValue: "Available until {{date}}",
+                                        date: new Intl.DateTimeFormat(
+                                          i18n.resolvedLanguage ?? i18n.language,
+                                          {
+                                            dateStyle: "medium",
+                                            timeStyle: "short",
+                                          },
+                                        ).format(new Date(expiresAt)),
+                                      })}
+                                    </time>
+                                  ) : null}
+                                </>
+                              )}
+                            </div>
+                            {renamingId !== item.id &&
+                              (canManageConversation || quickJumpHint) && (
+                                <div className="absolute right-2 top-1/2 flex h-11 w-[88px] -translate-y-1/2 items-center justify-end">
+                                  {canManageConversation ? (
+                                    <RecentChatActions
+                                      item={conversationActionItem}
+                                      onPin={handlePin}
+                                      onRename={handleStartRename}
+                                      onArchive={handleArchive}
+                                      onDelete={handleRequestDelete}
+                                      isUnread={isUnread}
+                                      isReadMutationPending={isReadMutationPending}
+                                      onToggleUnread={() =>
+                                        isUnread
+                                          ? conversationActivity.markRead(itemConversationId, conversationActivity.selectAttentionCursor(itemConversationId))
+                                          : conversationActivity.markUnread(itemConversationId)
+                                      }
+                                      quickJumpHint={quickJumpHint}
+                                    />
+                                  ) : (
+                                    quickJumpHint
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                          })}
+                          </div>
+                          {canToggleGroup && (
+                            <button
+                              type="button"
+                              aria-controls={groupItemsId}
+                              aria-expanded={isGroupExpanded}
+                              aria-label={t(
+                                isGroupExpanded
+                                  ? "chat.history.show_less_in"
+                                  : "chat.history.show_more_in",
+                                { group: groupLabel },
+                              )}
+                              onClick={() => toggleRecentGroup(group.key)}
+                              className="mx-11 flex min-h-11 items-center rounded-lg text-left text-[12px] font-medium text-black/55 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 motion-reduce:transition-none dark:text-white/55 dark:hover:text-white dark:focus-visible:ring-white/40"
+                            >
+                              {t(
+                                isGroupExpanded
+                                  ? "chat.history.show_less"
+                                  : "chat.history.show_more",
+                              )}
+                            </button>
+                          )}
+                        </section>
+                      );
+                    })}
+                  </>
+                )}
+                    {historyNextCursor && (
                       <div className="px-11">
                         <button
                           type="button"
-                          disabled
-                          className="flex min-h-11 w-full items-center rounded-lg text-left text-[12px] font-medium text-black/30 dark:text-white/30"
+                          disabled={isLoadingMoreHistory}
+                          aria-busy={isLoadingMoreHistory}
+                          onClick={onLoadMoreHistory}
+                          className="flex min-h-11 w-full items-center rounded-lg text-left text-[12px] font-medium text-black/55 transition-colors hover:text-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/30 disabled:cursor-wait disabled:text-black/30 motion-reduce:transition-none dark:text-white/55 dark:hover:text-white dark:focus-visible:ring-white/40 dark:disabled:text-white/30"
                         >
-                          {t("chat.history.no_older")}
+                          {t(
+                            isLoadingMoreHistory
+                              ? "chat.history.loading_older"
+                              : "chat.history.load_older",
+                          )}
                         </button>
                       </div>
                     )}
-                  {historyLoadMoreError && (
-                    <p
-                      role="alert"
-                      className={`px-11 text-[12px] leading-relaxed ${inlineFailureTextClass}`}
-                    >
-                      {t("chat.history.load_older_error")}
-                    </p>
-                  )}
-                  {isGuest ? (
-                    <p className="px-11 pb-2 text-[12px] leading-relaxed text-black/45 dark:text-white/45">
-                      {t(
-                        "guest.history.keep_history",
-                        "Sign in to keep your history",
+                    {!historyNextCursor &&
+                      hasRequestedOlderHistory &&
+                      !historyLoadMoreError && (
+                        <div className="px-11">
+                          <button
+                            type="button"
+                            disabled
+                            className="flex min-h-11 w-full items-center rounded-lg text-left text-[12px] font-medium text-black/30 dark:text-white/30"
+                          >
+                            {t("chat.history.no_older")}
+                          </button>
+                        </div>
                       )}
-                    </p>
-                  ) : null}
-                </div>
-            </div>
-          )}
-        </div>
+                    {historyLoadMoreError && (
+                      <p
+                        role="alert"
+                        className={`px-11 text-[12px] leading-relaxed ${inlineFailureTextClass}`}
+                      >
+                        {t("chat.history.load_older_error")}
+                      </p>
+                    )}
+                    {isGuest ? (
+                      <p className="px-11 pb-2 text-[12px] leading-relaxed text-black/45 dark:text-white/45">
+                        {t(
+                          "guest.history.keep_history",
+                          "Sign in to keep your history",
+                        )}
+                      </p>
+                    ) : null}
+                  </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
       {canManageConversation && (
         <>

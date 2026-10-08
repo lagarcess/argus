@@ -93,9 +93,19 @@ export type BusinessWorkspaceInfo = {
   currencies: CurrencyCode[];
   /** Whether Business conversations can answer questions about saved expenses. */
   assistant_available: boolean;
+  /** Whether Business conversations can be started or continued at all. */
+  chat_available: boolean;
   /** What a receipt upload accepts. The backend's document settings own it. */
   receipt_limits: ReceiptLimits;
 };
+
+/**
+ * The one reader of `chat_available`. Closed until the backend says so, so a
+ * workspace still loading, or an older payload without the field, offers no chat.
+ */
+export function businessChatAvailable(workspace: BusinessWorkspaceInfo | null): boolean {
+  return workspace?.chat_available === true;
+}
 
 export type ReceiptLimits = {
   max_bytes: number;
