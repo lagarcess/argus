@@ -43,6 +43,8 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["add.tray.account"].waitForExistence(timeout: 5), "the tray reopens")
         app.buttons["add.tray.account"].tap()
         XCTAssertTrue(app.buttons["accounts.type.checking"].waitForExistence(timeout: 10), "Account starts a new account")
+        XCTAssertTrue(app.buttons["accounts.cancel"].isHittable, "Cancel is a plain text button")
+        capture("release-surface-account-editor")
         cancelEditor()
 
         add.tap()

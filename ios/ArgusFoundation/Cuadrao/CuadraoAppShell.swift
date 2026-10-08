@@ -72,14 +72,18 @@ struct CuadraoAppShell<Content: View>: View {
             .environment(\.cuadraoChat, chat)
     }
 
-    /// The add tray floats above the bar over a light dim. Tapping the dim or swiping down closes it.
+    /// The add tray is a bubble that pops out of the + over a light dim. Tapping the dim or swiping down closes it.
     @ViewBuilder private var addLayer: some View {
         if addOpen && showsNavigation && !addItems.isEmpty {
             GeometryReader { proxy in
                 let barBottom = proxy.safeAreaInsets.bottom + CuadraoAppShellMetrics.navigationHeight
+                let atRight = compact && CuadraoNavigationSlot.current.contains(.add)
                 ZStack(alignment: .bottom) {
-                    Color.black.opacity(0.18)
-                        .contentShape(Rectangle())
+                    // The dim covers the whole screen, bar included, so no bright band is left behind the tray.
+                    Color.black.opacity(0.16).allowsHitTesting(false).accessibilityHidden(true)
+                    // Taps above the bar close the tray; the bar itself stays live for the X.
+                    Color.clear.contentShape(Rectangle())
+                        .padding(.bottom, barBottom)
                         .onTapGesture { closeAdd() }
                         .gesture(DragGesture(minimumDistance: 20).onEnded { value in
                             if value.translation.height > 30 { closeAdd() }
@@ -90,24 +94,27 @@ struct CuadraoAppShell<Content: View>: View {
                         closeAdd()
                         item.perform()
                     }
-                    .padding(.bottom, 8)
+                    .frame(maxWidth: 300)
+                    .frame(maxWidth: .infinity, alignment: atRight ? .trailing : .center)
+                    .padding(.horizontal, atRight ? 20 : 0)
+                    .padding(.bottom, barBottom + 8)
+                    .transition(reduceMotion ? .opacity
+                        : .scale(scale: 0.4, anchor: atRight ? .bottomTrailing : .bottom).combined(with: .opacity))
                     .accessibilityAction(.escape) { closeAdd() }
                 }
-                .padding(.bottom, barBottom)
             }
             .ignoresSafeArea()
-            .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom)))
         }
     }
 
     private func toggleAdd() {
         guard !addItems.isEmpty else { return }
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { addOpen.toggle() }
+        withAnimation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.72)) { addOpen.toggle() }
     }
 
     private func closeAdd() {
         guard addOpen else { return }
-        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { addOpen = false }
+        withAnimation(reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 0.85)) { addOpen = false }
     }
 
     private var tabSelection: Binding<CuadraoTab> {

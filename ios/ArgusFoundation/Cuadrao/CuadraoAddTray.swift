@@ -58,8 +58,8 @@ struct CuadraoAddTray: View {
             }
         }
         .padding(.vertical, 6).padding(.horizontal, 12)
-        .background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 26))
-        .padding(.horizontal, 16)
+        .background(WelcomePalette.surface, in: RoundedRectangle(cornerRadius: 28))
+        .shadow(color: .black.opacity(0.14), radius: 20, y: 6)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("add.tray")
     }
