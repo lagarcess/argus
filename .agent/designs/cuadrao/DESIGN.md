@@ -158,8 +158,13 @@ re-colour or re-set them in a font.
   `#172b26`: wordmark `#fafbf8`; mark front `#fffcf2` to `#e3dcc2`, back `#8fa38f` to
   `#5b7566` at 55% opacity, overlap `#b6e87a` to `#7fcb4f`. Gradients run top-left to
   bottom-right. The dark artwork is drawn for `#172b26`; on any other dark its
-  translucent back square changes tone, so a dark surface that shows the lockup uses
-  `#172b26`.
+  translucent back square changes tone slightly. The welcome screen therefore uses
+  `#172b26`; the invitation card and the chat empty state keep their palette
+  backgrounds and accept that small shift rather than change their layout.
+- **One component.** `CuadraoBrand` draws the lockup everywhere in the app (welcome at
+  268 pt wide through `CuadraoWelcomeLockup`, the invitation card and the chat empty
+  state at the compact 153 pt, which keeps the 32 pt height the old lockup had).
+  Never redraw it or set the wordmark as text.
 - **App icon.** `icon.svg` rendered full-bleed at 1024 x 1024 with the tile corner
   radius 0 (iOS rounds it and rejects transparency). Dark and tinted variants are not
   designed yet; a new founder decision is needed first.
