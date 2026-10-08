@@ -143,6 +143,7 @@ class PostgresDocumentStore:
         draft: DocumentDraft,
         expected_version: int,
         holder: str | None = None,
+        claim: str | None = None,
     ) -> bool:
         with self._pool.connection() as connection, connection.transaction():
             row = connection.execute(
@@ -161,6 +162,22 @@ class PostgresDocumentStore:
                 and row[1] > draft.updated_at
             ):
                 return False
+            if claim is not None:
+                changed = connection.execute(
+                    "update public.financial_document_extractions set draft=%s, "
+                    "preparation_job=preparation_job || '{\"claimed\": true}'::jsonb "
+                    "where connection_id=%s and user_id=%s "
+                    "and (draft->>'version')::integer=%s "
+                    "and preparation_job->>'attempt_id' = %s returning connection_id",
+                    (
+                        Jsonb(draft.model_dump(mode="json")),
+                        draft.connection_id,
+                        user_id,
+                        expected_version,
+                        claim,
+                    ),
+                ).fetchone()
+                return changed is not None
             changed = connection.execute(
                 "update public.financial_document_extractions set draft=%s "
                 "where connection_id=%s and user_id=%s and (draft->>'version')::integer=%s returning connection_id",

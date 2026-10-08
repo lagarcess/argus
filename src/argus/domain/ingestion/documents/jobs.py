@@ -133,11 +133,17 @@ class PreparationJobs:
             reason = "retryable_failure"
         else:
             return
-        if draft.status == "preparing" and not (
-            # Only the current attempt, unmarked, provably wrote this state.
-            job is not None
-            and draft.version == job.draft_version + 1
-            and job.provider_call_started_at is None
+        saved = store.get(user_id=user_id, connection_id=connection_id) is not None
+        if (
+            draft.status == "preparing"
+            and not saved
+            and not (
+                # Only the current attempt's own claim, before any provider call.
+                job is not None
+                and job.claimed
+                and draft.version == job.draft_version + 1
+                and job.provider_call_started_at is None
+            )
         ):
             if self._settle(user_id, connection_id, now, job, draft, OUTCOME_UNKNOWN):
                 report.outcome_unknown.append(connection_id)
@@ -159,7 +165,8 @@ class PreparationJobs:
                 draft,
                 attempt=attempt,
                 requeue=True,
-                unmarked=not fresh,
+                # A saved preparation replays without a provider call.
+                unmarked=not fresh and not saved,
             ):
                 report.redispatched.append(connection_id)
                 logger.info(

@@ -166,11 +166,16 @@ class DocumentsService:
         draft: DocumentDraft,
         *,
         holder: str | None = None,
+        claim: str | None = None,
         **changes: object,
     ) -> DocumentDraft:
         updated = self.revise(draft, **changes)
         if not self.store.update(
-            user_id=user_id, draft=updated, expected_version=draft.version, holder=holder
+            user_id=user_id,
+            draft=updated,
+            expected_version=draft.version,
+            holder=holder,
+            claim=claim,
         ):
             raise DocumentServiceError("document_version_conflict", retryable=True)
         return updated
@@ -313,8 +318,14 @@ class DocumentsService:
         replayed = batch is not None
         try:
             if batch is None:
+                # The claim names the attempt; a flag-off writer names none.
                 draft = self._update(
-                    user_id, draft, holder=holder, status="preparing", error_code=None
+                    user_id,
+                    draft,
+                    holder=holder,
+                    claim=attempt_id,
+                    status="preparing",
+                    error_code=None,
                 )
                 content = await asyncio.to_thread(
                     self.source_bytes, user_id=user_id, connection_id=connection_id

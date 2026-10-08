@@ -62,8 +62,7 @@ plus one sweep interval after its last claim or dispatch. A worker that dies
 after releasing its lease, such as a cancelled task, is detected on the next
 sweep.
 
-Backtest reconciliation runs only on reads, backpressure and operator runs;
-documents reuse its dispatch plumbing, not its cadence.
+Documents reuse the backtest dispatch plumbing, not its read-driven cadence.
 
 ## Attempt and lease model
 
@@ -87,28 +86,30 @@ they dispatch nothing.
 After claiming and reading the source, and before calling the extractor, the
 worker commits `provider_call_started_at` under its live lease and renews the
 lease (`mark_provider_call`). No marker proves the provider was never reached.
-An attempt may claim only the draft version it was dispatched for.
+An attempt may claim only the draft version it was dispatched for, and its
+claim names it: the write that moves the draft to `preparing` also sets
+`claimed` on that attempt's job. A flag-off writer's claim sets nothing.
 
 ## Retry and spend bounds
 
 An expired attempt is never billed again automatically. The sweep decides:
 
-- Dead and unclaimed, dead `preparing` written by the current attempt
-  (`draft.version == draft_version + 1`) with no marker, or a retryable failure
-  reported before the marker: re-dispatch, at most
-  `MAX_ATTEMPTS = 3` per explicit preparation. Past the bound the draft is
-  `needs_attention` with `document_preparation_interrupted`.
-- Any other dead `preparing` draft (a marker, no job, or a stale job, which
-  covers a flag-off writer killed mid-call): `needs_attention` with
-  `document_preparation_outcome_unknown`. Nothing is re-dispatched.
+- Dead and unclaimed, dead `preparing` whose claim names the current attempt
+  (`claimed`, at `draft_version + 1`) with no marker, or a retryable failure
+  reported before the marker: re-dispatch, at most `MAX_ATTEMPTS = 3` per
+  explicit preparation. Past the bound: `document_preparation_interrupted`.
+- Dead `preparing` with a saved preparation, whoever claimed it: re-dispatch,
+  which replays delivery without a provider call or consent.
+- Any other dead `preparing` draft (a marker, no job, or a claim that does not
+  name the current attempt, such as a flag-off writer killed mid-call):
+  `needs_attention` with `document_preparation_outcome_unknown`.
 - A re-dispatch is refused if a marker or a newer draft version lands after
   the sweep read the attempt.
 - A failure reported after the marker keeps its code and is not retried.
 
-So automatic work never makes a second provider call for one explicit
-preparation. Only `/prepare` or `/resume` with `X-Extraction-Consent: true`
-starts a new paid attempt; those stay limited by the document POST rate limits
-(5 per minute, 30 per day per person).
+Automatic work never makes a second provider call for one explicit
+preparation. Only a consented `/prepare` or `/resume` starts a new paid attempt
+(document POST limits: 5 per minute, 30 per day).
 
 ## Stale-result rejection
 

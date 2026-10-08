@@ -39,7 +39,12 @@ class DocumentStore(Protocol):
         draft: DocumentDraft,
         expected_version: int,
         holder: str | None = None,
-    ) -> bool: ...
+        claim: str | None = None,
+    ) -> bool:
+        """With ``claim``, the same write requires that attempt to be current
+        and records that it claimed the draft."""
+        ...
+
     def save(
         self,
         *,
@@ -179,9 +184,11 @@ class InMemoryDocumentStore:
         draft: DocumentDraft,
         expected_version: int,
         holder: str | None = None,
+        claim: str | None = None,
     ) -> bool:
+        key = (user_id, draft.connection_id)
         with self.connections._lock, self._lock:
-            raw = self._drafts.get((user_id, draft.connection_id))
+            raw = self._drafts.get(key)
             previous = DocumentDraft.model_validate_json(raw) if raw else None
             if (
                 not self._live(user_id, draft.connection_id, holder, draft.updated_at)
@@ -198,7 +205,15 @@ class InMemoryDocumentStore:
                 and lease > draft.updated_at
             ):
                 return False
-            self._drafts[(user_id, draft.connection_id)] = draft.model_dump_json()
+            if claim is not None:
+                job_raw = self._jobs.get(key)
+                job = PreparationJob.model_validate_json(job_raw) if job_raw else None
+                if job is None or job.attempt_id != claim:
+                    return False
+                self._jobs[key] = job.model_copy(
+                    update={"claimed": True}
+                ).model_dump_json()
+            self._drafts[key] = draft.model_dump_json()
             return True
 
     def save(

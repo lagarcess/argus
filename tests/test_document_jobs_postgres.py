@@ -578,3 +578,54 @@ def test_redispatch_refuses_a_marker_or_a_finished_draft_that_landed_after_the_s
     ), "the current version may still be replayed"
     repo.disconnect(user_id=owner, connection_id=row.id, now=later)
     store.forget(user_id=owner, connection_id=row.id)
+
+
+def test_only_the_named_attempt_claims_and_records_it(
+    pool: ConnectionPool, users: dict[str, str]
+) -> None:
+    now = datetime.now(timezone.utc)
+    repo = PostgresConnectionRepository(pool)
+    store = PostgresDocumentStore(pool, source_objects())
+    owner = users["owner"]
+    row = repo.create(
+        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+    )
+    assert store.capture(user_id=owner, draft=draft(row.id, now), content=b"%PDF-x")
+    job = PreparationJob(attempt=1, attempt_id="a1", draft_version=1, dispatched_at=now)
+    assert store.advance(
+        user_id=owner, connection_id=row.id, now=now, expected_attempt_id=None, job=job
+    )
+    assert repo.lease(connection_id=row.id, holder="worker", now=now)
+    preparing = draft(row.id, now, version=2, status="preparing")
+
+    assert not store.update(
+        user_id=owner, draft=preparing, expected_version=1, holder="worker", claim="a0"
+    ), "a claim for another attempt changes nothing"
+    assert store.draft(user_id=owner, connection_id=row.id).version == 1
+    assert store.update(
+        user_id=owner, draft=preparing, expected_version=1, holder="worker", claim="a1"
+    )
+    assert store.job(user_id=owner, connection_id=row.id).claimed is True
+
+    other = repo.create(
+        user_id=owner, source="statement", external_ref=str(uuid4()), label=None, now=now
+    )
+    assert store.capture(user_id=owner, draft=draft(other.id, now), content=b"%PDF-y")
+    assert store.advance(
+        user_id=owner,
+        connection_id=other.id,
+        now=now,
+        expected_attempt_id=None,
+        job=job.model_copy(update={"attempt_id": "b1"}),
+    )
+    assert repo.lease(connection_id=other.id, holder="flag-off", now=now)
+    assert store.update(
+        user_id=owner,
+        draft=draft(other.id, now, version=2, status="preparing"),
+        expected_version=1,
+        holder="flag-off",
+    )
+    assert store.job(user_id=owner, connection_id=other.id).claimed is False
+    for connection in (row.id, other.id):
+        repo.disconnect(user_id=owner, connection_id=connection, now=now)
+        store.forget(user_id=owner, connection_id=connection)

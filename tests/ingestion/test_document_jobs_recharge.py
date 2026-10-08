@@ -184,3 +184,79 @@ async def test_storage_failure_before_the_marker_is_retried_once(rig):
     assert service.get(user_id="owner", connection_id=connection).status == (
         "review_ready"
     )
+
+
+@pytest.mark.asyncio
+async def test_foreign_claim_of_the_dispatched_version_waits_for_the_owner(rig):
+    service, jobs, clock, extractor, dispatched = rig
+    connection = await queued(service)
+    jobs.start(user_id="owner", connection_id=connection)
+    job = service.store.job(user_id="owner", connection_id=connection)
+    die_while_preparing(service, connection)
+    draft = service.store.draft(user_id="owner", connection_id=connection)
+    assert draft.version == job.draft_version + 1, "same shape as the attempt's claim"
+
+    clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
+    report = jobs.sweep()
+
+    draft = service.get(user_id="owner", connection_id=connection)
+    assert report.outcome_unknown == [connection]
+    assert (draft.status, draft.error_code) == ("needs_attention", OUTCOME_UNKNOWN)
+    assert len(dispatched) == 1
+    assert extractor.calls == 0
+
+
+@pytest.mark.asyncio
+async def test_foreign_claim_after_a_superseding_redispatch_waits_for_the_owner(rig):
+    service, jobs, clock, extractor, dispatched = rig
+    connection = await queued(service)
+    jobs.start(user_id="owner", connection_id=connection)
+    draft = service.store.draft(user_id="owner", connection_id=connection)
+    service.update_proposal(
+        user_id="owner",
+        connection_id=connection,
+        version=draft.version,
+        proposal=DraftProposal(requested_plan="Trip"),
+    )
+    assert jobs.sweep().redispatched == [connection], "a stale queued attempt"
+    die_while_preparing(service, connection)
+
+    clock.now += DISPATCH_WINDOW + timedelta(seconds=1)
+    report = jobs.sweep()
+
+    draft = service.get(user_id="owner", connection_id=connection)
+    assert report.outcome_unknown == [connection]
+    assert draft.error_code == OUTCOME_UNKNOWN
+    assert len(dispatched) == 2
+    assert extractor.calls == 0
+
+
+class WorkerKilled(BaseException):
+    pass
+
+
+@pytest.mark.asyncio
+async def test_marked_attempt_that_saved_its_batch_is_replayed_without_a_call(rig):
+    service, jobs, clock, extractor, dispatched = rig
+    connection = await queued(service)
+    sink = service.hub.sink
+    sink.submit.side_effect = [WorkerKilled(), SubmitResult(1, 0, 0)]
+    jobs.start(user_id="owner", connection_id=connection)
+    [first] = dispatched
+    with pytest.raises(WorkerKilled):
+        await run_attempt(service, connection, first)
+    job = service.store.job(user_id="owner", connection_id=connection)
+    assert job.provider_call_started_at is not None
+    assert service.store.get(user_id="owner", connection_id=connection) is not None
+    assert service.store.draft(user_id="owner", connection_id=connection).status == (
+        "preparing"
+    )
+
+    assert jobs.sweep().redispatched == [connection]
+    [_, replay] = dispatched
+    assert await run_attempt(service, connection, replay) == "prepared"
+    assert extractor.calls == 1, "replaying a saved preparation never calls"
+    assert sink.submit.call_count == 2
+    assert service.get(user_id="owner", connection_id=connection).status == (
+        "review_ready"
+    )
