@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { businessContent } from "../components/content";
 import { privacyCopy } from "../components/privacy-copy";
 import { businessContactEmail } from "../components/site-copy";
 import { LOCALES } from "../lib/site-routes";
@@ -64,3 +65,12 @@ describe.each(LOCALES)("privacy text (%s)", (locale) => {
     expect(sectionText(byId("data"))).not.toMatch(/solo para responderte|only to reply/);
   });
 });
+
+// The line under the contact form must say what the privacy page says: the email also
+// keys a short in-memory submission limit, so it is not used "only" to reply.
+describe.each(LOCALES)("contact form privacy line (%s)", (locale) => {
+  test("does not claim the details are used only to reply", () => {
+    expect(businessContent[locale].contact.privacy).not.toMatch(/solo para responderte|only to reply/);
+  });
+});
+
