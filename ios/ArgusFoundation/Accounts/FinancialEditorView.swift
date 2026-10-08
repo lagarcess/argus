@@ -67,9 +67,8 @@ struct FinancialEditorView: View {
             .navigationTitle(model.isCheck ? "loop.check.title" : model.isCorrection ? "loop.correction.title" : "loop.expense.title")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("accounts.cancel") { dismiss() }.disabled(model.busy || model.phase == .uncertain)
-                }
+                CuadraoCancelToolbar(title: NSLocalizedString("accounts.cancel", comment: ""),
+                                     disabled: model.busy || model.phase == .uncertain) { dismiss() }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer(); Button("accounts.keyboard.done") { focused = false }
                 }
