@@ -26,14 +26,6 @@ struct CuadraoAppShell<Content: View>: View {
                     if chat.voiceContextOwner == nil && selection != .assistant && chat.voice.active && chat.voice.presentation != .expanded {
                         CuadraoVoiceBar(voice: chat.voice, spanish: spanish)
                     }
-                    if addOpen && showsNavigation && !addItems.isEmpty {
-                        CuadraoAddTray(items: addItems, spanish: spanish) { item in
-                            closeAdd()
-                            item.perform()
-                        }
-                        .padding(.bottom, 8)
-                        .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
-                    }
                     if showsNavigation {
                         ZStack {
                             if chat.voiceMessage.state != .recording {
@@ -50,6 +42,7 @@ struct CuadraoAppShell<Content: View>: View {
                     }
                 }
             }
+            .overlay { addLayer }
             .onChange(of: showsNavigation) { _, shown in if !shown { closeAdd() } }
             .onChange(of: selection) { _, _ in closeAdd() }
             .cuadraoSoftScrollEdges()
@@ -77,6 +70,34 @@ struct CuadraoAppShell<Content: View>: View {
             .tint(WelcomePalette.pine)
             .foregroundStyle(WelcomePalette.ink)
             .environment(\.cuadraoChat, chat)
+    }
+
+    /// The add tray floats above the bar over a light dim. Tapping the dim or swiping down closes it.
+    @ViewBuilder private var addLayer: some View {
+        if addOpen && showsNavigation && !addItems.isEmpty {
+            GeometryReader { proxy in
+                let barBottom = proxy.safeAreaInsets.bottom + CuadraoAppShellMetrics.navigationHeight
+                ZStack(alignment: .bottom) {
+                    Color.black.opacity(0.18)
+                        .contentShape(Rectangle())
+                        .onTapGesture { closeAdd() }
+                        .gesture(DragGesture(minimumDistance: 20).onEnded { value in
+                            if value.translation.height > 30 { closeAdd() }
+                        })
+                        .accessibilityHidden(true)
+                        .accessibilityIdentifier("add.scrim")
+                    CuadraoAddTray(items: addItems, spanish: spanish) { item in
+                        closeAdd()
+                        item.perform()
+                    }
+                    .padding(.bottom, 8)
+                    .accessibilityAction(.escape) { closeAdd() }
+                }
+                .padding(.bottom, barBottom)
+            }
+            .ignoresSafeArea()
+            .transition(reduceMotion ? .opacity : .opacity.combined(with: .move(edge: .bottom)))
+        }
     }
 
     private func toggleAdd() {

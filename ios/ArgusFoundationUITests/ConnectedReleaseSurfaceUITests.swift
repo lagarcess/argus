@@ -50,6 +50,18 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["Cancel"].waitForExistence(timeout: 10), "Plan opens the plan editor")
         cancelEditor()
 
+        // Tapping outside the tray, or swiping down, closes it.
+        add.tap()
+        XCTAssertTrue(app.buttons["add.tray.plan"].waitForExistence(timeout: 5))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.12)).tap()
+        let dimTapped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["add.tray.plan"])
+        XCTAssertEqual(XCTWaiter.wait(for: [dimTapped], timeout: 5), .completed, "tapping outside closes the tray")
+        add.tap()
+        XCTAssertTrue(app.buttons["add.tray.plan"].waitForExistence(timeout: 5))
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)))
+        let swiped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["add.tray.plan"])
+        XCTAssertEqual(XCTWaiter.wait(for: [swiped], timeout: 5), .completed, "swiping down closes the tray")
+
         // Scrolling Home down collapses the bar into the + at the right; the tray still opens from it.
         for _ in 0..<4 { app.swipeUp(velocity: .fast) }
         XCTAssertTrue(add.waitForExistence(timeout: 5))
@@ -69,6 +81,13 @@ extension FinancialLoopUITests {
         let search = app.buttons["tab.search"], plan = app.buttons["tab.plan"]
         search.press(forDuration: 0.3, thenDragTo: plan)
         XCTAssertTrue(plan.isSelected, "lifting over Plan from Search chooses Plan")
+
+        // Free tier: Search has no chats, files or memory to offer, so those filters are not shown.
+        app.buttons["tab.search"].tap()
+        XCTAssertTrue(app.buttons["search.filter.plans"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["search.filter.all"].exists)
+        for kind in ["chats", "files", "memory"] { XCTAssertFalse(app.buttons["search.filter." + kind].exists, kind) }
+        capture("release-surface-search-filters")
 
         // The tray does not outlive the screen it was opened on.
         app.buttons["tab.home"].tap()
