@@ -6,12 +6,18 @@ experience and assigned-work ownership. Check current PRs and release evidence
 for landing/deployment status. The historical ledger below stops at August 2,
 2026; later bounded landings are recorded separately below.
 Date: 2026-06-10
-Last reconciled: 2026-10-08 (PR #905, #908, #909, #913, #914, #918, #920 Business landings; PR #904 + PR #901 Business pilot landing; Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
+Last reconciled: 2026-10-08 (PR #919 and #921 Consumer iPhone landing; PR #905, #908, #909, #913, #914, #918, #920 Business landings; PR #904 + PR #901 Business pilot landing; Cuadrao launch reconciliation; PR #773 landing register restored; PR #809/#790/#810/#812 code checkpoint; PR #808/#813/#814/#815 documentation landing; PR #766 + PR #764/#763 + PR #760 + PR #759 + PR #757 + PR #755 + PR #753 + PR #751 + PR #749 + PR #747 + PR #745 + PR #743 + PR #735 + PR #739 + PR #738 + PR #733 + PR #672 + PR #695 + PR #721 + PR #711 landing registers; historical ledger still
 through 2026-08-02)
 Branch: `codex/private-alpha-next`
 Audience: Founder, Codex, external async agents, reviewers
 
 ## Later bounded landings
+
+- October 8, 2026: Consumer iPhone landing under [#877](https://github.com/lagarcess/argus/issues/877), in this order, on the founder's instruction.
+  - [PR #919](https://github.com/lagarcess/argus/pull/919) as `31a73c501` (accepted head `c98676ea9`): the + menu as an anchored card with a nub on the open bar and labeled round buttons stacked from the folded +, the free-tier Search wording, and the home-screen name "Cuadrao". Review fixes: the menu scrolls at large text and in landscape, icons stay in their badges, empty-state copy follows the bar.
+  - [PR #921](https://github.com/lagarcess/argus/pull/921) as `826ace6d4` (accepted head `808c36ff7`): Marketing's approved "Lean, calm" mark as the app icon, the welcome screen as one lockup and two native actions on `#fafbf8` / `#172b26`, the shared lockup on the invitation card and chat empty state, and the brand identity in `.agent/designs/cuadrao/DESIGN.md`. Marketing's SVGs are pinned: lockups at `acf1b180a`, the rest at `73286f8ca`.
+  - Before merge: integration had changed no iOS files since #919's base; the two PRs' files are disjoint and identical in integration to their accepted heads; the combined menu, large-text, welcome and lockup checks passed on the local integration merge; exact-head CI and smoke on `826ace6d4` passed.
+  - Phone build 3452 is built from `826ace6d4`. No migration, deployment or feature activation.
 
 - October 8, 2026: [PR #920](https://github.com/lagarcess/argus/pull/920) merged as `f5a2007cd`.
   - A switch now stops only new intake. With document extraction or ingestion off, saved Personal documents and Business receipts stay readable and deletable, with Storage erased first. WhatsApp unlink is always available to the signed-in owner.
