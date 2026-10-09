@@ -43,7 +43,7 @@ final class GuestAccessPolicyTests: XCTestCase {
 
     func testTheTrayOffersOnlyBuiltRowsAndMovementsNeedAnAccount() {
         XCTAssertEqual(GuestAccessPolicy.addActions(activeAccounts: 0, built: [.accounts]), [.account])
-        XCTAssertEqual(GuestAccessPolicy.addActions(activeAccounts: 0, built: [.accounts, .movements, .plans]), [.account, .plan])
+        XCTAssertEqual(GuestAccessPolicy.addActions(activeAccounts: 0, built: [.accounts, .movements, .plans]), [.account], "movements and plans need an account")
         XCTAssertEqual(GuestAccessPolicy.addActions(activeAccounts: 2, built: [.accounts, .movements, .plans]), [.account, .transaction, .plan])
         XCTAssertTrue(GuestAccessPolicy.addActions(activeAccounts: 3, built: []).isEmpty)
         let offered = GuestAccessPolicy.addActions(activeAccounts: 5, built: [.accounts, .movements, .plans])

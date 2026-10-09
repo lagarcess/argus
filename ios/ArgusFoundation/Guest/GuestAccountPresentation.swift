@@ -4,7 +4,10 @@ import CuadraoBook
 /// The currency rules the shared money fields use inside the book: the server's set, each currency's exact digits,
 /// and a ceiling that keeps totals inside Int64. The device's own currency data is never consulted.
 enum GuestCurrencyRules {
-    static let rules = CuadraoCurrencyRules(
+    static let rules = make()
+
+    /// The picker lists the whole table unless the host narrows it, as the plan form does to the currencies of the book's accounts.
+    static func make(pickerCodes: [String]? = nil) -> CuadraoCurrencyRules { CuadraoCurrencyRules(
         digits: { CurrencyTable.digits($0) ?? 2 },
         maximum: { MinorUnits.decimal(Limits.maximumMinor, digits: CurrencyTable.digits($0) ?? 2) },
         maximumMessage: { code, spanish in
@@ -14,7 +17,7 @@ enum GuestCurrencyRules {
             let digits = CurrencyTable.digits(code) ?? 2
             return MinorUnits.exactMinor(value, digits: digits).map { MoneyFormatter.grouped($0, digits: digits) } ?? ""
         },
-        pickerCodes: { CurrencyTable.pickerCodes })
+        pickerCodes: { pickerCodes ?? CurrencyTable.pickerCodes }) }
 }
 
 /// How book accounts read on screen, and how a form's values become a draft. Pure; no view and no server model.
@@ -161,7 +164,7 @@ enum GuestAccountPresentation {
         case .transferSameAccount: spanish ? "Elige una cuenta distinta para recibir." : "Choose a different account to receive it."
         case .movementLimit: spanish ? "Llegaste al máximo de movimientos en este iPhone." : "You've reached the most activity this iPhone can hold."
         case .noteTooLong: spanish ? "El concepto puede tener hasta \(Limits.note) caracteres." : "The description can have up to \(Limits.note) characters."
-        case .accountNotFound, .orderInvalid, .movementNotFound: spanish ? "No se pudo guardar. Inténtalo de nuevo." : "Couldn't save. Try again."
+        case .accountNotFound, .orderInvalid, .movementNotFound, .planNameEmpty, .planLimit, .planNotFound, .planKindLocked, .planArchived, .scopeInvalid: spanish ? "No se pudo guardar. Inténtalo de nuevo." : "Couldn't save. Try again."
         }
     }
 }

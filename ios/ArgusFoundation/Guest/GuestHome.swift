@@ -13,6 +13,8 @@ enum GuestSheet: Identifiable, Equatable {
     case movement(GuestMovementSheet.Mode)
     case archive(UUID)
     case archived
+    case plan(GuestPlanSheet.Mode)
+    case contribution(UUID)
 
     var id: String {
         switch self {
@@ -20,6 +22,8 @@ enum GuestSheet: Identifiable, Equatable {
         case .movement(let mode): "movement." + mode.id
         case .archive(let id): "archive." + id.uuidString
         case .archived: "archived"
+        case .plan(let mode): "plan." + mode.id
+        case .contribution(let id): "contribution." + id.uuidString
         }
     }
 }

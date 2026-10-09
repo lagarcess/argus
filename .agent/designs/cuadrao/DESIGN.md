@@ -951,6 +951,12 @@ Home, Plan, Search and Profile views rather than a second set.
   the expanded view pages by month. Spending never claims a month the book has no
   coverage for: it shows No data, and a month that coverage begins inside says
   from which day it counts.
+- Plan holds two kinds in the shared plan page and editor: a goal, whose progress is
+  the contributions the person records by hand, and a budget, a monthly limit over
+  some or all of one currency's accounts and categories, spent being this month's
+  expenses in that scope. The picker offers no debt plan. The currency is fixed when
+  a plan is made and chosen only among the currencies of the book's accounts. A plan
+  moves no money, and it says so.
 
 ### Authentication and invitation purpose
 

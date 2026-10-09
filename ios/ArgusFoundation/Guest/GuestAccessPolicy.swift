@@ -47,13 +47,13 @@ enum GuestAccessPolicy {
 
     /// Rows of the + tray that exist yet. Slices add to this set as the screens behind them land.
     enum Built: Hashable { case accounts, movements, plans }
-    static let built: Set<Built> = [.accounts, .movements]
+    static let built: Set<Built> = [.accounts, .movements, .plans]
 
     static func addActions(activeAccounts: Int, built: Set<Built> = GuestAccessPolicy.built) -> [CuadraoAddAction] {
         var actions: [CuadraoAddAction] = []
         if built.contains(.accounts) { actions.append(.account) }
         if built.contains(.movements), activeAccounts > 0 { actions.append(.transaction) }
-        if built.contains(.plans) { actions.append(.plan) }
+        if built.contains(.plans), activeAccounts > 0 { actions.append(.plan) }
         return actions
     }
 }

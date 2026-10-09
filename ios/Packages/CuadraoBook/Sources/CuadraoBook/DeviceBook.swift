@@ -13,19 +13,21 @@ public struct DeviceBook: Codable, Equatable, Sendable {
     public var accounts: [BookAccount]
     /// Every movement ever recorded, deleted ones included so a delete can be undone.
     public var movements: [Movement]
+    public var plans: [BookPlan]
 
     public init(schemaVersion: Int = DeviceBook.currentSchemaVersion, revision: Int = 0, settings: BookSettings = BookSettings(),
-                accounts: [BookAccount] = [], movements: [Movement] = []) {
+                accounts: [BookAccount] = [], movements: [Movement] = [], plans: [BookPlan] = []) {
         self.schemaVersion = schemaVersion
         self.revision = revision
         self.settings = settings
         self.accounts = accounts
         self.movements = movements
+        self.plans = plans
     }
 
     public static func empty() -> DeviceBook { DeviceBook() }
 
-    private enum CodingKeys: String, CodingKey { case schemaVersion, revision, settings, accounts, movements }
+    private enum CodingKeys: String, CodingKey { case schemaVersion, revision, settings, accounts, movements, plans }
 
     /// Fields added later decode to their defaults, so a book written before they existed still opens.
     public init(from decoder: Decoder) throws {
@@ -35,6 +37,7 @@ public struct DeviceBook: Codable, Equatable, Sendable {
         settings = try values.decodeIfPresent(BookSettings.self, forKey: .settings) ?? BookSettings()
         accounts = try values.decodeIfPresent([BookAccount].self, forKey: .accounts) ?? []
         movements = try values.decodeIfPresent([Movement].self, forKey: .movements) ?? []
+        plans = try values.decodeIfPresent([BookPlan].self, forKey: .plans) ?? []
     }
 }
 
@@ -73,6 +76,14 @@ public enum BookRuleError: Error, Equatable, Sendable {
     case movementNotFound
     case movementLimit
     case noteTooLong
+    case planNameEmpty
+    case planLimit
+    case planNotFound
+    /// A plan keeps its kind, and only a goal takes contributions.
+    case planKindLocked
+    case planArchived
+    /// A budget's scope named an account that is not one of its currency's accounts.
+    case scopeInvalid
 }
 
 extension DeviceBook {

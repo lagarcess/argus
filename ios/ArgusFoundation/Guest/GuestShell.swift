@@ -91,6 +91,7 @@ struct GuestShell: View {
     @State private var profileScroll = CuadraoNavigationScroll()
     @State private var profilePath: [GuestProfileRoute] = []
     @State private var homePath: [GuestRoute] = []
+    @State private var planPath: [UUID] = []
     @State private var sheet: GuestSheet?
     @State private var chat = CuadraoChatPreview(spanish: Locale.current.language.languageCode?.identifier == "es", includeExamples: false)
 
@@ -117,6 +118,7 @@ struct GuestShell: View {
         switch tab {
         case .home: homePath.isEmpty
         case .profile: profilePath.isEmpty
+        case .plan: planPath.isEmpty
         default: true
         }
     }
@@ -127,6 +129,7 @@ struct GuestShell: View {
                 switch action {
                 case .account: sheet = .account(.create)
                 case .transaction: sheet = .movement(.create(account: nil))
+                case .plan: sheet = .plan(.create)
                 default: break
                 }
             }
@@ -144,6 +147,10 @@ struct GuestShell: View {
                 .preferredColorScheme(appearance.colorScheme)
         case .archived:
             GuestArchivedAccounts(model: model, spanish: spanish).preferredColorScheme(appearance.colorScheme)
+        case .plan(let mode):
+            GuestPlanSheet(model: model, mode: mode, spanish: spanish).preferredColorScheme(appearance.colorScheme)
+        case .contribution(let id):
+            GuestContributionSheet(model: model, planID: id, spanish: spanish).preferredColorScheme(appearance.colorScheme)
         }
     }
 
@@ -162,10 +169,7 @@ struct GuestShell: View {
         case .home:
             GuestHome(model: model, scroll: navigationScroll, active: tab == .home, path: $homePath, sheet: $sheet)
         case .plan:
-            GuestPlaceholderTab(scroll: planScroll, active: tab == .plan,
-                title: spanish ? "Lo que viene" : "What's ahead",
-                detail: spanish ? "Aquí vivirán tus presupuestos y metas." : "Your budgets and goals will live here.",
-                identifier: "guest.plan")
+            GuestPlanTab(model: model, scroll: planScroll, active: tab == .plan, path: $planPath, sheet: $sheet)
         case .search:
             GuestPlaceholderTab(scroll: searchScroll, active: tab == .search,
                 title: spanish ? "Buscar" : "Search",

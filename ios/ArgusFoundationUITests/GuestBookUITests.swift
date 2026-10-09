@@ -12,7 +12,7 @@ extension FinancialLoopUITests {
         let title = app.navigationBars.firstMatch.staticTexts.firstMatch
         if title.exists { title.tap() }
         if app.keyboards.firstMatch.waitForNonExistence(timeout: 1) { return }
-        if app.buttons["Done"].exists { app.buttons["Done"].tap() }
+        if app.buttons["Done"].firstMatch.exists { app.buttons["Done"].firstMatch.tap() }
     }
 
     func launchSignedOut(arguments: [String], language: String = "en", reset: Bool = true) {
