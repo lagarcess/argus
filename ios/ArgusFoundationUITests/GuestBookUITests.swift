@@ -5,6 +5,16 @@ import XCTest
 /// development door; the release-set test proves the door is shut without it.
 extension FinancialLoopUITests {
     /// Starts the app signed out. A session left by an earlier journey is signed out first.
+    /// Closes the keyboard by tapping away, on the navigation bar's title. A build that still has a keyboard Done is closed
+    /// with it as a fallback, so this works before and after that control goes.
+    func dismissGuestKeyboard() {
+        guard app.keyboards.firstMatch.exists else { return }
+        let title = app.navigationBars.firstMatch.staticTexts.firstMatch
+        if title.exists { title.tap() }
+        if app.keyboards.firstMatch.waitForNonExistence(timeout: 1) { return }
+        if app.buttons["Done"].exists { app.buttons["Done"].tap() }
+    }
+
     func launchSignedOut(arguments: [String], language: String = "en", reset: Bool = true) {
         continueAfterFailure = false
         app.terminate()

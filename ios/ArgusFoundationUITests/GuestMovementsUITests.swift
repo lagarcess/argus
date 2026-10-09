@@ -11,9 +11,7 @@ extension FinancialLoopUITests {
         app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'guest.movement.row.' AND label CONTAINS %@", text)).firstMatch
     }
 
-    private func closeKeyboard() {
-        if app.buttons["Done"].waitForExistence(timeout: 2) { app.buttons["Done"].tap() }
-    }
+    private func closeKeyboard() { dismissGuestKeyboard() }
 
     private func addAccount(type: String, name: String, currency: String? = nil, amount: String? = nil) {
         tapVisible(app.buttons["accounts.add"])

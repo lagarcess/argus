@@ -13,9 +13,7 @@ extension FinancialLoopUITests {
         amount.typeText(text)
     }
 
-    private func closeKeyboard() {
-        if app.buttons["Done"].waitForExistence(timeout: 2) { app.buttons["Done"].tap() }
-    }
+    private func closeKeyboard() { dismissGuestKeyboard() }
 
     private func chooseCurrency(_ code: String) {
         app.buttons["guest.account.currency"].tap()
