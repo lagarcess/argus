@@ -47,7 +47,18 @@ The comparison page on 4511 is a separate preserved snapshot. The touch-up does 
 
 ## Verification record
 
-Pending final exact-commit checks and screenshots. Interim: 177 unit tests, typecheck, lint and production build pass. Existing 130 browser tests pass. The initial two new footer tests had a changing locator after clicking Pause; correcting that test yielded 6/6 focused desktop/mobile header, footer and reduced-motion checks. The missing product capture was deliberately kept as an open item rather than replaced with a fabricated screen.
+Implementation commit: `85c8cdf2a17c4a8dc6ff2990b75d6d44451cc40e`. Test-only pause synchronization: `fc1c3a0c40aae17075228674f330ef3a10d7170c`.
+
+- 177 unit tests pass; typecheck, lint and fresh production build pass.
+- Final complete browser matrix: **142/142 pass**, desktop 1440 px and touch/mobile 390 px, plus all routes at 320 px with reduced motion. Includes form validation, mock success, unavailable/retry, canonical routes, keyboard navigation, image loading and automated WCAG 2.1 AA checks.
+- Footer pause repeated three times per desktop/mobile: **6/6 pass**. The initial test measured before React applied the pause and saw one frame of movement; the final assertion waits for the rendered paused state and still verifies a fixed position.
+- Independent focused code/UI review and final delta review: **clean, no actionable findings**. No unchanged runtime was opened for speculative work.
+- Modularity budget: no violations. Integration remained `bbf4da23f01296af4ac639386fe9a0960218a49f`; no reconciliation merge or semantic overlap was needed.
+- [Screenshot manifest](screens/manifest.json) pins the actual product implementation commit and capture time. The later commit changes only test synchronization; product source is identical, so these images remain valid. The final evidence commit changes documentation/images only.
+- [Desktop Business](screens/business-es.png), [390 px Business](screens/business-es-390.png), [320 px Business](screens/business-es-320.png), [Personal](screens/personal-es.png), [Contact](screens/contact-es.png), [Privacy](screens/privacy-es.png). Matching English images are in the same directory.
+- [Footer first frame](screens/footer-motion-start.png), [later frame](screens/footer-motion-later.png), [paused state](screens/footer-paused.png).
+
+Hosted checks and publication are not part of this local acceptance. GitHub CI and founder copy approval remain separate gates.
 
 ### Actual Business image
 
