@@ -162,7 +162,7 @@ struct FinancialAssetForm: View {
                 .navigationTitle(model.details ? "assets.details" : model.selected == nil ? "assets.update" : "assets.correct")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.phase == .saving).accessibilityIdentifier("assets.cancel") }
+                    CuadraoCancelToolbar(title: "accounts.cancel", disabled: model.phase == .saving, identifier: "assets.cancel") { dismiss() }
                     ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = nil } }
                 }.interactiveDismissDisabled(model.phase == .saving)
         }

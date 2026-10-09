@@ -118,11 +118,6 @@ struct CuadraoPlanEditor<Details: View, Footer: View>: View {
                 }.padding(24)
             }.safeAreaInset(edge: .bottom) {
                 VStack(spacing: 12) {
-                    if rateFocused {
-                        Button(spanish ? "Listo" : "Done") { rateFocused = false }
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
-                            .accessibilityIdentifier("plan-rate-done")
-                    }
                     PlanPrimaryButton(title: editing ? (spanish ? "Guardar cambios" : "Save changes") : (spanish ? "Crear plan" : "Create plan")) {
                         draft.name = draft.name.trimmingCharacters(in: .whitespacesAndNewlines)
                         if draft.kind == .budget { draft.monthly = draft.target }
@@ -137,6 +132,7 @@ struct CuadraoPlanEditor<Details: View, Footer: View>: View {
                     CuadraoCancelToolbar(title: spanish ? "Cancelar" : "Cancel", disabled: host.saving) {
                         if draft != initial { discard = true } else { dismiss() }
                     }
+                    ToolbarItemGroup(placement: .keyboard) { Spacer(); Button(spanish ? "Listo" : "Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
                 }
                 .confirmationDialog(spanish ? "¿Descartar cambios?" : "Discard changes?", isPresented: $discard, titleVisibility: .visible) {
                     Button(spanish ? "Descartar" : "Discard", role: .destructive) { dismiss() }

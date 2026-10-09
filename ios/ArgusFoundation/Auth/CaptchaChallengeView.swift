@@ -15,10 +15,7 @@ struct CaptchaChallengeView: View {
                 .navigationTitle("auth.captcha.title")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("auth.cancel") { finish(.failure(.cancelled)) }
-                            .accessibilityIdentifier("auth.captcha.cancel")
-                    }
+                    CuadraoCancelToolbar(title: "auth.cancel", identifier: "auth.captcha.cancel") { finish(.failure(.cancelled)) }
                 }
                 .task {
                     do {

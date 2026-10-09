@@ -128,15 +128,11 @@ struct CuadraoExpenseSheet: View {
             .background(Cuadrao.paper)
             .navigationTitle("Registrar gasto").navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                CuadraoCancelToolbar(title: "Cancelar") { dismiss() }
+                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Listo") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 12) {
-                    if amountFocused {
-                        Button("Listo") { amountFocused = false }
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing)
-                            .accessibilityIdentifier("account-amount-done")
-                    }
                     Button("Guardar gasto") {
                         guard let cents else { return }
                         let title = note.trimmingCharacters(in: .whitespacesAndNewlines)

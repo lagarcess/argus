@@ -186,7 +186,7 @@ struct HouseholdContributionEditorView: View {
             }
             .navigationTitle(editor.correcting == nil ? "sharedPlan.record" : "household.correct")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(editor.busy) }
+                CuadraoCancelToolbar(title: "accounts.cancel", disabled: editor.busy) { dismiss() }
                 ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
             }.task { await editor.load() }
         }

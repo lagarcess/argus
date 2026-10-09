@@ -340,13 +340,9 @@ struct CuadraoProfileEditor: View {
             }
             .navigationTitle(spanish ? "Editar perfil" : "Edit profile").navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(spanish ? "Cancelar" : "Cancel") { dismiss() }.accessibilityIdentifier("cuadrao.profile.cancel")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(spanish ? "Guardar" : "Save", action: save)
-                        .disabled(!valid || !changed || photoLoading || saving).accessibilityIdentifier("cuadrao.profile.save")
-                }
+                CuadraoCancelToolbar(title: spanish ? "Cancelar" : "Cancel", identifier: "cuadrao.profile.cancel") { dismiss() }
+                CuadraoConfirmToolbar(title: spanish ? "Guardar" : "Save", disabled: !valid || !changed || photoLoading || saving,
+                                      identifier: "cuadrao.profile.save", action: save)
             }
     }
     private func save() {

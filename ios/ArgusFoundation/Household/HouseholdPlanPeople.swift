@@ -80,7 +80,7 @@ struct HouseholdPlanPeopleEditor: View {
             }
             .navigationTitle("household.people")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() } }
+                CuadraoCancelToolbar(title: "accounts.cancel") { dismiss() }
                 ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
             }
             .task { await load() }

@@ -100,10 +100,7 @@ struct CuadraoSearchContent<Results: View, Filters: View>: View {
                         .navigationTitle(spanish ? "Filtros" : "Filters")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
-                            ToolbarItem(placement: .confirmationAction) {
-                                Button(spanish ? "Listo" : "Done") { showingFilters = false }
-                                    .accessibilityIdentifier(accessibility.prefix + ".filters.done")
-                            }
+                            CuadraoDoneToolbar(title: spanish ? "Listo" : "Done", identifier: accessibility.prefix + ".filters.done") { showingFilters = false }
                         }
                 }.presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
             }
