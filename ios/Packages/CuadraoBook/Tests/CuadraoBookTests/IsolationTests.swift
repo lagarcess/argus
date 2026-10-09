@@ -17,7 +17,9 @@ struct IsolationTests {
         let files = try #require(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
             .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
         #expect(files.count >= 6)
-        let forbidden = ["URLSession", "URLRequest", "NWConnection", "CFNetwork", "import Network", "import UIKit", "import SwiftUI"]
+        // Network, UI, and the file-timestamp APIs the app's privacy manifest does not declare.
+        let forbidden = ["URLSession", "URLRequest", "NWConnection", "CFNetwork", "import Network", "import UIKit", "import SwiftUI",
+                         "modificationDate", "creationDate", "contentModificationDateKey", "attributesOfItem", "fileModificationDate"]
         let floatingPoint = try NSRegularExpression(pattern: #"\b(Double|Float|Float80|CGFloat)\b"#)
         for file in files {
             let text = try String(contentsOf: file, encoding: .utf8)
