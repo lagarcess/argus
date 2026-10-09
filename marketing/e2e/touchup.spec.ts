@@ -58,6 +58,21 @@ test("footer moves automatically, pauses and ends at the page edge", async ({
   const before = await positions();
   await expect.poll(positions).not.toBe(before);
   await control.click();
+  await expect(panel).toHaveAttribute("data-paused", "true");
+  await expect
+    .poll(() =>
+      panel
+        .locator("i")
+        .first()
+        .evaluate((node) => getComputedStyle(node).animationPlayState),
+    )
+    .toBe("paused");
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
   const stopped = await positions();
   await page.waitForTimeout(250);
   expect(await positions()).toBe(stopped);
