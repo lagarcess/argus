@@ -896,7 +896,9 @@ history rules. Account deletion must not silently redefine them.
 
 ### Welcome screen
 
-One main brand composition and the two native actions; nothing else.
+One main brand composition and the two native actions; nothing else. The one
+exception is the quiet third action below, which exists only while the on-device
+guest book's door is open ([October 9 decision](../../../docs/specs/argus-decision-log.md#october-9-2026-iphone-on-device-guest-book-probar-sin-cuenta)).
 
 - The lockup is the only brand element: no repeated header lockup, no tagline.
   Marketing's lockup SVG, at most 268 pt wide, narrowing on small screens instead of
@@ -909,6 +911,32 @@ One main brand composition and the two native actions; nothing else.
   follows Dynamic Type. The screen scrolls at large text sizes; nothing is clipped.
 - Accessibility: the lockup is one element labelled `cuadrao`. Identifiers:
   `cuadrao.welcome.lockup`, `cuadrao.welcome.signup`, `cuadrao.welcome.signin`.
+- **Probar sin cuenta / Try without an account** is a third action under Sign in,
+  shown only while `CuadraoFirstRelease.guestBook` is on (Release is off). It is
+  plain text in the pine accent, with no fill or outline so it never competes with
+  the two buttons, at least 44 pt high, 12 pt below Sign in. Identifier
+  `cuadrao.welcome.guest`.
+
+### On-device guest book
+
+**Probar sin cuenta / Try without an account** opens a book that lives only on the
+iPhone: accounts, movements, budgets, goals, search and plan what-ifs typed by hand.
+It is a mode above authentication, not a sign-in state, and it shares the approved
+Home, Plan, Search and Profile views rather than a second set.
+
+- No network call, account, invitation code, assistant, voice, receipts, files,
+  household, Updates bell or avatar photo. Dictation is the system keyboard's.
+- Empty Home offers one first-account invitation, as signed-in Home does. Profile
+  offers Create account and Sign in, appearance, preferred currency, Terms and
+  Privacy, and **Eliminar los datos de este iPhone / Delete this iPhone's data**,
+  which asks once and removes the book.
+- Signing up or in leaves the book untouched and says so: *Tu libro de este iPhone
+  sigue aquí; no se subió.* / *Your book on this iPhone is still here; it was not
+  uploaded.* Nothing is claimed into the account.
+- A book written by a newer version of the app opens read-only with an update
+  message; the app never rewrites what it cannot read.
+- An amount keeps the currency's exact digits and is never rounded; the currency
+  choice lists only currencies the server accepts.
 
 ### Authentication and invitation purpose
 
