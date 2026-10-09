@@ -24,7 +24,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
-from argus.domain.research.config import research_rail_enabled
+from argus.domain.research.config import research_rail_switched_on
 
 from tests.evals.measurement_eval_scorecard import SKIPPED_BUDGET_STATUS
 
@@ -126,7 +126,7 @@ def refuse_unbounded_rails(environ: Mapping[str, str]) -> None:
     direct search need only the Perplexity key, so the key must be absent too.
     The OpenRouter web-search provider posts outside the receipt path as well.
     """
-    if research_rail_enabled():
+    if research_rail_switched_on():
         raise RuntimeError(
             "ARGUS_RESEARCH_RAIL_ENABLED must be off for a budgeted live eval: "
             "research spend is neither bounded nor visible to the harness"

@@ -623,3 +623,14 @@ def test_refuse_unbounded_rails(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
     with pytest.raises(RuntimeError, match="ARGUS_RESEARCH_RAIL_ENABLED must be off"):
         budget.refuse_unbounded_rails({})
+
+
+def test_rail_refusal_reads_the_switch_inside_a_business_turn(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.domain.chat_surface import turn_surface_scope
+
+    monkeypatch.setenv("ARGUS_RESEARCH_RAIL_ENABLED", "true")
+    with turn_surface_scope("business"):
+        with pytest.raises(RuntimeError, match="ARGUS_RESEARCH_RAIL_ENABLED must be off"):
+            budget.refuse_unbounded_rails({})
