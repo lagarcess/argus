@@ -20,7 +20,7 @@ The founder confirmed that footer photos must be fully hidden at rest. The natur
 
 The implementation uses one reveal offset on a clipped track containing the footer content and an absolutely positioned photo strip. Moving the content together prevents a second crop across the top of the wordmark during the peek. The rendered photo strip bounds the reveal at 120 to 200 pixels according to screen width. Native overscroll alone was rejected because it cannot consistently expose custom clipped photos across browsers.
 
-The founder supplied replacement footer photos during this correction. The dressmaker appears on the left and the artisan on the right. Original files are copied unchanged; Next/Image owns responsive delivery, and CSS crops toward the upper body without stretching. Final crop review, visual acceptance, and header direction are pending. The main editorial florist/accountant images remain unchanged.
+The founder supplied replacement footer photos during this correction. The dressmaker appears on the left and the artisan on the right. Original files are copied unchanged; Next/Image owns responsive delivery, and CSS crops toward the upper body without stretching. The release captain inspected the final crop. Founder visual acceptance and header direction remain pending. The main editorial florist/accountant images remain unchanged.
 
 Typecheck, lint, and a fresh production build pass. All 20 focused browser checks pass on desktop and mobile. They cover resting crop, wheel peek, idle return, fixed document height, upward wheel departure, keyboard navigation, reduced motion, both languages, and dispatched touch drag/release. The first run caught the hidden photos remaining unloaded because they were lazy-loaded. Both footer images now load eagerly through the existing Next.js image optimizer; the rerun passes. Dispatched touch events test the handler; they do not prove physical iPhone overscroll behavior. The release captain reviewed the bounded diff and verified the rebuilt preview. No founder design acceptance, new GitHub CI verdict, or release readiness is claimed.
 
@@ -87,3 +87,7 @@ The Business runtime owner captured `business-inbox-source.png` and `business-re
 The focused browser log is [footer-peek-results.txt](footer-peek-results.txt). The updated preview runs on 4512 with real form-provider credentials unset. The original comparison on 4511 is preserved.
 
 Visual verification found a native browser edge bounce competing with the custom peek. Marketing now disables the native vertical edge effect through CSS while keeping normal scrolling. The final photo crop uses `center 20%`. The focused suite passes again after this correction. The removed screenshot URL returns 404, both previews return 200, and the original comparison listener remains PID 11951.
+
+### Current visual evidence
+
+[The new manifest](footer-peek-screens/manifest.json) pins runtime source `f98974687caecc01c24786007e448754a782d1a2`. [Rest](footer-peek-screens/footer-rest.png), [peek](footer-peek-screens/footer-peek.png), and [settled](footer-peek-screens/footer-settled.png) show the new ending. Business, Personal, Contact, and Privacy captures cover both languages, plus Business at 320 and 390 pixels. The final evidence commit changes no runtime source. These local review artifacts do not establish founder design approval.
