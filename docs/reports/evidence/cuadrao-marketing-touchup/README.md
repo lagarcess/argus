@@ -140,3 +140,6 @@ Visual verification found a native browser edge bounce competing with the custom
 ### Current visual evidence
 
 [The new manifest](footer-peek-screens/manifest.json) pins runtime source `f98974687caecc01c24786007e448754a782d1a2`. [Rest](footer-peek-screens/footer-rest.png), [peek](footer-peek-screens/footer-peek.png), and [settled](footer-peek-screens/footer-settled.png) show the new ending. Business, Personal, Contact, and Privacy captures cover both languages, plus Business at 320 and 390 pixels. The final evidence commit changes no runtime source. These local review artifacts do not establish founder design approval.
+
+
+Personal hand and live mock follow-up: final visual source `7872970775ffdd4b92deeb9b43fe3586b6ea43ba`. The [Personal evidence](personal-pet/README.md) records current header artwork in the phone, the reference-style black hand, updated screenshots/clip and safe live demo at `http://127.0.0.1:4513/personal`. No email is saved or sent by that demo.
