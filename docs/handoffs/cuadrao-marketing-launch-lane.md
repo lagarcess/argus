@@ -8,9 +8,49 @@ This document is the single pickup point. It links to the canonical contracts an
 
 **The successor's immediate scope is website aesthetics, worked with the founder, while Cuadrao LLC formation is pending.** Nothing is authorized to publish.
 
-**First action:** ask the founder which aesthetic tweaks they want, then branch from current `origin/codex/private-alpha-next` into a fresh worktree and read sections 1 and 5. Do not start anything listed under "Held" in section 1.
+**First action:** ask the founder which aesthetic tweaks they want. Resume the existing touch-up branch and worktree recorded below. Do not restart from integration or discard the current work. Do not start anything listed under "Held" in section 1.
 
 **The founder may change Business positioning after an interview with José.** Do not rewrite the website's promise, headlines or story from that interview or in anticipation of it. Visual work (spacing, type scale, color use, imagery, motion, layout polish) is in scope; changing what the Business site claims or who it speaks to is not, until the founder brings the outcome.
+
+## Touch-up ownership checkpoint, 2026-10-09
+
+The founder assigned this Codex chat ownership of Marketing only. This checkpoint
+supersedes the earlier fresh-branch instruction. Business and Consumer worktrees,
+code, and services are outside this assignment.
+
+**The founder has not accepted the current design.** Prior passing tests and
+review reports do not establish design approval. The first question was sent to
+the founder asking what to change and what to keep. Design edits await that answer.
+New copy remains a draft in the [copy review](../reports/evidence/cuadrao-marketing-touchup/copy-review.md).
+
+Verified at 13:54 America/Chicago on 2026-10-09:
+
+- [PR #939](https://github.com/lagarcess/argus/pull/939) is open and draft, targeting `codex/private-alpha-next`.
+- Branch `codex/marketing-touchup-delivery` is checked out at `/Users/garces/.codex/worktrees/cuadrao-marketing-delivery/private-alpha-next`.
+- Local HEAD and GitHub PR head both equal `e09ee0e35b3c92546cf86c47f83b2fdbf10b47af`. The worktree was clean before these documentation updates.
+- The original integration base is `bbf4da23f01296af4ac639386fe9a0960218a49f`. No fetch, reconciliation, reset, or rebase was performed during pickup.
+- Updated preview `http://127.0.0.1:4512/` returns HTTP 200. Its existing process runs from this worktree's `marketing/` directory.
+- Original comparison `http://127.0.0.1:4511/` returns HTTP 200. Its existing process runs from `/Users/garces/.codex/visualizations/2026/09/26/01a0de75-29ee-71f0-8f58-0d2bb3934a33/cuadrao-marketing-touchup/canonical/marketing`.
+- Neither preview was restarted or changed. Preserve the comparison files and process.
+
+The [touch-up evidence](../reports/evidence/cuadrao-marketing-touchup/README.md)
+records the prior implementation and verification. Its screenshot manifest pins
+`85c8cdf2a17c4a8dc6ff2990b75d6d44451cc40e`. The only subsequent change under
+`marketing/` is test synchronization in `e2e/touchup.spec.ts`. Prior browser logs
+record 142 passing checks and six repeated footer checks. Those suites were not
+rerun during pickup, and no new visual acceptance or CI verdict is claimed.
+
+The repository-wide pstack checkpoint points to the older connected-preview lane,
+not this touch-up. Use this handoff, PR #939, and its committed evidence to continue.
+No private transcript is required.
+
+Next, record the founder's requested changes here before implementing them in
+`marketing/`. Keep new copy Spanish first for founder review. Use the isolated test
+ports in the evidence README so tests do not displace either comparison preview.
+Read the mandatory product and technical documents before code changes.
+
+No merge, publication, hosted change, real email, or public-form activation is
+authorized. Existing LLC, operator wording, and provider holds still apply.
 
 ## 1. Scope and decisions
 
@@ -214,8 +254,8 @@ Pinned and hashed in the [pinned comment on #906](https://github.com/lagarcess/a
 
 **What the successor can do now (no approval beyond the founder's direction in conversation):**
 
-1. Ask the founder for the aesthetic tweaks. Create a fresh worktree from current `origin/codex/private-alpha-next`.
-2. For each tweak: change `marketing/` on a branch, run the checks in section 3 (build first), open a PR into integration, record review and landing on the PR and on #880 (integration is protected: no direct pushes, and landing records are not docs-only PRs).
+1. Ask the founder for the aesthetic tweaks. Resume `codex/marketing-touchup-delivery` in the existing worktree recorded in the ownership checkpoint.
+2. For each requested tweak, update `marketing/` on the existing branch and verify the affected behavior. Use the isolated test ports in the touch-up evidence README. Continue PR #939. Record any founder-authorized landing on the PR and #880. Integration remains protected.
 3. Keep new or changed user-facing words Spanish first and confirmed with the founder. Keep the Contact line and the privacy page consistent.
 4. After a tweak lands on a path #927 carries, refresh the candidate once (section 2) and update #927's body.
 5. Do not change product copy that expresses Business positioning until the founder reports the José interview outcome.
