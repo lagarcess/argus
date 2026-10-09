@@ -70,7 +70,11 @@ The bounded Marketing implementation groups ES/EN separately and uses one locali
 
 The founder said the latest header/footer view looks good, then requested that scrolling advance the receipt through Recibir, Revisar, and Aprobar. This feedback applies to the reviewed view, not publication or whole-page acceptance. The proposed pattern is a short sticky story with normal document scrolling, reverse progression on upward scroll, natural release after the final step, and click/keyboard rail shortcuts. A fit check must keep the receipt readable on phones; reduced motion keeps the plain manual presentation. The existing illustrated amounts and development disclosure remain unchanged.
 
-Implementation and browser verification are pending. Scope remains Marketing only on the existing branch and preview, with original comparison 4511 preserved.
+The founder confirmed holding the section through all three steps and asked whether the whole page should become a larger scroll story. The recommendation is one primary receipt transformation now, with quieter surrounding sections. A second sequence should wait for another concrete product story; no whole-page animation expansion is assigned.
+
+Implemented and verified at source `5c3c2d4a41ea2a1d1d76244b0158a1c32f28e805`. Normal scroll owns the active chapter and rail fill; each stage has half a viewport of travel, including a final reading interval before release. Desktop holds the complete scene. On phones the introduction scrolls away, then the rail, disclosure, and receipt pin together below the header. Reduced motion or insufficient height uses ordinary manual tabs without extra scroll distance. No product copy or claims changed.
+
+Fresh build, typecheck, lint, and **42 focused browser checks pass**. Initial screenshot review caught a clipped mobile heading; the final layout and added regression check correct it. The bounded final code review is clean. [Evidence and continuation](../reports/evidence/cuadrao-marketing-touchup/README.md#scroll-driven-receipt-story-2026-10-09) includes exact-source screenshots, logs, reproduction commands, and limits. The existing Marketing branch contains local commits only; PR #939 has not been pushed or merged. Preview 4512 serves the rebuilt source with real provider credentials unset. Original comparison 4511 remains preserved. Whole-page design acceptance and all release holds remain pending.
 
 ## 1. Scope and decisions
 

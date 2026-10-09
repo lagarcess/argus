@@ -45,6 +45,32 @@ Verification against source `80cb9aca17b8a3789ea32f121928af1b48226484`:
 
 The later evidence commit changes only documentation and images, so runtime source is identical to the manifest. Whole-page founder design acceptance remains pending. This is a local review result, not a READY or GitHub CI claim.
 
+## Scroll-driven receipt story, 2026-10-09
+
+The founder approved a section that holds through Recibir, Revisar, and Aprobar, then releases the page. They also asked whether the entire page should tell a larger scroll story. The current recommendation is one primary receipt transformation with quieter surrounding sections, adding another sequence only when there is another concrete product story. This change does not expand whole-page motion or alter product claims, sample amounts, or development disclosures.
+
+The implementation uses native document scrolling and CSS sticky, the pattern demonstrated by [Scrollama's sticky example](https://russellsamora.github.io/scrollama/sticky-side/). No Scrollama dependency was added. Scroll position owns both the active chapter and continuous rail fill. Each chapter spans half a viewport; the final interval gives time to read before release. Upward scrolling reverses the sequence. Click and arrow-key shortcuts move to the chosen chapter, and passive scroll never moves focus. There is no wheel interception, forced snapping, or autoplay.
+
+Desktop holds the full introduction and receipt scene. Phones let the introduction scroll away and hold only the rail, disclosure, and receipt below the header. A fit check measures the tallest card and removes the added runway when content cannot fit. Reduced motion retains ordinary manual tabs, consistent with [W3C reduced-motion guidance](https://www.w3.org/WAI/WCAG22/Techniques/css/C39.html). The initial visual review found a partially clipped mobile heading; a separate mobile stage and regression coverage resolved it before final capture.
+
+Verification against source `5c3c2d4a41ea2a1d1d76244b0158a1c32f28e805`:
+
+- Fresh production build, typecheck, lint, and diff checks pass.
+- **42 focused browser checks pass** across desktop and mobile: ES/EN forward and reverse progression; all three stages; final-stage hold and page release; native wheel input; click/keyboard shortcuts; focus preservation; 390-pixel anchor entry and resize; 320-pixel readability; short landscape and reduced-motion fallbacks; existing header, footer, and withdrawn-screenshot checks.
+- The release captain inspected desktop and phone captures, including both languages. A final read-only review of the mobile delta returned clean, with no actionable findings. All delegated writers returned ownership; no agent has an active follow-up.
+- [Screenshot manifest](scroll-story-screens/manifest.json) pins this source. It includes all three stages in ES/EN at 1440×900 and 390×844, plus the short-height manual fallback. [Desktop review stage](scroll-story-screens/story-es-1440-2.png), [phone review stage](scroll-story-screens/story-es-390-2.png), and [English phone approval](scroll-story-screens/story-en-390-3.png).
+- [Browser results](scroll-story-results.txt) and [build results](scroll-story-build.txt). Headless Chromium and dispatched touch coverage do not establish physical iPhone/Safari behavior.
+- Updated preview 4512 serves this build with real form-provider credentials unset. Comparison 4511 and its listener PID 11951 are preserved. No Business or Consumer files/services changed. No push, merge, publication, hosted change, or real email occurred.
+
+Reproduce from `marketing/` after building:
+
+```sh
+CI=1 MARKETING_E2E_SITE_PORT=4540 MARKETING_E2E_PUBLIC_PORT=4541 MARKETING_E2E_MOCK_PORT=4542 bun run test:e2e e2e/capture-story.spec.ts e2e/touchup.spec.ts
+bun run scripts/capture-story.mjs
+```
+
+Only the Marketing preview may be stopped for a rebuild, after verifying its process working directory. Preserve comparison 4511. The subsequent evidence commit contains documentation and captures only; runtime source is identical to the manifest. Continue on `codex/marketing-touchup-delivery`, retaining PR #939 and the original integration base recorded in the handoff. This is a local design iteration, not a READY, current GitHub CI, or whole-page founder acceptance claim.
+
 ## Historical reference decisions
 
 Both founder-provided recordings were inspected directly, frame by frame:
