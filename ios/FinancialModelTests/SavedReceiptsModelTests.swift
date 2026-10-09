@@ -39,7 +39,7 @@ final class SavedReceiptsModelTests: XCTestCase {
     func testTheServersCodesBecomeTheApprovedMessages() async {
         let cases: [(String, SavedReceiptFailure)] = [
             ("document_too_large", .tooLarge), ("document_media_type_unsupported", .wrongType),
-            ("document_rate_limited", .limitReached), ("document_storage_unavailable", .couldNotSave),
+            ("document_rate_limited", .limitReached), ("document_storage_unavailable", .couldNotSave), ("invalid_document", .wrongType),
         ]
         for (code, expected) in cases {
             let model = model(ScriptedTransport(saveFailure: SessionFailure.rejected(status: 400, code: code)))
@@ -79,7 +79,44 @@ final class SavedReceiptsModelTests: XCTestCase {
         await transport.failDeletes()
         await model.remove(model.items[0])
         XCTAssertEqual(model.items.map(\.id), ["b"], "a failed delete keeps the receipt")
-        XCTAssertEqual(model.outcome, .failed(.couldNotSave))
+        XCTAssertEqual(model.outcome, .failed(.couldNotDelete))
+        XCTAssertFalse(model.canRetry, "a failed delete never offers Try again, which would resend an old file")
+    }
+
+    func testAFileCapturedDuringASaveWaitsItsTurnAndIsNotLost() async {
+        let transport = ScriptedTransport(saveDelayNanoseconds: 60_000_000)
+        let model = model(transport)
+        let first = Task { await model.save([(Data([1]), "one.pdf", true)]) }
+        try? await Task.sleep(nanoseconds: 15_000_000)
+        await model.save([(Data([2]), "two.pdf", true)])
+        await first.value
+        let sent = await transport.saved
+        XCTAssertEqual(sent.map(\.filename), ["one.pdf", "two.pdf"])
+        XCTAssertEqual(model.outcome, .saved)
+        XCTAssertFalse(model.saving)
+    }
+
+    func testCancellingAFailedSaveDropsTheHeldFiles() async {
+        let transport = ScriptedTransport(saveFailure: SessionFailure.unavailable)
+        let model = model(transport)
+        await model.save([(Data([1]), "a.pdf", true)])
+        XCTAssertTrue(model.canRetry)
+        model.discardFailedFiles()
+        XCTAssertFalse(model.canRetry)
+        model.fail(.unusableFile)
+        XCTAssertEqual(model.outcome, .failed(.unusableFile))
+        XCTAssertFalse(model.canRetry)
+    }
+
+    func testASaveFailingAfterSignOutLeavesNothingHeld() async {
+        let transport = ScriptedTransport(saveFailure: SessionFailure.unavailable, saveDelayNanoseconds: 60_000_000)
+        let model = model(transport)
+        let saving = Task { await model.save([(Data(count: 1_000), "a.pdf", true)]) }
+        try? await Task.sleep(nanoseconds: 15_000_000)
+        model.bind(signedOut)
+        await saving.value
+        XCTAssertNil(model.outcome)
+        XCTAssertFalse(model.canRetry, "the earlier person's file is not kept")
     }
 
     func testALateAnswerAfterSignOutIsIgnored() async {
@@ -115,7 +152,7 @@ final class SavedReceiptsModelTests: XCTestCase {
             let copy = SavedReceiptCopy(spanish: spanish)
             let all = [copy.title, copy.empty, copy.saving, copy.savedTitle, copy.savedDetail, copy.alreadySaved, copy.tooLarge, copy.wrongType,
                        copy.limitReached, copy.couldNotSave, copy.retry, copy.view, copy.delete, copy.cancel, copy.deleteTitle, copy.deleteMessage,
-                       copy.couldNotOpen, copy.couldNotLoad]
+                       copy.couldNotOpen, copy.couldNotLoad, copy.couldNotDelete, copy.unusableFile, copy.scannerUnavailable]
             XCTAssertTrue(all.allSatisfy { !$0.isEmpty && !$0.contains("\u{2014}") }, spanish ? "es" : "en")
         }
         XCTAssertEqual(SavedReceiptCopy(spanish: true).tooLarge, "El archivo pesa más de 10 MB. Elige uno más pequeño.")
@@ -131,11 +168,12 @@ actor ScriptedTransport: SavedReceiptsTransport {
     private var listFailure: Error?
     private var deletesFail = false
     private let delay: UInt64
+    private let saveDelay: UInt64
     private(set) var saved: [Sent] = []
     private(set) var attempts = 0
 
-    init(listed: [SavedDocument] = [], replayed: Bool = false, saveFailure: Error? = nil, listFailure: Error? = nil, delayNanoseconds: UInt64 = 0) {
-        self.listed = listed; self.replayed = replayed; self.saveFailure = saveFailure; self.listFailure = listFailure; self.delay = delayNanoseconds
+    init(listed: [SavedDocument] = [], replayed: Bool = false, saveFailure: Error? = nil, listFailure: Error? = nil, delayNanoseconds: UInt64 = 0, saveDelayNanoseconds: UInt64 = 0) {
+        self.listed = listed; self.replayed = replayed; self.saveFailure = saveFailure; self.listFailure = listFailure; self.delay = delayNanoseconds; self.saveDelay = saveDelayNanoseconds
     }
     func stopFailing() { saveFailure = nil }
     func failDeletes() { deletesFail = true }
@@ -151,6 +189,7 @@ actor ScriptedTransport: SavedReceiptsTransport {
     }
     func save(_ bytes: Data, mediaType: String, filename: String, identity: SessionSnapshot) async throws -> SavedDocumentCapture {
         attempts += 1
+        if saveDelay > 0 { try? await Task.sleep(nanoseconds: saveDelay) }
         if let saveFailure { throw saveFailure }
         saved.append(Sent(mediaType: mediaType, filename: filename))
         return try JSONDecoder().decode(SavedDocumentCapture.self, from: JSONSerialization.data(withJSONObject: [

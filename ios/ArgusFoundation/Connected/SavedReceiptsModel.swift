@@ -9,13 +9,13 @@ enum SavedReceiptOutcome: Equatable {
 }
 
 enum SavedReceiptFailure: Equatable {
-    case tooLarge, wrongType, limitReached, couldNotSave
+    case tooLarge, wrongType, limitReached, couldNotSave, couldNotDelete, unusableFile, scannerUnavailable
 
     init(_ error: Error) {
         guard case .rejected(_, let code)? = error as? SessionFailure else { self = .couldNotSave; return }
         switch code {
         case "document_too_large": self = .tooLarge
-        case "document_media_type_unsupported": self = .wrongType
+        case "document_media_type_unsupported", "invalid_document": self = .wrongType
         case "document_rate_limited": self = .limitReached
         default: self = .couldNotSave
         }
@@ -64,6 +64,7 @@ final class SavedReceiptsModel: ObservableObject {
     private var ticket = UUID()
     private var nextOffset: Int?
     private var failedFiles: [(data: Data, name: String, pdf: Bool)] = []
+    private var queued: [(data: Data, name: String, pdf: Bool)] = []
 
     init(transport: any SavedReceiptsTransport, currentSession: @escaping @Sendable () async -> SessionSnapshot) {
         self.transport = transport
@@ -80,7 +81,7 @@ final class SavedReceiptsModel: ObservableObject {
         identity = next
         ticket = UUID()
         items = []; nextOffset = nil; loading = false; loadFailed = false; saving = false; removing = nil; outcome = nil
-        failedFiles = []
+        failedFiles = []; queued = []
     }
 
     var hasMore: Bool { nextOffset != nil }
@@ -96,7 +97,7 @@ final class SavedReceiptsModel: ObservableObject {
             items = page.items; nextOffset = page.nextOffset
         } catch {
             guard mine == ticket else { return }
-            if await identityChanged() { return }
+            if await identityChanged(mine) { return }
             loadFailed = true
         }
     }
@@ -113,40 +114,59 @@ final class SavedReceiptsModel: ObservableObject {
             nextOffset = page.nextOffset
         } catch {
             guard mine == ticket else { return }
-            _ = await identityChanged()
+            _ = await identityChanged(mine)
         }
     }
 
     /// Saves each captured file. The outcome is the last file's, which is the only one when one file was chosen.
+    /// Files captured while a save is running wait their turn and are reported with it.
     func save(_ files: [(data: Data, name: String, pdf: Bool)]) async {
-        guard let identity, !saving, !files.isEmpty else { return }
+        guard let identity, !files.isEmpty else { return }
+        if saving { queued += files; return }
         let mine = ticket
         saving = true; outcome = nil; failedFiles = []
         defer { if mine == ticket { saving = false } }
         var last: SavedReceiptOutcome = .saved
-        for file in files {
-            do {
-                let capture = try await transport.save(file.data, mediaType: Self.mediaType(file), filename: file.name, identity: identity)
-                last = capture.replayed ? .alreadySaved : .saved
-            } catch {
-                guard mine == ticket else { return }
-                if await identityChanged() { return }
-                let failure = SavedReceiptFailure(error)
-                if failure == .couldNotSave { failedFiles = files }
-                outcome = .failed(failure)
-                return
+        var batch = files
+        while !batch.isEmpty {
+            for (index, file) in batch.enumerated() {
+                do {
+                    let capture = try await transport.save(file.data, mediaType: Self.mediaType(file), filename: file.name, identity: identity)
+                    last = capture.replayed ? .alreadySaved : .saved
+                } catch {
+                    guard mine == ticket else { return }
+                    if await identityChanged(mine) { return }
+                    let failure = SavedReceiptFailure(error)
+                    if failure == .couldNotSave { failedFiles = Array(batch[index...]) + queued }
+                    queued = []
+                    outcome = .failed(failure)
+                    await load()
+                    return
+                }
             }
+            guard mine == ticket else { return }
+            batch = queued; queued = []
         }
-        guard mine == ticket else { return }
         outcome = last
         await load()
     }
+
+    /// True when the last failure was one a second try can fix and the files are still held.
+    var canRetry: Bool { !failedFiles.isEmpty }
 
     /// Tries again with the files that could not be saved, only after a failure that a retry can fix.
     func retry() async {
         let files = failedFiles
         outcome = nil
         await save(files)
+    }
+
+    func discardFailedFiles() { failedFiles = [] }
+
+    /// A failure before anything was sent, such as a file the picker could not read.
+    func fail(_ failure: SavedReceiptFailure) {
+        failedFiles = []
+        outcome = .failed(failure)
     }
 
     func remove(_ document: SavedDocument) async {
@@ -160,8 +180,8 @@ final class SavedReceiptsModel: ObservableObject {
             items.removeAll { $0.id == document.id }
         } catch {
             guard mine == ticket else { return }
-            if await identityChanged() { return }
-            outcome = .failed(.couldNotSave)
+            if await identityChanged(mine) { return }
+            outcome = .failed(.couldNotDelete)
         }
     }
 
@@ -169,7 +189,7 @@ final class SavedReceiptsModel: ObservableObject {
     func source(of document: SavedDocument) async -> Data? {
         guard let identity, document.sourceAvailable else { return nil }
         do { return try await transport.source(document.id, identity: identity) }
-        catch { _ = await identityChanged(); return nil }
+        catch { _ = await identityChanged(ticket); return nil }
     }
 
     static func mediaType(_ file: (data: Data, name: String, pdf: Bool)) -> String {
@@ -178,9 +198,10 @@ final class SavedReceiptsModel: ObservableObject {
     }
 
     /// After a failure: if the session moved on (signed out, another person), start clean and tell the owner.
-    private func identityChanged() async -> Bool {
+    private func identityChanged(_ mine: UUID) async -> Bool {
         guard let identity else { return true }
         let snapshot = await currentSession()
+        guard mine == ticket else { return true }
         guard snapshot != identity else { return false }
         bind(snapshot)
         sessionChanged?(snapshot)

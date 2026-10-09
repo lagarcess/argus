@@ -164,11 +164,11 @@ private struct SavedReceiptOutcomeAlert: ViewModifier {
                 }
             }
             .alert(title, isPresented: Binding(get: { model.outcome != nil }, set: { if !$0 { model.outcome = nil } })) {
-                if case .failed(.couldNotSave)? = model.outcome {
+                if case .failed(.couldNotSave)? = model.outcome, model.canRetry {
                     Button(copy.retry) { Task { await model.retry() } }.accessibilityIdentifier("saved.receipts.retry.save")
-                    Button(copy.cancel, role: .cancel) {}
+                    Button(copy.cancel, role: .cancel) { model.discardFailedFiles() }
                 } else {
-                    Button(copy.done, role: .cancel) {}.accessibilityIdentifier("saved.receipts.outcome.done")
+                    Button(copy.done, role: .cancel) { model.discardFailedFiles() }.accessibilityIdentifier("saved.receipts.outcome.done")
                 }
             } message: {
                 if case .saved? = model.outcome { Text(copy.savedDetail) }

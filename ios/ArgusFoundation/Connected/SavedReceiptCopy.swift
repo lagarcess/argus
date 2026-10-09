@@ -1,7 +1,7 @@
 import Foundation
 
 /// Every word of the saved-receipts surface, Spanish first. These are the founder-approved Consumer words
-/// (October 8). The three marked "pending approval" are not in the approved table.
+/// (October 8). The ones marked "pending approval" are not in the approved table.
 struct SavedReceiptCopy {
     let spanish: Bool
 
@@ -42,12 +42,26 @@ struct SavedReceiptCopy {
     /// Pending approval: not in the approved table.
     var couldNotLoad: String { spanish ? "No pudimos cargar tus recibos." : "We could not load your receipts." }
 
+    /// Pending approval: not in the approved table.
+    var couldNotDelete: String { spanish ? "No pudimos eliminar el recibo." : "We could not delete the receipt." }
+    /// The approved receipt-source wording.
+    var unusableFile: String {
+        spanish ? "Usa hasta 10 páginas de imagen o PDF, con un máximo de 20 MB." : "Use up to 10 image or PDF pages, no more than 20 MB."
+    }
+    /// The approved scanner wording.
+    var scannerUnavailable: String {
+        spanish ? "El escáner no está disponible aquí. Puedes elegir una foto o un archivo." : "The scanner is unavailable here. Choose a photo or file."
+    }
+
     func failure(_ failure: SavedReceiptFailure) -> String {
         switch failure {
         case .tooLarge: tooLarge
         case .wrongType: wrongType
         case .limitReached: limitReached
         case .couldNotSave: couldNotSave
+        case .couldNotDelete: couldNotDelete
+        case .unusableFile: unusableFile
+        case .scannerUnavailable: scannerUnavailable
         }
     }
 }

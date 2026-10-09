@@ -88,10 +88,18 @@ struct ConnectedCuadraoShell: View {
             }
         }
         .savedReceiptOutcome(auth.savedReceipts, spanish: spanish)
-        .sheet(item: $capturing) { source in
+        .fullScreenCover(item: $capturing) { source in
             ReceiptNativePicker(source: source, spanish: spanish) { result in
                 capturing = nil
-                if case .success(let files) = result { Task { await auth.savedReceipts?.save(files) } }
+                switch result {
+                case .success(let files):
+                    let prepared = SavedReceiptFiles.prepared(files, source: source, spanish: spanish)
+                    Task { await auth.savedReceipts?.save(prepared) }
+                case .failure(let error) where (error as NSError).code != NSUserCancelledError || (error as NSError).domain != NSCocoaErrorDomain:
+                    auth.savedReceipts?.fail(.unusableFile)
+                case .failure:
+                    break
+                }
             }.ignoresSafeArea()
         }
         .sheet(isPresented: $creatingPlan) {
@@ -211,6 +219,10 @@ struct ConnectedCuadraoShell: View {
             return
         }
         #endif
+        if source == .scan && !SavedReceiptFiles.scannerAvailable {
+            auth.savedReceipts?.fail(.scannerUnavailable)
+            return
+        }
         capturing = source
     }
 
