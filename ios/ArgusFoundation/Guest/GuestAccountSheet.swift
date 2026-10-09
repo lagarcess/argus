@@ -32,7 +32,7 @@ struct GuestAccountSheet: View {
             fresh.currency = model.book.settings.primaryCurrency ?? CurrencyTable.priority[0]
             _entry = State(initialValue: fresh)
         case .edit(let id):
-            _entry = State(initialValue: model.book.account(id).map(GuestAccountPresentation.entry) ?? CanvasAccountEntry())
+            _entry = State(initialValue: model.book.account(id).map { GuestAccountPresentation.entry($0, in: model.book) } ?? CanvasAccountEntry())
         }
     }
 

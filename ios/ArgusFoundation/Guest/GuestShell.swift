@@ -90,7 +90,7 @@ struct GuestShell: View {
     @State private var searchScroll = CuadraoNavigationScroll()
     @State private var profileScroll = CuadraoNavigationScroll()
     @State private var profilePath: [GuestProfileRoute] = []
-    @State private var homePath: [UUID] = []
+    @State private var homePath: [GuestRoute] = []
     @State private var sheet: GuestSheet?
     @State private var chat = CuadraoChatPreview(spanish: Locale.current.language.languageCode?.identifier == "es", includeExamples: false)
 
@@ -126,6 +126,7 @@ struct GuestShell: View {
             CuadraoAddItem(action: action) {
                 switch action {
                 case .account: sheet = .account(.create)
+                case .transaction: sheet = .movement(.create(account: nil))
                 default: break
                 }
             }
@@ -136,6 +137,8 @@ struct GuestShell: View {
         switch sheet {
         case .account(let mode):
             GuestAccountSheet(model: model, mode: mode, spanish: spanish).preferredColorScheme(appearance.colorScheme)
+        case .movement(let mode):
+            GuestMovementSheet(model: model, mode: mode, spanish: spanish).preferredColorScheme(appearance.colorScheme)
         case .archive(let id):
             CuadraoArchiveAccountReview(spanish: spanish) { _ = try? model.apply { try $0.settingArchived(id, true) } }
                 .preferredColorScheme(appearance.colorScheme)

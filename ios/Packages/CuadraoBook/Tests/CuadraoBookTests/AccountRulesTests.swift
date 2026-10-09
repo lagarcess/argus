@@ -18,15 +18,15 @@ struct AccountRulesTests {
         let unknown = try make(amount: "").accounts[0]
         let zero = try make(amount: "0").accounts[0]
         #expect(unknown.opening == nil)
-        #expect(unknown.balance == nil)
-        #expect(zero.balance == Money(minor: 0, currency: "USD", digits: 2))
+        #expect(unknown.openingBalance == nil)
+        #expect(zero.openingBalance == Money(minor: 0, currency: "USD", digits: 2))
         #expect(try make(amount: "   ").accounts[0].opening == nil, "spaces are blank too")
     }
 
     @Test func amountsKeepTheCurrencysExactDigits() throws {
-        #expect(try make(currency: "USD", amount: "1234.56").accounts[0].balance?.minor == 123_456)
-        #expect(try make(currency: "JPY", amount: "15000").accounts[0].balance?.minor == 15_000)
-        #expect(try make(currency: "KWD", amount: "12.345").accounts[0].balance?.minor == 12_345)
+        #expect(try make(currency: "USD", amount: "1234.56").accounts[0].openingBalance?.minor == 123_456)
+        #expect(try make(currency: "JPY", amount: "15000").accounts[0].openingBalance?.minor == 15_000)
+        #expect(try make(currency: "KWD", amount: "12.345").accounts[0].openingBalance?.minor == 12_345)
         #expect(try make(currency: "KWD", amount: "12.345").accounts[0].digits == 3)
         #expect(try make(currency: "JPY", amount: "15000").accounts[0].digits == 0)
         #expect(throws: BookRuleError.amount(.precision(digits: 0))) { try make(currency: "JPY", amount: "1.5") }
@@ -37,11 +37,11 @@ struct AccountRulesTests {
 
     @Test func aDebtIsTypedPositiveAndStoredNegativeOnce() throws {
         let card = try make(.creditCard, currency: "DOP", amount: "250.50").accounts[0]
-        #expect(card.balance?.minor == -25_050)
-        #expect(card.balance?.plain == "-250.50")
+        #expect(card.openingBalance?.minor == -25_050)
+        #expect(card.openingBalance?.plain == "-250.50")
         #expect(throws: BookRuleError.negativeAmount) { try make(.otherDebt, amount: "-5") }
         #expect(throws: BookRuleError.negativeAmount) { try make(.property, amount: "-5") }
-        #expect(try make(.checking, amount: "-5").accounts[0].balance?.minor == -500, "an overdrawn checking account is allowed")
+        #expect(try make(.checking, amount: "-5").accounts[0].openingBalance?.minor == -500, "an overdrawn checking account is allowed")
     }
 
     @Test func aShareExistsOnlyForOptionalAssets() throws {
@@ -62,7 +62,7 @@ struct AccountRulesTests {
     @Test func limitsAndUnsupportedCurrenciesAreRefused() throws {
         #expect(throws: BookRuleError.currencyUnsupported) { try make(currency: "XXX") }
         #expect(throws: BookRuleError.amountTooLarge) { try make(currency: "USD", amount: "10000000000000.01") }
-        #expect(try make(currency: "USD", amount: "10000000000000.00").accounts[0].balance?.minor == Limits.maximumMinor)
+        #expect(try make(currency: "USD", amount: "10000000000000.00").accounts[0].openingBalance?.minor == Limits.maximumMinor)
         var book = DeviceBook.empty()
         for _ in 0..<Limits.accounts { book = try make(in: book) }
         #expect(throws: BookRuleError.accountLimit) { try make(in: book) }
@@ -85,7 +85,7 @@ struct AccountRulesTests {
         let edited = try book.editingAccount(id, with: BookAccountDraft(kind: .cash, currency: "JPY", nickname: "", amountText: "500"))
         #expect(edited.accounts[0].kind == .cash)
         #expect(edited.accounts[0].digits == 0)
-        #expect(edited.accounts[0].balance?.minor == 500)
+        #expect(edited.accounts[0].openingBalance?.minor == 500)
     }
 
     @Test func clearingTheAmountReturnsToUnknownAndAnUnchangedAmountKeepsItsStart() throws {
@@ -151,7 +151,7 @@ struct AccountRulesTests {
         decoder.dateDecodingStrategy = .iso8601
         let book = try decoder.decode(DeviceBook.self, from: Data(json.utf8))
         #expect(CurrencyTable.digits("JPY") == 0)
-        #expect(book.accounts[0].balance?.plain == "1234.56", "read with the digits it was written with")
+        #expect(book.accounts[0].openingBalance?.plain == "1234.56", "read with the digits it was written with")
     }
 
     @Test func aBookWithAccountsRoundTripsThroughTheStore() async throws {

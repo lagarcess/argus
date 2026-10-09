@@ -56,8 +56,8 @@ public struct BookAccount: Codable, Equatable, Identifiable, Sendable {
         self.createdAt = createdAt
     }
 
-    /// The stated balance, or nil while it is unknown.
-    public var balance: Money? {
+    /// The balance as first stated, before any movement. `DeviceBook.balance(of:)` is what the person reads now.
+    public var openingBalance: Money? {
         opening.map { Money(minor: $0.amountMinor, currency: currency, digits: digits) }
     }
 }
@@ -85,9 +85,9 @@ extension DeviceBook {
     public var activeAccounts: [BookAccount] { accounts.filter { !$0.archived } }
     public var archivedAccounts: [BookAccount] { accounts.filter(\.archived) }
 
-    /// Whether anything depends on the account's currency and type: a stated balance, and later its movements.
+    /// Whether anything depends on the account's currency and type: a stated balance or a movement, deleted or not.
     public func hasRecords(_ id: UUID) -> Bool {
-        account(id)?.opening != nil
+        account(id)?.opening != nil || movements.contains { $0.effect(on: id) != nil }
     }
 
     public func addingAccount(_ draft: BookAccountDraft, id: UUID = UUID(), now: Date = Date(),
@@ -125,8 +125,9 @@ extension DeviceBook {
         account.nickname = try Self.nickname(draft.nickname)
         if account.kind.isOptionalAsset { account.ownershipShareBps = try Self.share(draft.shareBps, kind: account.kind) }
         let stated = try Self.opening(draft.amountText, kind: account.kind, digits: account.digits, now: now, zone: zone)
-        // An unchanged amount keeps its start date; only a revised or newly stated one starts tracking now.
-        if let stated, let current = account.opening, stated.amountMinor == current.amountMinor {
+        // An amount equal to the balance the person reads now keeps the tracking start; a different or newly stated
+        // one starts tracking now, so earlier movements are already inside it.
+        if let stated, let current = account.opening, stated.amountMinor == balance(of: id)?.minor {
             account.opening = current
         } else {
             account.opening = stated

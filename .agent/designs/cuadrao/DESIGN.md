@@ -942,6 +942,15 @@ Home, Plan, Search and Profile views rather than a second set.
   zero; a stated balance starts tracking at that moment. The currency and type are
   kept once a balance is stated. Archive keeps the account and its place, with Undo
   and a Restore list; the order set by dragging is part of the book.
+- Movements are expense, income and same-currency transfer, recorded in the shared
+  transaction sheet in one Save. The date cannot be in the future or before the
+  account's tracking began, an archived account takes no new ones, and a delete
+  offers Undo. An account's balance is its stated balance plus the movements since,
+  so a movement on an unknown balance leaves it unknown. Home shows the net balance
+  of one currency with the shared chart over daily balances the book derived, and
+  the expanded view pages by month. Spending never claims a month the book has no
+  coverage for: it shows No data, and a month that coverage begins inside says
+  from which day it counts.
 
 ### Authentication and invitation purpose
 

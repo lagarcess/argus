@@ -51,14 +51,14 @@ enum GuestAccountPresentation {
         account.nickname ?? artwork(account.kind).title(spanish)
     }
 
-    static func amount(_ account: BookAccount, spanish: Bool, locale: Locale) -> String {
-        guard let balance = account.balance else { return spanish ? "Saldo desconocido" : "Balance unknown" }
+    static func amount(_ account: BookAccount, in book: DeviceBook, spanish: Bool, locale: Locale) -> String {
+        guard let balance = book.balance(of: account.id) else { return spanish ? "Saldo desconocido" : "Balance unknown" }
         return MoneyFormatter.grouped(balance.minor, digits: balance.digits,
                                       grouping: locale.groupingSeparator ?? ",", decimal: locale.decimalSeparator ?? ".")
     }
 
-    private static func qualifier(_ account: BookAccount, spanish: Bool) -> String {
-        guard let minor = account.balance?.minor else { return "" }
+    private static func qualifier(_ account: BookAccount, in book: DeviceBook, spanish: Bool) -> String {
+        guard let minor = book.balance(of: account.id)?.minor else { return "" }
         if account.kind == .creditCard, minor > 0 { return spanish ? " · a favor" : " · credit" }
         return minor < 0 ? (spanish ? " · pendiente" : " · owed") : ""
     }
@@ -70,18 +70,18 @@ enum GuestAccountPresentation {
         return (spanish ? "Tu parte: " : "Your share: ") + text + "%"
     }
 
-    static func row(_ account: BookAccount, spanish: Bool, locale: Locale) -> CanvasAccountRowValue {
+    static func row(_ account: BookAccount, in book: DeviceBook, spanish: Bool, locale: Locale) -> CanvasAccountRowValue {
         var notes: [String] = []
         if let share = share(account, spanish: spanish) { notes.append(share) }
         if account.archived { notes.append(spanish ? "Archivada" : "Archived") }
         return CanvasAccountRowValue(title: title(account, spanish: spanish), subtitle: artwork(account.kind).title(spanish),
-            artwork: artwork(account.kind), amount: amount(account, spanish: spanish, locale: locale),
-            amountCaption: account.currency + qualifier(account, spanish: spanish),
+            artwork: artwork(account.kind), amount: amount(account, in: book, spanish: spanish, locale: locale),
+            amountCaption: account.currency + qualifier(account, in: book, spanish: spanish),
             note: notes.isEmpty ? nil : notes.joined(separator: " · "))
     }
 
-    static func detail(_ account: BookAccount, spanish: Bool, locale: Locale) -> CanvasAccountDetailValue {
-        let shown = amount(account, spanish: spanish, locale: locale)
+    static func detail(_ account: BookAccount, in book: DeviceBook, spanish: Bool, locale: Locale) -> CanvasAccountDetailValue {
+        let shown = amount(account, in: book, spanish: spanish, locale: locale)
         let freshness: String
         if let opening = account.opening {
             let formatter = DateFormatter()
@@ -98,7 +98,7 @@ enum GuestAccountPresentation {
             notes.append(spanish ? "Saldo con signo: un monto negativo indica dinero que debes."
                 : "Signed balance: a negative amount means money owed.")
         }
-        if account.opening != nil {
+        if book.hasRecords(account.id) {
             notes.append(spanish ? "La moneda y el tipo se conservan con el balance registrado."
                 : "The currency and type are kept with the recorded balance.")
         }
@@ -121,12 +121,12 @@ enum GuestAccountPresentation {
     }
 
     /// What the form shows for an existing account: the typed form of its balance (a debt as a positive amount owed).
-    static func entry(_ account: BookAccount) -> CanvasAccountEntry {
+    static func entry(_ account: BookAccount, in book: DeviceBook) -> CanvasAccountEntry {
         var entry = CanvasAccountEntry()
         entry.kind = artwork(account.kind)
         entry.name = account.nickname ?? ""
         entry.currency = account.currency
-        if let balance = account.balance {
+        if let balance = book.balance(of: account.id) {
             entry.amount = MoneyFormatter.plain(account.kind.isLiability ? -balance.minor : balance.minor, digits: balance.digits)
         }
         let percent = account.ownershipShareBps / 100
@@ -152,7 +152,16 @@ enum GuestAccountPresentation {
         case .accountLimit: spanish ? "Llegaste al máximo de cuentas en este iPhone." : "You've reached the most accounts this iPhone can hold."
         case .currencyLocked: spanish ? "La moneda se conserva con el balance registrado." : "The currency is kept with the recorded balance."
         case .kindLocked: spanish ? "El tipo se conserva con el balance registrado." : "The type is kept with the recorded balance."
-        case .accountNotFound, .orderInvalid: spanish ? "No se pudo guardar. Inténtalo de nuevo." : "Couldn't save. Try again."
+        case .amountNotPositive: spanish ? "Escribe un monto mayor que cero." : "Enter an amount above zero."
+        case .futureDate: spanish ? "La fecha no puede ser futura." : "The date can't be in the future."
+        case .beforeTracking:
+            spanish ? "Esa fecha es anterior al inicio del seguimiento de la cuenta." : "That date is before the account's tracking began."
+        case .accountArchived: spanish ? "Una cuenta archivada no recibe movimientos nuevos." : "An archived account takes no new activity."
+        case .transferCurrencyMismatch: spanish ? "Las transferencias son entre cuentas de la misma moneda." : "Transfers are between accounts in the same currency."
+        case .transferSameAccount: spanish ? "Elige una cuenta distinta para recibir." : "Choose a different account to receive it."
+        case .movementLimit: spanish ? "Llegaste al máximo de movimientos en este iPhone." : "You've reached the most activity this iPhone can hold."
+        case .noteTooLong: spanish ? "El concepto puede tener hasta \(Limits.note) caracteres." : "The description can have up to \(Limits.note) characters."
+        case .accountNotFound, .orderInvalid, .movementNotFound: spanish ? "No se pudo guardar. Inténtalo de nuevo." : "Couldn't save. Try again."
         }
     }
 }

@@ -11,18 +11,21 @@ public struct DeviceBook: Codable, Equatable, Sendable {
     public var settings: BookSettings
     /// In display order; archived accounts keep their place.
     public var accounts: [BookAccount]
+    /// Every movement ever recorded, deleted ones included so a delete can be undone.
+    public var movements: [Movement]
 
     public init(schemaVersion: Int = DeviceBook.currentSchemaVersion, revision: Int = 0, settings: BookSettings = BookSettings(),
-                accounts: [BookAccount] = []) {
+                accounts: [BookAccount] = [], movements: [Movement] = []) {
         self.schemaVersion = schemaVersion
         self.revision = revision
         self.settings = settings
         self.accounts = accounts
+        self.movements = movements
     }
 
     public static func empty() -> DeviceBook { DeviceBook() }
 
-    private enum CodingKeys: String, CodingKey { case schemaVersion, revision, settings, accounts }
+    private enum CodingKeys: String, CodingKey { case schemaVersion, revision, settings, accounts, movements }
 
     /// Fields added later decode to their defaults, so a book written before they existed still opens.
     public init(from decoder: Decoder) throws {
@@ -31,6 +34,7 @@ public struct DeviceBook: Codable, Equatable, Sendable {
         revision = try values.decodeIfPresent(Int.self, forKey: .revision) ?? 0
         settings = try values.decodeIfPresent(BookSettings.self, forKey: .settings) ?? BookSettings()
         accounts = try values.decodeIfPresent([BookAccount].self, forKey: .accounts) ?? []
+        movements = try values.decodeIfPresent([Movement].self, forKey: .movements) ?? []
     }
 }
 
@@ -58,6 +62,17 @@ public enum BookRuleError: Error, Equatable, Sendable {
     case kindLocked
     /// The order given was not exactly the active accounts.
     case orderInvalid
+    case amountNotPositive
+    /// A movement cannot be dated after the moment it is recorded.
+    case futureDate
+    /// A movement cannot be dated before its account's balance was stated; that balance already includes it.
+    case beforeTracking
+    case accountArchived
+    case transferCurrencyMismatch
+    case transferSameAccount
+    case movementNotFound
+    case movementLimit
+    case noteTooLong
 }
 
 extension DeviceBook {

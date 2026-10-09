@@ -4,11 +4,12 @@ import CuadraoBook
 /// A row of the book's Accounts section, shared by Home and the archived list.
 struct GuestAccountRow: View {
     let account: BookAccount
+    let book: DeviceBook
     let spanish: Bool
     @Environment(\.locale) private var locale
 
     var body: some View {
-        CanvasAccountRowContent(value: GuestAccountPresentation.row(account, spanish: spanish, locale: locale))
+        CanvasAccountRowContent(value: GuestAccountPresentation.row(account, in: book, spanish: spanish, locale: locale))
     }
 }
 
@@ -41,7 +42,7 @@ struct GuestAccountsSection: View {
                     identifier: { "guest.account.row." + $0.id.uuidString },
                     open: { open($0.id) }, edit: { edit($0.id) }, archive: { archive($0.id) },
                     reorder: { ids in _ = try? model.apply { try $0.reorderingActive(ids) } }) { account in
-                    GuestAccountRow(account: account, spanish: spanish)
+                    GuestAccountRow(account: account, book: model.book, spanish: spanish)
                         .overlay(alignment: .bottom) { Rectangle().fill(WelcomePalette.separator).frame(height: 1).padding(.leading, 54) }
                 }
             }
@@ -64,6 +65,10 @@ struct GuestAccountDetail: View {
     @ObservedObject var model: GuestBookModel
     let id: UUID
     let spanish: Bool
+    let add: () -> Void
+    let open: (UUID) -> Void
+    let editMovement: (UUID) -> Void
+    let deleteMovement: (UUID) -> Void
     let edit: () -> Void
     let archive: () -> Void
     let restore: () -> Void
@@ -73,7 +78,12 @@ struct GuestAccountDetail: View {
         if let account = model.book.account(id) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    CanvasAccountDetailHeader(value: GuestAccountPresentation.detail(account, spanish: spanish, locale: locale))
+                    CanvasAccountDetailHeader(value: GuestAccountPresentation.detail(account, in: model.book, spanish: spanish, locale: locale))
+                    if !account.archived {
+                        RegistrationButton(title: spanish ? "Añadir movimiento" : "Add transaction", action: add)
+                            .accessibilityIdentifier("guest.account.record")
+                    }
+                    history(account)
                     VStack(spacing: 0) {
                         CanvasActionRow(title: spanish ? "Editar cuenta" : "Edit account", symbol: "pencil", action: edit)
                             .accessibilityIdentifier("guest.account.edit")
@@ -97,6 +107,24 @@ struct GuestAccountDetail: View {
     }
 }
 
+extension GuestAccountDetail {
+    /// The account's own movements, newest first.
+    @ViewBuilder fileprivate func history(_ account: BookAccount) -> some View {
+        let movements = model.book.liveMovements(of: account.id)
+        if !movements.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(spanish ? "Movimientos" : "Activity").font(CuadraoTypography.section).accessibilityAddTraits(.isHeader)
+                VStack(spacing: 0) {
+                    ForEach(movements) { movement in
+                        GuestMovementRow(movement: movement, book: model.book, perspective: account.id, spanish: spanish,
+                            open: { open(movement.id) }, edit: { editMovement(movement.id) }, delete: { deleteMovement(movement.id) })
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Archived accounts, each with Restore. History and balances are kept.
 struct GuestArchivedAccounts: View {
     @ObservedObject var model: GuestBookModel
@@ -114,7 +142,7 @@ struct GuestArchivedAccounts: View {
                     }
                     ForEach(model.book.archivedAccounts) { account in
                         VStack(alignment: .leading, spacing: 0) {
-                            GuestAccountRow(account: account, spanish: spanish)
+                            GuestAccountRow(account: account, book: model.book, spanish: spanish)
                             CanvasActionRow(title: spanish ? "Restaurar" : "Restore", symbol: "arrow.uturn.backward") {
                                 _ = try? model.apply { try $0.settingArchived(account.id, false) }
                             }.foregroundStyle(WelcomePalette.pine).accessibilityIdentifier("guest.account.restore." + account.id.uuidString)
