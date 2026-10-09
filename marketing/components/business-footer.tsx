@@ -40,6 +40,7 @@ export function BusinessFooter({
     <footer
       className={`${styles.footer} ${business ? styles.businessFooter : ""} ${shell.footer}`}
     >
+      <FooterMotion>
       {showClosing && (
         <section className={styles.closing} aria-labelledby="closing-title">
           <div>
@@ -136,8 +137,7 @@ export function BusinessFooter({
           </div>
         </div>
       )}
-      <FooterMotion>
-        <div className={styles.wordmarkCrop}>
+        <div className={styles.wordmarkCrop} aria-hidden="true">
           <span>cuadrao</span>
         </div>
       </FooterMotion>

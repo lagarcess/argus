@@ -34,7 +34,7 @@ export function FooterMotion({ children }: { children: ReactNode }) {
       const current = -new DOMMatrixReadOnly(
         getComputedStyle(moving).transform,
       ).m42;
-      const limit = Math.min(strip.offsetHeight, frame.offsetHeight * 0.6);
+      const limit = strip.offsetHeight;
       const reveal = Math.min(limit, current + delta * 0.35);
       clearTimeout(returnTimer);
       moving.style.transitionDuration = "60ms";
@@ -89,10 +89,10 @@ export function FooterMotion({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <div ref={panel} className={styles.motion} data-footer-peek aria-hidden="true">
+    <div ref={panel} className={styles.motion} data-footer-peek>
       <div ref={track} className={styles.peekTrack}>
         {children}
-        <div ref={photos} className={styles.photoStrip}>
+        <div ref={photos} className={styles.photoStrip} aria-hidden="true">
           <Image
             src="/cuadrao-site/footer-dressmaker.png"
             width={1456}
