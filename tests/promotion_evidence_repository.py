@@ -176,7 +176,8 @@ def live_eval_scorecard(repository_root: Path, *, measured_sha: str) -> dict[str
         candidate_sha=measured_sha, repository_root=repository_root
     )
     return {
-        "schema_version": 3,
+        "schema_version": 4,
+        "budget": {"budget_usd": "5.000000", "spent_usd": "0.000000", "complete": True},
         "provenance": {
             "evaluation_mode": "live",
             "market_data_provider_mode": "live_provider",
@@ -201,6 +202,8 @@ def live_eval_scorecard(repository_root: Path, *, measured_sha: str) -> dict[str
             "expected_failed": 0,
             "unexpected_pass": 0,
             "skipped": 0,
+            "infrastructure_error": 0,
+            "skipped_budget": 0,
         },
         "results": [
             {"id": case_id, "category": "messy_english", "status": "passed"}

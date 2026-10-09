@@ -44,7 +44,7 @@ def _request(kind: str, inputs: list[dict[str, Any]], solve_for: str | None = No
 def _resolve(request, *, retrieved=(RATE_PAGE,), currency="DOP", notes=None):
     return ac.resolve_calculation(
         request,
-        catalog=get_tool_catalog(),
+        catalog=get_tool_catalog(surface="personal"),
         retrieved=list(retrieved),
         currency=currency,
         subject_symbol=None,
@@ -67,7 +67,7 @@ def _published_many(template, requests, *, notes=None, language="en"):
         requests,
         template=template,
         language=language,
-        catalog=get_tool_catalog(),
+        catalog=get_tool_catalog(surface="personal"),
         retrieved=[RATE_PAGE],
         currency="DOP",
         subject_symbol=None,
@@ -418,7 +418,7 @@ def test_a_figure_from_finance_data_is_cited_without_the_provider_url() -> None:
     notes: list[str] = []
     resolved = ac.resolve_calculation(
         request,
-        catalog=get_tool_catalog(),
+        catalog=get_tool_catalog(surface="personal"),
         retrieved=[],
         currency="USD",
         subject_symbol="NVDA",
@@ -433,7 +433,7 @@ def test_a_figure_from_finance_data_is_cited_without_the_provider_url() -> None:
     assert source["date"] == "2026-07-26"
     unevidenced = ac.resolve_calculation(
         request,
-        catalog=get_tool_catalog(),
+        catalog=get_tool_catalog(surface="personal"),
         retrieved=[],
         currency="USD",
         subject_symbol="NVDA",

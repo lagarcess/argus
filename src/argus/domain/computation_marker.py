@@ -41,8 +41,9 @@ def computation_from_tool_cards(
     """
     if catalog is None:
         from argus.domain.capability_registry import get_tool_catalog
+        from argus.domain.chat_surface import turn_surface
 
-        catalog = get_tool_catalog(include_unavailable=True)
+        catalog = get_tool_catalog(surface=turn_surface(), include_unavailable=True)
     declared = [
         card for card in cards if _calculation(card, catalog=catalog) is not None
     ][:MAX_COMPUTATION_CALCULATIONS]

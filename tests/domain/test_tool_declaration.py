@@ -364,7 +364,7 @@ def test_public_receipt_policy_rejects_undeclared_modes(public_receipt):
 def test_existing_tools_declare_their_public_receipt_evidence(name, public_receipt):
     from argus.domain.capability_registry import get_tool_catalog
 
-    declaration = get_tool_catalog(include_unavailable=True).get(name)
+    declaration = get_tool_catalog(surface="personal", include_unavailable=True).get(name)
     assert declaration.policy.public_receipt == public_receipt
     assert declaration.tool_schema()["policy"]["public_receipt"] == public_receipt
 

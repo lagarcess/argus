@@ -180,4 +180,5 @@ def count_completed_runs_for_user(user_id: str) -> int:
         for run_id, run in api_state.store.backtest_runs.items()
         if api_state.store.backtest_run_owners.get(run_id) == user_id
         and run.status == "completed"
+        and api_state.store.conversation_spaces.get(run.conversation_id) is None
     )

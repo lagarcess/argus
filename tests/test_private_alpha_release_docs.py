@@ -602,6 +602,19 @@ def test_main_promotion_manifest_accepts_matching_clean_live_scorecard(
             repository_root=tmp_path,
         )
 
+    # A schema 4 run the budget cut short measured nothing for the case it
+    # skipped, and cannot clear promotion however its other cases scored.
+    scorecard["schema_version"] = 4
+    scorecard["budget"] = {"budget_usd": "5.000000", "spent_usd": "4.900000", "complete": False}
+    scorecard["results"][1]["status"] = "skipped_budget"
+    scorecard["totals"] = {**scorecard["totals"], "passed": 1, "skipped_budget": 1}
+    scorecard_path.write_text(json.dumps(scorecard), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"incomplete_run skipped_for_budget=\['case-b'\]"):
+        assert_main_promotion_live_eval_evidence(
+            manifest_path,
+            repository_root=tmp_path,
+        )
+
 
 def test_main_promotion_manifest_rejects_summary_without_complete_results(
     tmp_path: Path,

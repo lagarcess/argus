@@ -304,12 +304,13 @@ def project_calculation_turn(
     """
     from argus.domain.answer_dossiers import computed_answer_cards
     from argus.domain.capability_registry import get_tool_catalog
+    from argus.domain.chat_surface import turn_surface
 
     cards = computed_answer_cards(message.model_dump(mode="python"))
     if not cards:
         refuse("unsupported_turn")
     assert cards is not None
-    catalog = get_tool_catalog(include_unavailable=True)
+    catalog = get_tool_catalog(surface=turn_surface(), include_unavailable=True)
     for card in cards:
         _refuse_unpublishable(card, catalog)
     asked = audit_text(question, field="question", private_ids=private_ids)

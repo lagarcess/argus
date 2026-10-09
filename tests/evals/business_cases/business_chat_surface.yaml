@@ -1,0 +1,212 @@
+# Business chat turns. The router reads the surface from the stored
+# conversation; these cases name it as `surface`. A Business turn has an empty
+# tool catalog and no research, so each case asserts that a general
+# business-finance question is answered in the user's language with no
+# Personal tool or record reaching it (offered.personal_reach is empty), and
+# that asking for a Personal tool gets a plain answer instead of a card. Kept
+# apart from measurement_cases so the Personal suite's fixture identity is
+# unchanged.
+category: business_chat_surface
+cases:
+  - id: business_chat_concept_cash_flow_es
+    surface: business
+    prompt: "¿Qué es el flujo de caja de un negocio y por qué importa?"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      semantic_turn_act: educational_question
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]
+  - id: business_chat_concept_margins_en
+    surface: business
+    prompt: "What's the difference between gross margin and net margin?"
+    user_language: en
+    ui_language: en
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      semantic_turn_act: educational_question
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+  - id: business_chat_separate_expenses_en
+    surface: business
+    prompt: "How should I keep my personal and business expenses apart?"
+    user_language: en
+    ui_language: en
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+  - id: business_chat_sales_tax_es
+    surface: business
+    prompt: "¿Qué es el ITBIS y cómo lo incluyo en mis precios?"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]
+  - id: business_chat_pricing_en
+    surface: business
+    prompt: "How do I set prices for the cakes I sell from my bakery?"
+    user_language: en
+    ui_language: en
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+  - id: business_chat_break_even_es
+    # Arithmetic the Personal chat would answer with a calculation card; a
+    # Business turn declares no calculation, so the answer is prose alone.
+    surface: business
+    prompt: "Vendo empanadas a 75 pesos y cada una me cuesta 40. Pago 12,000 de alquiler al mes. ¿Cuántas tengo que vender para cubrir el alquiler?"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]
+  - id: business_chat_profit_arithmetic_en
+    surface: business
+    prompt: "If I sell 200 cupcakes at $3 each and each costs $1.20 to make, what's my profit?"
+    user_language: en
+    ui_language: en
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+  - id: business_chat_live_price_es
+    # The Personal chat researches a current price; a Business turn has no
+    # research, so the honest answer says it cannot look the figure up.
+    surface: business
+    prompt: "¿A cuánto está hoy el dólar en pesos dominicanos?"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance", "unsupported_or_out_of_scope"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]
+  - id: business_chat_live_price_en
+    surface: business
+    prompt: "What's Tesla's stock price right now?"
+    user_language: en
+    ui_language: en
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance", "unsupported_or_out_of_scope"]
+      capability_verdict: answer_only
+      stage_outcomes: ["ready_to_respond"]
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+  - id: business_chat_backtest_request_en
+    # A Personal tool asked for by name. The clarify or confirm gate answers
+    # with the business_chat_tool_unavailable notice; no card is built.
+    surface: business
+    prompt: "Backtest buying $5,000 of AAPL from January 2, 2024 through December 31, 2024."
+    user_language: en
+    ui_language: en
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+        recovery_code: business_chat_tool_unavailable
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: answer_only
+  - id: business_chat_backtest_request_es
+    surface: business
+    prompt: "Prueba comprar 100 dólares de bitcoin cada mes durante 2024."
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+        recovery_code: business_chat_tool_unavailable
+      intent: ["backtest_execution", "strategy_drafting"]
+      capability_verdict: answer_only
+  - id: business_chat_asset_discovery_es
+    # Asset discovery is a Personal investing tool; the discovery gate answers
+    # with the same notice and offers no candidate rows.
+    surface: business
+    prompt: "¿Qué empresas parecidas a Tesla podría mirar para invertir?"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+        recovery_code: business_chat_tool_unavailable
+      intent: ["conversation_followup", "beginner_guidance"]
+      capability_verdict: answer_only
+      semantic_turn_act: asset_discovery
+      stage_outcomes: ["ready_to_respond"]
+  - id: business_chat_personal_decision_recall_en
+    # A Personal saved decision is never recalled into a Business turn; the
+    # honest answer says this chat does not have it.
+    surface: business
+    prompt: "What did I decide about my Apple investment idea last week?"
+    user_language: en
+    ui_language: en
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance", "results_explanation"]
+      capability_verdict: answer_only
+    prose_judge:
+      criteria: ["honesty", "no_raw_runtime_error"]
+  - id: business_chat_personal_portfolio_es
+    surface: business
+    prompt: "¿Cómo le fue a mi última prueba de inversión?"
+    user_language: es-419
+    ui_language: es-419
+    expected:
+      offered:
+        response: true
+        personal_reach: []
+      intent: ["conversation_followup", "beginner_guidance", "results_explanation"]
+      capability_verdict: answer_only
+    prose_judge:
+      criteria: ["honesty", "spanish_language_integrity", "no_raw_runtime_error"]

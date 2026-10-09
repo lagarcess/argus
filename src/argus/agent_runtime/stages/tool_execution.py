@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import json
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from importlib.resources import files
 from typing import Any
 from uuid import uuid4
 
-from argus.agent_runtime.stages.interpret_types import StageOutcome, StageResult
+from argus.agent_runtime.presentation_i18n import runtime_locale
+from argus.agent_runtime.recovery_messages import recovery_state_stage_patch
+from argus.agent_runtime.stages.interpret_types import (
+    InterpretDecision,
+    StageOutcome,
+    StageResult,
+)
 from argus.agent_runtime.state.models import (
     ArtifactReference,
     RunState,
@@ -15,6 +23,7 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.substage_events import emit_tool_progress
+from argus.domain.chat_surface import record_surface_gate, turn_surface
 from argus.domain.tool_contracts import (
     MAX_TOOL_CALLS,
     ToolCall,
@@ -87,9 +96,13 @@ async def execute_tool_calls_async(
     if catalog is None:
         from argus.domain.capability_registry import get_tool_catalog
 
-        catalog = get_tool_catalog()
-    if any(catalog.get(call.tool_name) is None for call in calls):
-        return _rejected_batch("unknown_tool")
+        catalog = get_tool_catalog(surface=turn_surface())
+    undeclared = sorted({c.tool_name for c in calls if catalog.get(c.tool_name) is None})
+    if undeclared:
+        if turn_surface() == "personal":
+            return _rejected_batch("unknown_tool")
+        record_surface_gate("tool_call", surface=turn_surface(), tools=undeclared)
+        return surface_tool_refusal(language, functions=tuple(undeclared))
 
     patch: dict[str, Any] = {
         "tool_calls": [],
@@ -240,6 +253,42 @@ def _with_cards(
     if references:
         patch["artifact_references"] = references
     return StageResult(outcome=outcome, stage_patch=patch)
+
+
+# The persisted refusal is the founder's copy in the turn's language; the web
+# locale bundles carry the same sentence, and a test keeps them equal.
+_BUSINESS_REFUSAL: dict[str, str] = json.loads(
+    files("argus_display_contract").joinpath("business_chat_refusal.json").read_text()
+)
+
+
+def surface_tool_refusal(
+    language: str | None,
+    *,
+    functions: tuple[str, ...],
+    decision: InterpretDecision | None = None,
+) -> StageResult:
+    """The turn's chat does not declare the function: say so, with no card or
+    call, and point to Personal chat only when it runs that function now."""
+    from argus.domain.capability_registry import personal_chat_runs
+
+    destination = {"personal_chat": "available"} if personal_chat_runs(functions) else {}
+    return StageResult(
+        outcome="ready_to_respond",
+        decision=decision,
+        stage_patch={
+            "tool_calls": [],
+            "tool_call_records": [],
+            "tool_effects": [],
+            "assistant_response": _BUSINESS_REFUSAL[runtime_locale(language)],
+            **recovery_state_stage_patch(
+                "business_chat_tool_unavailable",
+                language=language,
+                retryable=False,
+                **destination,
+            ),
+        },
+    )
 
 
 def _rejected_batch(code: str) -> StageResult:

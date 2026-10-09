@@ -13,6 +13,7 @@ from typing import Annotated, Any, ForwardRef, Literal, Union, get_args, get_ori
 from loguru import logger
 from pydantic import BaseModel, ConfigDict, ValidationError, create_model
 
+from argus.domain.chat_surface import ChatSurface
 from argus.domain.tool_contracts import (
     TOOL_INPUT_SOURCES_FIELD,
     LocalizedText,
@@ -261,6 +262,8 @@ class ToolDeclaration:
     domain: tuple[str, ...] = ()
     units: tuple[ToolUnit, ...] = ()
     confirmation_handler: Callable[..., Any] | None = None
+    # A Business chat sees only the tools that name it.
+    surfaces: frozenset[ChatSurface] = frozenset({"personal"})
     arguments_type: type[BaseModel] = field(init=False, repr=False)
     call_arguments_type: type[BaseModel] = field(init=False, repr=False)
     result_type: type[BaseModel] = field(init=False, repr=False)

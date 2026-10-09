@@ -78,6 +78,28 @@ Run the live harness with:
 
 ```bash
 ARGUS_RUN_LIVE_EVALS=1 \
+ARGUS_LIVE_EVAL_BUDGET_USD=5.00 \
+ARGUS_EVAL_ENV_FILE=<path> \
+ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider \
+ARGUS_ASSET_PROVIDER_MODE=live_provider \
+poetry run pytest tests/evals/test_measurement_eval_live.py -q
+```
+
+`ARGUS_LIVE_EVAL_BUDGET_USD` is the most the run may spend, in actual provider
+cost. The run refuses to start without it. See [Spend budget](#spend-budget).
+
+`ARGUS_EVAL_FIXTURE_SET` picks the fixture sets: `personal` (the default, the
+promotion measurement), `business` (the Business chat cases in
+`business_cases/`, each run in the chat it names), or `all` (both, under one
+budget, one scorecard each). A Business scorecard records
+`provenance.fixture_set: business`, so a promotion gate never reads it as the
+Personal measurement. The required run for a change to shared runtime
+behavior measures both:
+
+```bash
+ARGUS_RUN_LIVE_EVALS=1 \
+ARGUS_LIVE_EVAL_BUDGET_USD=5.00 \
+ARGUS_EVAL_FIXTURE_SET=all \
 ARGUS_EVAL_ENV_FILE=<path> \
 ARGUS_MARKET_DATA_PROVIDER_MODE=live_provider \
 ARGUS_ASSET_PROVIDER_MODE=live_provider \
@@ -108,6 +130,53 @@ suite asks the configured provider for a fixed equity window that begins on the
 `calendar_alignment`. Synthetic daily data starts on 2024-01-01 and stops the
 suite before it can spend tokens or write a scorecard.
 
+## Spend budget
+
+A live run holds its total actual provider spend under
+`ARGUS_LIVE_EVAL_BUDGET_USD`, across every fixture set it measures, by
+reserving each billable post before it is sent. The guard lives in
+`tests/evals/live_eval_budget.py`; nothing in it touches model-facing text,
+production limits or models.
+
+- Each eval turn runs inside the runtime's own `turn_execution_scope`, the
+  per-turn allowance production enforces, and the prose judge in its own
+  scope. A turn can post at most 7 ordinary permits, 1 research route, 1
+  research voicing and the 2-post shared repair pool: 11 with research on, 9
+  with research off, which a budgeted run always is
+  (`src/argus/agent_runtime/turn_execution.py`). The per-post guard does not
+  rely on that ceiling; it reserves every post either way.
+- Every httpx post to OpenRouter, sync or async, passes through the guard at
+  the transport: each candidate model, each fallback, each reasoning-400
+  retry, the prose judge and any SDK client is its own post with its own
+  reservation.
+- A post is reserved at the most it can bill, from the actual request: every
+  byte of its UTF-8 body as a prompt token (the body holds the messages,
+  system text, response schema and tools; committed receipts bill at least
+  3.62 bytes per prompt token, see
+  `docs/reports/evidence/live-eval-per-call-guard/input-bound-pairs.json`),
+  plus its `max_tokens` of output (twice that for deepseek-v4-flash, which
+  once billed past it), at the pinned ceiling price of the model it targets.
+  A request with no `max_tokens`, an unpriced model, a web-search plugin or a
+  stream is refused.
+- Reservations are taken under one lock, so concurrent posts can never
+  together reserve past the budget. A post the remaining budget cannot cover
+  is refused before it is sent: it costs nothing, its case is `skipped_budget`
+  (incomplete, never a product failure), the run stops, and no further case
+  or rerun starts.
+- After the response the reservation becomes the provider's reported cost. A
+  post with no reported cost (an error, a timeout, a missing field) keeps its
+  whole reservation charged. A bill above its reservation stops the run.
+- A case whose final status is `failed` runs once more while the run goes on.
+  An `infrastructure_error` is not rerun (#365).
+- The scorecard's `budget` block lists every post: case, task, model, body
+  bytes, reservation, reported cost and charge. A run that stopped leaves
+  every scorecard it wrote incomplete, and every consumer refuses those.
+- Prices are ceilings pinned in the repo with their source, and
+  `test_live_eval_budget.py` replays every committed receipt against them.
+- Paid clients the guard cannot reserve make the run refuse to start: the
+  research rail and the Perplexity key (the Perplexity Agent, direct search
+  and memory embeddings), and the OpenRouter web-search provider.
+
 ## When to Run
 
 Run the mocked suite everywhere; it is free and safe.
@@ -136,8 +205,15 @@ scorecards include per-category totals and pass rates. Seven-session scorecards
 include stable trajectory labels, operation names, and failure prefixes only;
 they omit prompts, SSE payloads, route receipts, and runtime identifiers.
 
-Measurement scorecards use schema version 3 and cannot be written without this
-validated `provenance` object:
+Measurement scorecards use schema version 4. Schema 4 adds the `budget` block
+(budget, spend, per-case bounds and charges, the pinned price table, the
+input cap, and `complete`), the `skipped_budget` result status, and the
+`skipped_budget` total. Every consumer that reads a scorecard as evidence
+(`tests/release_promotion_evidence_support.py`,
+`tests/test_interpreter_prompt_freeze.py`) calls
+`assert_scorecard_complete`, so a run the budget cut short can never stand as
+a pass. Scorecards cannot be written without this validated `provenance`
+object:
 
 - `market_data_provider_mode`
 - `asset_provider_mode`
@@ -190,9 +266,11 @@ with the infrastructure evidence beside it. Expected-fail masks cannot hide an
 outage. Historical schema-v2 scorecards are not rewritten; new scorecards add
 the infrastructure count and per-result `infrastructure_errors`.
 
-There is no automatic retry or paid A/B in this policy. Diagnose the recorded
-availability failure and explicitly authorize any later rerun; an unavailable
-measurement cannot establish either a product regression or a quality pass.
+There is no automatic retry of an availability failure or paid A/B in this
+policy. Diagnose the recorded availability failure and explicitly authorize
+any later rerun; an unavailable measurement cannot establish either a product
+regression or a quality pass. The budgeted rerun of a `failed` case (see
+[Spend budget](#spend-budget)) never applies to an `infrastructure_error`.
 The deterministic transport reproduction in `test_measurement_availability.py`
 costs $0 and does not certify current live-provider quality.
 

@@ -18,6 +18,16 @@ from tests.evals.measurement_assertions import (
     _compare_subset,
 )
 
+# The patch key that carries each Personal tool or record into a turn. A
+# Business chat turn reaches none of them.
+_PERSONAL_CARRIERS = {
+    "asset_discovery": "discovery",
+    "backtest_confirmation": "confirmation_payload",
+    "tool_cards": "tool_result_cards",
+    "research": "research",
+    "next_experiments": "next_experiments",
+}
+
 
 def offered_to_user(
     *,
@@ -88,6 +98,11 @@ def offered_to_user(
         "dropped_not_named": [name for name in dropped if name not in named_unavailable],
         "actionable": bool(
             discovery_symbols or experiment_kinds or option_ids or launch_payload
+        ),
+        "personal_reach": sorted(
+            reach
+            for reach, key in _PERSONAL_CARRIERS.items()
+            if final_patch.get(key) or interpret_patch.get(key)
         ),
     }
 
@@ -311,6 +326,11 @@ def compare_offered(
         failures.append("offered.response: no assistant answer reached the turn")
     if expected.get("response") is False and actual.get("response"):
         failures.append("offered.response: confirmation turn unexpectedly carried prose")
+    for key in ("recovery_code", "personal_reach"):
+        if key in expected and actual.get(key) != expected[key]:
+            failures.append(
+                f"offered.{key}: expected {expected[key]!r}, got {actual.get(key)!r}"
+            )
     if expected.get("launch_matches_expected") is True:
         _compare_delivered_launch(fields, actual.get("launch_payload"), failures)
     if expected.get("clarification_matches_expected") is True:

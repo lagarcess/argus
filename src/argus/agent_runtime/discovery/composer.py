@@ -25,7 +25,9 @@ from argus.agent_runtime.stages.interpret_types import (
     InterpretDecision,
     StageResult,
 )
+from argus.agent_runtime.stages.tool_execution import surface_tool_refusal
 from argus.agent_runtime.substage_events import emit_substage
+from argus.domain.chat_surface import surface_allows
 from argus.domain.market_data import resolve_asset
 from argus.domain.research.admission import (
     ResearchAttemptAdmission,
@@ -81,6 +83,10 @@ async def discovery_stage_result_if_applicable(
         and decision.semantic_turn_act != "asset_discovery"
     ):
         return None
+    if not surface_allows("asset_discovery"):
+        return surface_tool_refusal(
+            language, functions=("asset_discovery",), decision=decision
+        )
     return await discovery_operation_result(
         decision=decision,
         request=decision.asset_discovery,

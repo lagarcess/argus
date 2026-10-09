@@ -13,6 +13,9 @@ See `docs/specs/private-alpha-next-p2.1a-capability-registry-impl.md`.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
+from argus.domain.chat_surface import ChatSurface, SurfaceGate, record_surface_gate
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 from argus.domain.strategy_template_contract import (  # noqa: F401
     RegisteredStrategyTemplate,
@@ -69,14 +72,18 @@ def indicator_template(key: str) -> str | None:
     return INDICATOR_TEMPLATE_REACHABILITY.get(key)
 
 
-def get_tool_catalog(*, include_unavailable: bool = False) -> ToolCatalog:
+def get_tool_catalog(
+    *, surface: ChatSurface, include_unavailable: bool = False
+) -> ToolCatalog:
     """Assemble real declarations only when a catalog consumer asks for them.
 
     Each declaration lives beside its typed callable and card presenter. This
     is the sole catalog assembly point: schemas, execution, discovery and
-    capability answers consume the same immutable declarations. Completion and
-    receipt readers may resolve an already admitted binding with
-    ``include_unavailable``; new calls always use the effective catalog.
+    capability answers consume the same immutable declarations. ``surface`` is
+    the chat asking, taken from its stored conversation: a Business chat gets
+    only the declarations that name it. Completion and receipt readers may
+    resolve an already admitted binding with ``include_unavailable``; new calls
+    always use the effective catalog.
     """
     from argus.agent_runtime.research_tools import get_research_declarations
     from argus.agent_runtime.tools.registered_backtest import get_backtest_declaration
@@ -88,6 +95,40 @@ def get_tool_catalog(*, include_unavailable: bool = False) -> ToolCatalog:
         if include_unavailable or research_rail_enabled()
         else ()
     )
-    return ToolCatalog(
-        (get_backtest_declaration(), *get_calculation_declarations(), *research)
+    declarations = (
+        get_backtest_declaration(),
+        *get_calculation_declarations(),
+        *research,
     )
+    declared = tuple(item for item in declarations if surface in item.surfaces)
+    if surface != "personal" and len(declared) < len(declarations):
+        record_surface_gate(
+            "tool_catalog", surface=surface, withheld=len(declarations) - len(declared)
+        )
+    return ToolCatalog(declared)
+
+
+def personal_chat_runs(functions: Iterable[str]) -> bool:
+    """Whether the person's Personal chat runs every one of these right now:
+    the catalog tools under today's switches, and asset discovery while its
+    search is on. A Business refusal links to Personal chat only then."""
+    from argus.domain.research.config import research_rail_switched_on
+    from argus.domain.research.search import discovery_search_config
+
+    catalog = get_tool_catalog(
+        surface="personal", include_unavailable=research_rail_switched_on()
+    )
+    return all(
+        discovery_search_config().enabled
+        if function == "asset_discovery"
+        else catalog.get(function) is not None
+        for function in functions
+    )
+
+
+def surface_declares(surface: ChatSurface, tool_name: str, *, gate: SurfaceGate) -> bool:
+    """Whether a ``surface`` chat may call ``tool_name``; a refusal is logged."""
+    if get_tool_catalog(surface=surface).get(tool_name) is not None:
+        return True
+    record_surface_gate(gate, surface=surface, tools=[tool_name])
+    return False

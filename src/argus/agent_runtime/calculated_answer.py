@@ -47,6 +47,7 @@ from argus.domain.calculations.answer_request import (
     all_properties_required,
     calculation_kinds_clause,
 )
+from argus.domain.chat_surface import surface_allows, turn_surface
 from argus.domain.research.contracts import ResearchSource, RetrievedRow
 from argus.llm.openrouter import (
     invoke_openrouter_json_schema_sync,
@@ -161,8 +162,9 @@ def calculated_answer(
     offered: bool = False,
     evidence: Sequence[RetrievedRow] = (),
 ) -> CalculatedAnswer | None:
-    """One voicing call and its computed calculation, or None when voicing failed."""
-    if not resolve_openrouter_api_key():
+    """One voicing call and its computed calculation, or None when voicing failed
+    or the turn's chat declares no calculation."""
+    if not resolve_openrouter_api_key() or not surface_allows("calculation"):
         return None
     voiced = _voice(
         _messages(
@@ -200,7 +202,7 @@ def calculated_answer(
         calculations,
         template=prose,
         language=language,
-        catalog=get_tool_catalog(),
+        catalog=get_tool_catalog(surface=turn_surface()),
         retrieved=retrieved,
         currency=user.currency,
         subject_symbol=subject_symbol,

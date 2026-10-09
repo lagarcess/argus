@@ -138,6 +138,7 @@ from argus.api.schemas import (
 )
 from argus.domain.artifact_presentation_kind import artifact_presentation_kind
 from argus.domain.backtest_finalization import BacktestFinalizationError
+from argus.domain.chat_surface import turn_surface_scope
 from argus.domain.research.admission import research_attempt_admission_context
 from argus.domain.result_readout_content import (
     READOUT_METADATA_KEYS,
@@ -1415,6 +1416,7 @@ async def chat_stream(
     async def events() -> AsyncIterator[str]:
         with (
             openrouter_traffic_class(turn_account.kind),
+            turn_surface_scope(conversation.surface),
             turn_execution_scope(entry_state=checkpoint_values or {}),
             research_attempt_admission_context(
                 lambda: claim_research_provider_attempt(

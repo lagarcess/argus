@@ -37,10 +37,12 @@ import { resultMessageReadoutText } from "@/lib/result-readout-display";
 import { writeClipboardText } from "@/lib/clipboard";
 import { isRetryAction } from "@/lib/chat-retry-actions";
 import {
+  offersPersonalChat,
   recoveryDisplayText,
   recoveryNoticeUnderAnswer,
   wearsQuietFailureNotice,
 } from "@/lib/chat-recovery-display";
+import PersonalChatLink from "./PersonalChatLink";
 import { feedbackContextForMessage } from "@/lib/chat-message-feedback-context";
 import { Tooltip } from "@/components/ui/Tooltip";
 import FailureNotice from "./FailureNotice";
@@ -514,6 +516,7 @@ export default function ChatMessage({
             </div>
           ) : null}
 
+          {!isUser && offersPersonalChat(message.recoveryDisplay) ? <PersonalChatLink /> : null}
           {!isUser && !isStreaming && message.memoryRecalls?.length ? (
             <MemoryRecallNote recalls={message.memoryRecalls} />
           ) : null}

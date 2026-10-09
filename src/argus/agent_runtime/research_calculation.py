@@ -97,6 +97,7 @@ def packet_answer(
         _note(notes, MALFORMED_CALCULATION_REASON_CODE)
         return skipped_calculation(packet, notes, CALCULATION_NOT_COMPUTED_CODE)
     from argus.domain.capability_registry import get_tool_catalog
+    from argus.domain.chat_surface import turn_surface
 
     retrieved = retrieved_pages(packet)
     evidence = cited_evidence(packet)
@@ -104,7 +105,7 @@ def packet_answer(
         requests,
         template=packet.answer_markdown,
         language=language,
-        catalog=get_tool_catalog(),
+        catalog=get_tool_catalog(surface=turn_surface()),
         retrieved=retrieved,
         currency=user.currency,
         subject_symbol=_only_symbol(subjects),
@@ -142,6 +143,7 @@ def offered_calculation(
     left out. None only when nothing of the prose is left."""
     if "{{" in prose:
         from argus.domain.capability_registry import get_tool_catalog
+        from argus.domain.chat_surface import turn_surface
 
         try:
             requests = [
@@ -160,7 +162,7 @@ def offered_calculation(
             for name, request in zip(calculation_names(requests), requests, strict=True):
                 resolved = resolve_calculation(
                     request,
-                    catalog=get_tool_catalog(),
+                    catalog=get_tool_catalog(surface=turn_surface()),
                     retrieved=retrieved,
                     currency=user.currency,
                     subject_symbol=_only_symbol(subjects),

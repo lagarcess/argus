@@ -352,7 +352,9 @@ async def refresh_computed_answer(
         claim_research_provider_attempt,
         release_research_provider_claim,
     )
+    from argus.api.conversation_surface import stored_conversation_surface
     from argus.domain.capability_registry import get_tool_catalog
+    from argus.domain.chat_surface import record_surface_gate
     from argus.domain.research.admission import (
         claim_current_research_attempt,
         research_attempt_admission_context,
@@ -363,8 +365,15 @@ async def refresh_computed_answer(
     answer = owned_computed_answer(
         user=user, conversation_id=conversation_id, message_id=message_id
     )
-    catalog = get_tool_catalog()
+    surface = stored_conversation_surface(
+        user_id=user.id, conversation_id=conversation_id
+    )
+    catalog = get_tool_catalog(surface=surface)
     declarations = [catalog.get(card.tool_name) for card in answer.cards]
+    if surface != "personal" and None in declarations:
+        record_surface_gate(
+            "tool_call", surface=surface, tools=[card.tool_name for card in answer.cards]
+        )
     cited = [_cited_inputs(card) for card in answer.cards]
     if not any(cited) or any(declaration is None for declaration in declarations):
         raise NothingToRefreshError("This answer cites no page to look up again.")

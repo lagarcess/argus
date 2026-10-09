@@ -371,6 +371,15 @@ def test_live_suite_runs_environment_probe_before_any_eval_case(
 
     monkeypatch.setenv("ARGUS_RUN_LIVE_EVALS", "1")
     monkeypatch.setenv("OPENROUTER_API_KEY", "fixture-openrouter-key")
+    monkeypatch.setenv("ARGUS_LIVE_EVAL_BUDGET_USD", "5.00")
+    monkeypatch.delenv("ARGUS_RESEARCH_RAIL_ENABLED", raising=False)
+    monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
+    for tier_env, model in {
+        "ARGUS_STRUCTURED_MODEL": "x-ai/grok-4.3",
+        "ARGUS_CHAT_MODEL": "deepseek/deepseek-v4-flash",
+        "ARGUS_CONTEXT_MODEL": "openai/gpt-oss-120b",
+    }.items():
+        monkeypatch.setenv(tier_env, model)
     monkeypatch.setenv(
         "ARGUS_ASSET_PROVIDER_MODE",
         "recorded_provider_fixture",

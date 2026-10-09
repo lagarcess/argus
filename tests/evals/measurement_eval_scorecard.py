@@ -10,15 +10,39 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Literal, Mapping
 
 import yaml  # type: ignore[import-untyped]
 
 from tests.promotion_evidence_configuration import measured_release_configuration
 
 FIXTURE_DIR = Path(__file__).with_name("measurement_cases")
+BUSINESS_FIXTURE_DIR = Path(__file__).with_name("business_cases")
+# A scorecard measures one fixture set. The Personal set is the promotion
+# measurement; the Business set measures Business chat on its own.
+FixtureSet = Literal["personal", "business"]
+FIXTURE_SETS: dict[FixtureSet, Path] = {
+    "personal": FIXTURE_DIR,
+    "business": BUSINESS_FIXTURE_DIR,
+}
 SCORECARD_DIR = Path("temp/argus_eval_scorecards")
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+
+# Schema 4 adds the spend budget: a `budget` block, the `skipped_budget` result
+# status for a case the budget could not start, and `budget.complete`.
+SCORECARD_SCHEMA_VERSION = 4
+SKIPPED_BUDGET_STATUS = "skipped_budget"
+RESULT_STATUSES = (
+    "passed",
+    "failed",
+    "expected_failed",
+    "unexpected_pass",
+    "skipped",
+    "infrastructure_error",
+    SKIPPED_BUDGET_STATUS,
+)
+# Statuses that count toward a category's quality rate.
+_QUALITY_STATUSES = ("passed", "failed", "expected_failed", "unexpected_pass")
 
 _LIVE_PROBE_SYMBOL = "SPY"
 _LIVE_PROBE_REQUESTED_DATE_RANGE = {
@@ -61,6 +85,7 @@ class EvalScorecardProvenance:
     worktree_clean: bool
     release_configuration: dict[str, str | None]
     live_market_data_probe: LiveMarketDataProbe | None = None
+    fixture_set: FixtureSet = "personal"
 
 
 @dataclass(frozen=True)
@@ -214,7 +239,7 @@ def _measurement_fixture_identity_from_entries(
 def build_scorecard_provenance(
     *,
     evaluation_mode: str,
-    fixture_dir: Path = FIXTURE_DIR,
+    fixture_set: FixtureSet = "personal",
     repository_root: Path = REPOSITORY_ROOT,
 ) -> EvalScorecardProvenance:
     if evaluation_mode not in {"live", "mocked"}:
@@ -225,7 +250,7 @@ def build_scorecard_provenance(
     asset_provider_mode = _resolved_provider_mode("ARGUS_ASSET_PROVIDER_MODE")
     candidate_sha = _candidate_sha(repository_root)
     python_version = platform.python_version()
-    fixture_identity = measurement_fixture_identity(fixture_dir)
+    fixture_identity = measurement_fixture_identity(FIXTURE_SETS[fixture_set])
     worktree_clean = _worktree_is_clean(repository_root)
     if not worktree_clean:
         raise ValueError("scorecard_provenance:worktree_clean")
@@ -247,6 +272,7 @@ def build_scorecard_provenance(
             candidate_sha, repository_root=repository_root
         ),
         live_market_data_probe=live_probe,
+        fixture_set=fixture_set,
     )
     validated_provenance_payload(provenance)
     return provenance
@@ -309,67 +335,84 @@ def scorecard_for_results(
     results: list[dict[str, Any]],
     *,
     provenance: EvalScorecardProvenance,
+    budget: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     provenance_payload = validated_provenance_payload(provenance)
     _assert_complete_live_result_set(results, provenance=provenance)
-    by_category: dict[str, dict[str, int | float | None]] = {}
+    if provenance.evaluation_mode == "live" and budget is None:
+        raise ValueError("scorecard_budget:live_run_requires_budget")
+    counts: dict[str, dict[str, int]] = {}
     for result in results:
-        category = str(result["category"])
-        bucket = by_category.setdefault(
-            category,
-            {
-                "passed": 0,
-                "failed": 0,
-                "expected_failed": 0,
-                "unexpected_pass": 0,
-                "skipped": 0,
-                "infrastructure_error": 0,
-                "pass_rate": 0.0,
-            },
+        bucket = counts.setdefault(
+            str(result["category"]), {status: 0 for status in RESULT_STATUSES}
         )
         status = str(result["status"])
-        if status not in bucket:
-            status = "failed"
-        bucket[status] = int(bucket[status]) + 1
+        bucket[status if status in bucket else "failed"] += 1
 
-    for bucket in by_category.values():
-        denominator = sum(
-            int(bucket[status])
-            for status in ("passed", "failed", "expected_failed", "unexpected_pass")
-        )
-        bucket["pass_rate"] = (
-            None if denominator == 0 else round(int(bucket["passed"]) / denominator, 4)
-        )
+    by_category: dict[str, dict[str, int | float | None]] = {}
+    for category, bucket in counts.items():
+        denominator = sum(bucket[status] for status in _QUALITY_STATUSES)
+        by_category[category] = {
+            **bucket,
+            "pass_rate": None if denominator == 0 else round(bucket["passed"] / denominator, 4),
+        }
 
     return {
-        "schema_version": 3,
+        "schema_version": SCORECARD_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "provenance": provenance_payload,
         "provider_usage": _provider_usage(results),
+        "budget": budget,
         "category_pass_rates": by_category,
         "totals": {
-            status: sum(int(item[status]) for item in by_category.values())
-            for status in (
-                "passed",
-                "failed",
-                "expected_failed",
-                "unexpected_pass",
-                "skipped",
-                "infrastructure_error",
-            )
+            status: sum(bucket[status] for bucket in counts.values())
+            for status in RESULT_STATUSES
         },
         "results": results,
     }
+
+
+def assert_scorecard_complete(scorecard: Mapping[str, Any]) -> None:
+    """Refuse a scorecard whose run the budget cut short.
+
+    Every consumer that treats a scorecard as evidence calls this: a case the
+    budget could not start is a missing measurement, and a run with one can
+    never stand as a pass. Scorecards before schema 4 could not skip for
+    budget, so they pass by construction.
+    """
+    if int(scorecard.get("schema_version") or 0) < SCORECARD_SCHEMA_VERSION:
+        return
+    results = scorecard.get("results") or []
+    skipped = [
+        str(result.get("id"))
+        for result in results
+        if isinstance(result, Mapping) and result.get("status") == SKIPPED_BUDGET_STATUS
+    ]
+    totals = scorecard.get("totals") or {}
+    if skipped or int(totals.get(SKIPPED_BUDGET_STATUS) or 0):
+        raise ValueError(
+            f"scorecard_budget:incomplete_run skipped_for_budget={skipped}"
+        )
+    budget = scorecard.get("budget")
+    if (scorecard.get("provenance") or {}).get("evaluation_mode") == "live":
+        if not isinstance(budget, Mapping):
+            raise ValueError("scorecard_budget:live_run_requires_budget")
+        if budget.get("complete") is not True:
+            raise ValueError(
+                "scorecard_budget:incomplete_run "
+                f"stopped_reason={budget.get('stopped_reason')!r}"
+            )
 
 
 def write_scorecard(
     results: list[dict[str, Any]],
     *,
     provenance: EvalScorecardProvenance,
+    budget: dict[str, Any] | None = None,
     output_dir: Path = SCORECARD_DIR,
 ) -> Path:
     assert_provenance_matches_current_run(provenance)
-    scorecard = scorecard_for_results(results, provenance=provenance)
+    scorecard = scorecard_for_results(results, provenance=provenance, budget=budget)
     output_dir.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     path = output_dir / f"argus-eval-scorecard-{stamp}.json"
@@ -401,6 +444,8 @@ def validated_provenance_payload(
         raise ValueError("scorecard_provenance:fixture_case_ids")
     if provenance.worktree_clean is not True:
         raise ValueError("scorecard_provenance:worktree_clean")
+    if provenance.fixture_set not in FIXTURE_SETS:
+        raise ValueError("scorecard_provenance:fixture_set")
 
     live_probe_payload = None
     if provenance.live_market_data_probe is not None:
@@ -432,6 +477,13 @@ def validated_provenance_payload(
         "worktree_clean": provenance.worktree_clean,
         "release_configuration": dict(provenance.release_configuration),
         "live_market_data_probe": live_probe_payload,
+        # A Personal scorecard keeps its schema-4 shape; any other set names
+        # itself, so it can never be read as the promotion measurement.
+        **(
+            {}
+            if provenance.fixture_set == "personal"
+            else {"fixture_set": provenance.fixture_set}
+        ),
     }
 
 
@@ -439,7 +491,7 @@ def assert_provenance_matches_current_run(
     provenance: EvalScorecardProvenance,
 ) -> None:
     validated_provenance_payload(provenance)
-    fixture_identity = measurement_fixture_identity(FIXTURE_DIR)
+    fixture_identity = measurement_fixture_identity(FIXTURE_SETS[provenance.fixture_set])
     expected_values = {
         "market_data_provider_mode": _resolved_provider_mode(
             "ARGUS_MARKET_DATA_PROVIDER_MODE"

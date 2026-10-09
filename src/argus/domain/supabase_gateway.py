@@ -80,6 +80,7 @@ from argus.domain.supabase_message_reads import (
 )
 from argus.domain.supabase_public_excerpts import SupabasePublicExcerptMixin
 from argus.domain.supabase_query_helpers import fetch_all_rows as fetch_all_rows_batched
+from argus.domain.supabase_space_reads import SupabaseSpaceReadMixin
 from argus.domain.usage_counter_reader import UsageCounterReader, align_usage_period
 from argus.domain.usage_limits import (
     USAGE_COUNTER_LOCK as _USAGE_COUNTER_LOCK,
@@ -181,6 +182,7 @@ class SupabaseGateway(
     UsageCounterReader,
     DecisionAttachmentPersistenceMixin,
     SupabaseComputedAnswerReadMixin,
+    SupabaseSpaceReadMixin,
 ):
     client: Client
     auth_client_factory: AuthClientFactory | None = None
@@ -1795,16 +1797,6 @@ class SupabaseGateway(
         )
         row = _row_one(rows)
         return BacktestRun.model_validate(row) if row else None
-
-    def count_completed_runs(self, *, user_id: str) -> int:
-        rows = (
-            self.client.table("backtest_runs")
-            .select("id", count="exact")
-            .eq("user_id", user_id)
-            .eq("status", "completed")
-            .execute()
-        )
-        return int(rows.count or 0)
 
     def touch_conversation_title(
         self,

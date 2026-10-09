@@ -27,6 +27,7 @@ from argus.api.conversation_surface import (
     memory_conversation_in_scope,
     refuse_closed_chat,
     require_open_business_chat,
+    require_personal_conversation,
     surface_scope,
 )
 from argus.api.decision_message_reads import owned_message_decisions
@@ -873,7 +874,10 @@ def list_messages(
 @router.post(
     "/conversations/{conversation_id}/confirmations/{confirmation_id}/peer-assets",
     response_model=ConfirmationPeerAssetsResponse,
-    dependencies=[Depends(require_open_business_chat)],
+    dependencies=[
+        Depends(require_open_business_chat),
+        Depends(require_personal_conversation),
+    ],
 )
 def add_confirmation_peer_assets(
     conversation_id: str,
@@ -1115,7 +1119,10 @@ def add_confirmation_peer_assets(
 @router.post(
     "/conversations/{conversation_id}/confirmations/{confirmation_id}/direct-edit",
     response_model=ConfirmationDirectEditResponse,
-    dependencies=[Depends(require_open_business_chat)],
+    dependencies=[
+        Depends(require_open_business_chat),
+        Depends(require_personal_conversation),
+    ],
 )
 def direct_edit_confirmation(
     conversation_id: str,

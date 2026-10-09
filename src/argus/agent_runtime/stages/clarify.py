@@ -25,12 +25,15 @@ from argus.agent_runtime.simplification_option_contract import (
     simplification_option_identity,
 )
 from argus.agent_runtime.stages.interpret import StageResult
+from argus.agent_runtime.stages.tool_execution import surface_tool_refusal
 from argus.agent_runtime.state.models import (
     PendingNeedName,
     ResponseIntent,
     RunState,
     StrategySummary,
 )
+from argus.domain.capability_registry import surface_declares
+from argus.domain.chat_surface import turn_surface
 from loguru import logger
 
 OPTIONAL_PARAMETER_OPT_IN_LIMIT = 3
@@ -47,6 +50,10 @@ class StructuredClarificationGenerator(Protocol):
 class ClarifyingQuestionResult:
     prompt: str
     used_degraded_fallback: bool
+
+
+# A draft with these intents is the backtest tool's, clarified before its card.
+_BACKTEST_INTENTS = frozenset({"strategy_drafting", "backtest_execution"})
 
 
 def clarify_stage(
@@ -76,6 +83,10 @@ async def clarify_stage_async(
     language: str = "en",
     prefilled_assistant_prompt: str | None = None,
 ) -> StageResult:
+    if state.intent in _BACKTEST_INTENTS and not surface_declares(
+        turn_surface(), "backtest", gate="backtest_clarification"
+    ):
+        return surface_tool_refusal(language, functions=("backtest",))
     coverage_recovery = coverage_recovery_from_status(state.optional_parameter_status)
     unsupported_constraints = _unsupported_constraints(state.optional_parameter_status)
     ambiguous_fields = _ambiguous_fields(state.optional_parameter_status)
@@ -431,7 +442,10 @@ async def _asset_history_starts(
     )
     asset_class = str(strategy.asset_class or "")
     starts = await asyncio.gather(
-        *(asyncio.to_thread(asset_history_start, symbol, asset_class) for symbol in symbols)
+        *(
+            asyncio.to_thread(asset_history_start, symbol, asset_class)
+            for symbol in symbols
+        )
     )
     return {
         symbol: start.isoformat()

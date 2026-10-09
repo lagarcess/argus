@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Mapping
 from pathlib import Path
 
 from tests.evals.measurement_eval_scorecard import (
+    RESULT_STATUSES,
+    assert_scorecard_complete,
     measurement_fixture_identity_at_git_sha,
 )
 from tests.promotion_evidence_configuration import (
@@ -41,14 +44,15 @@ _MANIFESTS_PREDATING_PROSE_AB_RULE = frozenset(
 )
 
 
-LIVE_EVAL_RESULT_STATUSES = (
-    "passed",
-    "failed",
-    "expected_failed",
-    "unexpected_pass",
-    "skipped",
-    "infrastructure_error",
-)
+LIVE_EVAL_RESULT_STATUSES = RESULT_STATUSES
+
+
+def assert_personal_measurement(provenance: Mapping[str, object]) -> None:
+    """Promotion measures the Personal fixture set; a scorecard of another set
+    names itself and is refused here."""
+    assert provenance.get("fixture_set", "personal") == "personal", (
+        "a Business chat scorecard is not the promotion measurement"
+    )
 
 
 def assert_main_promotion_live_eval_evidence(
@@ -79,13 +83,16 @@ def assert_main_promotion_live_eval_evidence(
         (repository_root / "docs" / "reports" / "evidence").resolve()
     ), f"{manifest_path.name}: live eval scorecard is not durable evidence"
     scorecard = json.loads(scorecard_path.read_text(encoding="utf-8"))
-    assert scorecard.get("schema_version") in {2, 3}
+    assert scorecard.get("schema_version") in {2, 3, 4}
     assert (
-        scorecard.get("schema_version") == 3
+        scorecard.get("schema_version") >= 3
         or manifest_path.name in MANIFESTS_BEFORE_CONFIGURATION
     ), "release_configuration: new promotions require measurement scorecard schema v3"
+    # A run the budget cut short measured nothing for the cases it skipped.
+    assert_scorecard_complete(scorecard)
     provenance = scorecard.get("provenance", {})
     assert provenance.get("evaluation_mode") == "live"
+    assert_personal_measurement(provenance)
     assert provenance.get("market_data_provider_mode") == "live_provider"
     assert str(provenance.get("asset_provider_mode") or "").strip()
     assert_measurement_stands_for(
@@ -138,8 +145,13 @@ def assert_main_promotion_live_eval_evidence(
     assert result_case_ids == fixture_case_ids, (
         "live eval scorecard does not contain the complete fixture result set"
     )
-    # Scorecards written before #549 omit the zero infrastructure-error count.
-    totals = {"infrastructure_error": 0, **scorecard.get("totals", {})}
+    # Scorecards written before #549 omit the zero infrastructure-error count,
+    # and those before schema 4 the zero skipped-for-budget count.
+    totals = {
+        "infrastructure_error": 0,
+        "skipped_budget": 0,
+        **scorecard.get("totals", {}),
+    }
     calculated_totals = {
         status: sum(result["status"] == status for result in results)
         for status in LIVE_EVAL_RESULT_STATUSES
@@ -149,7 +161,7 @@ def assert_main_promotion_live_eval_evidence(
     )
     assert isinstance(totals.get("passed"), int) and totals["passed"] > 0
     assert totals.get("unexpected_pass") == 0
-    for status in ("skipped", "infrastructure_error"):
+    for status in ("skipped", "infrastructure_error", "skipped_budget"):
         assert totals[status] == 0, (
             f"{manifest_path.name}: live eval has {totals[status]} {status} "
             "case(s); missing measurements cannot clear promotion."
