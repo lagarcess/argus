@@ -93,7 +93,7 @@ Business activation is not a candidate yet.
 ### Local-only material
 Optional; it is not needed to resume.
 - The original machine has worktrees under `argus-worktrees/business-pilot-*`, all clean. Every commit in them is on GitHub, either merged or on a branch listed above.
-- The local Supabase stack `argus-biz-spaces` is stopped, with its volumes kept. It is disposable; create your own.
+- The local Supabase stacks `argus-biz-spaces` (ports 5778x), `argus-biz-pilot` (5718x) and `argus-biz-jobs` (5748x) are stopped, with their volumes kept. They are disposable; create your own.
 - The session scratchpad held two large source copies used only for reproduction, plus logs. They are not needed.
 - **Uncommitted work:** none.
 
