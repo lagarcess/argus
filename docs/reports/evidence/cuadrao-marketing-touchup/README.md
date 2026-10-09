@@ -71,6 +71,10 @@ bun run scripts/capture-story.mjs
 
 Only the Marketing preview may be stopped for a rebuild, after verifying its process working directory. Preserve comparison 4511. The subsequent evidence commit contains documentation and captures only; runtime source is identical to the manifest. Continue on `codex/marketing-touchup-delivery`, retaining PR #939 and the original integration base recorded in the handoff. This is a local design iteration, not a READY, current GitHub CI, or whole-page founder acceptance claim.
 
+## Personal pet and phone, 2026-10-09
+
+The founder requested a more playful Personal intake with a hand-held native welcome screen and a square pet delivering an envelope. The [Personal evidence record](personal-pet/README.md) owns the design decision, asset provenance, exact-source screenshots, mock-response recording, 37 passing checks and one touch-only skip. Source is `c8eab10647c56a49591033f5e5a026bb8a5befa6`. This supersedes prior Personal screenshots. Founder visual acceptance remains pending.
+
 ## Historical reference decisions
 
 Both founder-provided recordings were inspected directly, frame by frame:
