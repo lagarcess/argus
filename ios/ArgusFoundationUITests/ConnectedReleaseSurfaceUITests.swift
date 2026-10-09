@@ -133,4 +133,29 @@ extension FinancialLoopUITests {
         for row in ["account", "transaction", "plan"] { XCTAssertTrue(app.buttons["add.tray." + row].exists, row) }
         capture("release-surface-add-menu-landscape-large-text")
     }
+
+    /// Search, Profile and Plan fold the bar into the + as they scroll, and expand it again, as Home does.
+    func testReleaseSurfaceBarFoldsOnSearchProfileAndPlan() throws {
+        try signIn()
+        app.terminate()
+        // Large text makes every tab taller than the screen, so each one has something to scroll.
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "--cuadrao-release-gates",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
+        app.launch()
+        let add = app.buttons["nav.add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 20))
+        for tab in ["tab.search", "header.profile", "tab.plan"] {
+            XCTAssertTrue(app.buttons[tab].waitForExistence(timeout: 10), tab)
+            app.buttons[tab].tap()
+            XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 5))
+            let openLeft = app.buttons["tab.home"].frame.minX
+            for _ in 0..<5 { app.swipeUp(velocity: .fast) }
+            XCTAssertGreaterThan(add.frame.midX, app.frame.width - 60, "\(tab): scrolling folds the bar into the + at the right")
+            XCTAssertFalse(app.buttons["tab.home"].isHittable, "\(tab): the other slots are folded away")
+            capture("release-surface-fold-" + tab.replacingOccurrences(of: ".", with: "-"))
+            for _ in 0..<5 { app.swipeDown(velocity: .fast) }
+            XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 5), "\(tab): scrolling back expands the bar")
+            XCTAssertEqual(app.buttons["tab.home"].frame.minX, openLeft, accuracy: 2, "\(tab): the open bar is where it was")
+        }
+    }
 }
