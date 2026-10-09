@@ -147,6 +147,14 @@ gh pr checks 937
 - **Hosted facts:** none were verified by this lane after October 8, 2026. The October 8 compatibility-matrix evidence is [PR #916](https://github.com/lagarcess/argus/pull/916) (branch `codex/cuadrao-compat-matrix`, head `70c8eb9c4`, open, docs and evidence only, not on integration); treat it as old.
 - **Connectors:** GitHub (`gh`) and the Mac's Xcode, `xcrun simctl` and `xcrun devicectl`. No other access is required.
 
+### 4.1 Keeping the founder's phone app working (verified October 9, 2026 with `ps` and `lsof`)
+The phone build talks to the founder's Mac through two **detached** processes (parent process 1), so closing a Claude session does **not** stop them. They stop on a Mac restart or if someone kills them. Do not stop them while a build is on the phone.
+1. **Phone API:** `uvicorn argus.api.main:app --host 127.0.0.1 --port 58900`, started from the worktree `/Users/garces/Documents/projects/repos/argus/.claude/worktrees/cuadrao-pin-5def72` (the pinned tested candidate). It uses the local Docker Supabase stack on ports 58901 to 58911.
+2. **TLS forwarder:** `~/.cuadrao-local-tls/tls_forward.py` (maps 58950 to 58900, 58951 to 58901, 58955 to 58905; certificates and keys stay in that folder and must never be copied into Git). The phone's `ARGUS_API_URL` is the Mac's LAN address on port 58950, set in the ignored `ios/Config/Device.local.xcconfig`. If the Mac's LAN address changes, the phone build must be rebuilt.
+- Check: `lsof -nP -iTCP:58900 -sTCP:LISTEN` and `lsof -nP -iTCP:58950 -sTCP:LISTEN`.
+- Restart (unverified commands, check `--help` first): forwarder `cd ~/.cuadrao-local-tls && nohup python3 tls_forward.py >> forward.log 2>&1 &`. API: from the pin worktree, `python3 ios/scripts/auth/local_stack.py api --accounts --port-base 58900 --accounts-enabled on --python "$PWD/.venv/bin/python"` (the same pattern the guest-book agent used for port 59200). The Docker Supabase stack must already be up.
+- Saved receipts in the phone's real (non-demo) mode only work if that API has receipt storage and the documents flags enabled; this was not verified. Treat a failed save there as "server not enabled", not as an app bug, until checked.
+
 ## 5. Next steps
 ### A. The successor can do these
 1. Run section 3.1, then report to the founder.
