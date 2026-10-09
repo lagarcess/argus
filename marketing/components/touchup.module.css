@@ -144,12 +144,25 @@
 }
 .story {
   border-top: 1px solid var(--line);
+}
+.story[data-story-mode="scroll"] .storyRunway {
+  height: calc(var(--story-height) + var(--story-travel));
+}
+.story[data-story-mode="scroll"] .storyFrame {
+  position: sticky;
+  top: var(--story-top);
+}
+.storyFrame {
   display: grid;
   grid-template-columns: 0.9fr 1fr;
   gap: 85px;
   align-items: center;
 }
+.recordPanels {
+  display: grid;
+}
 .recordCard {
+  grid-area: 1 / 1;
   background: white;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -195,7 +208,7 @@
   z-index: -1;
 }
 .rail:after {
-  width: calc((var(--step, 0) + 1) * 33.333%);
+  width: calc(var(--rail-progress, var(--rail-selected)) * 100%);
   background: #335b47;
 }
 .rail button {
@@ -318,7 +331,7 @@
   .heroCard:hover {
     transform: rotate(1deg);
   }
-  .rail:after {
+  .story[data-story-mode="manual"] .rail:after {
     transition: width 0.25s ease;
   }
 }
@@ -350,7 +363,7 @@
     max-width: 370px;
     padding: 25px;
   }
-  .story {
+  .storyFrame {
     grid-template-columns: 1fr;
     gap: 32px;
   }

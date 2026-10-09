@@ -66,6 +66,12 @@ The founder approved changing the navigation label to **Cómo funciona** and sep
 
 The bounded Marketing implementation groups ES/EN separately and uses one localized navigation label for desktop and mobile. Footer input accumulates without losing movement between frames; touch holds the peek until release. Photos still hide fully at rest. Typecheck, lint, production build, 26 focused browser checks and 2 existing same-page language checks pass. The parent reviewed the diff and desktop/mobile screenshots. Source is `80cb9aca17b8a3789ea32f121928af1b48226484`; [current evidence](../reports/evidence/cuadrao-marketing-touchup/README.md#header-and-drag-refinement-2026-10-09) contains the manifest and logs. Both previews return 200. The original listener remains PID 11951. Work is committed locally, not pushed; the last verified GitHub head remains the pickup head above. Resume this branch without reset/rebase. Whole-page design acceptance remains pending. Existing release holds remain unchanged.
 
+### Scroll-driven receipt story request, 2026-10-09
+
+The founder said the latest header/footer view looks good, then requested that scrolling advance the receipt through Recibir, Revisar, and Aprobar. This feedback applies to the reviewed view, not publication or whole-page acceptance. The proposed pattern is a short sticky story with normal document scrolling, reverse progression on upward scroll, natural release after the final step, and click/keyboard rail shortcuts. A fit check must keep the receipt readable on phones; reduced motion keeps the plain manual presentation. The existing illustrated amounts and development disclosure remain unchanged.
+
+Implementation and browser verification are pending. Scope remains Marketing only on the existing branch and preview, with original comparison 4511 preserved.
+
 ## 1. Scope and decisions
 
 ### Status
