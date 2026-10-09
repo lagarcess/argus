@@ -162,6 +162,7 @@ struct GuestPlanDetail: View {
             }
             RegistrationButton(title: spanish ? "Añadir aporte" : "Add contribution", action: contribute)
                 .accessibilityIdentifier("guest.plan.contribute")
+            if !plan.archived { GuestWhatIf(model: model, plan: plan, spanish: spanish) }
             let live = plan.contributions.filter { !$0.deleted }.sorted { $0.occurredAt > $1.occurredAt }
             VStack(alignment: .leading, spacing: 12) {
                 Text(spanish ? "Aportes" : "Contributions").font(CuadraoTypography.section).accessibilityAddTraits(.isHeader)
@@ -204,6 +205,7 @@ struct GuestPlanDetail: View {
                         .accessibilityIdentifier("guest.plan.remaining")
                 }.font(.subheadline).foregroundStyle(status.isOver ? WelcomePalette.owedNegative : .secondary)
             }
+            if !plan.archived { GuestWhatIf(model: model, plan: plan, spanish: spanish) }
             Text((spanish ? "Mes de " : "Month of ") + status.month.start.formatted(.dateTime.month(.wide).year().locale(locale))
                  + (spanish ? ", día \(status.elapsedDays) de \(status.totalDays)." : ", day \(status.elapsedDays) of \(status.totalDays)."))
                 .font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("guest.plan.month")

@@ -136,6 +136,7 @@ struct GuestInsights: View {
                                             range: .constant(.month), periodOffset: .constant(offset))
                     }
                     GuestSpending(book: model.book, currency: currency, interval: month, spanish: spanish)
+                    GuestTotals(book: model.book, currency: currency, spanish: spanish)
                 }.padding(24)
             }
             .accessibilityIdentifier("guest.insights")
@@ -201,5 +202,43 @@ struct GuestSpending: View {
     private func share(_ part: Int64, of whole: Int64) -> CGFloat {
         guard whole > 0 else { return 0 }
         return CGFloat(NSDecimalNumber(decimal: MinorUnits.decimal(part, digits: 0) / MinorUnits.decimal(whole, digits: 0)).doubleValue)
+    }
+}
+
+/// The currency's accounts added up: what is held, what is owed, and what is left. Shares are applied; unknown balances are
+/// counted beside the totals, never guessed.
+struct GuestTotals: View {
+    let book: DeviceBook
+    let currency: String
+    let spanish: Bool
+    @Environment(\.locale) private var locale
+
+    private func text(_ minor: Int64, _ digits: Int) -> String {
+        MoneyFormatter.grouped(minor, digits: digits, grouping: locale.groupingSeparator ?? ",", decimal: locale.decimalSeparator ?? ".")
+    }
+
+    var body: some View {
+        if let totals = book.totals(currency: currency) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(spanish ? "Totales en \(currency)" : "Totals in \(currency)").font(CuadraoTypography.section)
+                    .accessibilityAddTraits(.isHeader)
+                row(spanish ? "Lo que tienes" : "What you hold", text(totals.assetsMinor, totals.digits), "guest.totals.assets")
+                row(spanish ? "Lo que debes" : "What you owe", text(totals.owedMinor, totals.digits), "guest.totals.owed")
+                row(spanish ? "Balance neto" : "Net balance", text(totals.netMinor, totals.digits), "guest.totals.net", strong: true)
+                if totals.unknownAccounts > 0 {
+                    Text(spanish ? "\(totals.unknownAccounts) sin balance conocido, fuera de estos totales."
+                         : "\(totals.unknownAccounts) with an unknown balance, left out of these totals.")
+                        .font(.caption).foregroundStyle(.secondary).accessibilityIdentifier("guest.totals.unknown")
+                }
+            }.accessibilityElement(children: .contain).accessibilityIdentifier("guest.totals")
+        }
+    }
+
+    private func row(_ title: String, _ value: String, _ identifier: String, strong: Bool = false) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title).font(strong ? .body.weight(.semibold) : .body)
+            Spacer(minLength: 12)
+            Text(value).font(CuadraoTypography.rowAmount).monospacedDigit().accessibilityIdentifier(identifier)
+        }.padding(.vertical, 4)
     }
 }

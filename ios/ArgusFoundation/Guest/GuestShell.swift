@@ -154,6 +154,15 @@ struct GuestShell: View {
         }
     }
 
+    /// A search result opens in the tab that owns it.
+    private func open(_ target: GuestSearchTarget) {
+        switch target {
+        case .account(let id): tab = .home; homePath = [.account(id)]
+        case .movement(let id): tab = .home; homePath = [.movement(id)]
+        case .plan(let id): tab = .plan; planPath = [id]
+        }
+    }
+
     private func scroll(for item: CuadraoTab) -> CuadraoNavigationScroll? {
         switch item {
         case .home: navigationScroll
@@ -171,10 +180,7 @@ struct GuestShell: View {
         case .plan:
             GuestPlanTab(model: model, scroll: planScroll, active: tab == .plan, path: $planPath, sheet: $sheet)
         case .search:
-            GuestPlaceholderTab(scroll: searchScroll, active: tab == .search,
-                title: spanish ? "Buscar" : "Search",
-                detail: spanish ? "Aquí buscarás entre tus cuentas y movimientos." : "Here you will search your accounts and activity.",
-                identifier: "guest.search")
+            GuestSearchTab(model: model, scroll: searchScroll, active: tab == .search, open: open)
         case .profile:
             GuestProfile(model: model, appearance: $appearance, path: $profilePath, webURL: webURL, leave: leave, deleteData: deleteData)
                 .modifier(CuadraoNavigationScrollObserver(scroll: profileScroll, enabled: tab == .profile && profilePath.isEmpty))
