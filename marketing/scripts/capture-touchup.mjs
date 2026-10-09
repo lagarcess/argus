@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const baseURL = process.env.MARKETING_CAPTURE_URL ?? "http://127.0.0.1:4512";
 const root = new URL("../../", import.meta.url);
 const output = new URL(
-  "docs/reports/evidence/cuadrao-marketing-touchup/screens/",
+  "docs/reports/evidence/cuadrao-marketing-touchup/footer-peek-screens/",
   root,
 );
 await mkdir(output, { recursive: true });
@@ -57,23 +57,23 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto(baseURL);
-  const panel = page.locator("footer [data-paused]");
-  await panel.scrollIntoViewIfNeeded();
+  const panel = page.locator("[data-footer-peek]");
+  await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
   for (const image of await panel.locator("img").all())
     await image.evaluate(async (element) => {
       await element.decode();
     });
-  await page.screenshot({
-    path: fileURLToPath(new URL("footer-motion-start.png", output)),
-  });
-  await page.waitForTimeout(2500);
-  await page.screenshot({
-    path: fileURLToPath(new URL("footer-motion-later.png", output)),
-  });
-  await page.getByRole("button", { name: "Pausar animación" }).click();
-  await page.screenshot({
-    path: fileURLToPath(new URL("footer-paused.png", output)),
-  });
+  for (const state of ["rest", "peek", "settled"]) {
+    if (state === "peek") {
+      await page.mouse.move(100, 900);
+      await page.mouse.wheel(0, 600);
+      await page.waitForTimeout(80);
+    }
+    if (state === "settled") await page.waitForTimeout(700);
+    const file = `footer-${state}.png`;
+    await page.screenshot({ path: fileURLToPath(new URL(file, output)) });
+    captures.push({ route: "/", file, width: 1440, state });
+  }
   await context.close();
 } finally {
   await browser.close();

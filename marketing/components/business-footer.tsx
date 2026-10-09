@@ -136,10 +136,11 @@ export function BusinessFooter({
           </div>
         </div>
       )}
-      <div className={styles.wordmarkCrop} aria-hidden="true">
-        <span>cuadrao</span>
-      </div>
-      <FooterMotion locale={locale} />
+      <FooterMotion>
+        <div className={styles.wordmarkCrop}>
+          <span>cuadrao</span>
+        </div>
+      </FooterMotion>
     </footer>
   );
 }

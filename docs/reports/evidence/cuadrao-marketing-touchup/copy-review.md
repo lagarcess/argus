@@ -2,6 +2,8 @@
 
 Draft for local review. No publication approval is implied. Spanish first.
 
+On October 9, 2026, the founder requested removal of the incomplete Business product capture because its numbers were incorrect. Its section and associated copy are withdrawn.
+
 This replaces the Business home feature tour with a receive, review and approve journey. Existing form, privacy, founder-letter, navigation and Personal signup copy remain unchanged. The Business metadata description derives from the same description below.
 
 | Surface | Spanish | English |
@@ -49,14 +51,9 @@ This replaces the Business home feature tour with a receive, review and approve 
 | accountantTitle | Revisar con el original a mano. | Review with the original at hand. |
 | accountantBody | El monto importa. Poder explicar de dónde sale, también. | The amount matters. Being able to explain its source does, too. |
 | photoNote | Imágenes ilustrativas generadas con IA. No representan clientes de Cuadrao. | AI-generated illustrative images. They do not depict Cuadrao customers. |
-| evidenceLabel | DENTRO DE CUADRAO | INSIDE CUADRAO |
-| evidenceTitle | El original, junto a los detalles. | The original, beside the details. |
-| evidenceBody | Un recibo guardado en el entorno de prueba actual. El documento queda a la vista mientras completas y revisas sus datos, antes de confirmar el gasto. | A receipt saved in the current test environment. The document stays visible while you enter and review its details, before confirming the expense. |
-| evidenceCaption | Captura real con datos ficticios. Recibo guardado, sin lectura automática. Producto en desarrollo. | Actual capture with fictional data. Receipt saved, without automatic reading. Product in development. |
-| evidenceAlt | Cuadrao Business: recibo ficticio original junto al formulario de revisión, aún sin completar | Cuadrao Business: original fictional receipt beside the review form, not yet completed |
 | limitsQuestion | ¿Qué se puede probar hoy? | What can be tested today? |
 | limitsAnswer | Estamos preparando un piloto de recepción de archivos, revisión y aprobación de gastos. Las conexiones de WhatsApp y correo, la preparación automática con IA y el trabajo entre firmas y sus clientes aún necesitan validación. No las anunciamos como disponibles. El alcance y el acceso se acuerdan antes de cada piloto. | We’re preparing a pilot for receiving files, reviewing expenses and approving them. WhatsApp and email connections, automatic AI preparation and collaboration between firms and their clients still need validation. We do not advertise them as available. Scope and access are agreed before each pilot. |
 | fitQuestion | ¿Para quién lo estamos construyendo? | Who are we building it for? |
 | fitAnswer | Para negocios en República Dominicana que necesitan mantener sus gastos y documentos al día, y para las personas que los ayudan a revisar sus cuentas. Estamos aprendiendo de sus procesos antes de ampliar el producto. | Businesses in the Dominican Republic that need to keep their expenses and documents up to date, and the people who help review their accounts. We’re learning from their processes before expanding the product. |
 
-Additional shared controls: **Pausar animación / Pause animation**, **Reanudar animación / Resume animation**. The image link reads **Ampliar captura del producto (nueva pestaña) / Enlarge product capture (new tab)**.
+Additional shared controls: **Pausar animación / Pause animation**, **Reanudar animación / Resume animation**.

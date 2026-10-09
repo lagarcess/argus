@@ -20,7 +20,7 @@ code, and services are outside this assignment.
 
 **The founder has not accepted the current design.** Prior passing tests and
 review reports do not establish design approval. The first question was sent to
-the founder asking what to change and what to keep. Design edits await that answer.
+the founder asking what to change and what to keep. The founder later requested the screenshot removal and footer correction recorded below. Whole-page design acceptance remains pending.
 New copy remains a draft in the [copy review](../reports/evidence/cuadrao-marketing-touchup/copy-review.md).
 
 Verified at 13:54 America/Chicago on 2026-10-09:
@@ -51,6 +51,14 @@ Read the mandatory product and technical documents before code changes.
 
 No merge, publication, hosted change, real email, or public-form activation is
 authorized. Existing LLC, operator wording, and provider holds still apply.
+
+## Founder follow-up, 2026-10-09
+
+The founder requested removal of the Business product screenshot because the product is incomplete and the numbers are incorrect. The Marketing-only change removes its whole section, related copy and styles, and the served image. Historical source captures remain in the evidence folder. See the [touch-up correction record](../reports/evidence/cuadrao-marketing-touchup/README.md#founder-correction-2026-10-09).
+
+The founder confirmed the footer should rest at the cropped Cuadrao wordmark with photos fully hidden. Extra downward scrolling reveals a short photo peek, and release returns to the crop. The local Marketing implementation now removes autoplay, the grid and pause control, keeps normal page height and native upward/keyboard navigation, and disables peeking for reduced motion. Typecheck and lint pass. Browser verification and fresh screenshots are pending after rebuilding the preview; prior footer checks describe the removed animation.
+
+The founder supplied the replacement footer photos. The unchanged dressmaker PNG is on the left and the unchanged artisan JPG on the right, with native dimensions and CSS upper-body cropping. Original files and the main editorial photos are preserved. Crop verification, header direction and final design acceptance remain open. The [footer correction record](../reports/evidence/cuadrao-marketing-touchup/README.md#footer-correction-2026-10-09) owns implementation details and remaining verification. The capture script writes new evidence to `footer-peek-screens/` without replacing historical captures. No Business or Consumer runtime, services, forms, or original comparison files were changed.
 
 ## 1. Scope and decisions
 
@@ -274,3 +282,7 @@ Pinned and hashed in the [pinned comment on #906](https://github.com/lagarcess/a
 Canonical, not copied here: the [launch record](../reports/2026-10-07-cuadrao-marketing-launch.md), [runbook](../runbooks/cuadrao-marketing-launch.md), [forms contract](../specs/cuadrao-marketing-forms-contract.md), [package README](../../marketing/README.md), [brand README](../../marketing/brand/README.md), [evidence](../reports/evidence/cuadrao-marketing-launch/README.md), [shared design guide](../../.agent/designs/cuadrao/DESIGN.md), and on #880 the [deployment request](https://github.com/lagarcess/argus/issues/880#issuecomment-6069169773), the [held migration and Render requests](https://github.com/lagarcess/argus/issues/880#issuecomment-6069364033) and the [checkpoint comment](https://github.com/lagarcess/argus/issues/880#issuecomment-6073256570).
 
 Optional, not needed to resume, and not committed: the working session's scratchpad held icon exploration sheets (rounds of mark variations and the finalists sheet, as images and HTML), screenshots of the local site, a one-off Cloudflare record script that read a scoped token from a local `.env` (the founder deleted the token), and review mutation scratch copies. The approved artwork and every hash needed to resume are in the repository and on #906; losing the scratchpad loses nothing required.
+
+### Current local verification
+
+The screenshot removal and footer peek pass a fresh production build and 20 focused browser checks. The hidden photo-loading failure found during the first run is fixed. See the touch-up evidence README for the result and photo provenance. Both implementation agents returned ownership and stopped. Only the updated Marketing preview on 4512 was rebuilt and restarted. The original comparison remains on 4511. Header feedback is advisory; no header changes were requested or made. No merge, push, publication, provider activation, or hosted change occurred.

@@ -107,39 +107,6 @@ export function TouchupLanding({ locale }: { locale: BusinessLocale }) {
         </figure>
         <p className={styles.caption}>{c.photoNote}</p>
       </section>
-      <section
-        className={`${styles.section} ${styles.evidence}`}
-        aria-labelledby="evidence-title"
-      >
-        <div className={styles.sectionHeading}>
-          <p className={styles.eyebrow}>{c.evidenceLabel}</p>
-          <h2 id="evidence-title">{c.evidenceTitle}</h2>
-          <p>{c.evidenceBody}</p>
-        </div>
-        <figure>
-          <a
-            href="/cuadrao-site/business-review.webp"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={
-              locale === "es"
-                ? "Ampliar captura del producto (nueva pestaña)"
-                : "Enlarge product capture (new tab)"
-            }
-          >
-            <Image
-              src="/cuadrao-site/business-review.webp"
-              width={810}
-              height={830}
-              sizes="(max-width: 700px) 100vw, 860px"
-              alt={c.evidenceAlt}
-            />
-          </a>
-          <figcaption className={styles.caption}>
-            {c.evidenceCaption}
-          </figcaption>
-        </figure>
-      </section>
     </>
   );
 }

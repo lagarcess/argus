@@ -285,26 +285,6 @@
 .editorial > p {
   grid-column: 1/-1;
 }
-.evidence {
-  padding-top: 60px;
-}
-.evidence figure {
-  max-width: 860px;
-  margin-inline: auto;
-}
-.evidence figure > a {
-  display: block;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  overflow: hidden;
-  background: white;
-  box-shadow: 0 15px 40px #172b2608;
-}
-.evidence img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
 .pilotRail {
   position: relative;
 }

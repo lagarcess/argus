@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 for (const path of ["/", "/en"]) {
   test(`${path} preserves the capture story and accessible progress rail`, async ({
@@ -18,9 +18,6 @@ for (const path of ["/", "/en"]) {
       path === "/" ? "Aprobado" : "Approved",
     );
     await expect(page.locator("iframe")).toHaveCount(0);
-    await expect(
-      page.getByRole("img", { name: /Cuadrao Business/ }),
-    ).toBeVisible();
   });
 }
 
@@ -41,52 +38,83 @@ test("header blends at the top and becomes a pill after scrolling", async ({
   ).toBeVisible();
 });
 
-test("footer moves automatically, pauses and ends at the page edge", async ({
-  page,
-}) => {
+async function footerEnd(page: Page) {
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+  await expect.poll(() => page.evaluate(() =>
+    document.documentElement.scrollHeight - window.innerHeight - window.scrollY,
+  )).toBeLessThanOrEqual(2);
+  return page.locator("[data-footer-peek]");
+}
+
+async function footerReveal(page: Page) {
+  return page.locator("[data-footer-peek]").evaluate((frame) =>
+    frame.getBoundingClientRect().bottom -
+    frame.querySelector("img")!.parentElement!.getBoundingClientRect().top,
+  );
+}
+
+test("footer rests at the crop, peeks on extra wheel input and settles without added height", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
-  const control = page.getByRole("button", { name: "Pausar animación" });
-  await control.scrollIntoViewIfNeeded();
-  const panel = page.locator("footer [data-paused]");
-  await expect(panel).toHaveAttribute("data-visible", "true");
-  const positions = () =>
-    panel
-      .locator("i")
-      .first()
-      .evaluate((node) => getComputedStyle(node).left);
-  const before = await positions();
-  await expect.poll(positions).not.toBe(before);
-  await control.click();
-  await expect(panel).toHaveAttribute("data-paused", "true");
-  await expect
-    .poll(() =>
-      panel
-        .locator("i")
-        .first()
-        .evaluate((node) => getComputedStyle(node).animationPlayState),
-    )
-    .toBe("paused");
-  await page.evaluate(
-    () =>
-      new Promise<void>((resolve) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-      ),
-  );
-  const stopped = await positions();
+  const frame = await footerEnd(page);
+  for (const source of ["footer-dressmaker", "footer-artisan"]) {
+    const image = frame.locator(`img[src*="${source}"]`);
+    await expect(image).toHaveCount(1);
+    await expect.poll(() => image.evaluate((node: HTMLImageElement) =>
+      node.complete && node.naturalWidth > 0,
+    )).toBe(true);
+  }
+  await expect.poll(() => footerReveal(page)).toBeLessThanOrEqual(0.5);
+  const height = await page.evaluate(() => document.documentElement.scrollHeight);
+  const end = await frame.evaluate((node) => node.getBoundingClientRect().bottom + window.scrollY);
+  expect(Math.abs(end - height)).toBeLessThanOrEqual(2);
+  await expect(page.getByRole("button", { name: /Pausar animación|Pause animation/ })).toHaveCount(0);
+  await page.mouse.move(100, 800);
+  await page.mouse.wheel(0, 500);
+  await expect.poll(() => footerReveal(page), { intervals: [20] }).toBeGreaterThan(5);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
+  await expect.poll(() => footerReveal(page)).toBeLessThanOrEqual(0.5);
+  expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
+});
+
+test("footer preserves upward wheel and keyboard navigation", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await footerEnd(page);
+  const bottom = await page.evaluate(() => window.scrollY);
+  await page.mouse.move(100, 800);
+  await page.mouse.wheel(0, 500);
+  await expect.poll(() => footerReveal(page), { intervals: [20] }).toBeGreaterThan(5);
+  await page.mouse.wheel(0, -350);
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(bottom - 100);
+  await expect.poll(() => footerReveal(page)).toBeLessThanOrEqual(0.5);
+  await footerEnd(page);
+  await page.keyboard.press("PageUp");
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(bottom - 100);
+});
+
+test("footer responds to dispatched touch drag and release", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  await footerEnd(page);
+  await page.locator("[data-footer-peek]").evaluate((target) => {
+    const touch = (clientY: number) => new Touch({ identifier: 1, target, clientX: 100, clientY });
+    target.dispatchEvent(new TouchEvent("touchstart", { bubbles: true, touches: [touch(700)] }));
+    target.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [touch(500)] }));
+  });
+  await expect.poll(() => footerReveal(page), { intervals: [20] }).toBeGreaterThan(5);
+  await page.locator("[data-footer-peek]").dispatchEvent("touchend", { touches: [] });
+  await expect.poll(() => footerReveal(page)).toBeLessThanOrEqual(0.5);
+});
+
+test("reduced motion keeps the crop fixed under extra scroll input", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.goto("/");
+  await footerEnd(page);
+  await page.mouse.move(100, 800);
+  await page.mouse.wheel(0, 500);
   await page.waitForTimeout(250);
-  expect(await positions()).toBe(stopped);
-  await expect(
-    page.getByRole("button", { name: "Reanudar animación" }),
-  ).toHaveAttribute("aria-pressed", "true");
-  const bottom = await panel.evaluate((node) =>
-    Math.abs(
-      node.getBoundingClientRect().bottom +
-        window.scrollY -
-        document.documentElement.scrollHeight,
-    ),
-  );
-  expect(bottom).toBeLessThanOrEqual(2);
+  expect(await footerReveal(page)).toBeLessThanOrEqual(0.5);
 });
 
 test("reduced motion is static and small screens do not overflow", async ({
@@ -119,17 +147,28 @@ test("reduced motion is static and small screens do not overflow", async ({
   }
 });
 
-test("editorial photographs and product evidence load", async ({ page }) => {
-  await page.goto("/");
-  for (const image of await page.locator("main img").all()) {
-    await image.scrollIntoViewIfNeeded();
-    await expect
-      .poll(() =>
-        image.evaluate(
-          (element: HTMLImageElement) =>
-            element.complete && element.naturalWidth > 0,
-        ),
-      )
-      .toBe(true);
-  }
-});
+for (const path of ["/", "/en"]) {
+  test(`${path} loads editorial photographs without the withdrawn product capture`, async ({
+    page,
+  }) => {
+    await page.goto(path);
+    await expect(
+      page.locator('img[src*="business-review"], a[href*="business-review"]'),
+    ).toHaveCount(0);
+    const photographs = page.locator(
+      'main img[src*="florist"], main img[src*="accountant"]',
+    );
+    await expect(photographs).toHaveCount(2);
+    for (const image of await photographs.all()) {
+      await image.scrollIntoViewIfNeeded();
+      await expect
+        .poll(() =>
+          image.evaluate(
+            (element: HTMLImageElement) =>
+              element.complete && element.naturalWidth > 0,
+          ),
+        )
+        .toBe(true);
+    }
+  });
+}

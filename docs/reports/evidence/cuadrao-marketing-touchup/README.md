@@ -8,14 +8,32 @@ The new text is a draft for founder review in [copy-review.md](copy-review.md). 
 
 Original integration base: `bbf4da23f01296af4ac639386fe9a0960218a49f`. Branch: `codex/marketing-touchup-delivery`.
 
-## Reference decisions
+## Founder correction, 2026-10-09
+
+The founder requested removal of the incomplete Business product screenshot because its numbers were incorrect. The Marketing page no longer renders that section in either language. Its localized copy, unused styles, and served `business-review.webp` asset are removed. Historical evidence images remain here for traceability.
+
+The earlier screenshots and browser results below describe the previous page. They do not verify this removal or establish design approval. The removal passes TypeScript, lint, and 40 focused unit tests covering existing sample money, priorities, and routes. The rebuilt page passes all 20 focused browser checks on desktop and mobile. That removal left header and footer behavior unchanged. The separate footer correction below supersedes the previous motion design.
+
+## Footer correction, 2026-10-09
+
+The founder confirmed that footer photos must be fully hidden at rest. The natural page ending remains the existing cropped hollow Cuadrao wordmark. Extra downward wheel or touch input at the page bottom briefly reveals a bounded photo strip; stopping input returns it to the crop. There is no added scroll height, autoplay, moving grid, pause button, scroll lock, or forced scroll correction. Upward scrolling and keyboard navigation remain native. Reduced motion keeps the static crop.
+
+The implementation uses one reveal offset on a clipped track containing the existing wordmark and an absolutely positioned photo strip. The reveal is bounded by both the rendered strip height and 60% of the cropped frame height, so the peek stays shallow on phones. Native overscroll alone was rejected because it cannot consistently expose custom clipped photos across browsers.
+
+The founder supplied replacement footer photos during this correction. The dressmaker appears on the left and the artisan on the right. Original files are copied unchanged; Next/Image owns responsive delivery, and CSS crops toward the upper body without stretching. Final crop review, visual acceptance, and header direction are pending. The main editorial florist/accountant images remain unchanged.
+
+Typecheck, lint, and a fresh production build pass. All 20 focused browser checks pass on desktop and mobile. They cover resting crop, wheel peek, idle return, fixed document height, upward wheel departure, keyboard navigation, reduced motion, both languages, and dispatched touch drag/release. The first run caught the hidden photos remaining unloaded because they were lazy-loaded. Both footer images now load eagerly through the existing Next.js image optimizer; the rerun passes. Dispatched touch events test the handler; they do not prove physical iPhone overscroll behavior. The release captain reviewed the bounded diff and verified the rebuilt preview. No founder design acceptance, new GitHub CI verdict, or release readiness is claimed.
+
+`marketing/scripts/capture-touchup.mjs` now writes to `footer-peek-screens/` and captures rest, peek, and settled states. It preserves the historical `screens/` images and manifest. Existing screenshot and test evidence below does not validate this correction.
+
+## Historical reference decisions
 
 Both founder-provided recordings were inspected directly, frame by frame:
 
 - Granola, recording `2026-10-09 at 12.41.17 AM`: a shallow image band under the oversized cropped footer wordmark. Adapted as a bounded 200 px desktop / 150 px mobile ending, not another full-screen section.
 - YC, recording `2026-10-09 at 12.44.04 AM`: thin moving grid lines, corner squares, cropped type. Adapted to Cuadrao pine, sage and lime. No reference logos or footage are reused.
 
-The footer starts moving when visible, pauses off screen, has an explicit pause control, and remains static with reduced motion. Its bottom border is the actual page ending. The original footer navigation and wordmark composition remain.
+The previous footer started moving when visible, paused off screen, and had an explicit pause control. That design is superseded by the founder correction above. Its historical evidence remains below.
 
 The original hero card behavior is a 2 degree resting rotation to 1 degree on hover over 220 ms. The maintained touch-up uses that same behavior; there was no separate shake keyframe in the source.
 
@@ -25,7 +43,9 @@ The document journey uses a keyboard-operable three-tab progress rail. The pilot
 
 - Header lockup: canonical `marketing/brand/cuadrao-lockup-light.svg`. `marketing/scripts/sync-brand.mjs` derives the served copy during dev/build.
 - Florist and accountant images: founder-provided illustrative images, recovered from the prior approved touch-up assets, already optimized as WebP. The page labels them as AI illustrations, not customers.
-- Business product image: actual local synthetic Business capture. Exact runtime and image details are recorded with the final evidence below.
+- Footer dressmaker: founder-supplied `codex-clipboard-123a87f8-93d2-4fef-be87-24e3c1fa6ed2.png`, copied unchanged to `marketing/public/cuadrao-site/footer-dressmaker.png` (1456×1360).
+- Footer artisan: founder-supplied `grok-image-064f7fef-226b-4166-92db-7e8aa4579b64.jpg`, copied unchanged to `marketing/public/cuadrao-site/footer-artisan.jpg` (1728×1152). Neither image is asserted to depict a customer.
+- Withdrawn Business product image: historical local synthetic capture, removed at the founder's request. The source evidence below remains for traceability.
 - Founder portrait, signature, Personal screen and footer artwork retain the canonical existing assets.
 
 ## Reproduction
@@ -54,12 +74,14 @@ Implementation commit: `85c8cdf2a17c4a8dc6ff2990b75d6d44451cc40e`. Test-only pau
 - Footer pause repeated three times per desktop/mobile: **6/6 pass**. The initial test measured before React applied the pause and saw one frame of movement; the final assertion waits for the rendered paused state and still verifies a fixed position.
 - Independent focused code/UI review and final delta review: **clean, no actionable findings**. No unchanged runtime was opened for speculative work.
 - Modularity budget: no violations. Integration remained `bbf4da23f01296af4ac639386fe9a0960218a49f`; no reconciliation merge or semantic overlap was needed.
-- [Screenshot manifest](screens/manifest.json) pins the actual product implementation commit and capture time. The later commit changes only test synchronization; product source is identical, so these images remain valid. The final evidence commit changes documentation/images only.
+- [Screenshot manifest](screens/manifest.json) pins the actual product implementation commit and capture time. The later commit changes only test synchronization; product source is identical, so these images described that earlier revision. The Business page images are now historical after the removal above. The final evidence commit changes documentation/images only.
 - [Desktop Business](screens/business-es.png), [390 px Business](screens/business-es-390.png), [320 px Business](screens/business-es-320.png), [Personal](screens/personal-es.png), [Contact](screens/contact-es.png), [Privacy](screens/privacy-es.png). Matching English images are in the same directory.
 - [Footer first frame](screens/footer-motion-start.png), [later frame](screens/footer-motion-later.png), [paused state](screens/footer-paused.png).
 
 Hosted checks and publication are not part of this local acceptance. GitHub CI and founder copy approval remain separate gates.
 
-### Actual Business image
+### Withdrawn Business image provenance
 
-The Business runtime owner captured `business-inbox-source.png` and `business-review-source.png` at 1440×1000 from the running local `/biz` app on October 9, 2026, checkout head `d136c3394`. It used a separate synthetic account, Spanish profile and an actual saved fixture upload (`receipt-dop.png`). AI preparation was off. The review form is intentionally unfilled and the receipt is not claimed to be an approved expense. No DOM text was replaced and no owner account was changed. The served image is a browser viewport clip of the receipt/review area so the product stays readable and development chrome stays outside the frame.
+The Business runtime owner captured `business-inbox-source.png` and `business-review-source.png` at 1440×1000 from the running local `/biz` app on October 9, 2026, checkout head `d136c3394`. It used a separate synthetic account, Spanish profile and an actual saved fixture upload (`receipt-dop.png`). AI preparation was off. The review form is intentionally unfilled and the receipt is not claimed to be an approved expense. No DOM text was replaced and no owner account was changed. The former served image was a browser viewport clip of the receipt/review area so the product stays readable and development chrome stays outside the frame.
+
+The focused browser log is [footer-peek-results.txt](footer-peek-results.txt). The updated preview runs on 4512 with real form-provider credentials unset. The original comparison on 4511 is preserved.

@@ -58,14 +58,6 @@ const es = {
   accountantBody: "El monto importa. Poder explicar de dónde sale, también.",
   photoNote:
     "Imágenes ilustrativas generadas con IA. No representan clientes de Cuadrao.",
-  evidenceLabel: "DENTRO DE CUADRAO",
-  evidenceTitle: "El original, junto a los detalles.",
-  evidenceBody:
-    "Un recibo guardado en el entorno de prueba actual. El documento queda a la vista mientras completas y revisas sus datos, antes de confirmar el gasto.",
-  evidenceCaption:
-    "Captura real con datos ficticios. Recibo guardado, sin lectura automática. Producto en desarrollo.",
-  evidenceAlt:
-    "Cuadrao Business: recibo ficticio original junto al formulario de revisión, aún sin completar",
   limitsQuestion: "¿Qué se puede probar hoy?",
   limitsAnswer:
     "Estamos preparando un piloto de recepción de archivos, revisión y aprobación de gastos. Las conexiones de WhatsApp y correo, la preparación automática con IA y el trabajo entre firmas y sus clientes aún necesitan validación. No las anunciamos como disponibles. El alcance y el acceso se acuerdan antes de cada piloto.",
@@ -135,14 +127,6 @@ const en: typeof es = {
     "The amount matters. Being able to explain its source does, too.",
   photoNote:
     "AI-generated illustrative images. They do not depict Cuadrao customers.",
-  evidenceLabel: "INSIDE CUADRAO",
-  evidenceTitle: "The original, beside the details.",
-  evidenceBody:
-    "A receipt saved in the current test environment. The document stays visible while you enter and review its details, before confirming the expense.",
-  evidenceCaption:
-    "Actual capture with fictional data. Receipt saved, without automatic reading. Product in development.",
-  evidenceAlt:
-    "Cuadrao Business: original fictional receipt beside the review form, not yet completed",
   limitsQuestion: "What can be tested today?",
   limitsAnswer:
     "We’re preparing a pilot for receiving files, reviewing expenses and approving them. WhatsApp and email connections, automatic AI preparation and collaboration between firms and their clients still need validation. We do not advertise them as available. Scope and access are agreed before each pilot.",
