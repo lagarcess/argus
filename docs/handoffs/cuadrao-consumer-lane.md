@@ -83,6 +83,7 @@ All under `/Users/garces/Documents/projects/repos/argus/.claude/worktrees/` on t
 - `agent-a3ea4bb6855947c8f`: guest-book worktree, including an untracked `guest-mode-evidence/` (41 screenshots, `RESULTS.txt` mapping tests to xcresults).
 - `agent-accef4746fb45a304`: transaction-sheet worktree, including its untracked `transaction-sheet-mock/` screenshots.
 - `cuadrao-r1-recovery/ios/Config/Device.local.xcconfig` (ignored by git): phone signing and API configuration. Copy it into `ios/Config/` only for a device build, and delete the copy after (`phone-build-candidate` style scripts do this).
+- `cuadrao-applier` (branch `codex/cuadrao-compat-matrix`, [PR #916](https://github.com/lagarcess/argus/pull/916), docs and tooling for the migration-apply rehearsal): a heading edit in `docs/PRIVATE_LAUNCH_RUNBOOK.md` line 951 ("Applying an approved migration list", without "(non-hosted targets only)") was applied in the working tree, and its validation run (modularity budget, `tests/test_apply_approved_migrations.py`, mypy, ruff) was **killed by the founder before it finished**. Whether it is committed is not recorded here: run `git -C <that path> status` and `git -C <that path> log -3`. Do not push it until the validation passes.
 - Optional, not needed to resume: the other `agent-*` and `cuadrao-*` worktrees and the `ios/.build` result bundles.
 
 ### 2.4 Builds
