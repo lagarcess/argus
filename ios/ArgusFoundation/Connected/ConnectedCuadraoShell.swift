@@ -16,7 +16,6 @@ struct ConnectedCuadraoShell: View {
     @State private var chatEditing = false
     @State private var searchDetail = false
     @State private var addNotice: AddNotice?
-    @State private var choosingAddAccount = false
     @State private var creatingPlan = false
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
@@ -82,13 +81,6 @@ struct ConnectedCuadraoShell: View {
                     .preferredColorScheme(appearance.colorScheme)
                     .tint(ArgusStyle.ink)
                     .foregroundStyle(ArgusStyle.ink)
-            }
-        }
-        .confirmationDialog("loop.chooseAccount", isPresented: $choosingAddAccount, titleVisibility: .visible) {
-            ForEach(addableAccounts) { account in
-                Button(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")) {
-                    auth.financialLoop?.record(account)
-                }.accessibilityIdentifier("nav.add.account." + account.id.uuidString)
             }
         }
         .sheet(isPresented: $creatingPlan) {
@@ -234,11 +226,10 @@ struct ConnectedCuadraoShell: View {
         }
         Task {
             if !accounts.hasLoaded { await accounts.load() }
-            switch ConnectedAddMovement.target(for: addableAccounts, loaded: accounts.hasLoaded) {
+            switch ConnectedAddMovement.target(for: addableAccounts, loaded: accounts.hasLoaded, preferredCurrency: auth.profile?.currency) {
             case .loadAccounts: addNotice = AddNotice(title: accounts.errorKey ?? "accounts.loading", message: nil)
             case .createAccount: accounts.create()
             case .record(let account): loop.record(account)
-            case .choose: choosingAddAccount = true
             }
         }
     }
