@@ -90,6 +90,8 @@ struct GuestShell: View {
     @State private var searchScroll = CuadraoNavigationScroll()
     @State private var profileScroll = CuadraoNavigationScroll()
     @State private var profilePath: [GuestProfileRoute] = []
+    @State private var homePath: [UUID] = []
+    @State private var sheet: GuestSheet?
     @State private var chat = CuadraoChatPreview(spanish: Locale.current.language.languageCode?.identifier == "es", includeExamples: false)
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
@@ -104,15 +106,42 @@ struct GuestShell: View {
                     .tag(item)
             }
         }
+        .environment(\.cuadraoCurrencyRules, GuestCurrencyRules.rules)
+        .sheet(item: $sheet) { sheetContent($0) }
         .tint(WelcomePalette.pine)
         .foregroundStyle(WelcomePalette.ink)
         .background(WelcomePalette.background.ignoresSafeArea())
     }
 
-    private var showsNavigation: Bool { tab != .profile || profilePath.isEmpty }
+    private var showsNavigation: Bool {
+        switch tab {
+        case .home: homePath.isEmpty
+        case .profile: profilePath.isEmpty
+        default: true
+        }
+    }
 
     private var addItems: [CuadraoAddItem] {
-        GuestAccessPolicy.addActions(activeAccounts: 0).map { CuadraoAddItem(action: $0) {} }
+        GuestAccessPolicy.addActions(activeAccounts: model.book.activeAccounts.count).map { action in
+            CuadraoAddItem(action: action) {
+                switch action {
+                case .account: sheet = .account(.create)
+                default: break
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private func sheetContent(_ sheet: GuestSheet) -> some View {
+        switch sheet {
+        case .account(let mode):
+            GuestAccountSheet(model: model, mode: mode, spanish: spanish).preferredColorScheme(appearance.colorScheme)
+        case .archive(let id):
+            CuadraoArchiveAccountReview(spanish: spanish) { _ = try? model.apply { try $0.settingArchived(id, true) } }
+                .preferredColorScheme(appearance.colorScheme)
+        case .archived:
+            GuestArchivedAccounts(model: model, spanish: spanish).preferredColorScheme(appearance.colorScheme)
+        }
     }
 
     private func scroll(for item: CuadraoTab) -> CuadraoNavigationScroll? {
@@ -128,7 +157,7 @@ struct GuestShell: View {
     @ViewBuilder private func content(_ item: CuadraoTab) -> some View {
         switch item {
         case .home:
-            GuestHome(model: model, scroll: navigationScroll, active: tab == .home)
+            GuestHome(model: model, scroll: navigationScroll, active: tab == .home, path: $homePath, sheet: $sheet)
         case .plan:
             GuestPlaceholderTab(scroll: planScroll, active: tab == .plan,
                 title: spanish ? "Lo que viene" : "What's ahead",

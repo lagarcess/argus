@@ -5,7 +5,7 @@ import XCTest
 /// development door; the release-set test proves the door is shut without it.
 extension FinancialLoopUITests {
     /// Starts the app signed out. A session left by an earlier journey is signed out first.
-    private func launchSignedOut(arguments: [String], language: String = "en", reset: Bool = true) {
+    func launchSignedOut(arguments: [String], language: String = "en", reset: Bool = true) {
         continueAfterFailure = false
         app.terminate()
         let locale = language == "es-419" ? ["-AppleLanguages", "(es-419)", "-AppleLocale", "es_DO"]
@@ -20,7 +20,7 @@ extension FinancialLoopUITests {
         }
     }
 
-    private func enterGuestBook() {
+    func enterGuestBook() {
         let guest = app.buttons["cuadrao.welcome.guest"]
         XCTAssertTrue(guest.waitForExistence(timeout: 10), "the welcome screen offers the book")
         guest.tap()

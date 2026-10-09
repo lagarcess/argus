@@ -190,7 +190,7 @@ struct BookStoreTests {
         _ = await store.open()
         try await store.save(try DeviceBook.empty().settingPrimaryCurrency("DOP"))
         let text = try #require(String(data: box.bytes("book.json"), encoding: .utf8))
-        #expect(text == #"{"revision":1,"schemaVersion":1,"settings":{"primaryCurrency":"DOP"}}"#)
+        #expect(text == #"{"accounts":[],"revision":1,"schemaVersion":1,"settings":{"primaryCurrency":"DOP"}}"#)
     }
 
     @Test func primaryCurrencyAcceptsOnlyTheServersSet() throws {

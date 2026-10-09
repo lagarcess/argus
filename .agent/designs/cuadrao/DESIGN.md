@@ -936,7 +936,12 @@ Home, Plan, Search and Profile views rather than a second set.
 - A book written by a newer version of the app opens read-only with an update
   message; the app never rewrites what it cannot read.
 - An amount keeps the currency's exact digits and is never rounded; the currency
-  choice lists only currencies the server accepts.
+  choice lists only currencies the server accepts. Each account fixes its digits
+  when it is created, so a yen has none and a dinar has three.
+- Accounts use the shared account form and rows. A blank balance is unknown, never
+  zero; a stated balance starts tracking at that moment. The currency and type are
+  kept once a balance is stated. Archive keeps the account and its place, with Undo
+  and a Restore list; the order set by dragging is part of the book.
 
 ### Authentication and invitation purpose
 

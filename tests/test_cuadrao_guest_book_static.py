@@ -60,7 +60,9 @@ def test_guest_code_has_no_network_or_server_bound_model():
     offenders = []
     for source in GUEST.rglob("*.swift"):
         text = source.read_text()
-        offenders += [(source.name, token) for token in FORBIDDEN_IN_GUEST_CODE if token in text]
+        # A name must stand alone: the book's own BookAccountDraft is not the server-bound AccountDraft.
+        offenders += [(source.name, token) for token in FORBIDDEN_IN_GUEST_CODE
+                      if re.search(r"(?<![A-Za-z])" + re.escape(token), text)]
     assert not offenders, offenders
 
 
