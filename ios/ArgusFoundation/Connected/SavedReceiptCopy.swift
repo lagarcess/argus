@@ -42,7 +42,7 @@ struct SavedReceiptCopy {
     /// Pending approval: not in the approved table.
     var couldNotLoad: String { spanish ? "No pudimos cargar tus recibos." : "We could not load your receipts." }
 
-    /// Pending approval: not in the approved table.
+    /// Founder-approved October 8.
     var couldNotDelete: String { spanish ? "No pudimos eliminar el recibo." : "We could not delete the receipt." }
     /// The approved receipt-source wording.
     var unusableFile: String {
