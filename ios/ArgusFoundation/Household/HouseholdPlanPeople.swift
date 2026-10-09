@@ -79,9 +79,9 @@ struct HouseholdPlanPeopleEditor: View {
                 }
             }
             .navigationTitle("household.people")
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 CuadraoCancelToolbar(title: "accounts.cancel") { dismiss() }
-                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
             }
             .task { await load() }
             .onChange(of: occurrenceId) { _, _ in loadAmounts() }

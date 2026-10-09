@@ -208,8 +208,12 @@ oval, rim or underline.
 - **Done** is plain text on the trailing side, used only on sheets that show something
   and have nothing to confirm (filters, spaces, people, currency list, updates, saved
   receipt viewer).
-- Number entry uses the keyboard's own Done bar. Do not add a Done button above a
-  sheet's primary button.
+- Nothing sits above the keyboard: no Done button, keyboard toolbar item or input
+  accessory view, because on iOS 26 each floats as a blue pill over the sheet's own
+  button. A keyboard closes by tapping away from the field (one rule for the whole
+  app in `KeyboardTapAway`), by scrolling, or with Return. A tap on or right beside the
+  field being edited keeps the keyboard. `ios/DesignPreviewTests/run_no_keyboard_accessory.py`
+  fails the model-test run when a source adds one.
 
 Do not add raw `ToolbarItem(.cancellationAction)` or `(.confirmationAction)` items to
 a sheet. Alerts and confirmation dialogs keep the system look.

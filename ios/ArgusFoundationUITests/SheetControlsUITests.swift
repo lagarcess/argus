@@ -32,21 +32,36 @@ extension FinancialLoopUITests {
         let barButtons = app.navigationBars.firstMatch.buttons.allElementsBoundByIndex
         XCTAssertFalse(barButtons.contains { $0.frame.midX > app.frame.width / 2 }, "no second confirm beside the sheet's own button")
         capture("sheet-controls-account-sheet")
+
+        // The amount keypad has no Done pill; tapping away closes it.
+        app.buttons.matching(NSPredicate(format: "label == 'Cash'")).firstMatch.tap()
+        let amount = app.textFields.allElementsBoundByIndex.last
+        XCTAssertNotNil(amount)
+        amount?.tap()
+        amount?.typeText("12")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        let pad = app.keyboards.firstMatch.frame.minY
+        let pill = app.buttons.allElementsBoundByIndex.filter { ["Done", "Listo"].contains($0.label) && $0.frame.maxY <= pad + 1 && $0.frame.maxY > pad - 120 }
+        XCTAssertTrue(pill.isEmpty, "no Done pill over the amount keypad: \(pill.map(\.debugDescription))")
+        capture("sheet-controls-amount-keypad")
+        app.navigationBars.firstMatch.staticTexts.firstMatch.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "tapping away closes the keypad")
         accountCancel.tap()
 
-        // Typing in a plan field shows the keyboard's own Done, and it closes the keyboard.
+        // Typing in a field never shows a floating Done pill above the keyboard or beside the Create button.
         app.buttons["nav.add"].tap()
         app.buttons["add.tray.plan"].tap()
         let name = app.textFields.matching(NSPredicate(format: "identifier IN {'goal.name', 'budget.name', 'debt.name', 'plan-name'}")).firstMatch
         XCTAssertTrue(name.waitForExistence(timeout: 10), "plan name field")
         name.tap()
         name.typeText("Trip")
-        let keyboardDone = app.toolbars.buttons["Done"]
-        XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), "the keyboard has its own Done")
-        XCTAssertFalse(app.buttons["plan-rate-done"].exists, "no second Done above the Create plan button")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        let keyboardTop = app.keyboards.firstMatch.frame.minY
+        let aboveKeyboard = app.buttons.allElementsBoundByIndex.filter { ["Done", "Listo"].contains($0.label) && $0.frame.maxY <= keyboardTop + 1 && $0.frame.maxY > keyboardTop - 120 }
+        XCTAssertTrue(aboveKeyboard.isEmpty, "no floating Done above the keyboard: \(aboveKeyboard.map(\.debugDescription))")
         capture("sheet-controls-plan-keyboard")
-        keyboardDone.tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Done closes the keyboard on the name field")
+        name.typeText("\n")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Return closes the keyboard")
         app.buttons["Cancel"].firstMatch.tap()
     }
 }
