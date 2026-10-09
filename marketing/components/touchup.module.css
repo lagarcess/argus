@@ -146,19 +146,32 @@
   border-top: 1px solid var(--line);
 }
 .story[data-story-mode="scroll"] .storyRunway {
-  height: calc(var(--story-height) + var(--story-travel));
+  height: calc(var(--story-before) + var(--story-height) + var(--story-travel));
 }
-.story[data-story-mode="scroll"] .storyFrame {
+.story [data-story-pin] {
   position: sticky;
   top: var(--story-top);
 }
 .storyFrame {
   display: grid;
   grid-template-columns: 0.9fr 1fr;
-  gap: 85px;
+  grid-template-areas: "intro panels" "controls panels";
+  column-gap: 85px;
   align-items: center;
 }
+.storyIntro {
+  grid-area: intro;
+  align-self: end;
+}
+.storyStage {
+  display: contents;
+}
+.storyControls {
+  grid-area: controls;
+  align-self: start;
+}
 .recordPanels {
+  grid-area: panels;
   display: grid;
 }
 .recordCard {
@@ -364,8 +377,18 @@
     padding: 25px;
   }
   .storyFrame {
-    grid-template-columns: 1fr;
-    gap: 32px;
+    display: contents;
+  }
+  .storyIntro {
+    margin-bottom: 32px;
+  }
+  .storyStage {
+    display: grid;
+    gap: 24px;
+    grid-template-areas: "controls" "panels";
+  }
+  .storyControls .rail {
+    margin-top: 0;
   }
   .soft {
     margin-inline: 12px;

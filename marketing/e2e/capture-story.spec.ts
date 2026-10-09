@@ -2,10 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 
 async function chapter(page: Page, index: number, fraction = 0.5) {
   await page.locator("#la-idea").evaluate((section, position) => {
-    const frame = section.querySelector<HTMLElement>("[data-story-frame]")!;
-    const runway = frame.parentElement!;
-    const segment = (runway.offsetHeight - frame.offsetHeight) / 3;
-    window.scrollTo(0, runway.getBoundingClientRect().top + window.scrollY - parseFloat(getComputedStyle(frame).top) + segment * (position.index + position.fraction));
+    const frame = section.querySelector<HTMLElement>("[data-story-pin]")!;
+    const runway = section.querySelector<HTMLElement>("[data-story-runway]")!;
+    const before = parseFloat(getComputedStyle(section).getPropertyValue("--story-before"));
+    const segment = (runway.offsetHeight - before - frame.offsetHeight) / 3;
+    window.scrollTo(0, runway.getBoundingClientRect().top + window.scrollY + before - parseFloat(getComputedStyle(frame).top) + segment * (position.index + position.fraction));
   }, { index, fraction });
 }
 
@@ -26,12 +27,12 @@ for (const path of ["/", "/en"]) {
       expect(panel!.y + panel!.height).toBeLessThanOrEqual((await page.evaluate(() => innerHeight)) - 20);
     }
     await chapter(page, 2, 0.1);
-    const held = await story.locator("[data-story-frame]").boundingBox();
+    const held = await story.locator("[data-story-pin]").boundingBox();
     await chapter(page, 2, 0.9);
-    expect((await story.locator("[data-story-frame]").boundingBox())!.y).toBeCloseTo(held!.y, 0);
+    expect((await story.locator("[data-story-pin]").boundingBox())!.y).toBeCloseTo(held!.y, 0);
     await expect(page.getByRole("tabpanel")).toContainText(labels[2]);
     await chapter(page, 3, 0.5);
-    expect((await story.locator("[data-story-frame]").boundingBox())!.y).toBeLessThan(held!.y - 100);
+    expect((await story.locator("[data-story-pin]").boundingBox())!.y).toBeLessThan(held!.y - 100);
   });
 }
 
@@ -57,8 +58,13 @@ for (const fallback of ["reduced motion", "short landscape"] as const) {
     if (fallback === "short landscape") await page.setViewportSize({ width: 844, height: 390 });
     await page.goto("/");
     await expect(page.locator("#la-idea")).toHaveAttribute("data-story-mode", "manual");
-    const frame = page.locator("[data-story-frame]");
-    expect(await frame.evaluate(node => node.parentElement!.offsetHeight - (node as HTMLElement).offsetHeight)).toBeLessThanOrEqual(1);
+    await expect(page.locator("[data-story-pin]")).toHaveCount(0);
+    const runway = page.locator("[data-story-runway]");
+    const panels = page.locator("[data-story-stage]");
+    expect(await runway.evaluate(node => node.getBoundingClientRect().bottom) -
+      await panels.evaluate(node => getComputedStyle(node).display === "contents"
+        ? node.parentElement!.getBoundingClientRect().bottom
+        : node.getBoundingClientRect().bottom)).toBeLessThanOrEqual(1);
     await page.getByRole("tab").last().click();
     await expect(page.getByRole("tabpanel")).toContainText("Registro aprobado");
     await page.keyboard.press("Home");
@@ -84,7 +90,7 @@ test("native wheel input advances and reverses a pinned chapter", async ({ page 
   await page.goto("/");
   await expect(page.locator("#la-idea")).toHaveAttribute("data-story-mode", "scroll");
   await chapter(page, 0);
-  const frame = page.locator("[data-story-frame]");
+  const frame = page.locator("[data-story-pin]");
   const before = (await frame.boundingBox())!.y;
   await page.mouse.move(150, 300);
   const distance = (await page.evaluate(() => innerHeight)) / 2;
@@ -94,4 +100,34 @@ test("native wheel input advances and reverses a pinned chapter", async ({ page 
   await page.mouse.wheel(0, -distance);
   await expect(page.getByRole("tab").nth(0)).toHaveAttribute("aria-selected", "true");
   expect((await frame.boundingBox())!.y).toBeCloseTo(before, 0);
+});
+
+
+test("phone introduction scrolls away before the complete rail and card stay in view", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/#el-producto");
+  await expect(page.locator("#la-idea")).toHaveAttribute("data-story-mode", "scroll");
+  const title = page.locator("#capture-title");
+  await expect(title).toHaveCount(1);
+  const header = page.locator("header");
+  await expect.poll(async () => {
+    const heading = (await title.boundingBox())!;
+    const navigation = (await header.boundingBox())!;
+    return heading.y >= navigation.y + navigation.height && heading.y + heading.height <= 844;
+  }).toBe(true);
+  for (const index of [0, 1, 2]) {
+    await chapter(page, index);
+    const heading = (await title.boundingBox())!;
+    const navigation = (await header.boundingBox())!;
+    expect(heading.y + heading.height).toBeLessThanOrEqual(navigation.y + navigation.height);
+    const pinned = (await page.locator("[data-story-pin]").boundingBox())!;
+    expect(pinned.y).toBeGreaterThanOrEqual(navigation.y + navigation.height);
+    expect(pinned.y + pinned.height).toBeLessThanOrEqual(844 - 20);
+    await expect(page.getByRole("tab").nth(index)).toHaveAttribute("aria-selected", "true");
+  }
+  await page.setViewportSize({ width: 390, height: 850 });
+  await expect(page.locator("#la-idea")).toHaveAttribute("data-story-mode", "scroll");
+  await chapter(page, 2);
+  await expect(page.getByRole("tab").last()).toHaveAttribute("aria-selected", "true");
 });
