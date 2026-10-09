@@ -9,6 +9,9 @@ struct ConnectedCuadraoShell: View {
     @State private var destination: AppDestination = .home
     @State private var sheet: FoundationSheet?
     @State private var navigationScroll = CuadraoNavigationScroll()
+    @State private var planScroll = CuadraoNavigationScroll()
+    @State private var searchScroll = CuadraoNavigationScroll()
+    @State private var profileScroll = CuadraoNavigationScroll()
     @State private var homePath: [ConnectedHomeRoute] = []
     @State private var profilePath: [CanvasProfileRoute] = []
     @State private var avatar: CuadraoAvatarSelection = .none
@@ -44,7 +47,7 @@ struct ConnectedCuadraoShell: View {
 
     private func shell(allowsHouseholdNavigation: Bool) -> some View {
         CuadraoAppShell(selection: $tab, chat: chat, spanish: spanish,
-            showsNavigation: showsNavigation && allowsHouseholdNavigation, compact: tab == .home && navigationScroll.compact,
+            showsNavigation: showsNavigation && allowsHouseholdNavigation, compact: scroll(for: tab)?.compact ?? false,
             avatar: avatar, profileName: auth.profile?.displayName ?? "", addItems: addItems) { _ in
             ForEach(CuadraoTab.allCases.filter { $0 != .assistant || CuadraoFirstRelease.hasAssistant }) { item in
                 tabContent(item)
@@ -138,6 +141,7 @@ struct ConnectedCuadraoShell: View {
                 FinancialPlanDestination(showProfile: { tab = .profile }, nativeNavigation: true, audience: planAudience)
                     .toolbar(.hidden, for: .navigationBar)
             }
+            .modifier(CuadraoNavigationScrollObserver(scroll: planScroll, enabled: tab == .plan && sheet == nil))
         case .assistant:
             NavigationStack {
                 CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing, showsPreviewNotice: true)
@@ -145,8 +149,21 @@ struct ConnectedCuadraoShell: View {
             }
         case .search:
             FinancialSearchDestination(active: tab == .search, showProfile: { tab = .profile }, nativePlanNavigation: true, detailChanged: { searchDetail = $0 })
+                .modifier(CuadraoNavigationScrollObserver(scroll: searchScroll, enabled: tab == .search && !searchDetail))
         case .profile:
             ConnectedCuadraoProfile(appearance: $appearance, avatar: $avatar, path: $profilePath)
+                .modifier(CuadraoNavigationScrollObserver(scroll: profileScroll, enabled: tab == .profile && profilePath.isEmpty))
+        }
+    }
+
+    /// Each tab folds the bar from its own scroll, so a long Plan, Search or Profile folds it as Home does.
+    private func scroll(for item: CuadraoTab) -> CuadraoNavigationScroll? {
+        switch item {
+        case .home: navigationScroll
+        case .plan: planScroll
+        case .search: searchScroll
+        case .profile: profileScroll
+        case .assistant: nil
         }
     }
 
