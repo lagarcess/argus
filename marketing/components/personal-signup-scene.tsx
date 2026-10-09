@@ -90,7 +90,7 @@ export function WelcomePhone({ logoRef, flying, alt, delivered }: { logoRef: Sce
   return <div className={styles.scene} data-welcome-phone="">
     <svg className={styles.palm} viewBox="0 0 460 690" aria-hidden="true">
       <defs><linearGradient id={wrist} x1="0" y1="0" x2="0" y2="1"><stop offset=".78" stopColor="#050505" /><stop offset="1" stopColor="#050505" stopOpacity="0" /></linearGradient></defs>
-      <path fill={`url(#${wrist})`} d="M91 690C103 637 74 593 61 548C48 502 50 444 54 396L64 283C66 261 79 251 92 257C106 263 107 277 105 298L103 374C127 345 171 306 229 259L341 151C355 136 374 139 382 153C390 167 383 181 373 194L329 263L376 330C403 369 405 404 388 456L345 568C333 606 321 647 315 690Z" />
+      <path fill={`url(#${wrist})`} d="M91 690C103 637 74 593 61 548C48 502 50 444 54 396L64 283C66 261 79 251 92 257C106 263 107 277 105 298L103 374C127 345 171 306 229 259L384 151C400 133 424 135 431 151C440 169 430 184 415 199L365 263L376 330C403 369 405 404 388 456L345 568C333 606 321 647 315 690Z" />
     </svg>
     <div className={styles.device}>
       <div className={styles.screen}>
