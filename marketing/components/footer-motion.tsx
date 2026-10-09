@@ -18,12 +18,15 @@ export function FooterMotion({ children }: { children: ReactNode }) {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let returnTimer: ReturnType<typeof setTimeout> | undefined;
     let touchY: number | undefined;
+    let reveal = 0;
+    let returning = false;
     const atBottom = () =>
       window.scrollY + window.innerHeight >=
       document.documentElement.scrollHeight - 2;
     const settle = () => {
       clearTimeout(returnTimer);
-      moving.style.transitionDuration = "420ms";
+      returning = true;
+      moving.style.transitionDuration = "500ms";
       moving.style.setProperty("--footer-peek", "0px");
     };
     const peek = (delta: number) => {
@@ -31,23 +34,25 @@ export function FooterMotion({ children }: { children: ReactNode }) {
         settle();
         return;
       }
-      const current = -new DOMMatrixReadOnly(
-        getComputedStyle(moving).transform,
-      ).m42;
-      const limit = strip.offsetHeight;
-      const reveal = Math.min(limit, current + delta * 0.35);
+      if (returning) {
+        reveal = -new DOMMatrixReadOnly(getComputedStyle(moving).transform).m42;
+        returning = false;
+      }
+      reveal = Math.min(strip.offsetHeight, reveal + delta * 0.75);
       clearTimeout(returnTimer);
       moving.style.transitionDuration = "60ms";
       moving.style.setProperty("--footer-peek", `${reveal}px`);
-      returnTimer = setTimeout(settle, 140);
     };
     const wheel = (event: WheelEvent) => {
       if (event.ctrlKey || Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
       const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? innerHeight : 1;
       peek(event.deltaY * unit);
+      if (touchY === undefined) returnTimer = setTimeout(settle, 240);
     };
     const touchStart = (event: TouchEvent) => {
       touchY = event.touches.length === 1 ? event.touches[0].clientY : undefined;
+      if (touchY !== undefined) clearTimeout(returnTimer);
+      else settle();
     };
     const touchMove = (event: TouchEvent) => {
       if (event.touches.length !== 1 || touchY === undefined) return;

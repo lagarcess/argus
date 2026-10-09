@@ -38,6 +38,37 @@ test("header blends at the top and becomes a pill after scrolling", async ({
   ).toBeVisible();
 });
 
+for (const locale of ["es", "en"] as const) {
+  test(`${locale} header separates language controls and links to how it works`, async ({ page }) => {
+    const home = locale === "es" ? "/" : "/en";
+    await page.goto(home);
+    const header = page.locator("header");
+    const menu = header.getByRole("button", { name: /Abrir menú|Open menu/ });
+    const mobile = await menu.isVisible();
+    if (mobile) {
+      await menu.click();
+      await page.keyboard.press("Escape");
+      await expect(menu).toBeFocused();
+      await menu.click();
+    }
+    const navigation = header.locator("nav:visible");
+    const languages = navigation.getByRole("group", { name: locale === "es" ? "Idioma" : "Language" });
+    await expect(languages.getByRole("link", { name: locale.toUpperCase(), exact: true })).toHaveAttribute("aria-current", "true");
+    for (const language of ["es", "en"]) {
+      const link = languages.getByRole("link", { name: language.toUpperCase(), exact: true });
+      await expect(link).toHaveAttribute("href", language === "es" ? "/" : "/en");
+      const bounds = await link.boundingBox();
+      expect(bounds!.width).toBeGreaterThanOrEqual(44);
+      expect(bounds!.height).toBeGreaterThanOrEqual(44);
+    }
+    await navigation.getByRole("link", { name: locale === "es" ? "Cómo funciona" : "How it works", exact: true }).click();
+    await expect(page).toHaveURL(`${home}#el-producto`);
+    if (mobile) await menu.click();
+    await header.locator("nav:visible").getByRole("group").getByRole("link", { name: locale === "es" ? "EN" : "ES", exact: true }).click();
+    await expect(page).toHaveURL(locale === "es" ? "/en" : "/");
+  });
+}
+
 async function footerEnd(page: Page) {
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
   await expect.poll(() => page.evaluate(() =>
@@ -77,6 +108,19 @@ test("footer rests at the crop, peeks on extra wheel input and settles without a
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(height);
 });
 
+test("footer accumulates gentle wheel input without losing it between paint frames", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  const frame = await footerEnd(page);
+  await frame.evaluate((target) => {
+    for (let step = 0; step < 10; step++) {
+      target.dispatchEvent(new WheelEvent("wheel", { bubbles: true, deltaY: 8 }));
+    }
+  });
+  await expect.poll(() => footerReveal(page), { intervals: [20] }).toBeGreaterThan(50);
+  await expect.poll(() => footerReveal(page)).toBeLessThanOrEqual(0.5);
+});
+
 test("footer preserves upward wheel and keyboard navigation", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
@@ -93,7 +137,7 @@ test("footer preserves upward wheel and keyboard navigation", async ({ page }) =
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeLessThan(bottom - 100);
 });
 
-test("footer responds to dispatched touch drag and release", async ({ page }) => {
+test("footer holds a dispatched touch drag open until release", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
   await footerEnd(page);
@@ -103,6 +147,8 @@ test("footer responds to dispatched touch drag and release", async ({ page }) =>
     target.dispatchEvent(new TouchEvent("touchmove", { bubbles: true, touches: [touch(500)] }));
   });
   await expect.poll(() => footerReveal(page), { intervals: [20] }).toBeGreaterThan(5);
+  await page.waitForTimeout(650);
+  expect(await footerReveal(page)).toBeGreaterThan(100);
   await page.locator("[data-footer-peek]").dispatchEvent("touchend", { touches: [] });
   await expect.poll(() => footerReveal(page)).toBeLessThanOrEqual(0.5);
 });

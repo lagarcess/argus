@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const baseURL = process.env.MARKETING_CAPTURE_URL ?? "http://127.0.0.1:4512";
 const root = new URL("../../", import.meta.url);
 const output = new URL(
-  "docs/reports/evidence/cuadrao-marketing-touchup/footer-peek-screens/",
+  "docs/reports/evidence/cuadrao-marketing-touchup/header-drag-screens/",
   root,
 );
 await mkdir(output, { recursive: true });
@@ -54,6 +54,18 @@ try {
     });
     captures.push({ route: "/", file: `business-es-${width}.png`, width });
   }
+  for (const width of [1151, 1200, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    await load("/");
+    const file = `header-${width}.png`;
+    await page.screenshot({ path: fileURLToPath(new URL(file, output)), clip: { x: 0, y: 0, width, height: 170 } });
+    captures.push({ route: "/", file, width });
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  await load("/");
+  await page.getByRole("button", { name: "Abrir menú" }).click();
+  await page.screenshot({ path: fileURLToPath(new URL("header-mobile-menu.png", output)) });
+  captures.push({ route: "/", file: "header-mobile-menu.png", width: 390 });
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto(baseURL);
@@ -69,7 +81,7 @@ try {
       await page.mouse.wheel(0, 600);
       await page.waitForTimeout(80);
     }
-    if (state === "settled") await page.waitForTimeout(700);
+    if (state === "settled") await page.waitForTimeout(900);
     const file = `footer-${state}.png`;
     await page.screenshot({ path: fileURLToPath(new URL(file, output)) });
     captures.push({ route: "/", file, width: 1440, state });

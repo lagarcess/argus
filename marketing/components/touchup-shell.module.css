@@ -48,7 +48,7 @@
   --footer-peek: 0px;
   position: relative;
   transform: translateY(calc(-1 * var(--footer-peek)));
-  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .photoStrip {
   position: absolute;

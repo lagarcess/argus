@@ -66,7 +66,7 @@ export function BusinessHeader({
   }, []);
 
   const languageLinks = (
-    <span className={styles.languages} aria-label={copy.language}>
+    <span className={styles.languages} role="group" aria-label={copy.language}>
       {(["es", "en"] as const).map((language) => (
         <a
           key={language}
@@ -134,7 +134,7 @@ export function BusinessHeader({
             ) : !personal ? (
               <>
                 <a href={`${home}#el-producto`}>
-                  {locale === "es" ? "El producto" : "The product"}
+                  {copy.howItWorks}
                 </a>
                 <a href={`${home}#nosotros`}>{copy.about}</a>
               </>
@@ -182,7 +182,7 @@ export function BusinessHeader({
               {copy.personal}
             </a>
             {!personal && (
-              <a href={`${home}#el-producto`}>{siteCopy[locale].explore}</a>
+              <a href={`${home}#el-producto`}>{copy.howItWorks}</a>
             )}
             {!personal && <a href={`${home}#nosotros`}>{copy.about}</a>}
             {page !== "personal" && (
