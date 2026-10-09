@@ -20,6 +20,7 @@ struct ConnectedCuadraoShell: View {
     @State private var searchDetail = false
     @State private var addNotice: AddNotice?
     @State private var creatingPlan = false
+    @State private var capturing: ReceiptSourceChoice?
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
@@ -85,6 +86,21 @@ struct ConnectedCuadraoShell: View {
                     .tint(ArgusStyle.ink)
                     .foregroundStyle(ArgusStyle.ink)
             }
+        }
+        .savedReceiptOutcome(auth.savedReceipts, spanish: spanish)
+        .fullScreenCover(item: $capturing) { source in
+            ReceiptNativePicker(source: source, spanish: spanish) { result in
+                capturing = nil
+                switch result {
+                case .success(let files):
+                    let prepared = SavedReceiptFiles.prepared(files, source: source, spanish: spanish)
+                    Task { await auth.savedReceipts?.save(prepared) }
+                case .failure(let error) where (error as NSError).code != NSUserCancelledError || (error as NSError).domain != NSCocoaErrorDomain:
+                    auth.savedReceipts?.fail(.unusableFile)
+                case .failure:
+                    break
+                }
+            }.ignoresSafeArea()
         }
         .sheet(isPresented: $creatingPlan) {
             if let loop = auth.financialLoop { ConnectedPlanEditor(loop: loop, seed: .create(kind: nil)) }
@@ -180,7 +196,7 @@ struct ConnectedCuadraoShell: View {
     private var addItems: [CuadraoAddItem] {
         let household = auth.household
         return CuadraoAddAction.available(
-            receiptsConnected: false,
+            receiptsConnected: CuadraoFirstRelease.savedReceipts,
             householdsAvailable: household?.isAvailable == true,
             inHousehold: household?.active == true
         ).compactMap { action in
@@ -189,9 +205,25 @@ struct ConnectedCuadraoShell: View {
             case .transaction: CuadraoAddItem(action: action, perform: addMovement)
             case .plan: CuadraoAddItem(action: action, perform: addPlan)
             case .group, .invite: CuadraoAddItem(action: action) { household?.showManagement = true }
-            case .scanCamera, .choosePhoto, .chooseFile: nil
+            case .scanCamera: CuadraoAddItem(action: action) { capture(.scan) }
+            case .choosePhoto: CuadraoAddItem(action: action) { capture(.photos) }
+            case .chooseFile: CuadraoAddItem(action: action) { capture(.file) }
             }
         }
+    }
+
+    private func capture(_ source: ReceiptSourceChoice) {
+        #if DEBUG
+        if CuadraoFirstRelease.savedReceiptsSample {
+            Task { await auth.savedReceipts?.save(SampleSavedReceiptsTransport.files(for: source)) }
+            return
+        }
+        #endif
+        if source == .scan && !SavedReceiptFiles.scannerAvailable {
+            auth.savedReceipts?.fail(.scannerUnavailable)
+            return
+        }
+        capturing = source
     }
 
     private func addAccount() {

@@ -25,6 +25,8 @@ struct ConnectedCuadraoProfile: View {
             .navigationDestination(for: CanvasProfileRoute.self) { route in
                 if route == .invitations, let invitations = auth.invitations {
                     InvitationsHub(model: invitations).toolbar(.visible, for: .navigationBar)
+                } else if route == .files, CuadraoFirstRelease.savedReceipts, let receipts = auth.savedReceipts {
+                    SavedReceiptsScreen(model: receipts, spanish: spanish).toolbar(.visible, for: .navigationBar)
                 } else {
                     CuadraoProfilePage(route: route, settings: $settingsExamples, spanish: spanish,
                         includeExamples: true, connection: .connected(appearance: $appearance, profile: auth))

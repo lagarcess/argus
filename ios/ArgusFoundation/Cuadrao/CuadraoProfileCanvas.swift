@@ -45,7 +45,7 @@ enum CanvasProfileRoute: Hashable {
         case .usage: es ? "Uso" : "Usage"
         case .help: es ? "Ayuda y comentarios" : "Help and feedback"
         case .memory: es ? "Memoria" : "Memory"
-        case .files: es ? "Archivos" : "Files"
+        case .files: CuadraoFirstRelease.savedReceipts ? SavedReceiptCopy(spanish: es).title : (es ? "Archivos" : "Files")
         case .conversations: es ? "Conversaciones" : "Conversations"
         case .shared: es ? "Conversaciones compartidas" : "Shared conversations"
         case .removed: es ? "Movimientos eliminados" : "Removed activity"
@@ -102,8 +102,18 @@ enum CuadraoFirstRelease {
     /// The Updates bell and receipt capture are designed, but nothing feeds them yet.
     static var showsUpdates: Bool { !hidesUnfinished || CuadraoDesignPreview.isActive }
     static var showsReceiptCapture: Bool { !hidesUnfinished || CuadraoDesignPreview.isActive }
+    /// Saved receipts are built and tested but stay off until receipt access is enabled (a separate founder approval).
+    #if DEBUG
+    static let savedReceipts = ProcessInfo.processInfo.arguments.contains("--cuadrao-saved-receipts") || savedReceiptsSample
+    /// Sample data and no system pickers, so the screens can be driven without a server.
+    static let savedReceiptsSample = ProcessInfo.processInfo.arguments.contains("--cuadrao-saved-receipts-sample")
+    #else
+    static let savedReceipts = false
+    #endif
+
     static func shows(_ route: CanvasProfileRoute) -> Bool {
         if route == .voice { return CuadraoDesignPreview.voiceSelection }
+        if route == .files, savedReceipts { return true }
         return !(hidesUnfinished && unfinishedProfileRoutes.contains(route))
     }
 }
