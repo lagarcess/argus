@@ -20,11 +20,30 @@ The founder confirmed that footer photos must be fully hidden at rest. The natur
 
 The implementation uses one reveal offset on a clipped track containing the footer content and an absolutely positioned photo strip. Moving the content together prevents a second crop across the top of the wordmark during the peek. The rendered photo strip bounds the reveal at 120 to 200 pixels according to screen width. Native overscroll alone was rejected because it cannot consistently expose custom clipped photos across browsers.
 
-The founder supplied replacement footer photos during this correction. The dressmaker appears on the left and the artisan on the right. Original files are copied unchanged; Next/Image owns responsive delivery, and CSS crops toward the upper body without stretching. The release captain inspected the final crop. Founder visual acceptance and header direction remain pending. The main editorial florist/accountant images remain unchanged.
+The founder supplied replacement footer photos during this correction. The dressmaker appears on the left and the artisan on the right. Original files are copied unchanged; Next/Image owns responsive delivery, and CSS crops toward the upper body without stretching. The release captain inspected the final crop. Founder visual acceptance remains pending; the later header direction is recorded below. The main editorial florist/accountant images remain unchanged.
 
 Typecheck, lint, and a fresh production build pass. All 20 focused browser checks pass on desktop and mobile. They cover resting crop, wheel peek, idle return, fixed document height, upward wheel departure, keyboard navigation, reduced motion, both languages, and dispatched touch drag/release. The first run caught the hidden photos remaining unloaded because they were lazy-loaded. Both footer images now load eagerly through the existing Next.js image optimizer; the rerun passes. Dispatched touch events test the handler; they do not prove physical iPhone overscroll behavior. The release captain reviewed the bounded diff and verified the rebuilt preview. No founder design acceptance, new GitHub CI verdict, or release readiness is claimed.
 
 `marketing/scripts/capture-touchup.mjs` now writes to `footer-peek-screens/` and captures rest, peek, and settled states. It preserves the historical `screens/` images and manifest. Existing screenshot and test evidence below does not validate this correction.
+
+## Header and drag refinement, 2026-10-09
+
+The founder authorized **Cómo funciona** and separate language controls, and requested lighter footer drag after checking [Granola](https://www.granola.ai/). Direct browser inspection confirmed that Granola readily exposes a shallow photo band on extra scroll and returns after input stops. Only the interaction informed this refinement; no reference assets were copied.
+
+The header now uses **Cómo funciona / How it works** from one localized navigation field on desktop and mobile. ES/EN has its own outlined group, filled current selection, and 44-pixel minimum targets. Language links preserve the current page, and the navigation link retains its existing product-section destination.
+
+The footer previously added each input to a still-animating rendered position, losing movement between frames. It now accumulates the requested displacement, uses 0.75 input gain instead of 0.35, waits 240 ms after the last wheel input, and returns over 500 ms. A held touch stays open until release. The existing photo-strip height still bounds the peek. Photos remain fully hidden at rest; reduced motion and native upward/keyboard scrolling remain intact.
+
+Verification against source `80cb9aca17b8a3789ea32f121928af1b48226484`:
+
+- Typecheck, lint, fresh production build, and diff checks pass.
+- **26 focused browser checks pass**, including both languages, mobile menu Escape/focus, navigation destinations, language-control target size, gentle wheel accumulation, held touch, idle/release return, fixed page height, reduced motion, and 320-pixel overflow checks.
+- **2 existing same-page language-switch checks pass**, desktop and mobile, on Contact.
+- Parent reviewed the implementation diff and screenshots at 1151, 1200, and 1440 pixels, plus the 390-pixel menu and footer peek/settled states. No actionable finding remained in this bounded review. Dispatched touch tests do not establish physical iPhone behavior.
+- [Screenshot manifest](header-drag-screens/manifest.json), [desktop header](header-drag-screens/header-1440.png), [mobile menu](header-drag-screens/header-mobile-menu.png), [peek](header-drag-screens/footer-peek.png), [settled](header-drag-screens/footer-settled.png), and [browser log](header-drag-results.txt). The capture script now writes `header-drag-screens/`; both previous evidence folders are preserved.
+- Preview 4512 was rebuilt with real form-provider credentials unset. Original comparison 4511 and its listener PID 11951 were preserved. Implementation and evidence are local commits on the existing branch; no push, merge, hosted change, or publication was performed.
+
+The later evidence commit changes only documentation and images, so runtime source is identical to the manifest. Whole-page founder design acceptance remains pending. This is a local review result, not a READY or GitHub CI claim.
 
 ## Historical reference decisions
 

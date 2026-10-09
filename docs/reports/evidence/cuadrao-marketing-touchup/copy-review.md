@@ -4,7 +4,7 @@ Draft for local review. No publication approval is implied. Spanish first.
 
 On October 9, 2026, the founder requested removal of the incomplete Business product capture because its numbers were incorrect. Its section and associated copy are withdrawn.
 
-This replaces the Business home feature tour with a receive, review and approve journey. Existing form, privacy, founder-letter, navigation and Personal signup copy remain unchanged. The Business metadata description derives from the same description below.
+This replaces the Business home feature tour with a receive, review and approve journey. Existing form, privacy, founder-letter and Personal signup copy remain unchanged. The founder later approved the navigation label **Cómo funciona**; its English counterpart is **How it works**. Both desktop and mobile use this label. The Business metadata description derives from the same description below.
 
 | Surface | Spanish | English |
 | --- | --- | --- |
