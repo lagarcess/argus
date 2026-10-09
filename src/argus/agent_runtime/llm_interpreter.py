@@ -3262,6 +3262,7 @@ async def _plan_focused_artifact_edit(
     return response
 
 
+@turn_execution.focused_repair
 async def _repair_incomplete_strategy_extraction(
     *,
     failed_response: LLMInterpretationResponse,
@@ -4914,7 +4915,6 @@ async def _focused_strategy_repair_after_candidate_failures(
         current_message_length=len(request.current_user_message),
         reason_codes=list(seed_response.reason_codes),
     ).info("Structured interpretation candidates failed; attempting focused repair")
-    # Preserve the existing last-resort call allowance for typed test repairs.
     with turn_execution.last_resort_repair_scope():
         return await _repair_incomplete_strategy_extraction(
             failed_response=seed_response,
