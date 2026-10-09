@@ -3,6 +3,8 @@ import { businessPath } from "@/lib/site-routes";
 import { businessContent, type BusinessLocale } from "./content";
 import { businessContactEmail, siteCopy } from "./site-copy";
 import styles from "./business.module.css";
+import shell from "./touchup-shell.module.css";
+import { FooterMotion } from "./footer-motion";
 
 export function ContactLink({
   locale,
@@ -35,7 +37,9 @@ export function BusinessFooter({
 }) {
   const c = siteCopy[locale];
   return (
-    <footer className={`${styles.footer} ${business ? styles.businessFooter : ""}`}>
+    <footer
+      className={`${styles.footer} ${business ? styles.businessFooter : ""} ${shell.footer}`}
+    >
       {showClosing && (
         <section className={styles.closing} aria-labelledby="closing-title">
           <div>
@@ -54,7 +58,9 @@ export function BusinessFooter({
       {business ? (
         <div className={styles.businessFooterGrid}>
           <div className={styles.footerIdentity}>
-            <a href={businessPath(locale)} className={styles.wordmark}>cuadrao</a>
+            <a href={businessPath(locale)} className={styles.wordmark}>
+              cuadrao
+            </a>
             <span>{c.business}</span>
             <p>{c.footerTag}</p>
           </div>
@@ -70,35 +76,70 @@ export function BusinessFooter({
             <a href={`${businessPath(locale)}#nosotros`}>{c.about}</a>
             <a href={businessPath(locale, "contact")}>{c.contact}</a>
             <a href={businessPath(locale, "privacy")}>{c.privacyLabel}</a>
-            <a href="https://www.linkedin.com/in/lucasgarces" target="_blank" rel="noopener noreferrer">Lucas · LinkedIn <ArrowUpRight size={14} aria-hidden="true" /></a>
+            <a
+              href="https://www.linkedin.com/in/lucasgarces"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Lucas · LinkedIn <ArrowUpRight size={14} aria-hidden="true" />
+            </a>
           </nav>
           <div className={styles.footerAvailability}>
             <p>{c.stage}</p>
-            <a href="#top" className={styles.backTop}>{c.top}<ArrowUpRight size={16} aria-hidden="true" /></a>
+            <a href="#top" className={styles.backTop}>
+              {c.top}
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </a>
           </div>
         </div>
-      ) : <div className={styles.footerLinks}>
-        <a href={businessPath(locale, personal ? "personal" : "home")} className={styles.wordmark}>
-          cuadrao
-        </a>
-        <p>{personal ? locale === "es" ? "Tus finanzas, en orden." : "Your finances, in order." : c.footerTag}</p>
-        <nav aria-label={businessContent[locale].closing.footerLabel}>
-          <a href={businessPath(locale)}>{c.business}</a>
-          <a href={businessPath(locale, "personal")}>{c.personal}</a>
-          <a href={personal ? `mailto:${businessContactEmail}` : businessPath(locale, "contact")}>{personal ? businessContactEmail : c.contact}</a>
-          <a href={businessPath(locale, "privacy")}>{c.privacyLabel}</a>
-        </nav>
-        <div>
-          <p>{personal ? locale === "es" ? "Cuadrao Personal · acceso anticipado" : "Cuadrao Personal · early access" : c.footerLocal}</p>
-          <a href="#top" className={styles.backTop}>
-            {c.top}
-            <ArrowUpRight size={16} aria-hidden="true" />
+      ) : (
+        <div className={styles.footerLinks}>
+          <a
+            href={businessPath(locale, personal ? "personal" : "home")}
+            className={styles.wordmark}
+          >
+            cuadrao
           </a>
+          <p>
+            {personal
+              ? locale === "es"
+                ? "Tus finanzas, en orden."
+                : "Your finances, in order."
+              : c.footerTag}
+          </p>
+          <nav aria-label={businessContent[locale].closing.footerLabel}>
+            <a href={businessPath(locale)}>{c.business}</a>
+            <a href={businessPath(locale, "personal")}>{c.personal}</a>
+            <a
+              href={
+                personal
+                  ? `mailto:${businessContactEmail}`
+                  : businessPath(locale, "contact")
+              }
+            >
+              {personal ? businessContactEmail : c.contact}
+            </a>
+            <a href={businessPath(locale, "privacy")}>{c.privacyLabel}</a>
+          </nav>
+          <div>
+            <p>
+              {personal
+                ? locale === "es"
+                  ? "Cuadrao Personal · acceso anticipado"
+                  : "Cuadrao Personal · early access"
+                : c.footerLocal}
+            </p>
+            <a href="#top" className={styles.backTop}>
+              {c.top}
+              <ArrowUpRight size={16} aria-hidden="true" />
+            </a>
+          </div>
         </div>
-      </div>}
+      )}
       <div className={styles.wordmarkCrop} aria-hidden="true">
         <span>cuadrao</span>
       </div>
+      <FooterMotion locale={locale} />
     </footer>
   );
 }

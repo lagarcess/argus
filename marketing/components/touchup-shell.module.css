@@ -1,0 +1,222 @@
+.header {
+  --scroll: 0;
+  width: calc(100% - 48px);
+  max-width: calc(1200px - var(--scroll) * 60px);
+  margin: 18px auto 0;
+  top: 18px;
+  padding: 10px 22px;
+  min-height: 72px;
+  gap: 28px;
+  border: 1px solid rgb(23 43 38 / calc(var(--scroll) * 0.13));
+  border-radius: calc(var(--scroll) * 44px);
+  background: rgb(250 251 248 / calc(var(--scroll) * 0.96));
+  box-shadow: 0 8px 28px rgb(23 43 38 / calc(var(--scroll) * 0.07));
+  backdrop-filter: blur(calc(var(--scroll) * 16px));
+}
+.header > a > img {
+  display: block;
+  width: 150px;
+  height: auto;
+}
+.header nav > div:first-child {
+  gap: 4px;
+}
+.header nav > div:first-child > a {
+  padding: 10px 14px;
+  border: none;
+  border-radius: 24px;
+  white-space: nowrap;
+}
+.header nav > div:first-child > a[aria-current="page"] {
+  background: #e8ede3;
+}
+.header nav > div:last-child {
+  gap: 20px;
+}
+.header nav > div:last-child > a:last-child {
+  border-radius: 28px;
+}
+.footer {
+  overflow: clip;
+}
+.motion {
+  height: 200px;
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: #cad7be;
+  border-bottom: 10px solid #172b26;
+  isolation: isolate;
+}
+.photoStrip {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  filter: saturate(0.65);
+  opacity: 0.76;
+}
+.photoStrip img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 49%;
+}
+.photoStrip:after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #d7ddc035;
+}
+.grid {
+  position: absolute;
+  inset: 0;
+  border-block: 1px solid #172b2690;
+  background: linear-gradient(
+    90deg,
+    transparent 49.95%,
+    #172b2670 50%,
+    transparent 50.1%
+  );
+}
+.vertical {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 24%;
+  width: 1px;
+  background: #172b2699;
+}
+.vertical:before,
+.horizontal:before {
+  content: "";
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  background: #b6e87a;
+  border: 1px solid #172b26;
+}
+.vertical:before {
+  left: -4px;
+  top: 18px;
+}
+.horizontal {
+  position: absolute;
+  top: 48%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: #172b2699;
+}
+.horizontal:before {
+  top: -4px;
+  right: 24%;
+}
+.corner,
+.cornerEnd {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  border-top: 1px solid #172b26;
+  border-left: 1px solid #172b26;
+  left: 24px;
+  top: 22px;
+}
+.cornerEnd {
+  left: auto;
+  top: auto;
+  right: 24px;
+  bottom: 22px;
+  transform: rotate(180deg);
+}
+.motionControl {
+  position: absolute;
+  z-index: 1;
+  right: 20px;
+  bottom: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 8px 15px;
+  border: 1px solid #61785a;
+  border-radius: 30px;
+  background: #fafbf8;
+  color: #172b26;
+  font-size: 12px !important;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vertical {
+    animation: traverse 12s ease-in-out infinite alternate;
+  }
+  .horizontal {
+    animation: scan 10s ease-in-out infinite alternate;
+  }
+  .photoStrip {
+    animation: photo-breathe 14s ease-in-out infinite alternate;
+  }
+  .motion[data-visible="false"] *,
+  .motion[data-paused="true"] * {
+    animation-play-state: paused !important;
+  }
+}
+@keyframes traverse {
+  from {
+    left: 24%;
+  }
+  to {
+    left: 67%;
+  }
+}
+@keyframes scan {
+  from {
+    top: 34%;
+  }
+  to {
+    top: 68%;
+  }
+}
+@keyframes photo-breathe {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.045);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .motionControl {
+    display: none;
+  }
+}
+@media (max-width: 1100px) {
+  .header {
+    gap: 20px;
+    padding-inline: 18px;
+  }
+  .header nav > div:last-child {
+    gap: 12px;
+  }
+}
+@media (max-width: 800px) {
+  .header {
+    width: calc(100% - 24px);
+    top: 10px;
+    margin-top: 10px;
+    padding: 10px 15px;
+    min-height: 66px;
+    gap: 14px;
+  }
+  .header > a > img {
+    width: 124px;
+  }
+  .motion {
+    height: 150px;
+  }
+  .motionControl {
+    right: 12px;
+    bottom: 12px;
+  }
+}
