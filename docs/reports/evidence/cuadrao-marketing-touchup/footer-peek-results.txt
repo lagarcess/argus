@@ -1,44 +1,44 @@
 $ playwright test "e2e/touchup.spec.ts"
-(node:65223) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:65591) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-[WebServer] (node:65224) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (node:65592) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 [WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
-[WebServer] (node:65225) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (node:65593) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 [WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
-[WebServer] (node:65226) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (node:65594) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 [WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
 
 Running 20 tests using 1 worker
 
-(node:65227) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:65595) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:65227) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
-(node:65227) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:65595) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:65595) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✓   1 [desktop] › e2e/touchup.spec.ts:4:7 › / preserves the capture story and accessible progress rail (149ms)
-  ✓   2 [desktop] › e2e/touchup.spec.ts:4:7 › /en preserves the capture story and accessible progress rail (110ms)
-  ✓   3 [desktop] › e2e/touchup.spec.ts:24:5 › header blends at the top and becomes a pill after scrolling (106ms)
-  ✓   4 [desktop] › e2e/touchup.spec.ts:56:5 › footer rests at the crop, peeks on extra wheel input and settles without added height (1.1s)
-  ✓   5 [desktop] › e2e/touchup.spec.ts:80:5 › footer preserves upward wheel and keyboard navigation (739ms)
-  ✓   6 [desktop] › e2e/touchup.spec.ts:96:5 › footer responds to dispatched touch drag and release (487ms)
-  ✓   7 [desktop] › e2e/touchup.spec.ts:110:5 › reduced motion keeps the crop fixed under extra scroll input (384ms)
-  ✓   8 [desktop] › e2e/touchup.spec.ts:120:5 › reduced motion is static and small screens do not overflow (277ms)
-  ✓   9 [desktop] › e2e/touchup.spec.ts:151:7 › / loads editorial photographs without the withdrawn product capture (119ms)
-  ✓  10 [desktop] › e2e/touchup.spec.ts:151:7 › /en loads editorial photographs without the withdrawn product capture (121ms)
-(node:65245) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+  ✓   1 [desktop] › e2e/touchup.spec.ts:4:7 › / preserves the capture story and accessible progress rail (231ms)
+  ✓   2 [desktop] › e2e/touchup.spec.ts:4:7 › /en preserves the capture story and accessible progress rail (111ms)
+  ✓   3 [desktop] › e2e/touchup.spec.ts:24:5 › header blends at the top and becomes a pill after scrolling (108ms)
+  ✓   4 [desktop] › e2e/touchup.spec.ts:56:5 › footer rests at the crop, peeks on extra wheel input and settles without added height (1.0s)
+  ✓   5 [desktop] › e2e/touchup.spec.ts:80:5 › footer preserves upward wheel and keyboard navigation (737ms)
+  ✓   6 [desktop] › e2e/touchup.spec.ts:96:5 › footer responds to dispatched touch drag and release (498ms)
+  ✓   7 [desktop] › e2e/touchup.spec.ts:110:5 › reduced motion keeps the crop fixed under extra scroll input (394ms)
+  ✓   8 [desktop] › e2e/touchup.spec.ts:120:5 › reduced motion is static and small screens do not overflow (291ms)
+  ✓   9 [desktop] › e2e/touchup.spec.ts:151:7 › / loads editorial photographs without the withdrawn product capture (121ms)
+  ✓  10 [desktop] › e2e/touchup.spec.ts:151:7 › /en loads editorial photographs without the withdrawn product capture (122ms)
+(node:65617) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:65245) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
-(node:65245) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(node:65617) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:65617) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✓  11 [mobile] › e2e/touchup.spec.ts:4:7 › / preserves the capture story and accessible progress rail (137ms)
-  ✓  12 [mobile] › e2e/touchup.spec.ts:4:7 › /en preserves the capture story and accessible progress rail (118ms)
-  ✓  13 [mobile] › e2e/touchup.spec.ts:24:5 › header blends at the top and becomes a pill after scrolling (101ms)
-  ✓  14 [mobile] › e2e/touchup.spec.ts:56:5 › footer rests at the crop, peeks on extra wheel input and settles without added height (1.1s)
-  ✓  15 [mobile] › e2e/touchup.spec.ts:80:5 › footer preserves upward wheel and keyboard navigation (765ms)
-  ✓  16 [mobile] › e2e/touchup.spec.ts:96:5 › footer responds to dispatched touch drag and release (505ms)
-  ✓  17 [mobile] › e2e/touchup.spec.ts:110:5 › reduced motion keeps the crop fixed under extra scroll input (390ms)
-  ✓  18 [mobile] › e2e/touchup.spec.ts:120:5 › reduced motion is static and small screens do not overflow (301ms)
-  ✓  19 [mobile] › e2e/touchup.spec.ts:151:7 › / loads editorial photographs without the withdrawn product capture (127ms)
-  ✓  20 [mobile] › e2e/touchup.spec.ts:151:7 › /en loads editorial photographs without the withdrawn product capture (122ms)
+  ✓  11 [mobile] › e2e/touchup.spec.ts:4:7 › / preserves the capture story and accessible progress rail (127ms)
+  ✓  12 [mobile] › e2e/touchup.spec.ts:4:7 › /en preserves the capture story and accessible progress rail (107ms)
+  ✓  13 [mobile] › e2e/touchup.spec.ts:24:5 › header blends at the top and becomes a pill after scrolling (100ms)
+  ✓  14 [mobile] › e2e/touchup.spec.ts:56:5 › footer rests at the crop, peeks on extra wheel input and settles without added height (1.0s)
+  ✓  15 [mobile] › e2e/touchup.spec.ts:80:5 › footer preserves upward wheel and keyboard navigation (756ms)
+  ✓  16 [mobile] › e2e/touchup.spec.ts:96:5 › footer responds to dispatched touch drag and release (495ms)
+  ✓  17 [mobile] › e2e/touchup.spec.ts:110:5 › reduced motion keeps the crop fixed under extra scroll input (394ms)
+  ✓  18 [mobile] › e2e/touchup.spec.ts:120:5 › reduced motion is static and small screens do not overflow (285ms)
+  ✓  19 [mobile] › e2e/touchup.spec.ts:151:7 › / loads editorial photographs without the withdrawn product capture (117ms)
+  ✓  20 [mobile] › e2e/touchup.spec.ts:151:7 › /en loads editorial photographs without the withdrawn product capture (130ms)
 
-  20 passed (8.8s)
+  20 passed (8.9s)
