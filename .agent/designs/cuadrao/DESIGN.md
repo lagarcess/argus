@@ -194,6 +194,26 @@ The money editor retains its short grouping fade and respects Reduce Motion.
 Scroll-edge materials belong behind persistent chrome, never across interactive
 content. Surface-specific gestures retain their existing meanings.
 
+### Sheet controls
+
+Every sheet closes and confirms the same way, through three components in
+`CuadraoSheetToolbar.swift` and `CuadraoCancelToolbar.swift`. None has a glass
+oval, rim or underline.
+
+- **Cancel, Close or Back** is plain text on the leading side.
+- **Confirm** is a check mark on the trailing side, used only when the sheet has no
+  primary button of its own (Edit profile, crop photo, Reorder Home, receipt item,
+  exact amount). A sheet with its own button shows Cancel only, so two confirms never
+  compete. A disabled check is dimmed and still announced.
+- **Done** is plain text on the trailing side, used only on sheets that show something
+  and have nothing to confirm (filters, spaces, people, currency list, updates, saved
+  receipt viewer).
+- Number entry uses the keyboard's own Done bar. Do not add a Done button above a
+  sheet's primary button.
+
+Do not add raw `ToolbarItem(.cancellationAction)` or `(.confirmationAction)` items to
+a sheet. Alerts and confirmation dialogs keep the system look.
+
 ### Choices and currency
 
 Single-choice selectors show the current value and a downward chevron, with a

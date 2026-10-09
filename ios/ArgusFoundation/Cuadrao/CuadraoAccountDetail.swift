@@ -129,7 +129,7 @@ struct CuadraoExpenseSheet: View {
             .navigationTitle("Registrar gasto").navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 CuadraoCancelToolbar(title: "Cancelar") { dismiss() }
-                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Listo") { amountFocused = false } }
+                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Listo") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
             }
             .safeAreaInset(edge: .bottom) {
                 VStack(spacing: 12) {

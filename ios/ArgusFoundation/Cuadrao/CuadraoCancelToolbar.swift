@@ -22,14 +22,6 @@ struct CuadraoCancelToolbar: ToolbarContent {
             .buttonStyle(.plain)
             .foregroundStyle(disabled ? Color.secondary : WelcomePalette.pine)
             .disabled(disabled)
-            .modifier(OptionalIdentifier(identifier: identifier))
-    }
-}
-
-private struct OptionalIdentifier: ViewModifier {
-    let identifier: String?
-
-    @ViewBuilder func body(content: Content) -> some View {
-        if let identifier { content.accessibilityIdentifier(identifier) } else { content }
+            .modifier(CuadraoToolbarIdentifier(identifier: identifier))
     }
 }

@@ -14,7 +14,7 @@ extension FinancialLoopUITests {
         app.buttons["header.profile"].tap()
         app.staticTexts["Edit profile"].firstMatch.tap()
         let cancel = app.buttons["cuadrao.profile.cancel"]
-        XCTAssertTrue(cancel.waitForExistence(timeout: 10))
+        XCTAssertTrue(cancel.waitForExistence(timeout: 10), "profile Cancel")
         XCTAssertEqual(cancel.label, "Cancel")
         let save = app.buttons["cuadrao.profile.save"]
         XCTAssertTrue(save.exists)
@@ -24,13 +24,29 @@ extension FinancialLoopUITests {
         capture("sheet-controls-edit-profile")
         cancel.tap()
 
-        // A sheet with its own button has Cancel only, and one Done above the keyboard, not stacked on the button.
+        // A sheet with its own button has Cancel only: nothing else sits in the navigation bar.
         app.buttons["nav.add"].tap()
         app.buttons["add.tray.account"].tap()
         let accountCancel = app.buttons["Cancel"].firstMatch
-        XCTAssertTrue(accountCancel.waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["checkmark"].exists, "no second confirm beside the sheet's own button")
+        XCTAssertTrue(accountCancel.waitForExistence(timeout: 10), "account sheet Cancel")
+        let barButtons = app.navigationBars.firstMatch.buttons.allElementsBoundByIndex
+        XCTAssertFalse(barButtons.contains { $0.frame.midX > app.frame.width / 2 }, "no second confirm beside the sheet's own button")
         capture("sheet-controls-account-sheet")
         accountCancel.tap()
+
+        // Typing in a plan field shows the keyboard's own Done, and it closes the keyboard.
+        app.buttons["nav.add"].tap()
+        app.buttons["add.tray.plan"].tap()
+        let name = app.textFields.matching(NSPredicate(format: "identifier IN {'goal.name', 'budget.name', 'debt.name', 'plan-name'}")).firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 10), "plan name field")
+        name.tap()
+        name.typeText("Trip")
+        let keyboardDone = app.toolbars.buttons["Done"]
+        XCTAssertTrue(keyboardDone.waitForExistence(timeout: 5), "the keyboard has its own Done")
+        XCTAssertFalse(app.buttons["plan-rate-done"].exists, "no second Done above the Create plan button")
+        capture("sheet-controls-plan-keyboard")
+        keyboardDone.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5), "Done closes the keyboard on the name field")
+        app.buttons["Cancel"].firstMatch.tap()
     }
 }

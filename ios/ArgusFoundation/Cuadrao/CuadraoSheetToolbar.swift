@@ -27,6 +27,7 @@ struct CuadraoConfirmToolbar: ToolbarContent {
         .foregroundStyle(disabled ? Color.secondary : WelcomePalette.pine)
         .disabled(disabled)
         .accessibilityLabel(Text(LocalizedStringKey(title)))
+        .accessibilityShowsLargeContentViewer()
         .modifier(CuadraoToolbarIdentifier(identifier: identifier))
     }
 }

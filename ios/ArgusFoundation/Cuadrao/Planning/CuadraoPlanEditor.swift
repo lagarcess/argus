@@ -132,7 +132,7 @@ struct CuadraoPlanEditor<Details: View, Footer: View>: View {
                     CuadraoCancelToolbar(title: spanish ? "Cancelar" : "Cancel", disabled: host.saving) {
                         if draft != initial { discard = true } else { dismiss() }
                     }
-                    ToolbarItemGroup(placement: .keyboard) { Spacer(); Button(spanish ? "Listo" : "Done") { rateFocused = false } }
+                    ToolbarItemGroup(placement: .keyboard) { Spacer(); Button(spanish ? "Listo" : "Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) } }
                 }
                 .confirmationDialog(spanish ? "¿Descartar cambios?" : "Discard changes?", isPresented: $discard, titleVisibility: .visible) {
                     Button(spanish ? "Descartar" : "Discard", role: .destructive) { dismiss() }
