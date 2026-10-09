@@ -12,6 +12,7 @@ struct CuadraoPlanEditor<Details: View, Footer: View>: View {
     @State private var discard = false
     @FocusState private var nameFocused: Bool
     @FocusState private var rateFocused: Bool
+    @State private var rateText = ""
     @Environment(\.dismiss) private var dismiss
     private var editing: Bool { host.editing }
     private var ids: CuadraoPlanEditorIdentifiers { host.identifiers }
@@ -87,9 +88,11 @@ struct CuadraoPlanEditor<Details: View, Footer: View>: View {
                                 if draft.kind == .debt && host.showsRate {
                                     HStack {
                                         Text(spanish ? "Interés anual (%)" : "Annual interest (%)")
-                                        TextField("0", value: $draft.annualRate, format: .number).keyboardType(.decimalPad).focused($rateFocused).multilineTextAlignment(.trailing)
+                                        TextField("0", text: $rateText).keyboardType(.decimalPad).focused($rateFocused).multilineTextAlignment(.trailing)
                                             .accessibilityIdentifier(ids.rate)
+                                            .onChange(of: rateText) { _, text in draft.annualRate = Double(text.replacingOccurrences(of: ",", with: ".")) ?? 0 }
                                     }.padding(18)
+                                    .onAppear { if draft.annualRate != 0 && rateText.isEmpty { rateText = draft.annualRate.formatted(.number.grouping(.never)) } }
                                     Text(spanish ? "La estimación supone una tasa fija, pagos mensuales, sin compras nuevas ni comisiones." : "The estimate assumes a fixed rate, monthly payments, no new purchases or fees.")
                                         .font(.caption).foregroundStyle(.secondary)
                                 }

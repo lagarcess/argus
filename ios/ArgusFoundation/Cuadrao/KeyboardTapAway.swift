@@ -49,10 +49,10 @@ struct KeyboardTapAway: UIViewRepresentable {
                 if current is UITextField || current is UITextView || current is UISearchBar { return false }
                 view = current.superview
             }
-            guard let editing = UIResponder.currentFirstResponder else { return false }
-            // A tap on or right beside the field being edited places the caret; it is not a tap away.
+            guard let editing = UIResponder.currentFirstResponder, editing is UIKeyInput else { return false }
+            // A tap on the field, or on a control right beside it (a sign or currency button), is not a tap away.
             if let field = editing as? UIView, let window = field.window {
-                let area = field.convert(field.bounds, to: window).insetBy(dx: -16, dy: -16)
+                let area = field.convert(field.bounds, to: window).insetBy(dx: -64, dy: -16)
                 if area.contains(touch.location(in: window)) { return false }
             }
             editingAtTouch = editing
