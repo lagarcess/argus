@@ -434,9 +434,6 @@ private struct ConnectedArchivedAccounts: View {
                         }
                         .accessibilityIdentifier("accounts.manage.back")
                     }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button(spanish ? "Listo" : "Done") { dismiss() }
-                    }
                 }
         }.tint(WelcomePalette.pine)
     }

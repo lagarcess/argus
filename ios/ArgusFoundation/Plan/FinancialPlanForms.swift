@@ -90,7 +90,7 @@ struct FinancialExpectationForm: View {
                 .navigationTitle(draft.existing == nil ? "plan.add.title" : "plan.editExpectation.title")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.saving) }
+                    CuadraoCancelToolbar(title: "accounts.cancel", disabled: model.saving) { dismiss() }
                     ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
                 }
                 .interactiveDismissDisabled(model.saving)
@@ -164,7 +164,7 @@ struct FinancialPlanSelectionView: View {
                 }.padding(24)
             }.background(WelcomePalette.background).foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
                 .navigationTitle("plan.includedAccounts").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() }.disabled(model.saving) } }
+                .toolbar { CuadraoCancelToolbar(title: "accounts.cancel", disabled: model.saving) { dismiss() }}
                 .interactiveDismissDisabled(model.saving)
         }
     }
@@ -229,7 +229,7 @@ struct FinancialOccurrenceView: View {
                 }.padding(24)
             }.background(WelcomePalette.background).foregroundStyle(WelcomePalette.ink).tint(WelcomePalette.pine)
                 .navigationTitle(occurrence.title).navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .cancellationAction) { Button("action.close") { model.selectedOccurrence = nil }.disabled(model.saving) } }
+                .toolbar { CuadraoCancelToolbar(title: "action.close", disabled: model.saving) { model.selectedOccurrence = nil }}
                 .interactiveDismissDisabled(model.saving)
         }
     }

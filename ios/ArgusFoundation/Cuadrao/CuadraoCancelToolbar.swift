@@ -17,7 +17,7 @@ struct CuadraoCancelToolbar: ToolbarContent {
 
     private var label: some View {
         Button(action: action) {
-            Text(title).fixedSize().frame(minHeight: 44).contentShape(Rectangle())
+            Text(LocalizedStringKey(title)).fixedSize().frame(minHeight: 44).contentShape(Rectangle())
         }
             .buttonStyle(.plain)
             .foregroundStyle(disabled ? Color.secondary : WelcomePalette.pine)

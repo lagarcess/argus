@@ -131,7 +131,7 @@ private struct SavedReceiptViewer: View {
                 }
             }
             .navigationTitle(receipt.document.filename).navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button(copy.done) { dismiss() } } }
+            .toolbar { CuadraoDoneToolbar(title: copy.done) { dismiss() } }
         }
         .tint(WelcomePalette.pine)
     }

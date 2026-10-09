@@ -150,7 +150,7 @@ struct HouseholdActivityEditorView: View {
             }
             .navigationTitle(model.correcting == nil ? "household.recordActivity" : "household.correct")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() } }
+                CuadraoCancelToolbar(title: "accounts.cancel") { dismiss() }
                 ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
             }.task { await model.load() }
         }
