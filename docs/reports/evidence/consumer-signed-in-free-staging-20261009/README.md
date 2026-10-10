@@ -11,6 +11,12 @@ were performed.
 ## Runtime and provenance
 
 - Integration base: `cd14c9883f180876d27c121f0787b25a73529492`.
+- October 10 reconciliation: integration `59c695a0e2690f28bd5c5e48b73a66ce07ebc785`
+  entered the Consumer branch through merge `14bae401b58b1de2ca63dd1b77e0bfc275eb412a`.
+  App and test source bytes remain unchanged from published head `9bba18fea`.
+  [Reconciliation metadata](integration-reconciliation.json) preserves the initial
+  check and recorded native sources. Final review and CI status live in
+  [PR #952](https://github.com/lagarcess/argus/pull/952).
 - Native configuration: Release, iPhone 18 Pro simulator, iOS 27.0.
 - API: `https://cuadrao-api-staging.onrender.com`.
 - Backend: `cad1cbe1ec27ff89c08eadbec31718a0e627383c`.
@@ -200,7 +206,5 @@ committed evidence contains only synthetic screenshots and aggregate results.
   is not claimed. English/Spanish money, Search and goal evidence is separate.
 - A first Search launch raced session restoration. Subsequent native sign-in
   runs passed; no shared auth implementation was changed.
-- Final integration reconciliation and checks on its resulting head remain
-  pending. The published-head CI above does not establish those later results.
-  Full local pytest remains blocked at collection
+- Full local pytest remains blocked at collection
   by the pre-existing SciPy binary load error described in `local-checks.json`.
