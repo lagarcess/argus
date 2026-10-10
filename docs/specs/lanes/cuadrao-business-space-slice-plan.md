@@ -1,6 +1,10 @@
 # Cuadrao Business space slice: implementation plan
 
-**Status:** approved plan, revision 2, with the founder's decisions in section 8 (October 8, 2026). S1 to S3 are implemented and unmerged in [#914](https://github.com/lagarcess/argus/pull/914), which depends on the Business API PR [#913](https://github.com/lagarcess/argus/pull/913). S4 and S5 are not started.
+**Status, October 10, 2026:** approved design, reconciled with the landed default-off foundation. [#913](https://github.com/lagarcess/argus/pull/913) and [#914](https://github.com/lagarcess/argus/pull/914) merged. [#918](https://github.com/lagarcess/argus/pull/918) landed the non-model-facing part of S4. [#920](https://github.com/lagarcess/argus/pull/920) keeps Business chat off. The remaining model-facing work in [#925](https://github.com/lagarcess/argus/pull/925) is excluded from this landing. S5 remains a desired contract, not accepted delivery evidence.
+
+This PR changes documents only. Section 8 preserves the October 8 decisions verbatim. The [October 9 handoff](../../handoffs/cuadrao-business-lane.md) records the later chat-off gate and evidence limits. Its pause describes that date: subsequent founder instructions resumed local capture work, as recorded in the [scope reconciliation in #900](https://github.com/lagarcess/argus/pull/900). The separate, unpublished sandbox checkpoint `df208f7ec2379cd84efd55eea0deb685d67c5360` is not imported here.
+
+The detailed tables below retain the original implementation design and code pointers. They do not claim that every proposed behavior passed acceptance. Current runtime contracts remain in [API_CONTRACT.md](../../API_CONTRACT.md) and [DATA_MODEL.md](../../DATA_MODEL.md). No hosted action, model call, chat activation, or new product work is authorized by this reconciliation.
 **Serves:** #819 (smallest additive slice), the [boundary proposal](cuadrao-business-boundary-proposal.md) and the Business owner pilot (#900).
 **Code base read:** `claude/business-pilot-flow` at `92599473a` (Business API #904, Storage #778, preparation jobs #823, WhatsApp, web #901). Line numbers are against that commit.
 **Approved by the founder (October 8):** separate Personal and Business spaces for the pilot, compatible with #819, so a connected Personal plus Business experience can come later without copying financial records. WhatsApp: the owner sends or forwards receipts from their own number to Cuadrao's one receiving number. A verified link ties that sending number to their Business space. Only owner-initiated submissions are processed, and their conversations are never read. One confirmed account-and-business deletion with an optional export.
@@ -21,20 +25,22 @@ A `spaces` row of kind `business` belongs to one person (`created_by`). Rows tha
 
 ## Where receipt capture sits in the Business roadmap
 
-The [connected-flow spec](../cuadrao-business-connected-flow-spec.md) (#912) owns the Business roadmap and its stages. This plan delivers part of stage B1 and nothing beyond it.
+The [connected-flow spec](../cuadrao-business-connected-flow-spec.md) (#912) records the original stages below. This plan covers part of B1. The [core-flow tracker](https://github.com/lagarcess/argus/issues/942) and [#900 reconciliation](https://github.com/lagarcess/argus/pull/900) carry the later customer outcome and capture scope. The stage names below do not replace that work or close its acceptance criteria.
 
 | Stage | What it covers | Status |
 | --- | --- | --- |
-| B1, capture with verified space isolation | Web and WhatsApp intake, review, one expense, reload, search and source retrieval, in an isolated Business space | In progress, default-off: [#913](https://github.com/lagarcess/argus/pull/913) and [#914](https://github.com/lagarcess/argus/pull/914) |
-| E0, offline fiscal engine | Synthetic customer and invoice input becomes a deterministic unsigned XML artifact with local validation evidence, per the [E0 plan](../cuadrao-business-e0-implementation-plan.md) | Approved. Starts after this B1 slice is finished (founder, October 8) |
-| B2, connected period pilot | One period of invoices, collections and expenses, plus the accountant package | Not started |
-| L, authorized live fiscal processing | Signing, submission and customer delivery, each authorized separately. No supplier is chosen | Not started |
+| B1, capture with verified space isolation | Web and WhatsApp intake, review, one expense, reload, search and source retrieval, in an isolated Business space | Foundation merged, default-off. Historical local evidence is in the handoff. Full capture and hosted delivery are not accepted by this PR |
+| E0, offline fiscal engine | Synthetic customer and invoice input becomes a deterministic unsigned XML artifact with local validation evidence, per the [E0 plan](../cuadrao-business-e0-implementation-plan.md) | Original plan approved October 8; subsequently held. Finishing this documentation does not start E0 |
+| B2, connected period pilot | One period of invoices, collections and expenses, plus the accountant package | No delivery acceptance established by this PR |
+| L, authorized live fiscal processing | Signing, submission and customer delivery, each authorized separately. No supplier is chosen | No delivery acceptance established by this PR |
 
 Two constraints carry forward from this slice:
 - The space model keeps every later record (invoice, payment, fiscal document, accountant grant) attachable to the same Business space without copying.
-- The pilot export already includes every original receipt with its status, so it can feed the accountant package later.
+- Q3 requires every retained receipt with its status in the proposed export. That requirement can support the later accountant package, but this plan does not prove export delivery.
 
 ## 1. Migration
+
+This is the original migration design, implemented in #914. References to empty hosted tables and local resets describe the October 8 planning assumptions. They are not a current preflight or permission to apply the migration.
 
 One file: `supabase/migrations/20261008140000_business_spaces.sql`, sorted after `20261008130000_whatsapp_intake.sql`.
 
@@ -119,6 +125,8 @@ def sql_predicate(scope: OwnerScope, column: str) -> tuple[str, tuple]: ...
 
 ## 3. Separate chat histories and finance-only Business chat
 
+The conversation separation landed in #918. The finance-only catalog and model behavior below remain the planned part of S4 carried by excluded #925. The handoff records approved refusal copy, but copy approval does not establish a passing Business scorecard or authorize chat activation. Business chat stays off under #920.
+
 **Mechanism: the conversation column (M3).** `supabase_gateway.py:530` `create_conversation` and `api/chat/computed_answers.py:301` `_new_conversation` take a required `owner_space_id`. A continuation copies the space of its source conversation. A public excerpt fork (`postgres_public_excerpt_forks.py:148`) is Personal. The client names a surface (`POST /conversations {surface}`, `GET /conversations?surface=business`), never a space, and the server resolves it.
 
 | Reader | File:line | Change |
@@ -128,7 +136,7 @@ def sql_predicate(scope: OwnerScope, column: str) -> tuple[str, tuple]: ...
 | History, previews | `postgres_history_reader.py:276-290`, `conversation_previews.py:18` | inherit from the listed conversation |
 | Delete all | `routers/conversations.py:394` to `supabase_gateway.py:678` `soft_delete_all_conversations` | `scope` predicate. Deleting all in `/chat` leaves Business chats alone, and the reverse |
 
-**Business chat runs a finance-only tool set.** It creates no decisions, ideas, evidence or backtest runs. That keeps the artifact readers free of Business rows with no change to them. Those are the decision reader (`supabase_decisions.py:35-114`) and the run, idea, evidence and decision joins in `postgres_search_reader.py:1765-2657`.
+**Planned model-facing contract, excluded from this landing.** Business chat must run a finance-only tool set. It creates no decisions, ideas, evidence or backtest runs. That keeps the artifact readers free of Business rows with no change to them. Those are the decision reader (`supabase_decisions.py:35-114`) and the run, idea, evidence and decision joins in `postgres_search_reader.py:1765-2657`.
 
 | Layer | Where | Rule |
 | --- | --- | --- |
@@ -138,6 +146,8 @@ def sql_predicate(scope: OwnerScope, column: str) -> tuple[str, tuple]: ...
 | Model-facing text | Business catalog schema | A different tool list is a model-facing change. AGENTS.md Never-Violate 12 requires a committed scorecard for the Business surface. Personal is unchanged |
 
 ## 4. Deletion and export
+
+The cascade and Storage deletion foundation is covered by the dated handoff evidence. The Business dialog and export contract below remain the S5 design. This PR neither implements them nor claims that this complete journey passed.
 
 **Lane 6, unchanged in code.** `delete from auth.users` cascades the space, Business accounts, connections, import events, conversations and sender links. Through them it removes activities, documents, jobs and observations. The Storage step erases `{user_id}/`. M8 and M9 keep Business accounts out of the household copy. `POST /api/v1/account/delete {confirm: true}` stays the only delete command. A Business space never blocks it, and export never gates it.
 
@@ -174,6 +184,8 @@ UTF-8 with BOM, quoted fields, plain decimal amounts. A missing source leaves `r
 
 ## 5. Tests
 
+This is the original acceptance matrix, not a list of passing results. The handoff identifies the exact heads and evidence for landed isolation and chat separation. Model-facing tests belong to excluded #925; the complete S5 journey remains unaccepted here.
+
 `tests/test_business_space_isolation_postgres.py` seeds owners A and B, each with Personal and Business accounts, connections, expenses, receipts and conversations.
 
 | Case | Asserts (literal ids and counts) |
@@ -196,27 +208,25 @@ UTF-8 with BOM, quoted fields, plain decimal amounts. A missing source leaves `r
 
 ## 6. Sequencing
 
-Existing order: #904 API, then #905 Storage (closed for preview billing), then `claude/business-pilot-jobs` (#823), then `claude/business-pilot-whatsapp`. #901 web and #900 docs sit beside them. This slice starts after WhatsApp lands, because M6 and M7 touch its tables.
+The original S1–S5 breakdown remains useful for explaining dependencies. Its delivery state is:
 
-| PR | Content | Default-off proof |
+| Slice | Delivery state | Boundary |
 | --- | --- | --- |
-| S1 | Migration M1 to M12, census, grants, trigger tests | Pre-S2 code keeps running: `create_financial_account` defaults the space to null, and no writer sets a space. No row changes |
-| S2 | `owner_scope.py`, required `scope` on R1 to R9, W1 to W6, D1, all Personal callers pass `PERSONAL` | Type check clean. Flag-off byte identity |
-| S3 | Resolver, `POST /business/space`, R10 and R11, WhatsApp wiring, isolation matrix | Behind `ARGUS_BUSINESS_PILOT_ENABLED` |
-| S4 | Conversation surface, finance-only catalog, artifact-route guard, memory gate, scorecard | Default surface Personal. `/chat` byte identity |
-| S5 | Export, deletion dialog block, locale keys, OpenAPI and `docs/API_CONTRACT.md` | Flag off hides both |
+| S1–S3 | #914 merged after #913 | Space migration, scoped readers and writers, resolver, search, and intake isolation are in integration, default-off |
+| S4 conversation separation | #918 merged | No model-facing text changed in that PR |
+| S4 activation gate | #920 merged | Business chat stays off; disabling intake preserves access to saved records |
+| S4 model-facing remainder | #925 excluded | Tool restrictions, refusal behavior, budget guard, and Business eval cases need their separate review and scorecard. No live run is authorized here |
+| S5 | Desired contract in section 4 | No complete export and deletion-dialog acceptance is claimed here |
 
-S3 imports the scoped signatures from S2, so S2 cannot be reverted while S3 stands. The revert would fail the type check.
+[#922](https://github.com/lagarcess/argus/pull/922) landed approved recovery copy. [#924](https://github.com/lagarcess/argus/pull/924) landed test cleanup. [#930](https://github.com/lagarcess/argus/pull/930) later landed the replay fix, so the October 9 handoff's statement that it is open is historical. None of those merges accepts #925 or completes the wider core-flow tracker.
+
+S3 depends on the scoped signatures from S2. Removing S2 while retaining S3 breaks callers. The original sequencing table remains in the [published October 8 plan](https://github.com/lagarcess/argus/blob/c7fbd77a231df40f09d1118640dc3a707eca43e0/docs/specs/lanes/cuadrao-business-space-slice-plan.md#6-sequencing).
 
 ## 7. Rollout and rollback
 
-**Hosted apply order** (each step is its own founder approval):
-1. Read-only ledger and catalog read of the target.
-2. Apply `20261008100000`, `20261008110000`, `20261008130000` and `20261008140000` in order through the #894 migration-list tool on a named non-hosted database.
-3. Staging proof.
-4. Production.
+The [dated handoff](../../handoffs/cuadrao-business-lane.md) records the approved migration ordering: Consumer C0 and C1 first, B1 with Build 2, then B2–B4 with Business activation. Each hosted action requires a separately named target, migration set, read-only checks, and synthetic smoke tests. This PR performs and authorizes none of them.
 
-Code deploys after the schema. The flag stays off until a separate enable decision.
+Local rehearsal, staging proof, and production deployment are separate gates. The later founder instruction was laptop proof before redirecting Meta or email to staging, with production untouched. That instruction is preserved in [#900](https://github.com/lagarcess/argus/pull/900). This reconciliation does not establish that the proof passed or authorize a callback change.
 
 **Minimum compatible code version (founder, October 8).** Once a release writes new-format data in hosted (documents in private Storage, or any Business row), every running build must be at or above that release's minimum compatible code version. That includes any replacement or rollback build. It must keep:
 - the Storage read, write and deletion behavior;
@@ -236,16 +246,18 @@ The [compatibility rehearsal](https://github.com/lagarcess/argus/pull/914) prove
 | After Business data exists in hosted | `ARGUS_BUSINESS_PILOT_ENABLED` off, and WhatsApp intake off, on a build at or above the activation minimum. Then fix forward. |
 | Schema | Never reverted. B1 would orphan stored files; B3 can't go while B4 stands; B4 would turn Business rows Personal or delete them. |
 
-The October 8 live read-only check found no financial, document, Storage, Business or WhatsApp data in production. So no minimum is in force yet. Each enable request names the release that becomes the minimum.
+The October 8 live read-only check found no financial, document, Storage, Business or WhatsApp data in production. That dated observation cannot establish today's compatibility minimum. Each authorized enable request must name its release and check current target state.
 
 | Risk | Mitigation |
 | --- | --- |
-| Opening a migration PR creates a billed Supabase preview branch (#905 closure) | Confirm previews are off before opening S1 |
+| A new migration PR could create a billed preview, as observed during #905 | Check preview policy before any separately assigned migration PR. S1 has already landed |
 | A future reader forgets the scope | Required keyword, so a new caller fails the type check. Triggers M5, M7, M8 and M9 back up the database |
-| A future tool writes chat artifacts in Business | The catalog is per surface, and the artifact routes are guarded. A new Business tool needs its own declaration and scorecard |
+| A future tool writes chat artifacts in Business | The S4 design requires a per-surface catalog and guarded artifact routes. #925 remains separate; new Business tools need their own contract and scorecard |
 | `create_financial_account` signature change | The new parameter defaults to null, so old callers resolve to it. S2 makes scope required in Python |
 
 ## 8. Founder decisions (October 8)
+
+These decisions are preserved verbatim as design history. Q4 is subject to the later chat-off gate documented above. Q5 describes the original sole-owner foundation; later sandbox firm access is separate work.
 
 | # | Question | Decision |
 | --- | --- | --- |

@@ -5,14 +5,15 @@ and Business spaces. The [slice plan](cuadrao-business-space-slice-plan.md)
 is the detailed contract, and it wins wherever the two differ. This proposal
 belongs to the [Business owner pilot](https://github.com/lagarcess/argus/pull/900).
 
-## Recommendation
+## Original recommendation
 
 Build the **smallest additive slice of #819**: a Business space owned by the
-person, with `owner_space_id` on the two Business root tables. Do not build a
+person, with an explicit space on each root record in the accepted plan. Do not build a
 separate business principal identity (option A).
 
-Two independent reviews, run on different models against the same code, each
-reached this recommendation on their own. Their evidence is below.
+The October 8 proposal records two independent reviews against the original
+code base `92599473a`. The evidence pointers below retain that historical
+reasoning; their line numbers are not current-code locations.
 
 ## Why not option A (business principal)
 
@@ -24,81 +25,20 @@ reached this recommendation on their own. Their evidence is below.
 | It is not a simple backfill into #819. #819 step 3 makes `user_id` mean `created_by`, a person, so every principal-owned row would have to be re-keyed. | `docs/specs/cuadrao-master-plan.md` §B2.3 |
 | Activity would be attributed to the principal instead of the person who acted. | `20260928200000_financial_accounts_first_slice.sql:63-66` (`recorded_by`) |
 
-## The slice
+## Accepted contract and superseded alternatives
 
-One migration, sorted after the consumer's pending files:
+The [accepted slice plan](cuadrao-business-space-slice-plan.md#design) owns the technical contract. Its four roots are accounts, connections, import events, and conversations. Children inherit their root's space. The import-event trigger forces the stored event space to agree with the connection space.
 
-- `spaces(id, kind check (kind = 'business'), name, created_by -> auth.users on delete cascade, created_at, closed_at, unique (id, created_by))`
-- `space_memberships(space_id -> spaces on delete cascade, person_id -> auth.users on delete cascade, role check (role = 'owner'), valid_from, valid_until)`. One active owner per space.
-- A nullable `owner_space_id` on `financial_accounts` and `financial_source_connections`, with a composite FK `(owner_space_id, user_id) -> spaces(id, created_by)`. A forged space id can therefore never point at another person's space.
-- RLS on, explicit grants, entries in `tests/test_client_grants_postgres.py`, and census rows.
+The initial proposal used two roots, an owner-membership row, an observation-based event filter, and a `business_conversations` join table. Those alternatives were superseded by the accepted plan. The founder deferred memberships in Q5. `spaces.created_by` owns the sole-owner fact, and `conversations.owner_space_id` owns the conversation's space.
 
-**Rule: `owner_space_id is null` means Personal.** Personal readers filter
-`is null` and Business readers filter `= :space`. No personal-space backfill is
-needed for the pilot. #819 later backfills personal spaces and switches the
-filter to equality. The free-text `space_id` column is not used.
+The [original proposal at the published PR head](https://github.com/lagarcess/argus/blob/c7fbd77a231df40f09d1118640dc3a707eca43e0/docs/specs/lanes/cuadrao-business-boundary-proposal.md) preserves those alternatives and their initial reader inventory. It is historical reasoning, not another implementation contract.
 
-## Readers that change
+The accepted plan records the [migration](cuadrao-business-space-slice-plan.md#1-migration), [reader and writer changes](cuadrao-business-space-slice-plan.md#2-readers-and-writers), and [chat separation](cuadrao-business-space-slice-plan.md#3-separate-chat-histories-and-finance-only-business-chat). Its [deletion and export section](cuadrao-business-space-slice-plan.md#4-deletion-and-export) retains the proposed S5 behavior. That proposal does not establish completed export or deletion-dialog acceptance.
 
-These are seven required SQL sites, counted reader by reader. Everything else
-either inherits from them or is scoped through an account or connection.
+## Delivery boundary, October 10
 
-| # | Reader | Why it changes |
-| --- | --- | --- |
-| 1 | `recording/postgres_repository.py:89-104` `list_accounts` | Feeds account lists, activity options, purchases, history and import review. |
-| 2 | `recording/money_postgres.py:27-33` `load_owner` | Feeds home and search through `planning/storage.py:201`, and money writes. |
-| 3 | `recording/canonical_groups.py:203-212` group query | Without it, Personal money reads would fail once a Business expense exists, because groups resolve against accounts that were filtered out. |
-| 4 | `ingestion/connections_postgres.py:98-106` `list` | Feeds connections and the documents list. |
-| 5 | `ingestion/reconcile/store_postgres.py:102-110` `events()` | Import events store only `user_id`, so this filters through observation and connection. |
-| 6 | the same file, `:92-100` `nearby()` | Stops duplicate matching across spaces. |
-| 7 | `recording/postgres_repository.py:106,265` get or `_load` by id | Also blocks granting a Business account to a household and stops Personal writers using a Business account id. |
+The default-off foundation has landed. The [slice delivery table](cuadrao-business-space-slice-plan.md#6-sequencing) separates those merged changes from the model-facing work in [#925](https://github.com/lagarcess/argus/pull/925), which is excluded from this documentation landing. Business chat remains off.
 
-There is also one writer fix. Document upload's `external_ref` must include the
-space (`documents/service.py:153-154`). Otherwise the same file uploaded in
-Personal and in Business would come back as the other space's document.
+The [October 9 handoff](../../handoffs/cuadrao-business-lane.md) records evidence and the pause at that time. Later founder instructions resumed local sandbox capture work. The [current scope reconciliation in #900](https://github.com/lagarcess/argus/pull/900) records that continuation and its limits. The local sandbox checkpoint `df208f7ec2379cd84efd55eea0deb685d67c5360` is unpublished history, outside this PR. Its work is not imported or accepted here.
 
-These need no change: search, home, purchases and detail (they inherit from
-readers 1 and 2), household projections (they only see granted accounts), and
-document reads, observations, loop, asset, plans, budgets, goals and debts
-(scoped by connection or account, or owned only by the person).
-
-## Business access
-
-- One resolver, `resolve_business_space(person_id) -> space_id`, from an active owner membership. Every Business route uses it. No route accepts a space id from the client.
-- Services receive `(session person, space)`. `user_id` stays the person, so the composite FK contains any forged space.
-- `business_conversations(conversation_id, space_id)` marks a conversation as Business. The read-only expense tool checks the membership again on every call. Argus `/chat` Recents leaves marked conversations out.
-- WhatsApp sender links point at the space. Receipts land under the person's `user_id` with `owner_space_id` set.
-- Storage (#778) keeps `{user_id}/{connection_id}/{sha256}`, so the person's folder still covers Business sources.
-- The person's own session could read their own Business rows through PostgREST, since `auth.uid() = user_id`. That is the same owner, no client uses that path, and employees later need #819 step 2 member-based RLS under either option.
-
-## Delete account and owned business data
-
-This is a single confirmed flow for a sole-owner pilot.
-
-1. **Explain.** Settings opens "Delete account and business data". It names what will be deleted: the person's Personal and Household-owned records (unchanged Lane 6 behavior), plus the Business space's accounts, expenses, receipts and their original files, the WhatsApp link, and Business conversations. Household data the person shared follows the existing placeholder rule.
-2. **Offer export first.** A "Download my business data" action returns a ZIP with:
-   - `expenses.csv`: date, merchant, amount, currency, category and account;
-   - `accounts.csv`;
-   - the original receipt files.
-
-   It is generated on request by the API from the same readers the Business screens use. Nothing is stored, and the link is never public. Export is optional and doesn't block deletion.
-3. **Confirm.** The existing destructive confirmation, adding the space's name and a summary of counts, for example "3 accounts, 41 expenses, 38 receipts".
-4. **Delete.** Lane 6 runs unchanged. Every Business table cascades from the person through `user_id` and `spaces.created_by`. The #778 `storage` step deletes the person's folder, which includes Business sources. The WhatsApp link rows cascade. The user is never left blocked: a Storage failure keeps the run pending and retried, as Lane 6 already does.
-
-Nothing is kept silently. Closing a business without deleting the account is a later feature, not part of this pilot.
-
-## Verification once approved
-
-- Real-Postgres isolation:
-  - two owners, each with Personal and Business data;
-  - each of readers 1-7 returns only its space;
-  - a forged space id gets 404;
-  - a Personal expense keeps working after a Business expense exists (reader 3);
-  - the same file uploaded in both spaces creates two documents.
-- Deletion: export, then delete. Every Business row, Storage file and WhatsApp link is gone, and another person's data is untouched. Run with the Lane 6 census drift test.
-- A flag-off journey stays byte-identical for `/chat` and `/financial-*`.
-
-## Open items
-
-- The `space-model` lock for this slice (#819) was decided on October 8: separate Personal and Business spaces.
-- Hosted Realtime publication membership hasn't been checked. No migration publishes these tables.
+The [core-flow tracker](https://github.com/lagarcess/argus/issues/942) tracks the broader outcome. Merging this document does not close capture, hosted delivery, extraction, accountant readiness, or a model scorecard. It authorizes no runtime changes, activation, live calls, or hosted actions.
