@@ -56,24 +56,52 @@ founder names one, the finish line is the accountant's acceptance only.
 | L7 | Evals gate the merge. Unit tests alone do not. | 2026-10-10 |
 | L8 | Jev and a separate MCP server are deferred. An MCP adapter can come later. It must call the same tools and the same authority checks. | 2026-10-10 |
 | L9 | Branch Cuadrao work from `codex/private-alpha-next`. `main` stays as the Argus tribute. | 2026-10-10 |
+| L10 | "I paid with my own money" is recorded against an "owner funds" source in the shared money service. The accountant decides if it is a capital contribution or a debt to the owner. | 2026-10-10 |
+| L11 | Approval is a permission, not a fixed role. The business admin holds it. The admin can grant it to an associate. An accounting firm gets it for each client through that client's grant, so a firm can manage a portfolio of clients. The agent never holds it. Each action goes into an action ledger that shows who did it, through which grant and for whom (section 6.9). | 2026-10-10 |
+| L12 | The OpenRouter key caps AI spend. Cuadrao adds no spend guard of its own. Before a PR makes model calls, the founder names the models for it (section 3.4). | 2026-10-10 |
+| L13 | The default currency is DOP. A draft marks a defaulted currency so the reviewer can change it before sign-off. | 2026-10-10 |
 
 ### 3.2 Open founder decisions
 
-Each open decision has a recommendation. Work that does not depend on the
-decision can start now. The "Blocks" column names the first work that stops.
+No open decision blocks J1. Each one has a recommendation. The "Blocks"
+column names the first work that stops.
 
 | ID | Question | Recommendation | Blocks |
 | --- | --- | --- | --- |
 | F1 | What must the accountant's package contain? | Use the field list in section 10. Confirm it with the pilot accountant before K1. | K1 |
 | F2 | Which lender and loan product define "bank-credible"? | Name one, for example a Banreservas commercial loan. Add its document list to the J8 acceptance. The bank regulator floor depends on the loan size (Appendix A). Below RD$5M, the owner signs the statements. | J8 sign-off only |
-| F3 | How does Cuadrao record "I paid with my own money"? | Add one canonical funding source, "owner funds", in the shared money service. The business expense is recorded against it. The accountant decides if it is a capital contribution or a debt to the owner. | J1 recording |
-| F4 | Who approves in version 1, and where? | The custodian approves in the web view. For the pilot, the owner appoints the accountant as custodian. A WhatsApp reply never approves. WhatsApp approval is later scope. | J1 approval |
 | F5 | What does WhatsApp do when the business has no AI consent? | Keep today's behavior. Save the message and send the fixed acknowledgement. Do not start an agent turn. | W1 |
-| F6 | Which spend limit applies? The sandbox contract says USD 15 for each 24 hours. The handoff says USD 5 in total. | One persisted guard with one owner. Set a limit for each conversation and for each business for each day. The founder sets the numbers. | E1 live run |
 | F7 | How do we approve agent text that a model writes? | Approve Spanish style rules and a set of golden replies, in Spanish first. Keep the fixed copy for receipt acknowledgements. | T1 scorecard |
-| F8 | What currency applies when the owner does not say one? | Each Business space declares a base currency at setup. The agent repeats the amount with its currency ("RD$850"). The owner can correct it. | J1 |
 | F9 | Do we capture fiscal fields (RNC, NCF or e-CF, ITBIS)? | Yes, as extracted facts marked "not verified". This is capture. It is not fiscal issuance or filing. | X1 |
 | F10 | What happens when a question is due after the WhatsApp 24-hour window closes? | The question waits. The agent asks it in the owner's next conversation. The accountant sees it in the web view. Template messages wait for #941. | W1 |
+
+### 3.3 Build now, build later
+
+Product-market fit comes from real owners and a real accountant using J1 to
+J3. It does not come from complete coverage. Build only the "now" list. Start
+an item from the "later" list only when real use asks for it.
+
+**Now:**
+
+- P0, C0 (only the shapes that J1 to J3 need), T1, W1 and E1 (scripted J1).
+- M1: income and owner funds only.
+- A1: one record page with the sources, the action ledger, the open questions
+  and an approve button.
+- A simple CSV for the accountant, with a funding column.
+- Then put J1 to J3 in front of one real owner and one real accountant.
+
+**Later:** M2, V1, X1, K1 beyond the simple CSV, R1, J4 to J8, and the formal
+E2 and E3 tests.
+
+### 3.4 PRs that make model calls
+
+Tell the founder before each of these PRs makes a model call. The founder
+names the models.
+
+- T1: the live scorecard for the new model-facing text.
+- E1: the live J1 case.
+- X1: the extractor change.
+- V1: transcription.
 
 ## 4. What we keep
 
@@ -160,7 +188,7 @@ step, record the reason in the decision log first.
 | Draft write | The write carries an idempotency key: the turn key plus the action index. A repeated write returns the first result. |
 | Revision of an existing draft | The write carries the expected version. A stale version fails visibly. The agent rereads and tries one time. |
 | Outbound WhatsApp message | The outbox records `pending`, `sent` or `unknown`. Do not resend an `unknown` message. The next turn reads the state and explains it. |
-| Model call | Count each call against the spend guard before dispatch. An unknown outcome counts as spent. |
+| Model call | The OpenRouter key caps spend. Record the cost of each call in the existing cost log. Do not retry a call with an unknown outcome without a check. |
 
 ### 5.5 What the agent does not do
 
@@ -185,11 +213,11 @@ Each draft field is a fact.
 | --- | --- |
 | `value` | The value, or null. |
 | `state` | `known`, `unknown`, `owner_does_not_know`. |
-| `origin` | `extracted`, `owner_stated`, `accountant_set`, `matched`. |
+| `origin` | `extracted`, `owner_stated`, `member_set`, `matched`, `default` (currency only). |
 | `verified` | `false` for an extracted fiscal fact until the accountant marks it. |
 | `source_ids` | The evidence and message IDs that support the value. |
 
-There is no `defaulted` origin. A value with no source stays `unknown`.
+One fact can have a default. If the owner names no currency, `currency` is DOP with origin `default`. The reviewer sees the default and can change it before sign-off. No other fact has a default. A value with no source stays `unknown`.
 
 ### 6.2 Activity draft
 
@@ -220,7 +248,8 @@ does not store old values.
 | Part | Meaning |
 | --- | --- |
 | `draft_id`, `version` | The draft and its new version. |
-| `actor_id`, `actor_kind` | The person. `actor_kind` is `owner_via_agent`, `staff`, `custodian` or `extractor`. |
+| `actor_id`, `actor_kind` | The person. `actor_kind` is `owner_via_agent`, `member` or `extractor`. |
+| `grant_id` | The grant that allowed the action. |
 | `changes` | For each field: before, after, origin and source IDs. |
 | `turn_key` | The agent turn, if an agent turn made the change. |
 | `created_at` | The time. |
@@ -243,7 +272,7 @@ There is no second history.
 `funding` values:
 
 - `business_account` with an account ID.
-- `owner_funds` (decision F3).
+- `owner_funds` (decision L10).
 - `unknown`.
 
 ### 6.5 Open question
@@ -273,12 +302,12 @@ an existing service where one exists.
 
 | Tool | Does | Wraps | Writes |
 | --- | --- | --- | --- |
-| `business_read_context` | Reads the space, its base currency, open drafts and open questions. | `workspace`, `inbox`, `overview` in `service.py:88-102,581-599` | No |
+| `business_read_context` | Reads the space, open drafts and open questions. | `workspace`, `inbox`, `overview` in `service.py:88-102,581-599` | No |
 | `business_propose_activity` | Creates a draft, or revises a draft at an expected version. | `ReconciliationService.resolve` in `reconcile/service.py:124-169` | Draft, revision |
 | `business_attach_source` | Links a message or an attachment to a draft. | New link from source to draft | Draft, revision |
 | `business_propose_allocation` | Proposes `funding` and `business_share`. | New. Uses 6.4. | Draft, revision |
 | `business_find_related` | Finds possible duplicates and matching money. It only proposes. | `activity_matches` in `matching.py:237-259`, `duplicates.py` | No |
-| `business_ask` | Opens a question for the owner or the accountant. Requests custodian review. | New open-question record | Question |
+| `business_ask` | Opens a question for the owner or the accountant. Requests review by a member who holds the approve permission. | New open-question record | Question |
 | `business_explain_status` | Reads the saved state of a draft or a record. | Status fields, dossier and history in `routers/business_authority.py:206-225` | No |
 
 Pointers without a directory are under `src/argus/domain/business/` or
@@ -294,6 +323,22 @@ Pointers without a directory are under `src/argus/domain/business/` or
   converge because of the idempotency keys in 5.4.
 - The worker processes one message at a time for each sender in each space.
   Messages from one sender run in arrival order.
+
+### 6.9 Action ledger
+
+The action ledger is the trust layer. The owner, the associate and the
+accountant can read it. Each entry answers these questions:
+
+- Who acted, and in which business?
+- Through which grant? Who gave the grant?
+- For whom? Example: "Ana (Contadores RD) for Taller de prueba".
+- What changed: the record, the version, and the old and new values.
+- From which source: a message, a photo or a web action.
+- When.
+
+Proposals, answers, approvals, grants and revocations all go into the ledger.
+The revision history (6.3) and the existing Business audit events feed it.
+There is no second history.
 
 ### 6.8 Model-facing text
 
@@ -334,7 +379,7 @@ are new.
 | N4. An agent proposal has no source kind | New | C0 | #945 |
 | N5. "Mío" cannot be recorded, and the export shows no payer | New | M1, K1 | #947 |
 | N6. A question after 24 hours is dropped | New | W1 (decision F10) | #944 |
-| N7. "850" has no currency source | New | C0, R1 (decision F8) | #943 |
+| N7. "850" has no currency source | New | C0 (decision L13: default DOP) | #943 |
 | N8. `manual_capture.require_processable` has no callers | New, low | T1 deletes it | #945 |
 
 Other findings:
@@ -353,8 +398,8 @@ Other findings:
 
 ### 8.1 Order
 
-1. P0. The Codex coordinator pushes `codex/cuadrao-business-sandbox` and lands
-   it, or names its replacement. Nothing below can merge before P0.
+1. P0. The founder lands the work on `codex/cuadrao-business-sandbox`
+   (in progress on October 10, 2026). Nothing below can merge before P0.
 2. C0. The contract. One writer.
 3. T1, M1, W1, A1 and E1 start in parallel against C0. Each uses the C0
    fixtures for the parts that are not built.
@@ -389,8 +434,8 @@ that row first.
 **Build:**
 
 1. Write the types in section 6 as Pydantic models.
-2. Write the migration for revisions, open questions, the agent source kind and
-   the space base currency.
+2. Write the migration for revisions, open questions and the agent source
+   kind.
 3. Write the API sections for the accountant view and the agent turn.
 4. Write fixtures: one fixture for each tool response, for J1 and J2.
 
@@ -412,8 +457,7 @@ that row first.
 2. Declare the seven tools with `surfaces={"business"}`.
 3. Add the typed Business actions to the interpretation schema.
 4. Remove the note exclusion in `candidate_eligibility.py`.
-5. Add the production spend guard (decision F6).
-6. Delete `manual_capture.require_processable`.
+5. Delete `manual_capture.require_processable`.
 
 **Verify:**
 
@@ -425,7 +469,7 @@ that row first.
 
 ### 8.5 PR M1: record income and owner-funded purchases once
 
-**Depends on:** C0. Decision F3.
+**Depends on:** C0.
 
 **Build:**
 
@@ -487,7 +531,8 @@ that row first.
 
 1. A scripted-model test of J1. Copy the pattern in
    `tests/test_issue_440_cancelled_draft_dates.py:48-251`.
-2. A live-model case under the spend guard. Commit its scorecard under
+2. A live-model case with the models the founder names. Commit its scorecard
+   under
    `docs/reports/evidence/cuadrao-business-agent/`.
 
 **Verify:** the test asserts stored state, not reply text:
@@ -496,7 +541,7 @@ that row first.
 - `funding=owner_funds`, `receipt_state=no_receipt`, `amount=850`,
   `currency=DOP`.
 - The original messages are linked.
-- No money record exists before the custodian approves.
+- No money record exists before a member with the approve permission approves.
 - After approval, one money record exists.
 
 The scripted test runs in CI on each PR. The live case runs before each merge
@@ -522,7 +567,7 @@ delivery.
 
 | ID | The owner sends | Cuadrao must |
 | --- | --- | --- |
-| J1 | "Pagué 850 de materiales." Then "Mío. No tengo recibo." | Ask "¿Con dinero del negocio o tuyo?". Make one expense draft with `owner_funds` and `no_receipt`. Get custodian approval. Record it once. Put it in the package with its messages and the accountant action "informal supplier: B11 or E41 may be needed". |
+| J1 | "Pagué 850 de materiales." Then "Mío. No tengo recibo." | Ask "¿Con dinero del negocio o tuyo?". Make one expense draft with `owner_funds` and `no_receipt`. Get approval from an authorized member. Record it once. Put it in the package with its messages and the accountant action "informal supplier: B11 or E41 may be needed". |
 | J2 | A photo of a fiscal receipt with a caption. | Extract the amount, the date, the supplier, RNC, NCF and ITBIS as "not verified". Ask only for missing facts. |
 | J3 | "Me pagaron 5,000 por la reparación." | Make one income draft. Ask for the account if it is not known. |
 | J4 | A receipt with business and personal items. | Propose the business share. Record only the business part. Flag the split for the accountant. |
@@ -600,13 +645,12 @@ These items are out of scope for this spec:
 1. **The sandbox branch is not pushed.** `codex/cuadrao-business-sandbox` is
    105 commits ahead of `codex/private-alpha-next`. It exists on one machine.
    The issues link to `docs/specs/lanes/cuadrao-business-sandbox-contract.md`,
-   which exists only on that branch. The Codex coordinator owns P0.
+   which exists only on that branch. The founder is landing it (P0).
 2. **#925 conflicts with the base.** T1 builds on its surface filter.
    Reconcile #925 or move its surface filter into T1.
 3. **#941 blocks real WhatsApp delivery.** Fixture and simulated proof can
    continue.
-4. **The spend limits disagree** (decision F6).
-5. **Holds from the handoff.** The October 10 decision lifts "Business chat
+4. **Holds from the handoff.** The October 10 decision lifts "Business chat
    stays off" as a build hold. Business chat stays off in hosted
    environments. Hosted actions, live calls and merges stay held.
 
