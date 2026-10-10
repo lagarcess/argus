@@ -1,6 +1,53 @@
 # Cuadrao Business lane handoff
 
-**Current checkpoint, October 10, 2026.** Integration is
+**Current checkpoint, October 10, 2026.** The fetched integration is
+`77ddf2c7d33cc4c7273cc4c39354b5152fe01e91`. The default-off foundation and
+planning #900/#910 are integrated. The agent direction landed through
+[#953](https://github.com/lagarcess/argus/pull/953). Exact postmerge
+[CI](https://github.com/lagarcess/argus/actions/runs/38087059299) and
+[smoke](https://github.com/lagarcess/argus/actions/runs/38087059317) passed on
+that SHA. This is a documentation checkpoint, not a hosted runtime acceptance.
+Consumer retains its acceptance ownership.
+
+The [Business execution spec](../specs/lanes/cuadrao-business-agent-execution-spec.md)
+owns L1 to L13 and C0-first build order. The later
+[hosted Business decision](../specs/argus-decision-log.md#october-10-2026-hosted-business-beta-and-build-grant)
+and [assignment](../specs/argus-execution-board.md#business-hosted-invite-only-build-october-10-2026)
+replace the general build/hosted hold only for the bounded invite-only Business
+integration and staging flow. The root coordinator alone owns merge and staging.
+Read those records for current owners, pending gates and acceptance. Do not
+restart the historical queue below.
+
+The existing Business lane retains P0 read-only dependency inventory and
+reconciliation planning. It must map J1 to J3 shapes against the fetched
+integration and identify missing API, data, migration and test dependencies.
+C0 remains the first build step. A runtime writer needs its chosen contract and
+exclusive assignment before changing those files. "Pagué 850" is one example.
+The real hosted flow must handle varied natural-language transactions and
+follow-ups, explicit unknowns and corrections without phrase or regex intent gates.
+
+#925 remains excluded at `1426404d82ade9ac1eaed255b0e68ed7db9d4a1a`. The
+sandbox remains preserved at `df208f7ec2379cd84efd55eea0deb685d67c5360`.
+Do not publish either wholesale. Historical local/synthetic WhatsApp evidence
+is not real delivery. #941 remains the activation prerequisite. Staging/web
+binding, callback/WABA subscription, current sender linking and grant-scoped
+readback require exact-candidate evidence before readiness.
+
+The 22:22 UTC continuation approved the existing Render workspace and named
+the runtime model choices. The later continuation selects Grok 4.3 as the
+first evaluation judge and prohibits Astra development runtime or judge API
+calls. The proposed $5 total synthetic live run remains pending. No calls, secret edits or persistent tester grants follow
+from this handoff. The manifest owns their concrete gates and the observed
+staging API revision. No separate staging web exists in that workspace. No production,
+main promotion, public signup, marketing/legal launch or Apple TestFlight is
+included. Consumer compatibility and existing shared migration ownership remain.
+
+## Historical October 10 documentation publication
+
+The following records the #953 publication boundary before the later hosted
+build grant. It preserves merge provenance. It grants no current action.
+
+**Documentation publication checkpoint, October 10, 2026.** Integration is
 `35fae200034c51ef27cee64d76adc4a903c19672`. The default-off foundation is
 integrated. Planning [#900](https://github.com/lagarcess/argus/pull/900) landed
 as `2754b0114948b20136b183debd7e8a7a14eab430` and

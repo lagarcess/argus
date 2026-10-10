@@ -36,6 +36,7 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-10-04 | Lock the space-model timing (2:21 PM CT): the space-model change lands before TestFlight. The model itself still needs its own lock. Detailed record: [October 4 space model timing](#space-model-timing). | Lucas |
 | 2026-10-07 | Approve the connected Business workflow and offline E0 plan with task-by-task independent review. Counsel may publish and land the docs-only PR; Lucas coordinates Business implementation. Detailed record: [Business connected flow and E0](#october-7-2026-business-connected-flow-and-offline-e0-plan). | Lucas |
 | 2026-10-10 | Approve the Business agent direction. One agent in the existing runtime talks only to the owner in WhatsApp and completes each record through Business tools. The accountant works in the web view. Reuse the runtime and services; no second loop, extractor, ledger or vendor. Contract first, then parallel streams; the "Pagué 850" journey is the first proof; evals gate merges. Cuadrao branches from `codex/private-alpha-next`. Detailed record: [Business agent direction](#october-10-2026-business-agent-direction). | Lucas |
+| 2026-10-10 | Clarify the first Business outcome as a working hosted internet system and an invite-only web beta. Authorize the bounded build, clean integration merges and staging only. Preserve varied natural-language flows and the existing runtime. Detailed record: [Hosted Business beta and build grant](#october-10-2026-hosted-business-beta-and-build-grant). | Lucas, relayed by the root coordinator |
 
 ## October 7, 2026 Business connected flow and offline E0 plan
 
@@ -624,3 +625,67 @@ The founder approved these points after two audits of the Business core flows:
 - Build only what J1 to J3 need, then test with one real owner and one real accountant. Other work waits until real use asks for it.
 
 The [Business agent execution spec](lanes/cuadrao-business-agent-execution-spec.md) owns the contract, the work order and the defaults. No decision is open.
+
+## October 10, 2026 hosted Business beta and build grant
+
+At 21:39 UTC, Lucas clarified that the customer milestone is a real production
+system reachable over the internet, demonstrated behind the marketing demo.
+A laptop-only demonstration does not satisfy it. Provenance is
+`Sentinel_197f868cd67c8191806a86d8f425ea91`. At 21:41 UTC, he clarified an
+invite-only web beta using existing tools, separate from Apple TestFlight.
+Provenance is `Sentinel_3b97373fd34081918bde53aeecce4293`.
+
+At 22:13 UTC, Lucas authorized the bounded hosted Business build, clean merges
+to `codex/private-alpha-next` and staging only. Provenance is
+`Sentinel_fc5880c0d93c8191abd96767711ff688`. The root coordinator owns the sole
+merge slot and staging actions. This replaces the general implementation and
+hosted hold only within that assigned Business flow. It does not authorize
+main or production promotion, public signup, marketing or legal launch,
+Apple TestFlight, or unrelated Consumer work.
+
+The [execution manifest](argus-execution-board.md#business-hosted-invite-only-build-october-10-2026)
+owns the current assignments, dependencies and pending action gates. The
+[execution spec](lanes/cuadrao-business-agent-execution-spec.md) still owns
+C0-first order and the larger J1 to J3 direction. The first customer proof
+must join real owner messages to one traceable record visible to an authorized
+accountant over the internet. It must preserve originals, visible unknown or
+unverified facts, correction history and grant-scoped human approval.
+
+"Pagué 850" is an illustrative J1 input, not a phrase to detect or the whole
+acceptance set. Use varied ordinary transactions, factual follow-ups, uncertainty
+and corrections through the typed interpreter and canonical tools. Judge saved
+state and user behavior. Do not substitute literal reply matching, word lists,
+regex intent gates or per-reply human wording approval for evaluations.
+
+Controlled WhatsApp test-recipient access differs from public onboarding.
+A hosted loop needs its permitted sender, verified callback and WABA subscription,
+authenticated sender-to-Business link, and grant-scoped readback. #941 still owns
+its remaining activation and policy prerequisites. A simulated transport or old
+tunnel does not prove that loop or authorize a callback cutover.
+
+At 22:22 UTC, Lucas approved the existing Cuadrao Render workspace
+`tea-d5rdkfk9c44c73e7a1ig`. Provenance is
+`Sentinel_6aaf381568a88191b21c0240807c0f52`. His runtime direction replaces
+the older configured mix. Favor `anthropic/claude-haiku-5.5`,
+`openai/gpt-6-luna-pro` and `deepseek/deepseek-v4.1-flash`. Use Grok only
+when needed. Prioritize the fastest reliable choice; he identified GPT Luna
+Pro as the slowest candidate. The coordinator verified all three exact IDs
+in OpenRouter's public catalog with structured-output and tool support.
+Catalog metadata does not prove runtime latency or authorize a paid call.
+
+A later continuation names Grok 4.3 as the first evaluation judge. Provenance is
+`Sentinel_70caa32aa180819187d0ffaaf50e6bd9`. Do not make Astra development
+runtime or judge API calls. A future paid-tier Astra option is hypothetical.
+Codex coding agents use a separate subscription; their model names do not
+select a runtime provider. The named runtime configuration remains replaceable.
+Do not turn model selection into a new model-platform build. Calibrate the
+judge with known-good and known-bad cases. Retain deterministic saved-state
+assertions, so same-model agreement is never the sole proof of correctness.
+
+The proposed $5 total synthetic live test run remains pending.
+No model call, secret change, persistent tester grant or live data transmission
+follows from this record. New paid services, credentials, expanded grants or
+security settings need a concrete scoped confirmation. The coordinator must
+confirm the setup and named tester authority before those actions. The L1 to
+L13 product decisions remain settled. These pending gates concern execution
+and access, not a reopened product design.
