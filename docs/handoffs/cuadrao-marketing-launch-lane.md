@@ -335,3 +335,8 @@ Latest phone cleanup source `1c4dca80a512919a523fc9649c8ccd1f96fa8539` removes t
 ## Accepted baseline lock before final footer polish
 
 The founder requested locking all progress so far. [Accepted design checkpoint](../reports/evidence/cuadrao-marketing-touchup/accepted-design-checkpoint.md) is now the current continuation authority for this touch-up. It records baseline `ee4a93e04`, runtime `1c4dca80a`, the local annotated tag, preservation boundaries and the remaining Personal-footer/polish work. It supersedes earlier pending-design-acceptance wording only for the accepted baseline. Footer requests are awaited; no speculative footer edits were made. No launch, merge, push, publication, hosted change, public-form or real-email authorization is implied.
+
+
+### Personal copy polish after baseline lock
+
+At the founder’s request, source `d81766f0b371d427f7346cdf1b8dcc1de052ca97` removes the phone’s design-preview caption and repetitive signup wording in both languages. Privacy, early-access status and actual signup behavior remain. The separate mock keeps its simulation label. Fresh build/typecheck/lint and 33 signup/motion browser checks pass, with one expected touch skip; independent scoped review is clean. Exact-source screenshots and recording are refreshed in [Personal evidence](../reports/evidence/cuadrao-marketing-touchup/personal-pet/README.md). The accepted checkpoint tag is unchanged. The founder will send a footer inspiration clip; await it before changing the photos/reveal. Preview 4512 is rebuilt with real providers unset, mock 4513 and original comparison 4511 remain available. Local only, unpushed; no release approval or other-lane changes.

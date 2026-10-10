@@ -1,6 +1,6 @@
 # Personal signup pet and phone
 
-Current visual source `1c4dca80a512919a523fc9649c8ccd1f96fa8539` (initial scene `c8eab10647c56a49591033f5e5a026bb8a5befa6`), October 9, 2026. Founder requested keeping the left-hand copy and signup, replacing the Home preview with a hand-held phone showing the native welcome screen, and adding a square pet that watches the cursor and delivers an envelope after signup succeeds. The founder chose the welcome screen with the logo and signup button. This is a local design iteration pending visual acceptance.
+Current visual source `d81766f0b371d427f7346cdf1b8dcc1de052ca97` (initial scene `c8eab10647c56a49591033f5e5a026bb8a5befa6`), October 9, 2026. Founder requested keeping the left-hand copy and signup, replacing the Home preview with a hand-held phone showing the native welcome screen, and adding a square pet that watches the cursor and delivers an envelope after signup succeeds. The founder chose the welcome screen with the logo and signup button. The founder locked the visual baseline in the [accepted checkpoint](../accepted-design-checkpoint.md). The subsequent copy cleanup and pending footer refinement do not imply release approval.
 
 ## Behavior
 
@@ -12,7 +12,7 @@ Mobile stacks the phone below the intake. A flight is skipped if its destination
 
 ## Asset provenance
 
-The welcome image is copied unchanged from `docs/reports/evidence/cuadrao-release-ui/2026-10-03-w1/release-design-launch-light.png`. Source dimensions are 1320×2868. The [native evidence](../../cuadrao-release-ui/README.md) records the October 3 simulator design capture. It is historical design evidence, not a claim about the current shipping app. The website caption says it is a welcome preview whose design may change. The English caption identifies the Spanish preview.
+The welcome image is copied unchanged from `docs/reports/evidence/cuadrao-release-ui/2026-10-03-w1/release-design-launch-light.png`. Source dimensions are 1320×2868. The [native evidence](../../cuadrao-release-ui/README.md) records the October 3 simulator design capture. It is historical design evidence, not a claim about the current shipping app. The original preview caption was removed at the founder’s request during final copy polish. This evidence retains the historical asset provenance; the phone is a Marketing composition, not a shipping-app claim.
 
 Served asset `marketing/public/cuadrao-site/personal-welcome-preview.png` has SHA-256 `8dc8c6e298742c0bfcec5261a1d4f79d93d4d2733ca46b1a2bc6356b23b22f7c`. The hand, pet and envelope are original SVG/CSS graphics. No Base artwork was extracted. The native logo was not redrawn. Consumer files, app services and simulators were not modified or launched.
 
@@ -77,3 +77,12 @@ The founder approved retaining the current hand and turning the phone slightly t
 The founder requested removing the phone slogan because the middle finger covered it, and asked about the color difference between the central icon and the icon beside the name. The central artwork was baked into the historical native capture; the name already used the current canonical lockup. Source `1c4dca80a512919a523fc9649c8ccd1f96fa8539` clears the old central icon and slogan in the rendered Marketing composition, then overlays `cuadrao-mark-light.svg` from the same canonical brand source as the header lockup. The dark green, pale green and lime overlap now agree. No colors or logo geometry were recreated. `sync-brand.mjs` derives both served SVGs from `marketing/brand/`; the native PNG remains unchanged on disk.
 
 The central image and flight anchor derive their center from the same `welcome.logo` coordinates. Hand, angle, form, native welcome buttons and motion logic are unchanged. Typecheck/lint/build pass; 15 existing brand tests pass. Final ES/EN desktop/mobile idle, pending, flying and settled captures/clip pin this source, with no page errors. The parent verified that the slogan and old mark are fully covered, the current icon loads and the welcome buttons remain visible. Independent scoped review is clean with zero comment/suppression flags. Prior motion evidence is retained for the unchanged state/geometry behavior. This is Marketing-only; no native or hosted update is implied. Preview 4512 and mock4513 remain available; comparison4511 is preserved. Workers have returned ownership and stopped.
+
+
+## Personal copy cleanup, October 9, 2026
+
+Runtime source `d81766f0b371d427f7346cdf1b8dcc1de052ca97` removes the design-review caption beneath the phone and the duplicate saved-email explanation. The invitation and confirmation are shorter in ES and EN. Early-access status, privacy, error handling and signup truth remain intact. The separate 4513 simulation retains its badge and Replay control because it does not save registrations. No footer changes were made; the founder will provide a clip for the image reveal below the cropped wordmark.
+
+Fresh build, typecheck, lint and diff checks pass. The focused signup/motion suite passes 33 checks with one expected pointer-only skip on touch. Independent scoped review is clean. Desktop/mobile ES/EN captures and the clip were refreshed at this exact runtime source; the parent inspected the rendered success view and verified the regular preview copy in the browser. [Copy browser results](copy-polish-browser-results.txt) and [copy build results](copy-polish-build-results.txt) record this pass. Earlier accessibility evidence is retained across this text/removal-only change, not claimed as a new run.
+
+The accepted tag `codex/marketing-design-checkpoint-2026-10-09` remains unchanged at `0a026651060576a0e359efd5f2b868c70222e556`. Continue on the existing branch/worktree. Preview 4512 was rebuilt with providers unset; mock 4513 remains separate and comparison 4511 is preserved. No push, merge, deployment, hosted change, real email or public-form activation occurred. Both delegated copy agents returned ownership and stopped.
