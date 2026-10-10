@@ -1,11 +1,9 @@
-import { Fragment } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { businessPath } from "@/lib/site-routes";
 import { businessContent, type BusinessLocale } from "./content";
 import { businessContactEmail, siteCopy } from "./site-copy";
 import styles from "./business.module.css";
 import shell from "./touchup-shell.module.css";
-import { FooterMotion } from "./footer-motion";
 
 export function ContactLink({
   locale,
@@ -37,12 +35,10 @@ export function BusinessFooter({
   personal?: boolean;
 }) {
   const c = siteCopy[locale];
-  const FooterContent = personal ? Fragment : FooterMotion;
   return (
     <footer
       className={`${styles.footer} ${business ? styles.businessFooter : ""} ${shell.footer}`}
     >
-      <FooterContent>
       {showClosing && (
         <section className={styles.closing} aria-labelledby="closing-title">
           <div>
@@ -139,10 +135,9 @@ export function BusinessFooter({
           </div>
         </div>
       )}
-        <div className={styles.wordmarkCrop} aria-hidden="true">
-          <span>cuadrao</span>
-        </div>
-      </FooterContent>
+      <div className={styles.wordmarkCrop} aria-hidden="true">
+        <span>cuadrao</span>
+      </div>
     </footer>
   );
 }

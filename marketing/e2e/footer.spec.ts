@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-for (const path of ["/personal", "/en/personal"]) {
+for (const path of ["/", "/en", "/personal", "/en/personal"]) {
   test(`${path} ends at the cropped wordmark without a photo reveal`, async ({ page }) => {
     await page.goto(path);
     await page.evaluate(() => document.fonts.ready);

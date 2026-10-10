@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { ArrowDown, ArrowUpRight, FileText } from "lucide-react";
 import type { BusinessLocale } from "./content";
 import { businessPath } from "@/lib/site-routes";
@@ -74,38 +73,6 @@ export function TouchupLanding({ locale }: { locale: BusinessLocale }) {
             </article>
           ))}
         </div>
-      </section>
-      <section
-        className={`${styles.section} ${styles.editorial}`}
-        aria-label={c.photosLabel}
-      >
-        <figure>
-          <Image
-            src="/cuadrao-site/florist.webp"
-            width={1200}
-            height={800}
-            sizes="(max-width: 700px) 100vw, 55vw"
-            alt={c.floristAlt}
-          />
-          <figcaption>
-            <strong>{c.floristTitle}</strong>
-            {c.floristBody}
-          </figcaption>
-        </figure>
-        <figure>
-          <Image
-            src="/cuadrao-site/accountant.webp"
-            width={1200}
-            height={800}
-            sizes="(max-width: 700px) 100vw, 45vw"
-            alt={c.accountantAlt}
-          />
-          <figcaption>
-            <strong>{c.accountantTitle}</strong>
-            {c.accountantBody}
-          </figcaption>
-        </figure>
-        <p className={styles.caption}>{c.photoNote}</p>
       </section>
     </>
   );

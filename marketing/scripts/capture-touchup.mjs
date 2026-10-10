@@ -69,23 +69,10 @@ try {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto(baseURL);
-  const panel = page.locator("[data-footer-peek]");
   await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
-  for (const image of await panel.locator("img").all())
-    await image.evaluate(async (element) => {
-      await element.decode();
-    });
-  for (const state of ["rest", "peek", "settled"]) {
-    if (state === "peek") {
-      await page.mouse.move(100, 900);
-      await page.mouse.wheel(0, 600);
-      await page.waitForTimeout(80);
-    }
-    if (state === "settled") await page.waitForTimeout(900);
-    const file = `footer-${state}.png`;
-    await page.screenshot({ path: fileURLToPath(new URL(file, output)) });
-    captures.push({ route: "/", file, width: 1440, state });
-  }
+  const file = "footer-rest.png";
+  await page.screenshot({ path: fileURLToPath(new URL(file, output)) });
+  captures.push({ route: "/", file, width: 1440, state: "static cropped wordmark" });
   await context.close();
 } finally {
   await browser.close();

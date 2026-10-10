@@ -49,15 +49,6 @@ const es = {
     },
     { title: "El registro", body: "Encuentra el gasto y su respaldo juntos." },
   ],
-  photosLabel: "EL TRABAJO DE CADA DÍA",
-  floristAlt: "Una florista revisa un recibo junto a su teléfono en su taller",
-  floristTitle: "El negocio no se detiene.",
-  floristBody: "Un recibo pequeño también cuenta la historia de tu negocio.",
-  accountantAlt: "Dos personas revisan documentos juntas en una oficina",
-  accountantTitle: "Revisar con el original a mano.",
-  accountantBody: "El monto importa. Poder explicar de dónde sale, también.",
-  photoNote:
-    "Imágenes ilustrativas generadas con IA. No representan clientes de Cuadrao.",
   limitsQuestion: "¿Qué se puede probar hoy?",
   limitsAnswer:
     "Estamos preparando un piloto de recepción de archivos, revisión y aprobación de gastos. Las conexiones de WhatsApp y correo, la preparación automática con IA y el trabajo entre firmas y sus clientes aún necesitan validación. No las anunciamos como disponibles. El alcance y el acceso se acuerdan antes de cada piloto.",
@@ -117,16 +108,6 @@ const en: typeof es = {
     },
     { title: "The record", body: "Find the expense and its source together." },
   ],
-  photosLabel: "EVERYDAY WORK",
-  floristAlt: "A florist reviews a receipt beside her phone in her workshop",
-  floristTitle: "Business keeps moving.",
-  floristBody: "A small receipt is part of your business story, too.",
-  accountantAlt: "Two people review documents together in an office",
-  accountantTitle: "Review with the original at hand.",
-  accountantBody:
-    "The amount matters. Being able to explain its source does, too.",
-  photoNote:
-    "AI-generated illustrative images. They do not depict Cuadrao customers.",
   limitsQuestion: "What can be tested today?",
   limitsAnswer:
     "We’re preparing a pilot for receiving files, reviewing expenses and approving them. WhatsApp and email connections, automatic AI preparation and collaboration between firms and their clients still need validation. We do not advertise them as available. Scope and access are agreed before each pilot.",
