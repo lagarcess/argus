@@ -340,3 +340,10 @@ The founder requested locking all progress so far. [Accepted design checkpoint](
 ### Personal copy polish after baseline lock
 
 At the founder’s request, source `d81766f0b371d427f7346cdf1b8dcc1de052ca97` removes the phone’s design-preview caption and repetitive signup wording in both languages. Privacy, early-access status and actual signup behavior remain. The separate mock keeps its simulation label. Fresh build/typecheck/lint and 33 signup/motion browser checks pass, with one expected touch skip; independent scoped review is clean. Exact-source screenshots and recording are refreshed in [Personal evidence](../reports/evidence/cuadrao-marketing-touchup/personal-pet/README.md). The accepted checkpoint tag is unchanged. The founder will send a footer inspiration clip; await it before changing the photos/reveal. Preview 4512 is rebuilt with real providers unset, mock 4513 and original comparison 4511 remain available. Local only, unpushed; no release approval or other-lane changes.
+
+
+### Personal footer sequence trial, October 9, 2026
+
+The founder approved trying the Granola-inspired image sequence on Personal only. Source `7f0f1354d68ee0638ed2ebca36425b7c359af428` layers the existing dressmaker and artisan photos and plays one finite swap during the extra-scroll reveal. No playback controls or continuous loop. Existing spring-back timing remains. Business keeps its photo pair; its desktop footer screenshot is byte-identical before and after.
+
+Fresh build/typecheck/lint, 42 focused browser checks, independent scoped review, and desktop/mobile visual inspection pass. [Personal footer evidence](../reports/evidence/cuadrao-marketing-touchup/personal-footer/README.md) owns the design tradeoff, exact-source captures, short clip, and reproduction. Preview 4512 is rebuilt with providers unset. Comparison 4511 and signup mock 4513 are preserved. The accepted baseline tag is unchanged. This new trial awaits founder feedback; no final replacement, hosted, merge, push, or activation authority is implied. All agents returned ownership and stopped.
