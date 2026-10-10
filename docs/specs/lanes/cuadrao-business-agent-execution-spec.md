@@ -653,8 +653,8 @@ These items are out of scope for this spec:
 3. **#941 blocks real WhatsApp delivery.** Fixture and simulated proof can
    continue.
 4. **Holds from the handoff.** The October 10 decision lifts "Business chat
-   stays off" as a build hold. Business chat stays off in hosted
-   environments. Hosted actions, live calls and merges stay held.
+   stays off". Business chat is the agent's surface, so the agent needs it on. Build it now. It turns on in hosted environments for pilot businesses, through server flags, after J1 passes and the founder approves. Hosted actions, live calls and merges stay held
+   until then.
 
 ## 14. Documents this spec changes
 

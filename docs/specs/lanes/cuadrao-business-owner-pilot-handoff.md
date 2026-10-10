@@ -39,7 +39,7 @@ records their PRs. Do not recreate those changes.
 
 ## Delivery and authority limits
 
-**October 10, 2026 update.** The founder approved the Business agent direction later the same day. The [Business agent execution spec](cuadrao-business-agent-execution-spec.md) now owns the Business build order, the agent contract and the open decisions. Where this document says "Business chat stays off" or that the agent audit approves no model-facing implementation, that spec takes priority for build work. Business chat stays off in hosted environments. Each model-facing change still needs a committed scorecard.
+**October 10, 2026 update.** The founder approved the Business agent direction later the same day. The [Business agent execution spec](cuadrao-business-agent-execution-spec.md) now owns the Business build order, the agent contract and the open decisions. Where this document says "Business chat stays off" or that the agent audit approves no model-facing implementation, that spec takes priority. Business chat is the agent's surface, so the agent needs it on. Build it now. It turns on in hosted environments for pilot businesses, through server flags, after J1 passes and the founder approves. Each model-facing change still needs a committed scorecard.
 
 Business chat stays off. This assignment changes no code, schema, flag, UI copy,
 provider setup, or model instruction. It includes no paid calls, hosted actions,

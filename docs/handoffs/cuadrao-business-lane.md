@@ -4,7 +4,7 @@
 
 **Update, October 10, 2026 (America/Chicago).** The product-direction discussion took place. The founder approved the Business agent direction. The [Business agent execution spec](../specs/lanes/cuadrao-business-agent-execution-spec.md) now owns the Business build order. These holds change:
 - The hold on new product work is lifted for the work in that spec.
-- "Business chat stays off" is lifted as a build hold. Business chat stays off in hosted environments.
+- "Business chat stays off" is lifted. Business chat is the agent's surface, so the agent needs it on. Build it now. It turns on in hosted environments for pilot businesses, through server flags, after J1 passes and the founder approves.
 - Live calls, the spend limit, deployment, hosted migration, activation and merges stay held. The spec lists the open spend-limit decision (F6).
 
 **Founder holds, in force:**
