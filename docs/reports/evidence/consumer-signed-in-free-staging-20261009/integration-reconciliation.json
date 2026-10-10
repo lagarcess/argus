@@ -1,14 +1,14 @@
 {
-  "checked_at": "2026-10-10T07:00:57.494379+00:00",
+  "checked_at": "2026-10-10T07:20:12.116460+00:00",
   "original_integration_base": "cd14c9883f180876d27c121f0787b25a73529492",
   "current_remote_integration": "cd14c9883f180876d27c121f0787b25a73529492",
   "reconciliation_merge": null,
   "overlap_disposition": "Integration has not advanced; no intervening runtime, API/data, UI owner, migration or environment changes to reconcile.",
-  "evidence": "Retained at each recorded test source; app source tree unchanged.",
-  "new_branch_ci": "Not run. Branch publication blocked by automatic approval review; explicit approval pending.",
+  "evidence": "Retained at each recorded test source. The sole later app delta refreshes the amount field identifier; the focused native regression passed at 7a66caad04e3c4ecadd48c8ae6a11042fd077bcc",
+  "new_branch_ci": "Draft publication approved; CI pending publication.",
   "ready": false,
-  "latest_remote_read_at": "2026-10-10T07:00:57.494379+00:00",
+  "latest_remote_read_at": "2026-10-10T07:20:12.116460+00:00",
   "latest_remote_integration_sha": "cd14c9883f180876d27c121f0787b25a73529492",
-  "modularity_check": "passed on the current integration base plus all Consumer test changes",
-  "final_local_test_source": "125087e96f6f2b24d0b59452e242825f135824c3"
+  "modularity_check": "Passed on the unchanged current integration base plus Consumer test changes and the approved one-line identifier fix.",
+  "final_local_test_source": "7a66caad04e3c4ecadd48c8ae6a11042fd077bcc"
 }

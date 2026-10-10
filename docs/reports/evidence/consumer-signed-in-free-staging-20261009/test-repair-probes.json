@@ -168,9 +168,15 @@
       "amount_label": "I want to spend up to"
     },
     "cause": "The reused UIKit amount field assigned its identifier only when first created, while plan switching changed the current identifier property.",
-    "proposed_fix": "Move the identifier assignment into updateUIView beside the current coordinator and presentation properties.",
     "writes": false,
-    "status": "Prepared patch; automatic approval review blocked product-source edits, awaiting explicit user approval."
+    "status": "Approved by the founder and applied at 7a66caad04e3c4ecadd48c8ae6a11042fd077bcc",
+    "fix": "Move the identifier assignment into updateUIView beside the current coordinator and presentation properties.",
+    "after": {
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "evidence": "results/plan-identity-after.json"
+    }
   },
   "empty_amount_replacement": {
     "test": "testConnectedGoalAllocationContributionCorrectionSearchAndRestore",
@@ -342,5 +348,14 @@
     "source": "ios/ArgusFoundation/Accounts/ConnectedTransactionSheet.swift:98",
     "evidence": "screenshots/large-text-transaction-ready-unreviewed.png",
     "software_keyboard_occlusion": "not established; screenshots do not show the onscreen keyboard"
+  },
+  "budget_after_identifier_fix": {
+    "source": "7a66caad04e3c4ecadd48c8ae6a11042fd077bcc",
+    "passed": 0,
+    "failed": 1,
+    "skipped": 0,
+    "result": "Failed before the first account editor opened: accounts.add could not reach the visible scroll area. No budget was created; no Save, Review or Confirm action occurred in this run. The broader budget journey remains unverified.",
+    "cause": "Not yet established; the failure occurred in account-entry setup before any budget assertions.",
+    "evidence": "results/budget-after-identifier-fix.json"
   }
 }

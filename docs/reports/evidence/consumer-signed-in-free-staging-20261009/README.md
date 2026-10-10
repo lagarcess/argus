@@ -75,9 +75,13 @@ visually inspected.
 
 The budget editor reuses the goal amount field. Its visible label updates, but
 its test identifier stays `goal.target` instead of `budget.limit`. A no-save
-regression reproduces this in one test. A one-line native fix is prepared and
-independently reviewed. Automatic approval review blocked the product-source
-edit; explicit approval is pending.
+regression reproduces this in one test. The founder approved the independently
+reviewed one-line native fix. It moves
+the identifier assignment into the UIKit update method. The same regression
+now passes on `7a66caad0`, with zero failures or skips. The full budget rerun
+failed earlier in account-entry setup. It could not reach `accounts.add` before
+the first account editor opened. No Save, Review or Confirm action occurred in
+that run. Its cause is not yet established; budget acceptance remains open.
 
 Goal acceptance then exposed an empty-input test error. XCTest reports the
 `0.00` placeholder as the field value, so the replacement helper requested
@@ -110,9 +114,10 @@ filter, saved the bill at DOP 35.00 and found that bill after a Spanish relaunch
 ## Acceptance record
 
 This is a partial checkpoint. No complete free-tier acceptance claim is made.
-Budget acceptance remains blocked by the reproduced field-identifier defect.
-The test branch is local because automatic approval review rejected publishing
-it; new-branch CI has not run. Large-text money entry and cancellation passed, but
+The identifier regression passes, but the broader budget rerun failed during
+account-entry setup before any budget assertions. The founder has approved
+draft publication; new-branch CI has not run yet. Large-text money entry and
+cancellation passed, but
 visual acceptance remains open because the transaction Date label wraps into
 a single-letter column at the largest text size.
 
@@ -129,6 +134,7 @@ a single-letter column at the largest text size.
 | Account and expense entry/cancel at largest text in portrait | [1 passed](results/large-text-money.json); visual issue remains | No Save, Review or Confirm action |
 | Search account editing, income correction, bill editing and Spanish relaunch | [1 passed](results/search-final.json) | Native saved-value and origin assertions |
 | Goal Search, relaunch and Spanish on the saved corrected goal | [1 passed](results/goal-retained-search.json) | No writes; exact supported DOP 750.00 |
+| Goal → Budget → Goal amount field identifier | [1 passed](results/plan-identity-after.json) | No writes |
 
 These listed cases had no failures or skips in their final runs. The complete
 goal workflow has split evidence. Its data operations passed before a stale
@@ -145,8 +151,10 @@ The offscreen-header regression used `daaf417dc`. The final large-text run and t
 session restoration before creating any Search records. Later Search attempts
 reached the editors and exposed the fixed-footer and currency-summary test
 errors described above. The final Search journey passed on `64c26e085`.
-The intervening commits change test navigation and input only. The app source
-tree is identical to integration. [Initial source](source-provenance.json),
+The intervening commits change test navigation and input only. Those earlier runs used the same app source tree as integration. The approved
+one-line identifier repair is the sole later product change; the earlier
+numerical and visible-UI evidence remains applicable, but was not rerun wholesale
+on the new identifier source. [Initial source](source-provenance.json),
 [scroll repair](coverage-source-provenance.json) and
 [picker repair](picker-source-provenance.json),
 [viewport repair](scroll-source-provenance.json) and
@@ -155,7 +163,8 @@ tree is identical to integration. [Initial source](source-provenance.json),
 [boundary and Back probes](boundary-readiness-source-provenance.json), and
 [Search filter repair](search-filter-source-provenance.json), and
 [retained-goal Search repair](goal-search-source-provenance.json), and
-[large-text money probe](large-text-money-source-provenance.json) record the exact tested
+[large-text money probe](large-text-money-source-provenance.json), and
+[approved identifier repair](identifier-fix-source-provenance.json) record the exact tested
 files. These records retain earlier successful runs at their tested sources;
 they do not claim that every case ran at the final documentation commit.
 
@@ -172,9 +181,10 @@ committed evidence contains only synthetic screenshots and aggregate results.
 
 ## Open acceptance items
 
-- Budget automation stops at the stale amount-field identifier. The one-line
-  native repair is prepared and independently reviewed, but automatic approval
-  review rejected the source edit. It has not been applied.
+- The amount-field identifier regression passes after the approved one-line
+  repair. The [full budget rerun](results/budget-after-identifier-fix.json) failed
+  during account-entry setup because `accounts.add` could not reach the visible
+  scroll area. No budget assertions ran. Its cause needs diagnosis.
 - Largest-text transaction layout needs repair. In the
   [retained screenshot](screenshots/large-text-transaction-ready-unreviewed.png),
   the Date label wraps one letter per line beside its picker. The controls remain
@@ -187,6 +197,6 @@ committed evidence contains only synthetic screenshots and aggregate results.
   is not claimed. English/Spanish money, Search and goal evidence is separate.
 - A first Search launch raced session restoration. Subsequent native sign-in
   runs passed; no shared auth implementation was changed.
-- Publication and new-branch CI await explicit approval after automatic review
-  rejected the branch push. Full local pytest also remains blocked at collection
+- Draft publication is approved and is being prepared. New-branch CI is pending.
+  Full local pytest also remains blocked at collection
   by the pre-existing SciPy binary load error described in `local-checks.json`.

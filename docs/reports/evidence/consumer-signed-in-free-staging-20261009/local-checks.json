@@ -17,9 +17,9 @@
     "cause": "Local SciPy _spropack binary cannot load on this macOS environment.",
     "live_evals_enabled": false
   },
-  "scope": "No production source, dependency or hosted configuration changed.",
+  "scope": "Tests/evidence and the approved one-line native identifier refresh. No backend, dependency or hosted configuration change.",
   "ci_scope_ruff": "passed: src tests workflows scripts",
-  "native_release_build": "passed: LargeTextMoney.xctestproducts",
+  "native_release_build": "passed: PlanIdentityApproved.xctestproducts",
   "test_delta_reviews": {
     "empty_amount": "clean",
     "footer_boundary": "clean",
@@ -28,8 +28,10 @@
     "goal_search_navigation": "clean",
     "large_text_money": "clean"
   },
-  "app_source_tree": "0d9584a4489c5081a1856665e2fa2aba392b5ec2",
-  "app_source_unchanged_from_integration": true,
+  "app_source_tree": "6f6e052f8ad348c247145915c5cb0c89c5d76c36",
+  "app_source_unchanged_from_integration": false,
   "large_text_visual_acceptance": "open: transaction Date label wraps into a single-letter column",
-  "final_local_test_source": "125087e96"
+  "final_local_test_source": "125087e96",
+  "app_source_delta": "CanvasDecimalInput identifier assignment moved into updateUIView",
+  "identifier_regression": "passed:1 test,0 failures,0 skips"
 }
