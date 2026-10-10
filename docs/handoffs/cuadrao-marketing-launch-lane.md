@@ -327,3 +327,6 @@ The founder rejected the earlier phone angle/hand geometry while retaining the r
 
 
 Latest founder steering: keep the corrected grip and turn the phone slightly toward the reader. Visual source `fbc064e0da41be93bfbdb1201e76031d1a915578` adds gentle perspective and narrows the silver edge through three CSS declarations. Fresh build and 13 motion checks pass (one intentional touch skip); exact-source captures/clip refreshed in Personal evidence. Preview 4512 and mock 4513 use the change. The hand, signup logic and other lanes remain untouched. Local only, unpushed.
+
+
+Latest phone cleanup source `1c4dca80a512919a523fc9649c8ccd1f96fa8539` removes the slogan inside the phone and replaces its older screenshot icon with the canonical light mark. The lockup and central mark now use the same approved greens and lime overlap. A code-native overlay preserves the original PNG; no Consumer screen was changed. Hand, reader-facing angle, welcome buttons and motion are retained. Typecheck/lint/build, 15 brand tests, refreshed exact-source browser captures and independent scoped review pass. The current source and provenance are in Personal evidence. Preview4512 and mock4513 remain local; no push, publication, provider activation or other-lane changes. All workers stopped.

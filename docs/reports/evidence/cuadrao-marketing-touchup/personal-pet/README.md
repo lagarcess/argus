@@ -1,6 +1,6 @@
 # Personal signup pet and phone
 
-Current visual source `fbc064e0da41be93bfbdb1201e76031d1a915578` (initial scene `c8eab10647c56a49591033f5e5a026bb8a5befa6`), October 9, 2026. Founder requested keeping the left-hand copy and signup, replacing the Home preview with a hand-held phone showing the native welcome screen, and adding a square pet that watches the cursor and delivers an envelope after signup succeeds. The founder chose the welcome screen with the logo and signup button. This is a local design iteration pending visual acceptance.
+Current visual source `1c4dca80a512919a523fc9649c8ccd1f96fa8539` (initial scene `c8eab10647c56a49591033f5e5a026bb8a5befa6`), October 9, 2026. Founder requested keeping the left-hand copy and signup, replacing the Home preview with a hand-held phone showing the native welcome screen, and adding a square pet that watches the cursor and delivers an envelope after signup succeeds. The founder chose the welcome screen with the logo and signup button. This is a local design iteration pending visual acceptance.
 
 ## Behavior
 
@@ -70,3 +70,10 @@ Parent desktop/mobile inspection caught and fixed a bezel painting seam and a ga
 ## Reader-facing angle refinement
 
 The founder approved retaining the current hand and turning the phone slightly toward the reader. Source `fbc064e0da41be93bfbdb1201e76031d1a915578` changes only the phone CSS: mild 3D perspective, a smaller shear, and a slimmer silver side. Hand paths, form, branding and motion logic are unchanged. Fresh build and 13 focused motion checks passed, with one intentional touch skip. Final desktop/mobile ES/EN images and the clip pin this source. The parent visually inspected the render and refreshed the in-app preview. See [angle motion results](reader-angle-motion-results.txt). Both 4512 and the 4513 mock serve this version; reload an existing tab. This approved, contained CSS adjustment was implemented directly and does not claim a separate independent review. No publish, push, provider or other-lane changes.
+
+
+## Phone slogan removal and brand parity
+
+The founder requested removing the phone slogan because the middle finger covered it, and asked about the color difference between the central icon and the icon beside the name. The central artwork was baked into the historical native capture; the name already used the current canonical lockup. Source `1c4dca80a512919a523fc9649c8ccd1f96fa8539` clears the old central icon and slogan in the rendered Marketing composition, then overlays `cuadrao-mark-light.svg` from the same canonical brand source as the header lockup. The dark green, pale green and lime overlap now agree. No colors or logo geometry were recreated. `sync-brand.mjs` derives both served SVGs from `marketing/brand/`; the native PNG remains unchanged on disk.
+
+The central image and flight anchor derive their center from the same `welcome.logo` coordinates. Hand, angle, form, native welcome buttons and motion logic are unchanged. Typecheck/lint/build pass; 15 existing brand tests pass. Final ES/EN desktop/mobile idle, pending, flying and settled captures/clip pin this source, with no page errors. The parent verified that the slogan and old mark are fully covered, the current icon loads and the welcome buttons remain visible. Independent scoped review is clean with zero comment/suppression flags. Prior motion evidence is retained for the unchanged state/geometry behavior. This is Marketing-only; no native or hosted update is implied. Preview 4512 and mock4513 remain available; comparison4511 is preserved. Workers have returned ownership and stopped.
