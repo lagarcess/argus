@@ -21,3 +21,10 @@ Invalid submit produces one tilt and blink, retains the entered email and displa
 Continue `codex/marketing-touchup-delivery` in the existing Marketing delivery worktree. Preview4512 and simulated signup4513 serve this accepted reaction. Comparison4511 and its archived source remain unchanged. Prior process IDs are observations; verify listener ownership before restarting.
 
 Only Marketing files and evidence changed. No Business or Consumer product worktree, service, API, schema or provider configuration changed. PR remains draft and unmerged. No deployment, hosted change, public-form activation or real email is authorized.
+
+
+## CI infrastructure retry
+
+The first publication head `70c3dc7581c31d06abd5616db479d7ea04a6293b` passed Marketing and frontend CI. The pinned release gate failed before tests in [run 38021122919](https://github.com/lagarcess/argus/actions/runs/38021122919/job/114122198745). Docker could not bind the disposable database port `54332` because the hosted runner reported it was already in use. No application assertion failed in that job.
+
+The workflow starts one disposable Supabase instance on a GitHub-hosted runner. Its port configuration and integration base are unchanged from the preceding green run. This is classified as a runner infrastructure failure. This evidence-only commit triggers one fresh full CI build on new runners; no job-only retry, source workaround or CI weakening is used. If the same failure recurs, stop retrying and investigate the shared CI environment separately from the Marketing change. Runtime and visual evidence remain valid.
