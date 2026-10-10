@@ -22,7 +22,7 @@ export function PrivacyPage({ locale }: { locale: BusinessLocale }) {
         </header>
         <div className={privacyStyles.sections}>
           {copy.sections.map((section) => (
-            <section key={section.title} className={privacyStyles.section}>
+            <section key={section.id} id={section.id} className={privacyStyles.section}>
               <h2>{section.title}</h2>
               {section.paragraphs?.map((paragraph) => (
                 <p key={paragraph}>{paragraph}</p>

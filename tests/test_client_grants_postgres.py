@@ -200,9 +200,13 @@ RELATIONS_WITHOUT_CLIENT_TABLE_GRANTS = frozenset(
         "public.refusal_observations",
         "public.route_receipts",
         "public.run_context_packets",
+        "public.spaces",
         "public.strategies",
         "public.usage_counters",
         "public.visitor_usage_counters",
+        "public.whatsapp_inbound_messages",
+        "public.whatsapp_link_codes",
+        "public.whatsapp_sender_links",
     }
 )
 
@@ -380,6 +384,21 @@ def test_migration_owner_default_privileges_give_clients_nothing(catalog) -> Non
     assert _default_privileges(catalog) == CLIENT_DEFAULT_PRIVILEGES
 
 
+def test_business_space_is_never_client_visible(catalog) -> None:
+    connections = _column_privileges(catalog)["public.financial_source_connections"]
+    assert "owner_space_id" not in connections["authenticated"]["SELECT"]
+    catalog.execute(
+        "select role_name, has_function_privilege(role_name,"
+        " 'public.business_space_of(uuid)', 'EXECUTE')"
+        " from unnest(array['anon', 'authenticated', 'service_role']) as role_name"
+    )
+    assert dict(catalog.fetchall()) == {
+        "anon": False,
+        "authenticated": False,
+        "service_role": True,
+    }
+
+
 # Behavior on a real write. A signed-in user owns these rows and the owner
 # policies would admit the write, so only the missing grant refuses it.
 
@@ -544,3 +563,44 @@ def test_service_role_still_writes_backend_owned_rows(owned_rows) -> None:
                 "select status from public.backtest_jobs where id = %(job_id)s", ids
             )
             assert cursor.fetchone() == ("succeeded",)
+
+
+# Storage. Buckets no client may reach, and every storage.objects policy; an
+# empty policy list means only the service role reads or writes any object.
+
+PRIVATE_BUCKETS = frozenset({"financial-document-sources"})
+STORAGE_OBJECT_POLICIES: frozenset[str] = frozenset()
+
+
+def test_private_buckets_exist_and_are_not_public(catalog) -> None:
+    catalog.execute(
+        "select id, public from storage.buckets where id = any(%s)",
+        (list(PRIVATE_BUCKETS),),
+    )
+    assert dict(catalog.fetchall()) == dict.fromkeys(PRIVATE_BUCKETS, False)
+
+
+def test_storage_object_policies_match_the_allow_list(catalog) -> None:
+    catalog.execute(
+        "select policyname from pg_policies"
+        " where schemaname = 'storage' and tablename = 'objects'"
+    )
+    assert {row[0] for row in catalog.fetchall()} == STORAGE_OBJECT_POLICIES
+
+
+@pytest.mark.parametrize("role", CLIENT_ROLES)
+def test_client_roles_cannot_see_their_own_private_objects(owned_rows, role) -> None:
+    connection, ids = owned_rows
+    name = f"{ids['user_id']}/{uuid4()}/{'a' * 64}"
+    with connection.cursor() as cursor:
+        with connection.transaction():
+            cursor.execute(
+                "insert into storage.objects (bucket_id, name, owner_id)"
+                " values ('financial-document-sources', %s, %s)",
+                (name, ids["user_id"]),
+            )
+            _act_as(cursor, role, user_id=ids["user_id"])
+            cursor.execute(
+                "select count(*) from storage.objects where name = %s", (name,)
+            )
+            assert cursor.fetchone() == (0,)

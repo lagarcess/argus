@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -447,3 +450,408 @@ def test_a_missing_url_is_refused(
             ["--candidate-sha", "x" * 40, "--approved-file", str(tmp_path / "a.json"),
              "--allow-host", "127.0.0.1", "--allow-database", "rehearsal"]
         )  # fmt: skip
+
+
+# --- hosted approval record -------------------------------------------------------------
+
+REF = "abcdefghijklmnopqrst"
+SHA = "a" * 40
+NOW = datetime(2026, 10, 20, 12, 0, tzinfo=timezone.utc)
+VERSIONS = ["20260925120000", "20260928200000"]
+DIRECT = f"db.{REF}.supabase.co"
+POOLER = "aws-0-us-east-2.pooler.supabase.com"
+
+
+def _record(**changes: object) -> str:
+    record: dict[str, object] = {
+        "id": "apply-2026-10-20",
+        "project_ref": REF,
+        "hosts": [DIRECT, POOLER],
+        "database": "postgres",
+        "candidate_sha": SHA,
+        "versions_sha256": applier.versions_digest(VERSIONS),
+        "issued_at": "2026-10-20T10:00:00Z",
+        "expires_at": "2026-10-21T10:00:00Z",
+        "approved_by": "founder",
+        "approval_reference": "https://github.com/lagarcess/argus/issues/833#issuecomment-1",
+    }
+    record.update(changes)
+    return json.dumps(record)
+
+
+def _approval(**changes: object) -> applier.HostedApproval:
+    return applier.parse_hosted_approval(_record(**changes), SHA, VERSIONS, (), NOW)
+
+
+def test_a_matching_record_is_accepted_and_names_its_hosts() -> None:
+    approval = _approval()
+    assert approval.hosts == (DIRECT, POOLER)
+    assert approval.id == "apply-2026-10-20"
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"candidate_sha": "b" * 40},
+        {"versions_sha256": "0" * 64},
+        {"expires_at": "2026-10-20T11:00:00Z"},
+        {"issued_at": "2026-10-20T13:00:00Z", "expires_at": "2026-10-21T13:00:00Z"},
+        {"issued_at": "2026-10-01T00:00:00Z", "expires_at": "2026-10-22T00:00:00Z"},
+        {"issued_at": "2026-10-20T10:00:00", "expires_at": "2026-10-21T10:00:00"},
+        {"project_ref": "short"},
+        {"hosts": ["db.example.com"]},
+        {"hosts": []},
+        {"id": ""},
+    ],
+)
+def test_a_record_for_another_run_or_time_or_host_is_refused(
+    changes: dict[str, object],
+) -> None:
+    with pytest.raises(applier.ApplyError):
+        _approval(**changes)
+
+
+def test_a_record_with_missing_or_extra_keys_is_refused() -> None:
+    extra = json.loads(_record())
+    extra["note"] = "x"
+    for text in (json.dumps(extra), json.dumps({"id": "x"}), "not json", "[]"):
+        with pytest.raises(applier.ApplyError):
+            applier.parse_hosted_approval(text, SHA, VERSIONS, (), NOW)
+
+
+def test_the_digest_covers_which_versions_run_without_a_ledger_row() -> None:
+    assert applier.versions_digest(VERSIONS) != applier.versions_digest(
+        VERSIONS, ["20260505000001"]
+    )
+    assert applier.versions_digest(VERSIONS) == applier.versions_digest(VERSIONS[::-1])
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        f"postgresql://postgres:p@{DIRECT}:5432/postgres",
+        f"postgresql://postgres.{REF}:p@{POOLER}:5432/postgres",
+    ],
+)
+def test_a_named_hosted_target_is_accepted_with_its_record(url: str) -> None:
+    hosted = _approval()
+    applier.check_target(url, [DIRECT, POOLER], ["postgres"], environ={}, hosted=hosted)
+
+
+@pytest.mark.parametrize(
+    ("url", "allow_hosts", "allow_databases"),
+    [
+        ("postgresql://postgres:p@db.zzzzzzzzzzzzzzzzzzzz.supabase.co:5432/postgres", ["db.zzzzzzzzzzzzzzzzzzzz.supabase.co"], ["postgres"]),
+        (f"postgresql://postgres:p@{DIRECT}:5432/other", [DIRECT], ["other"]),
+        (f"postgresql://postgres:p@{DIRECT}:5432/postgres", [DIRECT, "db.example.supabase.co"], ["postgres"]),
+        (f"postgresql://postgres.zzzzzzzzzzzzzzzzzzzz:p@{POOLER}:5432/postgres", [POOLER], ["postgres"]),
+        ("postgresql://u:p@127.0.0.1:5432/postgres", ["127.0.0.1"], ["postgres"]),
+    ],
+)  # fmt: skip
+def test_a_hosted_target_the_record_does_not_name_is_refused(
+    url: str, allow_hosts: list[str], allow_databases: list[str]
+) -> None:
+    with pytest.raises(applier.ApplyError):
+        applier.check_target(
+            url, allow_hosts, allow_databases, environ={}, hosted=_approval()
+        )
+
+
+def test_a_trailing_dot_is_the_same_named_host() -> None:
+    applier.check_target(
+        f"postgresql://postgres:p@{DIRECT}.:5432/postgres",
+        [DIRECT],
+        ["postgres"],
+        environ={},
+        hosted=_approval(),
+    )
+
+
+def test_a_hosted_target_without_a_record_is_still_refused() -> None:
+    with pytest.raises(applier.ApplyError, match="approval record"):
+        applier.check_target(
+            f"postgresql://postgres:p@{DIRECT}:5432/postgres",
+            [DIRECT],
+            ["postgres"],
+            environ={},
+        )
+
+
+def test_the_hosted_connection_must_reach_a_named_host_and_database() -> None:
+    hosted = _approval()
+    ok = SimpleNamespace(
+        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6", port=5432),
+        execute=lambda _sql: _Row("postgres"),
+    )
+    applier.verify_connection(ok, [DIRECT, POOLER], ["postgres"], hosted)
+    elsewhere = SimpleNamespace(
+        info=SimpleNamespace(
+            host="aws-0-eu-west-1.pooler.supabase.com", hostaddr="3.4.5.6"
+        ),
+        execute=lambda _sql: _Row("postgres"),
+    )
+    with pytest.raises(applier.ApplyError):
+        applier.verify_connection(elsewhere, [DIRECT, POOLER], ["postgres"], hosted)
+    wrong_db = SimpleNamespace(
+        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6", port=5432),
+        execute=lambda _sql: _Row("other"),
+    )
+    with pytest.raises(applier.ApplyError):
+        applier.verify_connection(wrong_db, [DIRECT, POOLER], ["postgres"], hosted)
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(
+        ["git", "-c", "user.name=t", "-c", "user.email=t@example.test", *args],
+        cwd=root, check=True, capture_output=True,
+    )  # fmt: skip
+
+
+def _repo(tmp_path: Path) -> tuple[Path, str]:
+    _git(tmp_path, "init", "-q")
+    (tmp_path / "base.txt").write_text("base")
+    _git(tmp_path, "add", "base.txt")
+    _git(tmp_path, "commit", "-q", "-m", "candidate")
+    sha = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    return tmp_path, sha
+
+
+def test_the_record_must_be_tracked_clean_and_on_top_of_the_candidate(
+    tmp_path: Path,
+) -> None:
+    root, sha = _repo(tmp_path)
+    path = "docs/release-manifests/approval.json"
+    record = root / path
+    record.parent.mkdir(parents=True)
+    record.write_text("{}")
+    with pytest.raises(applier.ApplyError, match="not tracked"):
+        applier.read_committed_record(root, path, sha)
+    _git(root, "add", path)
+    with pytest.raises(applier.ApplyError, match="uncommitted"):
+        applier.read_committed_record(root, path, sha)
+    _git(root, "commit", "-q", "-m", "approval")
+    assert applier.read_committed_record(root, path, sha) == "{}"
+    record.write_text('{"edited": true}')
+    with pytest.raises(applier.ApplyError, match="uncommitted"):
+        applier.read_committed_record(root, path, sha)
+    record.write_text("{}")
+    other = subprocess.run(
+        ["git", "commit-tree", "HEAD^{tree}", "-m", "unrelated"], cwd=root, check=True,
+        capture_output=True, text=True, env={**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.test",
+        "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.test"},
+    ).stdout.strip()  # fmt: skip
+    with pytest.raises(applier.ApplyError, match="on top of the candidate"):
+        applier.read_committed_record(root, path, other)
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=root, check=True, capture_output=True, text=True
+    ).stdout.strip()
+    with pytest.raises(applier.ApplyError, match="on top of the candidate"):
+        applier.read_committed_record(root, path, head)
+
+
+def test_the_record_is_read_from_the_commit_not_the_working_tree_and_never_a_symlink(
+    tmp_path: Path,
+) -> None:
+    root, sha = _repo(tmp_path)
+    outside = tmp_path.parent / "outside-record.json"
+    outside.write_text("{}")
+    link = root / "docs/release-manifests/linked.json"
+    link.parent.mkdir(parents=True)
+    link.symlink_to(outside)
+    _git(root, "add", ".")
+    _git(root, "commit", "-q", "-m", "linked record")
+    with pytest.raises(applier.ApplyError, match="symlink"):
+        applier.read_committed_record(root, "docs/release-manifests/linked.json", sha)
+
+
+@pytest.mark.parametrize(
+    "path", ["approval.json", "docs/other/approval.json", "../approval.json", "/etc/passwd",
+             "docs/release-manifests/../../approval.json"],
+)  # fmt: skip
+def test_the_record_path_must_sit_under_release_manifests(
+    tmp_path: Path, path: str
+) -> None:
+    root, sha = _repo(tmp_path)
+    with pytest.raises(applier.ApplyError, match="under docs/release-manifests"):
+        applier.read_committed_record(root, path, sha)
+
+
+def test_a_hosted_target_must_use_port_5432() -> None:
+    with pytest.raises(applier.ApplyError, match="port 5432"):
+        applier.check_target(
+            f"postgresql://postgres.{REF}:p@{POOLER}:6543/postgres", [POOLER], ["postgres"],
+            environ={}, hosted=_approval(),
+        )  # fmt: skip
+
+
+def test_a_record_cannot_name_another_projects_direct_host() -> None:
+    with pytest.raises(applier.ApplyError, match="direct host"):
+        _approval(hosts=["db.zzzzzzzzzzzzzzzzzzzz.supabase.co"])
+
+
+def test_the_pooler_user_must_be_exactly_postgres_dot_the_ref() -> None:
+    for user in (f"postgres.x{REF}", f"postgres.{REF}x", REF, "postgres"):
+        with pytest.raises(applier.ApplyError):
+            applier.check_target(
+                f"postgresql://{user}:p@{POOLER}:5432/postgres", [POOLER], ["postgres"],
+                environ={}, hosted=_approval(),
+            )  # fmt: skip
+
+
+def test_the_digest_covers_which_files_may_commit_in_several_transactions() -> None:
+    assert applier.versions_digest(VERSIONS) != applier.versions_digest(
+        VERSIONS, (), ["20261003120001"]
+    )
+
+
+def test_a_hosted_run_needs_the_ca_bundle(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    record = _record(versions_sha256=applier.versions_digest(["20260925120000"]))
+    monkeypatch.setattr(applier, "read_committed_record", lambda *_a: record)
+    monkeypatch.setattr(
+        applier,
+        "datetime",
+        SimpleNamespace(now=lambda _tz: NOW, fromisoformat=datetime.fromisoformat),
+    )
+    approved = tmp_path / "approved.json"
+    approved.write_text(json.dumps(["20260925120000"]))
+    monkeypatch.setenv(
+        "ARGUS_APPLY_DATABASE_URL", f"postgresql://postgres:p@{DIRECT}:5432/postgres"
+    )
+    with pytest.raises(applier.ApplyError, match="ssl-root-cert"):
+        applier.main(
+            ["--candidate-sha", SHA, "--approved-file", str(approved), "--allow-host", DIRECT,
+             "--allow-database", "postgres", "--hosted-approval", "docs/release-manifests/a.json"]
+        )  # fmt: skip
+
+
+def test_a_local_run_leaves_the_ssl_mode_to_libpq(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: dict[str, object] = {}
+    server = _Server(APPLIED)
+
+    def connect(*_a: object, **options: object) -> _Server:
+        seen.update(options)
+        return server
+
+    approved = tmp_path / "approved.json"
+    approved.write_text(json.dumps(["20260925120000"]))
+    monkeypatch.setenv(
+        "ARGUS_APPLY_DATABASE_URL", "postgresql://u:p@127.0.0.1:5432/rehearsal"
+    )
+    for name in applier._REFUSED_ENVIRONMENT:
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr("psycopg.connect", connect)
+    monkeypatch.setattr(applier.gate, "read_candidate_migrations", lambda *_a: CANDIDATES)
+    applier.main(
+        ["--candidate-sha", "x" * 40, "--approved-file", str(approved),
+         "--allow-host", "127.0.0.1", "--allow-database", "rehearsal"]
+    )  # fmt: skip
+    assert "sslmode" not in seen and "sslrootcert" not in seen
+
+
+def test_a_hosted_url_without_a_port_or_with_a_bad_one_is_refused() -> None:
+    for url in (
+        f"postgresql://postgres.{REF}:p@{POOLER}/postgres",
+        f"postgresql://postgres.{REF}:p@{POOLER}:abc/postgres",
+        f"postgresql://postgres.{REF}:p@{POOLER}:6543/postgres",
+    ):
+        with pytest.raises(applier.ApplyError, match="port 5432"):
+            applier.check_target(
+                url, [POOLER], ["postgres"], environ={}, hosted=_approval()
+            )
+
+
+def test_the_hosted_connection_must_be_on_port_5432() -> None:
+    wrong = SimpleNamespace(
+        info=SimpleNamespace(host=POOLER, hostaddr="3.4.5.6", port=6543),
+        execute=lambda _sql: _Row("postgres"),
+    )
+    with pytest.raises(applier.ApplyError, match="port 5432"):
+        applier.verify_connection(wrong, [POOLER], ["postgres"], _approval())
+
+
+# --- unrecorded versions leave no trace, so each has an effect probe ------------------------
+
+
+class _EffectConnection:
+    def __init__(self, definitions: list[tuple[str, str]]) -> None:
+        self.definitions = definitions
+
+    def execute(self, sql: str) -> _Cursor:
+        assert "pg_constraint" in sql, "the probe only reads the catalog"
+        return _Cursor(list(self.definitions))  # type: ignore[arg-type]
+
+
+OLD = [
+    (
+        "backtest_runs_asset_class_check",
+        "CHECK (asset_class = ANY (ARRAY['equity', 'crypto']))",
+    ),
+    (
+        "strategies_asset_class_check",
+        "CHECK (asset_class = ANY (ARRAY['equity', 'crypto']))",
+    ),
+]
+NEW = [
+    (name, definition.replace("'crypto'", "'crypto', 'currency_pair'"))
+    for name, definition in OLD
+]
+
+
+def test_the_probe_sees_the_effect_only_when_both_checks_allow_currency_pair() -> None:
+    assert not applier.effect_present(_EffectConnection(OLD), "20260505000001")
+    assert applier.effect_present(_EffectConnection(NEW), "20260505000001")
+    assert not applier.effect_present(_EffectConnection(NEW[:1]), "20260505000001")
+    assert not applier.effect_present(_EffectConnection([]), "20260505000001")
+
+
+def test_an_unrecorded_version_whose_effect_exists_is_refused_before_it_runs() -> None:
+    steps = applier.plan_steps(CANDIDATES, APPLIED, [], ["20260505000001"])
+    applier.check_unrecorded_effects(_EffectConnection(OLD), steps)
+    with pytest.raises(applier.ApplyError, match="already has its effect"):
+        applier.check_unrecorded_effects(_EffectConnection(NEW), steps)
+
+
+def test_an_unrecorded_version_without_a_probe_is_refused() -> None:
+    candidates = [*CANDIDATES, _migration("20260101000001", "old_other")]
+    steps = applier.plan_steps(candidates, APPLIED, [], ["20260101000001"])
+    with pytest.raises(applier.ApplyError, match="no effect probe"):
+        applier.check_unrecorded_effects(_EffectConnection(OLD), steps)
+
+
+def test_recorded_steps_need_no_probe() -> None:
+    steps = applier.plan_steps(CANDIDATES, APPLIED, ["20260925120000"])
+    applier.check_unrecorded_effects(_EffectConnection(NEW), steps)
+
+
+def test_an_unrecorded_version_without_a_probe_is_refused_before_connecting(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    approved = tmp_path / "approved.json"
+    approved.write_text("[]")
+    monkeypatch.setenv(
+        "ARGUS_APPLY_DATABASE_URL", "postgresql://u:p@127.0.0.1:5432/rehearsal"
+    )
+    monkeypatch.setattr("psycopg.connect", lambda *_a, **_k: pytest.fail("connected"))
+    with pytest.raises(applier.ApplyError, match="no effect probe"):
+        applier.main(
+            ["--candidate-sha", "x" * 40, "--approved-file", str(approved), "--unrecorded", "20260101000001",
+             "--allow-host", "127.0.0.1", "--allow-database", "rehearsal"]
+        )  # fmt: skip
+
+
+def test_the_probe_is_scoped_to_the_two_tables() -> None:
+    query, _ = applier._EFFECT_PROBES["20260505000001"]
+    assert (
+        "public.strategies'::regclass" in query
+        and "public.backtest_runs'::regclass" in query
+    )

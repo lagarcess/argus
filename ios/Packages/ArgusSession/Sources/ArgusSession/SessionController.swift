@@ -753,7 +753,8 @@ extension SessionController {
         catch { throw SessionFailure.invalidResponse }
     }
     func financialRequest(route: String = "financial-accounts", path: String = "", method: String = "GET", body: Data? = nil,
-                                  key: String? = nil, query: [URLQueryItem] = [], expectedIdentity: SessionSnapshot) async throws -> Data {
+                                  key: String? = nil, query: [URLQueryItem] = [], contentType: String = "application/json",
+                                  headers: [String: String] = [:], expectedIdentity: SessionSnapshot) async throws -> Data {
         guard expectedIdentity.phase == .authenticated, expectedIdentity.profile != nil else { throw SessionFailure.unauthorized }
         guard state.phase == .authenticated, state.revision == expectedIdentity.revision,
               state.profile?.id == expectedIdentity.profile?.id else { throw SessionFailure.staleOperation }
@@ -766,7 +767,8 @@ extension SessionController {
         var request = URLRequest(url: components.url!)
         request.httpMethod = method
         request.httpBody = body
-        if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        if body != nil { request.setValue(contentType, forHTTPHeaderField: "Content-Type") }
+        for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         if let key { request.setValue(key, forHTTPHeaderField: "Idempotency-Key") }
         return try await authenticatedResponse(using: activeAuth(), epoch: epoch, request: request).0
     }

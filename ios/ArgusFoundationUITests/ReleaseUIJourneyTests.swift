@@ -63,7 +63,7 @@ final class ReleaseUIJourneyTests: XCTestCase {
         let centers = order.map(\.frame.midX)
         XCTAssertEqual(centers, centers.sorted(), "Home, Plan, +, Search, Profile run left to right")
         XCTAssertEqual(release.buttons["nav.add"].frame.midX, release.frame.midX, accuracy: 2, "the + sits at the center")
-        XCTAssertEqual(release.buttons["nav.add"].label, "Add activity")
+        XCTAssertEqual(release.buttons["nav.add"].label, "Add")
         capture(release, "release-bar-add-en")
     }
 

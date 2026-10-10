@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { ReceiptStatus } from "@/lib/business-api";
+import type { ReceiptAttention, ReceiptStatus } from "@/lib/business-api";
 import { useBusiness } from "./BusinessWorkspace";
 
 export const cardClass =
@@ -97,17 +97,23 @@ export function useCategoryLabel() {
       : t("business.category.none", "No category");
 }
 
-export function useErrorLabel() {
+/** Each message names the cause and the next step the backend allows. */
+export function useAttentionLabel() {
   const { t } = useTranslation();
-  return (code: string | null) => {
-    if (!code) return "";
-    const known: Record<string, string> = {
-      document_unreadable: t("business.error.document_unreadable", "We couldn't read this receipt. Enter the details yourself or send a clearer photo."),
-      document_preparation_interrupted: t("business.error.document_preparation_interrupted", "Preparation stopped before it finished. Try again."),
-      extraction_unavailable: t("business.error.extraction_unavailable", "AI preparation isn't available right now. Your receipt is saved. Try again later or enter the details yourself."),
-    };
-    return known[code] ?? t("business.error.generic", "Something went wrong with this receipt. It is still saved.");
-  };
+  return (attention: ReceiptAttention | null) =>
+    attention
+      ? ({
+          unreadable: t("business.attention.unreadable", "We couldn't read this receipt. Enter the details yourself or send a clearer photo."),
+          ai_unavailable: t("business.attention.ai_unavailable", "AI preparation isn't available right now. Your receipt is saved. Try again later or enter the details yourself."),
+          interrupted: t("business.attention.interrupted", "Preparation stopped before it finished. Your receipt is saved. Try again or enter the details yourself."),
+          outcome_unknown: t("business.attention.outcome_unknown", "We couldn't recover the AI reading result. Your receipt is still saved. Try again or enter the details yourself."),
+          no_purchase_found: t("business.attention.no_purchase_found", "Cuadrao read this receipt but didn't find a purchase to save. Enter the details yourself."),
+          several_purchases: t("business.attention.several_purchases", "Cuadrao couldn't match this receipt to one purchase. Enter the details yourself to save one expense."),
+          source_unavailable: t("business.attention.source_unavailable", "The original file is no longer available. Enter the details yourself."),
+          check_details: t("business.attention.check_details", "Cuadrao couldn't read every part of this receipt. Check the details against the original before you confirm."),
+          other: t("business.attention.other", "Something went wrong with this receipt. It is still saved. Enter the details yourself."),
+        } satisfies Record<ReceiptAttention, string>)[attention]
+      : "";
 }
 
 export function LoadingRows({ rows = 3 }: { rows?: number }) {

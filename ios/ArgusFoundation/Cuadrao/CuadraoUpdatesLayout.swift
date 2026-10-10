@@ -38,9 +38,7 @@ struct CuadraoUpdatesLayout<Rows: View, Preferences: View>: View {
         .navigationTitle(spanish ? "Novedades" : "Updates").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) { preferences() }
-            ToolbarItem(placement: .confirmationAction) {
-                Button(spanish ? "Listo" : "Done") { dismiss() }.accessibilityIdentifier("cuadrao.updates.done")
-            }
+            CuadraoDoneToolbar(title: spanish ? "Listo" : "Done", identifier: "cuadrao.updates.done") { dismiss() }
         }
     }
 

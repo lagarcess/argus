@@ -1,8 +1,9 @@
-"""Personal money orchestration over the shared atomic repository."""
+"""Money orchestration over the shared atomic repository, within one owner scope."""
 
 from typing import Any
 from uuid import UUID
 
+from argus.domain.owner_scope import OwnerScope
 from argus.domain.recording.errors import (
     AccountNotFound,
     RecordingInputError,
@@ -26,10 +27,15 @@ class MoneyService:
         self.repository = accounts._repository
 
     def preview(
-        self, *, user_id: str, request: MoneyRequest, activity_id: str | None = None
+        self,
+        *,
+        user_id: str,
+        request: MoneyRequest,
+        scope: OwnerScope,
+        activity_id: str | None = None,
     ) -> dict[str, Any]:
         activity_id = self._id(activity_id)
-        records = self.accounts.list_accounts(user_id=user_id)
+        records = self.accounts.list_accounts(user_id=user_id, scope=scope)
         self.require_personal(records, request, activity_id)
         return plan(
             records,
@@ -44,6 +50,7 @@ class MoneyService:
         user_id: str,
         request: MoneyRequest,
         idempotency_key: str,
+        scope: OwnerScope,
         activity_id: str | None = None,
     ) -> dict[str, Any]:
         from argus.domain.recording.money_storage import transact
@@ -61,6 +68,7 @@ class MoneyService:
             request_identity(request, activity_id),
             planner,
             self.accounts._clock(),
+            scope=scope,
         )
         return {
             "activity": activity(records, aid, revision),
@@ -69,6 +77,44 @@ class MoneyService:
             ],
             "replayed": replayed,
         }
+
+    def write_entered(
+        self,
+        *,
+        user_id: str,
+        request: MoneyRequest,
+        idempotency_key: str,
+        scope: OwnerScope,
+    ) -> dict[str, Any]:
+        """Record a new activity exactly as the person entered it.
+
+        For a form with no preview step. It is planned under the account lock
+        and refused when a balance question needs an answer. The idempotency
+        identity is the entered request, so a retry replays the first write
+        even though that write moved the account versions a preview would name.
+        """
+
+        from argus.domain.recording.money_storage import transact
+
+        def planner(accounts: list[StoredAccount]) -> MoneyPlan:
+            self.require_personal(accounts, request, None)
+            result = plan(accounts, request, None, self.accounts._clock())
+            if not result.preview["ready"]:
+                raise RecordingInputError(
+                    "balance_coverage_required", "Review each balance question."
+                )
+            return result
+
+        records, aid, revision, _, replayed = transact(
+            self.repository,
+            user_id,
+            idempotency_key,
+            request_identity(request, None),
+            planner,
+            self.accounts._clock(),
+            scope=scope,
+        )
+        return {"activity": activity(records, aid, revision), "replayed": replayed}
 
     def prepare(
         self,
@@ -89,13 +135,17 @@ class MoneyService:
             )
         return result
 
-    def detail(self, *, user_id: str, activity_id: str) -> dict[str, Any]:
+    def detail(
+        self, *, user_id: str, activity_id: str, scope: OwnerScope
+    ) -> dict[str, Any]:
         aid = self._id(activity_id)
         assert aid is not None
-        return activity(self.accounts.list_accounts(user_id=user_id), aid)
+        return activity(self.accounts.list_accounts(user_id=user_id, scope=scope), aid)
 
-    def history(self, *, user_id: str, activity_id: str) -> dict[str, Any]:
-        records = self.accounts.list_accounts(user_id=user_id)
+    def history(
+        self, *, user_id: str, activity_id: str, scope: OwnerScope
+    ) -> dict[str, Any]:
+        records = self.accounts.list_accounts(user_id=user_id, scope=scope)
         aid = self._id(activity_id)
         assert aid is not None
         revisions = groups(records).get(aid)
@@ -110,8 +160,12 @@ class MoneyService:
             "next_cursor": None,
         }
 
-    def purchases(self, *, user_id: str, currency: str | None = None) -> dict[str, Any]:
-        records = current_activities(self.accounts.list_accounts(user_id=user_id))
+    def purchases(
+        self, *, user_id: str, scope: OwnerScope, currency: str | None = None
+    ) -> dict[str, Any]:
+        records = current_activities(
+            self.accounts.list_accounts(user_id=user_id, scope=scope)
+        )
         refunded: dict[str, int] = {}
         for item in records:
             purchase_id = item["purchase_activity_id"]

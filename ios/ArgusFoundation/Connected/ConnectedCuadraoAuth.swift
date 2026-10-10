@@ -48,17 +48,8 @@ struct ConnectedCuadraoAuthFlow: View {
         GeometryReader { geometry in
             ScrollView {
                 VStack(spacing: 0) {
-                    CuadraoBrand()
-                        .padding(.top, 28)
                     Spacer(minLength: 32)
-                    VStack(spacing: 32) {
-                        WelcomeSquares()
-                        Text(spanish ? "Tus finanzas,\nen orden." : "Your finances,\nin order.")
-                            .font(.system(.largeTitle, design: .serif))
-                            .lineSpacing(2)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.center)
-                    }
+                    CuadraoWelcomeLockup()
                     Spacer(minLength: 40)
                     VStack(spacing: 12) {
                         NavigationLink {
@@ -66,6 +57,8 @@ struct ConnectedCuadraoAuthFlow: View {
                         } label: {
                             Text(spanish ? "Crear cuenta" : "Create account")
                                 .font(.system(.body, weight: .semibold))
+                                .multilineTextAlignment(.center)
+                                .padding(.vertical, 14)
                                 .frame(maxWidth: .infinity, minHeight: 56)
                                 .foregroundStyle(WelcomePalette.onAccent)
                                 .background(WelcomePalette.pine, in: RoundedRectangle(cornerRadius: 16))
@@ -76,6 +69,8 @@ struct ConnectedCuadraoAuthFlow: View {
                         } label: {
                             Text(spanish ? "Iniciar sesión" : "Sign in")
                                 .font(.system(.body, weight: .semibold))
+                                .multilineTextAlignment(.center)
+                                .padding(.vertical, 14)
                                 .frame(maxWidth: .infinity, minHeight: 56)
                                 .overlay {
                                     RoundedRectangle(cornerRadius: 16)
@@ -90,7 +85,7 @@ struct ConnectedCuadraoAuthFlow: View {
                 .frame(minHeight: geometry.size.height, alignment: .topLeading)
             }.scrollIndicators(.hidden)
         }
-        .background(WelcomePalette.background.ignoresSafeArea())
+        .background(WelcomePalette.brandPaper.ignoresSafeArea())
     }
 
     private var validationRequired: some View {

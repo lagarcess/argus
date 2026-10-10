@@ -44,17 +44,11 @@ struct CanvasDecimalInput: UIViewRepresentable {
         field.backgroundColor = .clear
         field.accessibilityIdentifier = identifier
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        let toolbar = UIToolbar(); toolbar.sizeToFit()
-        toolbar.items = [UIBarButtonItem(systemItem: .flexibleSpace),
-            UIBarButtonItem(title: spanish ? "Listo" : "Done", style: .done,
-                target: context.coordinator, action: #selector(Coordinator.done))]
-        field.inputAccessoryView = toolbar
         context.coordinator.field = field
         return field
     }
     func updateUIView(_ field: UITextField, context: Context) {
         context.coordinator.parent = self
-        (field.inputAccessoryView as? UIToolbar)?.items?.last?.title = spanish ? "Listo" : "Done"
         field.font = CuadraoTypography.moneyFont(size, category: contentSizeCategory)
         field.textAlignment = alignment
         if context.coordinator.pending == 0 && raw != context.coordinator.raw {
@@ -74,7 +68,6 @@ struct CanvasDecimalInput: UIViewRepresentable {
         /// While writes are in flight the binding can lag the field, so updates must not rewrite it.
         var pending = 0
         init(_ parent: CanvasDecimalInput) { self.parent = parent }
-        @objc func done() { field?.resignFirstResponder() }
         func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
             let old = textField.text ?? ""
             guard let r = Range(range, in: old) else { return false }

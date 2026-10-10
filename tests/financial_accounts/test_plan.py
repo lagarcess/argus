@@ -2,6 +2,7 @@ from datetime import timedelta
 from uuid import uuid4
 
 import pytest
+from argus.domain.owner_scope import PERSONAL
 from argus.domain.planning.model import UnsafeCutover
 from argus.domain.planning.schemas import (
     ExpectationCreate,
@@ -95,7 +96,7 @@ def test_expectations_never_write_balances_and_same_day_bills_expose_shortfall(s
     assert group["first_shortfall_date"] == NOW.date().isoformat()
     assert group["points"][0]["occurrence_id"] is None
     assert group["points"][1]["balance_minor"] == "-5000"
-    assert scene[0].get(user_id=scene[1], account_id=aid).expenses == ()
+    assert scene[0].get(user_id=scene[1], account_id=aid, scope=PERSONAL).expenses == ()
 
 
 def test_fulfillment_replay_refund_and_amount_correction_keep_one_occurrence(scene):
@@ -122,7 +123,10 @@ def test_fulfillment_replay_refund_and_amount_correction_keep_one_occurrence(sce
         reason=fake.sentence(),
     )
     preview = money.preview(
-        user_id=scene[1], request=correction, activity_id=purchase["activity_id"]
+        user_id=scene[1],
+        request=correction,
+        activity_id=purchase["activity_id"],
+        scope=PERSONAL,
     )
     correction = MoneyRequest.model_validate(preview["reviewed_request"]).model_copy(
         update={"preview_token": preview["preview_token"]}
@@ -132,6 +136,7 @@ def test_fulfillment_replay_refund_and_amount_correction_keep_one_occurrence(sce
         request=correction,
         activity_id=purchase["activity_id"],
         idempotency_key=str(uuid4()),
+        scope=PERSONAL,
     )
     read = planner.read(scene[1])
     assert read["occurrences"][0]["status"] == "fulfilled"
@@ -160,6 +165,7 @@ def test_account_correction_needs_review_then_explicit_relink(scene):
         user_id=scene[1],
         request=correction,
         activity_id=result["activity"]["activity_id"],
+        scope=PERSONAL,
     )
     correction = MoneyRequest.model_validate(preview["reviewed_request"]).model_copy(
         update={"preview_token": preview["preview_token"]}
@@ -169,6 +175,7 @@ def test_account_correction_needs_review_then_explicit_relink(scene):
         request=correction,
         activity_id=result["activity"]["activity_id"],
         idempotency_key=str(uuid4()),
+        scope=PERSONAL,
     )
     row = planner.read(scene[1])["occurrences"][0]
     assert (
@@ -326,6 +333,7 @@ def test_changed_empty_account_is_explicitly_excluded(scene):
         user_id=scene[1],
         account_id=aid,
         request=EditFinancialAccountRequest(expected_version=1, currency="USD"),
+        scope=PERSONAL,
     )
     read = planner.read(scene[1])
     assert read["occurrences"][0]["exclusion_reason"] == "account_changed"
@@ -397,6 +405,7 @@ def test_forecast_ownership_and_rounding_survive_identical_fulfillment(
         request=EditFinancialAccountRequest(
             expected_version=1, ownership_share_bps=share
         ),
+        scope=PERSONAL,
     )
     planner, _, _, occurrence = setup_plan(scene, amount=amount, kind=kind, aid=aid)
     expected = planner.read(user)["currencies"][0]

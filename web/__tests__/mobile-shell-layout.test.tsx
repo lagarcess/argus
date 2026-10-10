@@ -424,7 +424,7 @@ describe("omnisearch below threshold", () => {
 
   test("hides the layout toggle where the band forces collapsed", () => {
     expect(commandPalette).toContain(
-      "onToggleLayout={isBelowTablet ? undefined : toggleLayout}",
+      "onToggleLayout={isBelowTablet || !hasPreviewPane ? undefined : toggleLayout}",
     );
   });
 

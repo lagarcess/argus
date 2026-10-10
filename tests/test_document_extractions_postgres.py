@@ -9,9 +9,11 @@ from argus.domain.ingestion.connections_postgres import PostgresConnectionReposi
 from argus.domain.ingestion.contract import ImportCandidate, SourceRef
 from argus.domain.ingestion.documents.models import ExtractionBatch
 from argus.domain.ingestion.documents.store_postgres import PostgresDocumentStore
+from argus.domain.owner_scope import PERSONAL
 from psycopg_pool import ConnectionPool
 
 from tests import test_financial_accounts_postgres as shared
+from tests.document_sources_support import source_objects
 
 users = shared.users
 pytestmark = pytest.mark.skipif(
@@ -29,13 +31,15 @@ def test_checkpoint_is_immutable_and_owner_scoped(
     pool: ConnectionPool, users: dict[str, str]
 ) -> None:
     now = datetime.now(timezone.utc)
-    repo, store = PostgresConnectionRepository(pool), PostgresDocumentStore(pool)
+    repo = PostgresConnectionRepository(pool)
+    store = PostgresDocumentStore(pool, source_objects())
     row = repo.create(
         user_id=users["owner"],
         source="statement",
         external_ref=str(uuid4()),
         label=None,
         now=now,
+        scope=PERSONAL,
     )
     holder = str(uuid4())
     assert repo.lease(connection_id=row.id, holder=holder, now=now)
@@ -107,6 +111,7 @@ def test_capture_survives_new_store_handles_and_disconnect_hides_source(
         external_ref=str(uuid4()),
         label="Document",
         now=now,
+        scope=PERSONAL,
     )
     draft = DocumentDraft(
         connection_id=connection.id,
@@ -118,9 +123,12 @@ def test_capture_survives_new_store_handles_and_disconnect_hides_source(
         updated_at=now,
     )
     source = b"%PDF-fixture"
-    assert PostgresDocumentStore(pool).capture(user_id=owner, draft=draft, content=source)
+    objects = source_objects()
+    assert PostgresDocumentStore(pool, objects).capture(
+        user_id=owner, draft=draft, content=source
+    )
     with ConnectionPool(shared.DSN, min_size=0, max_size=2) as restarted:
-        store = PostgresDocumentStore(restarted)
+        store = PostgresDocumentStore(restarted, objects)
         assert store.draft(user_id=owner, connection_id=connection.id) == draft
         assert store.source(user_id=owner, connection_id=connection.id) == source
         assert store.source(user_id=other, connection_id=connection.id) is None
@@ -140,3 +148,63 @@ def test_capture_survives_new_store_handles_and_disconnect_hides_source(
             "select count(*) from public.financial_document_extractions where connection_id=%s",
             (connection.id,),
         ).fetchone() == (0,)
+
+
+def test_bucket_and_reference_check_use_the_python_limits(
+    pool: ConnectionPool, users: dict[str, str]
+) -> None:
+    from argus.domain.ingestion.documents.config import (
+        SOURCE_MAX_BYTES,
+        SOURCE_MEDIA_TYPES,
+    )
+    from argus.domain.ingestion.documents.objects import SOURCE_BUCKET
+    from psycopg import errors
+
+    with pool.connection() as sql:
+        assert sql.execute(
+            "select file_size_limit, allowed_mime_types from storage.buckets where id = %s",
+            (SOURCE_BUCKET,),
+        ).fetchone() == (SOURCE_MAX_BYTES, list(SOURCE_MEDIA_TYPES))
+    owner, now = users["owner"], datetime.now(timezone.utc)
+    connection = PostgresConnectionRepository(pool).create(
+        user_id=owner,
+        source="statement",
+        external_ref=str(uuid4()),
+        label=None,
+        now=now,
+        scope=PERSONAL,
+    )
+    digest = "c" * 64
+
+    def reference(media_type: str, size: int) -> None:
+        with pool.connection() as sql, sql.transaction():
+            sql.execute(
+                "insert into public.financial_document_extractions"
+                " (connection_id, user_id, draft, source_bucket, source_path,"
+                "  source_media_type, source_size_bytes, source_sha256)"
+                " values (%s, %s, '{}'::jsonb, %s, %s, %s, %s, %s)",
+                (
+                    connection.id,
+                    owner,
+                    SOURCE_BUCKET,
+                    f"{owner}/{connection.id}/{digest}",
+                    media_type,
+                    size,
+                    digest,
+                ),
+            )
+            raise _RolledBack()
+
+    for media_type in SOURCE_MEDIA_TYPES:
+        with pytest.raises(_RolledBack):
+            reference(media_type, SOURCE_MAX_BYTES)
+    for media_type, size in (
+        ("text/plain", 1),
+        ("application/pdf", SOURCE_MAX_BYTES + 1),
+    ):
+        with pytest.raises(errors.CheckViolation):
+            reference(media_type, size)
+
+
+class _RolledBack(Exception):
+    pass

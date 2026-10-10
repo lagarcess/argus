@@ -239,7 +239,7 @@ import { SEND_BUSY_FALLBACK, SEND_GENERIC_FALLBACK, sendRefusal } from "@/lib/se
 import { useDailyCapNotice } from "./useDailyCapNotice";
 import { useChatAccountBoundary } from "./useChatAccountBoundary";
 import { authenticatedRequestHeaders, ChatAccountChangedError } from "@/lib/chat-auth-ownership";
-import { useChatWorkspace, type ChatShellView } from "./ChatWorkspace";
+import { useChatWorkspace, visibleShellView, workspaceChatAvailable, type ChatShellView } from "./ChatWorkspace";
 import ConversationDeleteDialog from "./ConversationDeleteDialog";
 import { useChatShellBridge, WorkspaceMain, workspaceComposerProps } from "./WorkspaceMain";
 type View = ChatShellView;
@@ -279,7 +279,8 @@ export default function ChatInterface() {
   }, [messages]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const workspace = useChatWorkspace();
-  const [currentView, setCurrentView] = useState<View>(() => workspace?.initialView ?? "chat");
+  const [shellView, setCurrentView] = useState<View>(() => workspace?.initialView ?? "chat");
+  const currentView = visibleShellView(workspace, shellView);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const mobileShell = useMobileShell();
   const [searchOverlayOpen, setSearchOverlayOpen] = useState(false);
@@ -506,7 +507,7 @@ export default function ChatInterface() {
       try {
         await loadHistoryPage(null, false);
         if (!targetConversationId) return;
-        const { items } = await listConversations({ limit: 50 });
+        const { items } = await listConversations({ limit: 50, surface: workspace?.conversationSurface });
         const conversation = items.find(
           (item) => item.id === targetConversationId,
         );
@@ -1042,7 +1043,7 @@ export default function ChatInterface() {
     let guestSubmissionHandedToStream = false;
     // Never decline a real message in silence; see lib/send-refusal.ts.
     const refuseSend = sendRefusal(showToast, t);
-    if (!trimmed || accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
+    if (!trimmed || !workspaceChatAvailable(workspace) || accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
     if (sendAdmissionInFlightRef.current || isStreamingResponse) {
       return false;
     }
@@ -1109,7 +1110,7 @@ export default function ChatInterface() {
 
     if (shouldCreateNewRouteConversation || (!targetConversationId && !action?.type)) {
       try {
-        const { conversation } = await createConversation(i18n.language, ownedRequest);
+        const { conversation } = await createConversation(i18n.language, ownedRequest, workspace?.conversationSurface);
         if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return false;
         targetConversationId = conversation.id;
         shouldResetMessagesForNewConversation = shouldCreateNewRouteConversation || messages.length === 0;
@@ -1624,7 +1625,7 @@ export default function ChatInterface() {
           try {
             const retryWasVisible = canApplyVisibleStreamUpdate();
             if (retryWasVisible) clearActiveConversationPointer();
-            const { conversation } = await createConversation(i18n.language, ownedRequest);
+            const { conversation } = await createConversation(i18n.language, ownedRequest, workspace?.conversationSurface);
             if (accountBoundary.invalidated.current || accountBoundary.conversionPending.current) return;
             if (!moveRequestToConversation(conversation.id)) return;
             if (retryWasVisible) {

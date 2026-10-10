@@ -12,7 +12,8 @@ export default function BusinessExpensesPanel() {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage ?? "en";
   const categoryLabel = useCategoryLabel();
-  const { source, revision, period, records, openPanel, actions } = useBusiness();
+  const { source, revision, period, records, panel, openPanel, actions } = useBusiness();
+  const found = panel.kind === "expenses" ? panel.expenseId : undefined;
   const [items, setItems] = useState<BusinessExpense[] | null>(null);
   const [failed, setFailed] = useState(false);
   const accounts = useMemo(
@@ -62,7 +63,12 @@ export default function BusinessExpensesPanel() {
       ) : (
         <ul className={`${cardClass} divide-y divide-black/[0.05] p-2 dark:divide-white/[0.05]`}>
           {items.map((expense) => (
-            <li key={expense.id} className="flex items-center gap-3 px-3 py-3">
+            <li
+              key={expense.id}
+              aria-current={expense.id === found ? "true" : undefined}
+              ref={expense.id === found ? (row) => row?.scrollIntoView({ block: "nearest" }) : undefined}
+              className="flex items-center gap-3 rounded-[14px] px-3 py-3 aria-[current=true]:bg-black/[0.04] dark:aria-[current=true]:bg-white/[0.06]"
+            >
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[15px] font-medium text-black dark:text-white">
                   {expense.merchant ?? t("business.expenses.no_merchant", "Expense")}

@@ -149,9 +149,9 @@ struct HouseholdActivityEditorView: View {
                 }
             }
             .navigationTitle(model.correcting == nil ? "household.recordActivity" : "household.correct")
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("accounts.cancel") { dismiss() } }
-                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
+                CuadraoCancelToolbar(title: "accounts.cancel") { dismiss() }
             }.task { await model.load() }
         }
     }
