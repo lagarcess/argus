@@ -387,3 +387,8 @@ Founder approved a subtle rejection reaction and refreshed demo. Runtime `0455fa
 Build/lint/typecheck, demo boundary test and 49 focused browser checks pass, with one expected touch skip. Independent scoped review is clean. [Personal evidence](../reports/evidence/cuadrao-marketing-touchup/personal-pet/README.md) records exact-source ES/EN desktop/mobile captures, the refreshed clip and test output. Both preview4512 and mock4513 include the change. Demo is reset for founder tryout at http://127.0.0.1:4513/personal. Comparison4511 is preserved.
 
 This new reaction and its evidence are local, unpushed checkpoints. Remote PR939 remains `781e820f5986e1d009bbfb2fb61ffd6ea6912d56` with its earlier green CI; do not apply that CI result to the new local delta. Continue the existing branch, preserve earlier accepted design and wait for feedback on this reaction. No merge, deployment, hosted changes, public forms or real email. Workers stopped; Marketing ownership remains with this thread.
+
+
+## Reaction accepted for PR update
+
+The founder accepted the invalid-email pet reaction and authorized pushing it to PR939 and obtaining green CI. [Reaction acceptance](../reports/evidence/cuadrao-marketing-touchup/personal-pet/reaction-acceptance.md) supersedes the preceding local-only and pending-feedback instructions. Runtime remains `0455fa4c2`; exact-source evidence is retained. Integration is unchanged at `43fac94de`, with no new overlap and a passing merged-tree modularity check. The final CI result belongs to the publication head and is recorded in PR checks and the terminal verification comment. Deployment, hosted changes, real email and public forms remain on hold.
