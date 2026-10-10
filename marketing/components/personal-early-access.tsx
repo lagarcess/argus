@@ -19,7 +19,7 @@ const copy = {
     eyebrow: "CUADRAO PERSONAL · ACCESO ANTICIPADO",
     title: "Tus finanzas, en orden.",
     benefit: "Tus cuentas y el próximo pago, a la vista.",
-    body: "Estamos preparando la app. Déjanos tu correo y te avisaremos cuando puedas probarla.",
+    body: "Déjanos tu correo y te avisaremos cuando puedas probar Cuadrao.",
     label: "Correo electrónico",
     button: "Avísame cuando pueda probarla",
     saving: "Guardando tu registro…",
@@ -27,19 +27,17 @@ const copy = {
     privacyLink: "Política de privacidad",
     rateLimited: "Hiciste varios intentos seguidos. Espera unos minutos e inténtalo de nuevo.",
     success: "Ya estás en la lista.",
-    saved: "Tu correo quedó registrado para el acceso anticipado.",
-    next: "Cuando haya invitaciones disponibles, podremos contactarte. Registrarte no garantiza acceso inmediato.",
+    next: "Te avisaremos cuando haya una invitación para ti.",
     error: `No pudimos guardar tu correo. Inténtalo de nuevo o escríbenos a ${businessContactEmail}.`,
     invalid: "Revisa tu correo e inténtalo de nuevo.",
     noScript: "Activa JavaScript para usar este formulario.",
-    caption: "Vista previa de bienvenida. El diseño puede cambiar.",
     alt: "Pantalla de bienvenida de Cuadrao Personal con su logo y el botón para crear una cuenta.",
   },
   en: {
     eyebrow: "CUADRAO PERSONAL · EARLY ACCESS",
     title: "Your finances, in order.",
     benefit: "Your accounts and next payment, at a glance.",
-    body: "We’re preparing the app. Leave your email and we’ll let you know when you can try it.",
+    body: "Leave your email and we’ll let you know when you can try Cuadrao.",
     label: "Email address",
     button: "Let me know when I can try it",
     saving: "Saving your signup…",
@@ -47,12 +45,10 @@ const copy = {
     privacyLink: "Privacy policy",
     rateLimited: "You made several attempts in a row. Wait a few minutes and try again.",
     success: "You're on the list.",
-    saved: "Your email is registered for early access.",
-    next: "We can contact you when invitations become available. Signing up does not guarantee immediate access.",
+    next: "We’ll email you when an invitation is available for you.",
     error: `We couldn't save your email. Try again or write to ${businessContactEmail}.`,
     invalid: "Check your email address and try again.",
     noScript: "Enable JavaScript to use this form.",
-    caption: "Welcome preview in Spanish. The design may change.",
     alt: "Cuadrao Personal welcome screen in Spanish with its logo and create-account button.",
   },
 } as const;
@@ -118,7 +114,6 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
             <div className={styles.confirmation}>
               <span className={styles.check}><Check size={24} aria-hidden="true" /></span>
               <h2 ref={confirmation} tabIndex={-1}>{c.success}</h2>
-              <p>{c.saved}</p>
               <p>{c.next}</p>
             </div>
           ) : (
@@ -147,7 +142,6 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
       </div>
       <figure className={styles.preview}>
         <WelcomePhone logoRef={logoRef} flying={Boolean(flight)} alt={c.alt} delivered={state.status === "success"} />
-        <figcaption>{c.caption}</figcaption>
       </figure>
       <SignupFlight flight={flight} onFinish={finish} />
     </section>
