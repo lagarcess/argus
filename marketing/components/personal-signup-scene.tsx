@@ -90,7 +90,7 @@ export function WelcomePhone({ logoRef, flying, alt, delivered }: { logoRef: Sce
   return <div className={styles.scene} data-welcome-phone="">
     <svg className={styles.palm} viewBox="0 0 480 820" aria-hidden="true">
       <defs><linearGradient id={wrist} x1="0" y1="0" x2="0" y2="1"><stop offset=".73" stopColor="#050505" /><stop offset="1" stopColor="#050505" stopOpacity="0" /></linearGradient></defs>
-      <path fill={`url(#${wrist})`} d="M0 820L12 782L13 745Q19 734 34 732C22 694 18 650 17 607L16 543C15 512 25 480 28 445C32 405 23 396 28 372L38 320C43 298 34 276 45 260C55 245 77 243 96 260L116 285L102 653Q180 711 337 687L387 264L391 183C393 167 409 151 425 147C441 143 457 151 461 166C470 192 444 220 426 253L425 286L452 314L461 386L449 441L450 517C460 541 457 564 442 592L418 640C408 664 407 690 389 720L324 820Z" />
+      <path fill={`url(#${wrist})`} d="M0 820L12 782L13 745Q19 734 34 732C22 694 18 650 17 607L16 543C15 512 25 480 28 445C32 405 23 396 28 372L38 320C43 298 34 276 45 260C55 245 77 243 96 260L116 285L387 264L391 183C393 167 409 151 425 147C441 143 457 151 461 166C470 192 444 220 426 253L425 286L452 314L461 386L449 441L450 517C460 541 457 564 442 592L418 640C408 664 407 690 389 720L324 820Z" />
     </svg>
     <div className={styles.device}>
       <div className={styles.screen}>
