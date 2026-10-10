@@ -1,6 +1,6 @@
 # PR929 integration reconciliation
 
-The coordinator assigned the first reconciliation slot to PR929. The founder's clarified scope is to land Marketing through PR939 and PR929 evidence. PR927 remains a separate main-promotion hold and must not be retargeted. Nothing lands in main. No merge or auto-merge slot has been granted to this lane yet.
+The coordinator assigned the first reconciliation slot to PR929. The founder's clarified scope is to land Marketing through PR939 and PR929 evidence. PR927 remains a separate main-promotion hold and must not be retargeted. Nothing lands in main. At the preparation checkpoint, no merge or auto-merge slot had been granted. The coordinator later granted a slot for PR929 only, subject to exact-head checks.
 
 ## Decision continuity
 
@@ -26,3 +26,15 @@ All 84 focused documentation-link and CI-policy tests passed. Changed-document l
 After PR929 lands, reconcile PR939 against the new integration head. Its `marketing/README.md` and `docs/runbooks/cuadrao-marketing-launch.md` overlap this evidence correction. Preserve the main-specific rollback explanation and the accepted PR939 design.
 
 Deployment, hosted changes, real email and public forms stay on hold. Page publication requires approved Spanish and English privacy wording naming the actual responsible operator for Meta, plus separate LLC clearance. No operator name is invented and "LLC pending" is not approved published wording. A later pages-first version must explicitly withhold both forms. These publication holds do not authorize changes to PR927 or main.
+
+## Integration landing
+
+PR929 squash-merged on October 10, 2026 at 18:29:53 UTC as `4cb85949b4dea6855971c8268aac1bd1a0cacb01`, with integration parent `cd14c9883f180876d27c121f0787b25a73529492`. The landed tree exactly equals reviewed head `a8d1a5e8044f11bc2194a72b1be16b3f8592a077`. Its stable base-to-head patch ID is `a2e3ce8b70e5605eff6f9724dd600e622191a9f0`.
+
+The independent review returned PASS with no findings. Both [push CI](https://github.com/lagarcess/argus/actions/runs/38075123350) and [PR CI](https://github.com/lagarcess/argus/actions/runs/38075126130) passed, as did [local smoke](https://github.com/lagarcess/argus/actions/runs/38075126134). Unresolved review threads were zero. The policy skipped docs-checks because the patch includes `marketing/README.md`; local links and all 84 focused documentation tests passed separately.
+
+The canonical integration checkout fast-forwarded cleanly to the merge SHA with zero ahead/behind. No linked issue closure applies to this evidence correction. Launch work remains with its existing owners. No environment-template change is needed because this patch adds no runtime configuration.
+
+Post-merge [integration CI](https://github.com/lagarcess/argus/actions/runs/38076009266) and [smoke](https://github.com/lagarcess/argus/actions/runs/38076009284) were started for the landed SHA. Their terminal results are recorded in the PR completion comment after verification. GitHub rejected the separate ledger push because integration requires a PR. The saved commit `0767f10fd2f8b160517deea83d0f196247e87310` remains on local branch `codex/marketing-pr929-ledger-checkpoint`. PR939 carries these three landing-record files for review and CI. This landing record is not an advance claim of success for those runs.
+
+The coordinator authorized PR939 preparation while post-merge checks run. Its merge still needs a separate slot after this landing is verified. PR927 and main remain untouched. All publication, privacy-operator, LLC, hosted-change and public-form holds above remain in force.
