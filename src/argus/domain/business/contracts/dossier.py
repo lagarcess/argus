@@ -18,6 +18,14 @@ class MessageSource(Contract):
     text: str = Field(min_length=1, max_length=20000)
 
 
+class WebActionSource(Contract):
+    id: UUID
+    kind: Literal["web_action"] = "web_action"
+    channel: Literal["web"] = "web"
+    received_at: datetime
+    text: str = Field(min_length=1, max_length=20000)
+
+
 class AttachmentSource(Contract):
     id: UUID
     kind: Literal["attachment"] = "attachment"
@@ -28,7 +36,9 @@ class AttachmentSource(Contract):
     media_type: str
 
 
-SourceEvidence = Annotated[MessageSource | AttachmentSource, Field(discriminator="kind")]
+SourceEvidence = Annotated[
+    MessageSource | WebActionSource | AttachmentSource, Field(discriminator="kind")
+]
 QuestionState = Literal[
     "open", "answered", "owner_does_not_know", "waiting_for_window", "withdrawn"
 ]

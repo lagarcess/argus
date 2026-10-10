@@ -8892,7 +8892,13 @@ distinction. There is no fallback lookup guessing which kind a UUID names.
 immutable before/after `history`, live `capabilities`, `blockers`,
 `approval_available`, and `approval_result`. Sources expose original text or the
 existing authorized attachment connection, channel and receipt time; receipt
-time does not become activity date. Questions carry stable IDs, field, recipient,
+time does not become activity date. A human form submission has source kind
+`web_action`, channel `web`, and immutable canonical submitted command text in
+`text` (1–20,000 characters). The server derives its stable source key from the
+scoped idempotent command and assigns `member_set` fact provenance with the
+actual human actor; browser requests never supply source IDs or provenance.
+It is neither extracted evidence nor an agent proposal. Questions can reference
+that web action as their answer source. Questions carry stable IDs, field, recipient,
 channel, state, prompt and allowed answer states. History includes readable actor
 and issuer labels with grant provenance, time and before/after facts. A failed
 history read is an error, never an empty successful history.
@@ -8914,7 +8920,13 @@ share one SQL transaction. The current recording path commits that claim before
 MoneyService writes; this is not one SQL transaction spanning money. Recovery
 uses the stored canonical MoneyService request/key and converges to one effect.
 
-Agent turns persist the typed action plan before any writes. Each action receipt
+Agent turns persist the typed action plan before any writes, together with
+server-derived `plan_actor: ActorProvenance` metadata outside the model plan.
+Its actor ID must match the turn actor and its grant snapshot cannot change.
+Every action receipt, including a human web command without a turn, stores its
+immutable actual `actor: ActorProvenance`; a planned action must match its
+plan actor snapshot. Resume rechecks that same live grant and refuses revocation
+rather than substituting a different current grant. Each action receipt
 is keyed by `turn_key + action_index` within the trusted client/actor scope.
 Per `(space, sender)` durable leases use monotonic fences and arrival ordering.
 A worker with an expired/replaced fence cannot commit. Persisted model and reply

@@ -46,7 +46,23 @@ def db(users: dict[str, str]) -> Iterator[Connection]:
 def client(db: Connection, users: dict[str, str]) -> dict[str, str]:
     owner = users["owner"]
     client_id = space(db, owner)
-    return {"id": client_id, "owner": owner, "draft": event(db, owner, client_id)}
+    return {
+        "id": client_id,
+        "owner": owner,
+        "draft": event(db, owner, client_id),
+        "grant": fake.uuid4(),
+    }
+
+
+def actor_provenance(client: dict[str, str]) -> dict[str, str]:
+    return {
+        "actor_id": client["owner"],
+        "actor_kind": "member",
+        "display_name": "Synthetic member",
+        "grant_id": client["grant"],
+        "issuer_id": client["owner"],
+        "issuer_display_name": "Synthetic issuer",
+    }
 
 
 def add_source(db: Connection, space_id: str) -> str:
@@ -65,8 +81,8 @@ def add_turn(db: Connection, client: dict[str, str], actions: list[dict] | None)
     plan = None if actions is None else Jsonb({"schema_version": 1, "actions": actions})
     db.execute(
         "insert into public.business_turns"
-        " (turn_key, space_id, sender_hash, actor_id, model_state, plan)"
-        " values (%s, %s, %s, %s, %s, %s)",
+        " (turn_key, space_id, sender_hash, actor_id, model_state, plan, plan_actor)"
+        " values (%s, %s, %s, %s, %s, %s, %s)",
         (
             key,
             client["id"],
@@ -74,6 +90,7 @@ def add_turn(db: Connection, client: dict[str, str], actions: list[dict] | None)
             client["owner"],
             "not_started" if plan is None else "completed",
             plan,
+            None if actions is None else Jsonb(actor_provenance(client)),
         ),
     )
     return key
@@ -82,9 +99,17 @@ def add_turn(db: Connection, client: dict[str, str], actions: list[dict] | None)
 def add_receipt(db: Connection, client: dict[str, str], key: str, command: dict) -> None:
     db.execute(
         "insert into public.business_action_receipts"
-        " (space_id, actor_id, idempotency_key, input_hash, command, turn_key, action_index)"
-        " values (%s, %s, %s, %s, %s, %s, 0)",
-        (client["id"], client["owner"], key, fake.sha256(), Jsonb(command), key),
+        " (space_id, actor_id, idempotency_key, input_hash, command, turn_key, action_index, actor)"
+        " values (%s, %s, %s, %s, %s, %s, 0, %s)",
+        (
+            client["id"],
+            client["owner"],
+            key,
+            fake.sha256(),
+            Jsonb(command),
+            key,
+            Jsonb(actor_provenance(client)),
+        ),
     )
 
 
@@ -285,9 +310,13 @@ def test_action_receipt_requires_matching_persisted_plan_and_actor(
     with pytest.raises(errors.CheckViolation, match="plan_required"), db.transaction():
         add_receipt(db, client, key, command)
     db.execute(
-        "update public.business_turns set model_state='completed',plan=%s"
+        "update public.business_turns set model_state='completed',plan=%s,plan_actor=%s"
         " where turn_key=%s",
-        (Jsonb({"schema_version": 1, "actions": [command]}), key),
+        (
+            Jsonb({"schema_version": 1, "actions": [command]}),
+            Jsonb(actor_provenance(client)),
+            key,
+        ),
     )
     with pytest.raises(errors.CheckViolation, match="plan_required"), db.transaction():
         add_receipt(db, {**client, "owner": users["other"]}, key, command)
@@ -379,3 +408,117 @@ def test_grant_is_explicit_for_one_client_and_can_be_revoked(
         ).fetchone()[0]
         == 0
     )
+
+
+def test_web_action_evidence_is_immutable_idempotent_and_web_only(
+    db: Connection, client: dict[str, str]
+) -> None:
+    source_key = fake.sha256()
+    text = json.dumps(
+        {"version": 1, "facts": {"amount": {"state": "known", "value": "25"}}}
+    )
+    insert = (
+        "insert into public.business_sources"
+        " (space_id,kind,channel,source_key,text_content,received_at)"
+        " values (%s,'web_action',%s,%s,%s,now()) returning id"
+    )
+    source_id = db.execute(insert, (client["id"], "web", source_key, text)).fetchone()[0]
+    assert (
+        db.execute(
+            "select text_content from public.business_sources where id=%s", (source_id,)
+        ).fetchone()[0]
+        == text
+    )
+    with pytest.raises(errors.CheckViolation), db.transaction():
+        db.execute(insert, (client["id"], "whatsapp", fake.sha256(), text))
+    with pytest.raises(errors.UniqueViolation), db.transaction():
+        db.execute(insert, (client["id"], "web", source_key, text))
+    with (
+        pytest.raises(errors.CheckViolation, match="business_evidence_immutable"),
+        db.transaction(),
+    ):
+        db.execute(
+            "update public.business_sources set text_content=%s where id=%s",
+            (fake.sentence(), source_id),
+        )
+    db.execute(
+        "insert into public.business_questions"
+        " (space_id,draft_id,field,asked_of,channel,state,prompt,allowed_answers,answer_source_id)"
+        " values (%s,%s,'amount','accountant','web','answered',%s,ARRAY['known'],%s)",
+        (client["id"], client["draft"], fake.sentence(), source_id),
+    )
+
+
+def test_plan_actor_cannot_be_missing_foreign_or_substituted(
+    db: Connection, client: dict[str, str], users: dict[str, str]
+) -> None:
+    key = add_turn(db, client, None)
+    plan = Jsonb({"schema_version": 1, "actions": []})
+    for actor in (None, Jsonb({**actor_provenance(client), "actor_id": users["other"]})):
+        with pytest.raises(errors.CheckViolation), db.transaction():
+            db.execute(
+                "update public.business_turns set model_state='completed',plan=%s,plan_actor=%s"
+                " where turn_key=%s",
+                (plan, actor, key),
+            )
+    key = add_turn(db, client, [{"action": "business_read_context"}])
+    replacement = {**actor_provenance(client), "grant_id": fake.uuid4()}
+    with pytest.raises(errors.CheckViolation, match="plan_immutable"), db.transaction():
+        db.execute(
+            "update public.business_turns set plan_actor=%s where turn_key=%s",
+            (Jsonb(replacement), key),
+        )
+    with pytest.raises(errors.CheckViolation, match="plan_required"), db.transaction():
+        add_receipt(
+            db,
+            {**client, "grant": replacement["grant_id"]},
+            key,
+            {"action": "business_read_context"},
+        )
+
+
+def test_human_receipt_retains_immutable_actor_without_a_turn(
+    db: Connection, client: dict[str, str], users: dict[str, str]
+) -> None:
+    command = {
+        "action": "review_draft",
+        "draft_id": client["draft"],
+        "request": {"version": 1, "facts": {"amount": {"state": "unknown"}}},
+    }
+    key = fake.sha256()
+    insert = (
+        "insert into public.business_action_receipts"
+        " (space_id,actor_id,actor,idempotency_key,input_hash,command)"
+        " values (%s,%s,%s,%s,%s,%s)"
+    )
+    params = (
+        client["id"],
+        client["owner"],
+        Jsonb(actor_provenance(client)),
+        key,
+        fake.sha256(),
+        Jsonb(command),
+    )
+    for invalid in (
+        None,
+        Jsonb({**actor_provenance(client), "actor_id": users["other"]}),
+    ):
+        with (
+            pytest.raises((errors.CheckViolation, errors.NotNullViolation)),
+            db.transaction(),
+        ):
+            db.execute(insert, (*params[:2], invalid, *params[3:]))
+    db.execute(insert, params)
+    with (
+        pytest.raises(errors.CheckViolation, match="identity_immutable"),
+        db.transaction(),
+    ):
+        db.execute(
+            "update public.business_action_receipts set actor=%s where idempotency_key=%s",
+            (Jsonb({**actor_provenance(client), "grant_id": fake.uuid4()}), key),
+        )
+    assert db.execute(
+        "select actor,turn_key from public.business_action_receipts"
+        " where idempotency_key=%s",
+        (key,),
+    ).fetchone() == (actor_provenance(client), None)

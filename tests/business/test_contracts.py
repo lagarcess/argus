@@ -12,14 +12,18 @@ from argus.domain.business.contracts.actions import (
     TurnPlan,
     canonical_input_hash,
 )
-from argus.domain.business.contracts.dossier import BusinessDossier, ReviewQuestion
+from argus.domain.business.contracts.dossier import (
+    BusinessDossier,
+    ReviewQuestion,
+    SourceEvidence,
+)
 from argus.domain.business.contracts.facts import (
     BusinessFactPatch,
     BusinessFacts,
     Known,
     legacy_projection,
 )
-from argus.domain.business.contracts.recovery import DurableTurn
+from argus.domain.business.contracts.recovery import ActionReceipt, DurableTurn
 from faker import Faker
 from pydantic import TypeAdapter, ValidationError
 
@@ -237,10 +241,10 @@ def test_owner_uncertainty_cannot_reopen_owner_question(dossier: BusinessDossier
         ReviewQuestion.model_validate({**value, "answer_source_id": None})
 
 
-def test_completed_turn_needs_persisted_plan() -> None:
+def test_completed_turn_needs_persisted_plan(dossier: BusinessDossier) -> None:
     value = {
         "space_id": fake.uuid4(),
-        "actor_id": fake.uuid4(),
+        "actor_id": dossier.history[0].actor.actor_id,
         "sender_hash": fake.sha256(),
         "turn_key": fake.sha256(),
         "arrival_sequence": 1,
@@ -249,7 +253,14 @@ def test_completed_turn_needs_persisted_plan() -> None:
     }
     with pytest.raises(ValidationError, match="persisted plan"):
         DurableTurn.model_validate(value)
-    assert DurableTurn.model_validate({**value, "plan": {"actions": []}}).plan is not None
+    with pytest.raises(ValidationError, match="actor provenance"):
+        DurableTurn.model_validate({**value, "plan": {"actions": []}})
+    saved = {**value, "plan": {"actions": []}, "plan_actor": dossier.history[0].actor}
+    assert DurableTurn.model_validate(saved).plan is not None
+    with pytest.raises(ValidationError, match="actual actor"):
+        DurableTurn.model_validate({**saved, "actor_id": fake.uuid4()})
+    with pytest.raises(ValidationError, match="actor provenance"):
+        DurableTurn.model_validate({**saved, "plan": None, "model_state": "running"})
 
 
 def test_plan_rejects_more_than_the_executor_can_run() -> None:
@@ -296,3 +307,50 @@ def test_known_facts_require_evidence_and_amount_requires_exact_string() -> None
         )
     with pytest.raises(ValidationError):
         BusinessFactPatch.model_validate({"amount": {"state": "known", "value": 0.1}})
+
+
+def test_web_action_source_preserves_human_command_and_rejects_whatsapp(
+    dossier: BusinessDossier,
+) -> None:
+    payload = {
+        "id": fake.uuid4(),
+        "kind": "web_action",
+        "channel": "web",
+        "received_at": dossier.sources[0].received_at,
+        "text": '{"facts":{"funding":{"state":"known","value":{"kind":"owner_funds"}}},"version":1}',
+    }
+    adapter = TypeAdapter(SourceEvidence)
+    source = adapter.validate_python(payload)
+    assert source.text == payload["text"]
+    assert adapter.validate_json(adapter.dump_json(source)) == source
+    with pytest.raises(ValidationError):
+        adapter.validate_python({**payload, "channel": "whatsapp"})
+
+
+def test_receipt_provenance_is_required_and_bound_to_actual_actor(
+    dossier: BusinessDossier,
+) -> None:
+    actor = dossier.history[0].actor
+    payload = {
+        "space_id": dossier.space_id,
+        "actor_id": actor.actor_id,
+        "actor": actor,
+        "idempotency_key": fake.sha256(),
+        "input_hash": fake.sha256(),
+        "command": {
+            "action": "review_draft",
+            "draft_id": dossier.draft_id,
+            "request": {
+                "version": dossier.version,
+                "facts": {"amount": {"state": "unknown"}},
+            },
+        },
+        "created_at": dossier.sources[0].received_at,
+    }
+    receipt = ActionReceipt.model_validate(payload)
+    assert receipt.turn_key is None and receipt.actor == actor
+    with pytest.raises(ValidationError, match="actual actor"):
+        ActionReceipt.model_validate({**payload, "actor_id": fake.uuid4()})
+    del payload["actor"]
+    with pytest.raises(ValidationError):
+        ActionReceipt.model_validate(payload)

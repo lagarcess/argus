@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import Field, model_validator
 
 from .actions import ActionOutcome, Command, TurnPlan
+from .authority import ActorProvenance
 from .facts import Contract
 
 TurnPhase = Literal[
@@ -36,6 +37,7 @@ class DurableTurn(Contract):
     phase: TurnPhase
     model_state: Literal["not_started", "running", "completed", "unknown"]
     plan: TurnPlan | None = None
+    plan_actor: ActorProvenance | None = None
     lease_fence: int | None = Field(default=None, ge=1)
     reply_text: str | None = None
 
@@ -45,6 +47,10 @@ class DurableTurn(Contract):
             raise ValueError("completed interpretation requires its persisted plan")
         if self.plan is not None and self.model_state != "completed":
             raise ValueError("a persisted plan requires completed interpretation")
+        if (self.plan is None) != (self.plan_actor is None):
+            raise ValueError("persisted plan requires its actor provenance")
+        if self.plan_actor is not None and self.plan_actor.actor_id != self.actor_id:
+            raise ValueError("plan provenance must match the actual actor")
         if self.phase in {"turn_done", "reply_pending", "reply_sent", "reply_unknown"}:
             if self.plan is None:
                 raise ValueError("completed turns require a plan")
@@ -54,6 +60,7 @@ class DurableTurn(Contract):
 class ActionReceipt(Contract):
     space_id: UUID
     actor_id: UUID
+    actor: ActorProvenance
     idempotency_key: str = Field(min_length=1, max_length=80)
     input_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     command: Command
@@ -64,6 +71,8 @@ class ActionReceipt(Contract):
 
     @model_validator(mode="after")
     def action_identity(self) -> ActionReceipt:
+        if self.actor.actor_id != self.actor_id:
+            raise ValueError("receipt provenance must match the actual actor")
         if (self.turn_key is None) != (self.action_index is None):
             raise ValueError("turn key and action index must be supplied together")
         return self

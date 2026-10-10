@@ -58,8 +58,9 @@ create index business_client_grants_issuer_idx on public.business_client_grants(
 create table public.business_sources (
     id uuid primary key default gen_random_uuid(),
     space_id uuid not null references public.spaces(id) on delete cascade,
-    kind text not null check (kind in ('message', 'attachment', 'agent_proposal')),
+    kind text not null check (kind in ('message', 'attachment', 'agent_proposal', 'web_action')),
     channel text not null check (channel in ('web', 'whatsapp')),
+    check (kind <> 'web_action' or channel = 'web'),
     source_key text not null check (char_length(source_key) between 1 and 200),
     text_content text,
     connection_id uuid,
@@ -70,7 +71,7 @@ create table public.business_sources (
         references public.financial_source_connections(id, owner_space_id) on delete cascade,
     check (
         (kind = 'attachment' and connection_id is not null and text_content is null)
-        or (kind in ('message', 'agent_proposal') and connection_id is null
+        or (kind in ('message', 'agent_proposal', 'web_action') and connection_id is null
             and char_length(text_content) between 1 and 20000) is true
     )
 );
@@ -162,12 +163,23 @@ create table public.business_turns (
     model_state text not null default 'not_started'
         check (model_state in ('not_started', 'running', 'completed', 'unknown')),
     plan jsonb,
+    plan_actor jsonb,
     lease_fence bigint check (lease_fence >= 1),
     reply_text text,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now(),
     unique (turn_key, space_id, actor_id),
     check ((model_state = 'completed') = (plan is not null)),
+    check ((plan is null) = (plan_actor is null)),
+    check (plan_actor is null or (
+        jsonb_typeof(plan_actor) = 'object'
+        and plan_actor->>'actor_id' = actor_id::text
+        and plan_actor->>'actor_kind' in ('owner_via_agent', 'member', 'extractor')
+        and jsonb_typeof(plan_actor->'display_name') = 'string'
+        and jsonb_typeof(plan_actor->'grant_id') = 'string'
+        and jsonb_typeof(plan_actor->'issuer_id') = 'string'
+        and jsonb_typeof(plan_actor->'issuer_display_name') = 'string'
+    ) is true),
     check (plan is null or (
         jsonb_typeof(plan) = 'object' and plan->>'schema_version' = '1'
         and jsonb_typeof(plan->'actions') = 'array'
@@ -183,6 +195,15 @@ create index business_turns_actor_idx on public.business_turns(actor_id);
 create table public.business_action_receipts (
     space_id uuid not null references public.spaces(id) on delete cascade,
     actor_id uuid not null references auth.users(id) on delete cascade,
+    actor jsonb not null check ((
+        jsonb_typeof(actor) = 'object'
+        and actor->>'actor_id' = actor_id::text
+        and actor->>'actor_kind' in ('owner_via_agent', 'member', 'extractor')
+        and jsonb_typeof(actor->'display_name') = 'string'
+        and jsonb_typeof(actor->'grant_id') = 'string'
+        and jsonb_typeof(actor->'issuer_id') = 'string'
+        and jsonb_typeof(actor->'issuer_display_name') = 'string'
+    ) is true),
     idempotency_key text not null check (char_length(idempotency_key) between 1 and 80),
     input_hash text not null check (input_hash ~ '^[0-9a-f]{64}$'),
     command jsonb not null check (jsonb_typeof(command) = 'object'),
@@ -221,7 +242,8 @@ create trigger business_source_immutable before update
 create function argus_private.business_plan_immutable()
 returns trigger language plpgsql set search_path = '' as $$
 begin
-    if old.plan is not null and new.plan is distinct from old.plan then
+    if old.plan is not null and (new.plan, new.plan_actor)
+        is distinct from (old.plan, old.plan_actor) then
         raise exception 'business_plan_immutable' using errcode = '23514';
     end if;
     if (new.turn_key, new.space_id, new.sender_hash, new.actor_id, new.arrival_sequence)
@@ -239,13 +261,14 @@ create function argus_private.business_receipt_plan_required()
 returns trigger language plpgsql set search_path = '' as $$
 declare
     saved_action jsonb;
+    saved_actor jsonb;
 begin
     if tg_op = 'UPDATE' then
         if (new.space_id, new.actor_id, new.idempotency_key, new.input_hash,
-            new.command, new.turn_key, new.action_index)
+            new.command, new.turn_key, new.action_index, new.actor)
             is distinct from
            (old.space_id, old.actor_id, old.idempotency_key, old.input_hash,
-            old.command, old.turn_key, old.action_index) then
+            old.command, old.turn_key, old.action_index, old.actor) then
             raise exception 'business_action_identity_immutable' using errcode = '23514';
         end if;
         if old.outcome is not null and (
@@ -256,11 +279,13 @@ begin
         end if;
     end if;
     if new.turn_key is not null then
-        select t.plan->'actions'->new.action_index into saved_action
+        select t.plan->'actions'->new.action_index, t.plan_actor
+          into saved_action, saved_actor
           from public.business_turns t
          where t.turn_key = new.turn_key and t.space_id = new.space_id
            and t.actor_id = new.actor_id;
-        if saved_action is null or saved_action <> new.command then
+        if saved_action is null or saved_action <> new.command
+            or saved_actor is distinct from new.actor then
             raise exception 'business_action_plan_required' using errcode = '23514';
         end if;
     end if;
