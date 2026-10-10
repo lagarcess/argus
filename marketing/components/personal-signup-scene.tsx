@@ -85,7 +85,9 @@ export function SignupPet({ petRef, pose = "rest" }: { petRef?: Scene["petRef"];
   </span>;
 }
 
-export function WelcomePhone({ logoRef, flying, alt, delivered }: { logoRef: Scene["logoRef"]; flying: boolean; alt: string; delivered: boolean }) {
+type WelcomePhoneCopy = { alt: string; createAccount: string; signIn: string };
+
+export function WelcomePhone({ logoRef, flying, copy, delivered }: { logoRef: Scene["logoRef"]; flying: boolean; copy: WelcomePhoneCopy; delivered: boolean }) {
   const wrist = useId();
   return <div className={styles.scene} data-welcome-phone="">
     <svg className={styles.palm} viewBox="0 0 480 820" aria-hidden="true">
@@ -94,10 +96,14 @@ export function WelcomePhone({ logoRef, flying, alt, delivered }: { logoRef: Sce
     </svg>
     <div className={styles.device}>
       <div className={styles.screen}>
-        <Image src={welcome.src} width={welcome.width} height={welcome.height} alt={alt} sizes="(max-width: 700px) 240px, 280px" priority />
+        <Image src={welcome.src} width={welcome.width} height={welcome.height} alt={copy.alt} sizes="(max-width: 700px) 240px, 280px" priority />
         <span className={styles.wordmark} aria-hidden="true"><Image src="/cuadrao-site/cuadrao-lockup-light.svg" width={268} height={56} alt="" /></span>
         <span className={styles.heroClearance} aria-hidden="true" />
         <Image className={styles.heroMark} src="/cuadrao-site/cuadrao-mark-light.svg" width={60} height={52} alt="" style={{ left: `${welcome.logo.x}%`, top: `${welcome.logo.y}%` }} />
+        <span className={styles.welcomeActions} aria-hidden="true" data-phone-actions="">
+          <span>{copy.createAccount}</span>
+          <span>{copy.signIn}</span>
+        </span>
         <span ref={logoRef} className={styles.logo} style={{ left: `${welcome.logo.x}%`, top: `${welcome.logo.y}%` }} data-phone-logo="" aria-hidden="true">
           {flying && <span className={styles.ripple} />}
           {delivered && !flying && <span className={styles.deliveredPet}><SignupPet pose="delivered" /></span>}

@@ -91,7 +91,7 @@ for (const width of [320, 390]) {
     await expect(page.locator("[data-signup-flight]")).toHaveCount(0);
     expect(await page.evaluate(() => window.scrollY)).toBe(before);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    await expect(page.getByAltText(/welcome screen in Spanish/)).toBeVisible();
+    await expect(page.getByAltText(/welcome screen with its logo/)).toBeVisible();
   });
 }
 
@@ -105,4 +105,19 @@ test("scrolling during delivery removes the flight and keeps the true confirmati
   await expect(hero(page)).toHaveAttribute("data-flight-state", "settled");
   await expect(page.getByRole("heading", { name: "Ya estás en la lista." })).toBeVisible();
   await expect(page.locator("[data-signup-flight]")).toHaveCount(0);
+});
+
+test("phone welcome labels follow the page language in both directions", async ({ page }) => {
+  await desktop(page);
+  const actions = page.locator("[data-phone-actions]");
+  await expect(actions).toHaveText("Crear cuentaIniciar sesión");
+  await page.getByRole("group", { name: "Idioma" }).getByRole("link", { name: "EN", exact: true }).click();
+  await expect(page).toHaveURL(/\/en\/personal$/);
+  await expect(actions).toHaveText("Create accountSign in");
+  await expect(page.getByAltText("Cuadrao Personal welcome screen with its logo and create-account button.")).toBeVisible();
+  await page.getByRole("group", { name: "Language" }).getByRole("link", { name: "ES", exact: true }).click();
+  await expect(page).toHaveURL(new URL("/personal", page.url()).href);
+  await expect(actions).toHaveText("Crear cuentaIniciar sesión");
+  await expect(actions).toHaveAttribute("aria-hidden", "true");
+  await expect(actions.locator("button, a, input")).toHaveCount(0);
 });

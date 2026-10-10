@@ -31,7 +31,11 @@ const copy = {
     error: `No pudimos guardar tu correo. Inténtalo de nuevo o escríbenos a ${businessContactEmail}.`,
     invalid: "Revisa tu correo e inténtalo de nuevo.",
     noScript: "Activa JavaScript para usar este formulario.",
-    alt: "Pantalla de bienvenida de Cuadrao Personal con su logo y el botón para crear una cuenta.",
+    phone: {
+      alt: "Pantalla de bienvenida de Cuadrao Personal con su logo y el botón para crear una cuenta.",
+      createAccount: "Crear cuenta",
+      signIn: "Iniciar sesión",
+    },
   },
   en: {
     eyebrow: "CUADRAO PERSONAL · EARLY ACCESS",
@@ -49,7 +53,11 @@ const copy = {
     error: `We couldn't save your email. Try again or write to ${businessContactEmail}.`,
     invalid: "Check your email address and try again.",
     noScript: "Enable JavaScript to use this form.",
-    alt: "Cuadrao Personal welcome screen in Spanish with its logo and create-account button.",
+    phone: {
+      alt: "Cuadrao Personal welcome screen with its logo and create-account button.",
+      createAccount: "Create account",
+      signIn: "Sign in",
+    },
   },
 } as const;
 
@@ -141,7 +149,7 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
         <p className={styles.privacy} id="signup-privacy">{c.privacy} <a href={`mailto:${businessContactEmail}`}>{businessContactEmail}</a>. <a href={businessPath(locale, "privacy")}>{c.privacyLink}</a>.</p>
       </div>
       <figure className={styles.preview}>
-        <WelcomePhone logoRef={logoRef} flying={Boolean(flight)} alt={c.alt} delivered={state.status === "success"} />
+        <WelcomePhone logoRef={logoRef} flying={Boolean(flight)} copy={c.phone} delivered={state.status === "success"} />
       </figure>
       <SignupFlight flight={flight} onFinish={finish} />
     </section>
