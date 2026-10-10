@@ -2,7 +2,7 @@
 
 The public Cuadrao website: Business, Personal, contact and privacy, in Spanish and English. It is an independent Next.js package. It shares nothing at runtime with the Argus API or the legacy `web/` app, needs no Argus environment group, and has its own lockfile.
 
-Forms, limits and data: [forms contract](../docs/specs/cuadrao-marketing-forms-contract.md). Release settings, cutover and rollback: [launch runbook](../docs/runbooks/cuadrao-marketing-launch.md). Design: [website design guide](../.agent/designs/cuadrao-business/DESIGN.md).
+Forms, limits and data: [forms contract](../docs/specs/cuadrao-marketing-forms-contract.md). Release settings, cutover and rollback: [launch runbook](../docs/runbooks/cuadrao-marketing-launch.md). Design: [website design guide](https://github.com/lagarcess/argus/blob/a706ed2284ad67f959d334baa2d4e0305217ac93/.agent/designs/cuadrao-business/DESIGN.md).
 
 ## Run
 
@@ -13,6 +13,10 @@ bun run lint && bun run typecheck && bun test
 bun run build && bun run start -- -p 3000
 bunx playwright install chromium && bun run test:e2e   # needs a build
 ```
+
+The touch-up review and exact ES/EN draft copy live in [the delivery record](../docs/reports/evidence/cuadrao-marketing-touchup/README.md). Dev and build derive the served header lockup from `brand/`; edit the canonical source, not its public copy.
+
+For parallel local lanes, override `MARKETING_E2E_SITE_PORT`, `MARKETING_E2E_PUBLIC_PORT` and `MARKETING_E2E_MOCK_PORT` together. The browser suite reads the existing production build, so rebuild after every product change. `MARKETING_CAPTURE_URL=http://127.0.0.1:4512 node scripts/capture-touchup.mjs` captures all routes in an isolated headless browser; run it only against the committed build named in its manifest.
 
 Provider settings are optional locally. Without them each form shows its unavailable state.
 

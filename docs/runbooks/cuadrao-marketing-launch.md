@@ -2,7 +2,7 @@
 
 Owns the release path for the independent `marketing/` package: promotion, the Render service, email DNS, domain cutover, verification and rollback. Parent issue [#880](https://github.com/lagarcess/argus/issues/880); children #887 to #892. The package, its forms and its data are documented in [marketing/README.md](../../marketing/README.md) and the [forms contract](../specs/cuadrao-marketing-forms-contract.md).
 
-Nothing in this document is an approval. Each gated action below needs the founder's explicit yes in chat, with the exact candidate named.
+Nothing in this document is an approval. Each gated action below needs the founder's explicit yes in chat, with the exact candidate named. The accepted #939 design is locked. Publishing pages is blocked on approved ES/EN privacy wording naming the real operator and separate LLC clearance; see Section 4.
 
 ## 1. Promotion path
 
@@ -30,7 +30,7 @@ It carries no change to `web/`, `src/`, `ios/`, `render.yaml` or any other migra
 
 Production's newest migration (`20260914120000`) equals `main`'s newest file, but the ledgers do not match (read-only, 2026-10-07; 81 entries). 69 versions match by version and name. Production carries seven April entries `main` lacks, five entries recorded at different versions from the repo files, and lacks the ledger rows of five `main` migrations whose tables already exist. The Supabase GitHub integration's production branch record has read `MIGRATIONS_FAILED` since 2026-06-04. A `supabase db push` would try to replay migrations production already has, so it is never used.
 
-The consumer lane's reviewed applier (PR #894) plans one ordered production batch: an unrecorded `20260505000001_add_currency_pair_asset_class`, then this lane's `20260920000000`, then the consumer's 35 files `20260925120000` to `20261005230000`. The applier refuses a skipped version, so this migration must be applied before theirs, not after. This lane does not apply it alone. The founder holds the only production DSN and runs the read-only gate (`scripts/ops/production_migration_gate.py`) and the applier; the gate report and backup precede the apply.
+The consumer lane's reviewed applier (PR #894) plans one ordered production batch: an unrecorded `20260505000001_add_currency_pair_asset_class`, then this lane's `20260920000000`, then the consumer's 35 files `20260925120000` to `20261005230000`. The applier refuses a skipped version, so this migration must be applied before theirs, not after. The independent-prefix option below permits a separate founder-approved batch; this lane does not execute production applies. The founder holds the only production DSN and runs the read-only gate (`scripts/ops/production_migration_gate.py`) and the applier; the gate report and backup precede the apply.
 
 Option B departs from the usual "main is promoted from integration" practice. It needs the founder's approval as a workflow exception before the second PR is opened. The exact file list is regenerated from `git diff --name-status origin/main...<candidate>` and posted with the request.
 
@@ -99,21 +99,23 @@ Not part of this launch. If chosen later, switch Auto-Deploy to "After CI Checks
 ## 4. Preconditions before creation
 
 1. Candidate merged to `main` through the approved path; exact SHA and CI recorded.
-2. The signup migration is applied as part of the consumer lane's ordered batch (above) by the founder with the reviewed applier, after a recorded gate report and backup, and `public.cuadrao_early_access_signups` reads back with RLS on, no `anon`, `authenticated` or `service_role` delete, and a ledger row. A repository migration file is not production proof.
+2. The signup migration is applied either as its own first ordered prefix or with the consumer lane's ordered batch (see the independent-migration analysis above) by the founder with the reviewed applier, after a recorded gate report and backup, and `public.cuadrao_early_access_signups` reads back with RLS on, no `anon`, `authenticated` or `service_role` delete, and a ledger row. A repository migration file is not production proof.
 2a. Supabase stays on the Free plan; no plan change is a precondition. Known limit: a Free project pauses when it is inactive, and while it is paused the Personal form answers its truthful unavailable state (503) and keeps the visitor's email. The operator restores the project from the Supabase dashboard. A restore is the only recovery, so check the project's state as part of hosted acceptance and before any announcement. The Business inquiry does not use Supabase.
 3. `notify.cuadrao.ai` verified in Resend (Section 6), `CUADRAO_INQUIRY_TO=hola@cuadrao.ai` set, and one approved test message received at `hola@cuadrao.ai` (an iCloud custom-domain address; the founder confirms it exists).
 4. The founder has typed the three provider values into the Render form, and the complete form has been read back to them before Create.
 5. Rollback target named (Section 8). The first deploy has no earlier artifact, so a rollback cannot be exercised until a second deploy exists.
 6. The operator wording below is settled and published. Until the founder confirms it, the contact and signup forms are not published and no real visitor submission is taken: the privacy notice must identify who is responsible for the data those forms collect.
 
-### Operator wording (prepared, not published)
+### Operator wording and LLC clearance (publication held)
 
-The privacy notice has no responsible-operator section yet, on purpose. Prepared text, Spanish first, for the founder's approval:
+The founder requires two separate go-live gates before publishing pages:
 
-- ES, "Quién es responsable": "Cuadrao LLC es responsable de los datos que se reciben en este sitio. Para cualquier consulta sobre ellos, escribe a hola@cuadrao.ai."
-- EN, "Who is responsible": "Cuadrao LLC is responsible for the data received on this site. For any question about it, write to hola@cuadrao.ai."
+1. Approve the privacy policy needed for Meta publication, naming the actual responsible operator in both Spanish and English. The name has not been supplied in this refresh. Do not publish “LLC pending” or assume that Cuadrao LLC is the current operator.
+2. Obtain the founder's explicit LLC clearance. Approval of the operator wording does not satisfy this separate gate.
 
-Cuadrao LLC is pending formation. This text is true only once the company is formed and operates the site; do not publish it before the founder confirms both. It names no individual. If the forms must go live before then, the notice has to name the actual current responsible party, and the founder chooses that wording. Publishing the section means adding it to `marketing/components/privacy-copy.ts` in both languages and removing the matching hold in `marketing/__tests__/privacy-copy.test.ts`.
+After the founder confirms the real operator and wording, update `marketing/components/privacy-copy.ts` in both languages and the corresponding hold in `marketing/__tests__/privacy-copy.test.ts`. This refresh does not claim either gate is satisfied. Deployment, hosted changes, public forms and real email remain on hold.
+
+A later pages-first proposal must explicitly withhold both forms, not merely omit provider keys and leave unavailable forms visible. No pages-first version is authorized or implemented here. Neither pages-first nor green CI bypasses the two publication gates above.
 
 ## 5. Hosted acceptance on the Render address
 
@@ -174,4 +176,4 @@ After hosted acceptance and the founder's publication approval, coordinating wit
 
 ## 9. Open founder inputs
 
-Batched in the launch record: Spanish copy approvals, the privacy text facts (retention wording, processors) and the confirmation that Cuadrao LLC is formed and operates the site (operator wording above), the Option B exception, provider access for read-only inspection, and the approved test addresses.
+Batched in the launch record: Spanish copy approvals, the privacy text facts (retention wording, processors) and approval of the actual responsible operator in ES/EN plus separate LLC clearance (operator wording above), the Option B exception, provider access for read-only inspection, and the approved test addresses.

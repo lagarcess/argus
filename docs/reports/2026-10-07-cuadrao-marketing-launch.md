@@ -1,5 +1,7 @@
 # Cuadrao marketing launch record
 
+> Current continuation: [PR #927 refresh and release holds](evidence/cuadrao-marketing-promotion/README.md) supersedes the historical operator and candidate-status notes below. Pages remain held for approved real-operator ES/EN privacy wording and separate LLC clearance. The accepted #939 design is locked.
+
 Status record for [#880](https://github.com/lagarcess/argus/issues/880) and its children. The [launch runbook](../runbooks/cuadrao-marketing-launch.md) owns settings and procedure, the [forms contract](../specs/cuadrao-marketing-forms-contract.md) owns the endpoints and data, and the [evidence folder](evidence/cuadrao-marketing-launch/README.md) holds the proof. This page only says where the launch stands. It authorizes nothing.
 
 ## Landing

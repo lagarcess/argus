@@ -24,10 +24,10 @@ const brand = (name: string) => readFileSync(join(root, "brand", name), "utf8");
 const fills = (svg: string) => [...svg.matchAll(/stop-color="(#[0-9a-f]{6})"/g)].map((match) => match[1]);
 
 describe("dark-background mark", () => {
-  test("is the tiled icon's own shapes, transform and colours without the tile", () => {
+  test("preserves its shapes and dark-surface palette without the tile", () => {
     const dark = brand("cuadrao-mark-dark.svg");
     expect(paths(dark)).toEqual(paths(tiled));
-    expect(fills(dark)).toEqual(fills(tiled));
+    expect(fills(dark)).toEqual(["#fffcf2", "#e3dcc2", "#8fa38f", "#5b7566", "#b6e87a", "#7fcb4f"]);
     expect(dark).toContain('transform="translate(6.8 0) skewX(-12)"');
     expect(dark).not.toContain("<rect");
   });
@@ -81,14 +81,15 @@ describe("intrinsic size", () => {
 const markGroup = (svg: string) => svg.match(/<g transform="translate\(6\.8 0\) skewX\(-12\)">.*?<\/g>/s)?.[0] ?? "";
 
 describe("whole mark group", () => {
-  test("is identical, with its opacity, in the icon, the dark mark and the dark lockup", () => {
-    const group = markGroup(tiled);
+  test("preserves opacity in the dark mark and dark lockup", () => {
+    const group = markGroup(brand("cuadrao-mark-dark.svg"));
     expect(group).toContain('opacity=".55"');
-    expect(markGroup(brand("cuadrao-mark-dark.svg"))).toBe(group);
     expect(markGroup(brand("cuadrao-lockup-dark.svg"))).toBe(group);
   });
 
-  test("is identical in the light mark and the light lockup", () => {
+  test("is identical in the light mark, favicon and light lockup", () => {
+    expect(markGroup(tiled)).toBe(markGroup(light));
+    expect(fills(tiled)).toEqual(fills(light));
     expect(markGroup(brand("cuadrao-lockup-light.svg"))).toBe(markGroup(brand("cuadrao-mark-light.svg")));
   });
 
@@ -99,8 +100,8 @@ describe("whole mark group", () => {
     expect(brand("cuadrao-lockup-light.svg")).toMatch(/<path transform="[^"]*" fill="#172b26"/);
   });
 
-  test("the icon tile is the site's ink", () => {
-    expect(tiled).toContain('<rect width="64" height="64" rx="14" fill="#172b26"/>');
+  test("the icon tile is the site's paper", () => {
+    expect(tiled).toContain('<rect width="64" height="64" rx="14" fill="#fafbf8"/>');
   });
 });
 

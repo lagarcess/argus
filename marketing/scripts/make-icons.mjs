@@ -1,12 +1,13 @@
-// Renders the Cuadrao mark (app/icon.svg, "Lean, calm") to the PNG and ICO files
-// browsers request by convention. Run after editing the SVG: node scripts/make-icons.mjs
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const svg = readFileSync(join(root, "app/icon.svg"), "utf8");
+const mark = readFileSync(join(root, "brand/cuadrao-mark-light.svg"), "utf8");
+const artwork = mark.replace(/<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "");
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#fafbf8"/><g transform="translate(32 32) scale(.92) translate(-32 -32)">${artwork}</g></svg>\n`;
+writeFileSync(join(root, "app/icon.svg"), svg);
 
 const browser = await chromium.launch();
 const page = await browser.newPage();
