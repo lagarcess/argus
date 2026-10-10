@@ -232,9 +232,12 @@ extension FinancialLoopUITests {
         app.buttons["search.filters.done"].tap()
     }
     func chooseSearchPlans() {
+        let summary = app.staticTexts["search.filter-summary"]
+        let previousSummary = summary.exists ? summary.label : nil
         tapVisible(app.buttons["search.filter.plans"])
         XCTAssertTrue(app.buttons["search.filter.plans"].isSelected)
-        XCTAssertFalse(app.staticTexts["search.filter-summary"].exists, "Plans is a perspective, not a filter")
+        XCTAssertEqual(summary.exists ? summary.label : nil, previousSummary,
+                       "Changing perspective must preserve the currency filter")
     }
     func searchBack() {
         let detail = app.scrollViews["search.detail"]
