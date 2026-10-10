@@ -1,0 +1,43 @@
+{
+  "codeHead": "53029f5d7c18827adba9daf79197936086ea0188",
+  "webTree": "6f8fd6c501fd48e8af8e35688bbe227a98d988bc",
+  "previewSourceTree": "906080f3045c87c1708ee6206a03625eaf11ff03",
+  "recordedAt": "2026-09-28T23:39:40.556771+00:00",
+  "originalIntegrationBase": "4b84e054a0d8079b21f38784335ad3241809b4cd",
+  "currentIntegration": "19550f28e344c1004dd3ea366625c25fae4b3355",
+  "reconciliationMerge": "f2eacef631d87fdca2b763ef5100d7980933300b",
+  "acceptance": {
+    "browserPassed": 46,
+    "screenshots": 48,
+    "forbiddenRequests": 0,
+    "pageErrors": 0,
+    "productionPassed": 5,
+    "frontendUnitPassed": 2205,
+    "unitFiles": 205,
+    "expectCalls": 17523,
+    "lintErrors": 0,
+    "preexistingLintWarnings": 8,
+    "productionBuild": "passed",
+    "modularityViolations": 0
+  },
+  "environment": {
+    "browser": "147.0.7727.15",
+    "platform": "darwin 27.0.0 arm64",
+    "node": "v26.10.0",
+    "timezone": "America/Santo_Domingo",
+    "deviceScaleFactor": 1,
+    "reducedMotion": "reduce",
+    "bun": "1.4.2",
+    "next": "16.2.4",
+    "react": "19.2.4",
+    "typescript": "5.9.3",
+    "playwright": "1.59.1"
+  },
+  "limitations": [
+    "Chromium local fixtures; no physical-device or cross-browser claim",
+    "No model/provider turns, financial writes, real authentication or server authorization exercised",
+    "Production guard can stream HTTP 200 with explicit Next not-found marker; no preview markup",
+    "Founder visual acceptance and landing authorization remain pending"
+  ],
+  "evidenceDisposition": "Before-reference and historical original captures remain unchanged. This full after run replaces the incomplete f2eacef6 attempt that found bottom-navigation occlusion. Later documentation/evidence-only heads require explicit source equality revalidation in the terminal PR audit."
+}

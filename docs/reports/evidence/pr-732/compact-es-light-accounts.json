@@ -1,0 +1,29 @@
+{
+  "name": "compact-es-light-accounts",
+  "codeHead": "efe2ec66631ad43395de5746b578528bf432c4a6",
+  "worktreeChanges": null,
+  "capturedAt": "2026-09-28T21:20:01.318Z",
+  "url": "http://127.0.0.1:3197/dev/ecosystem?view=accounts&state=sample&audience=sample",
+  "viewport": {
+    "width": 360,
+    "height": 800
+  },
+  "browser": "147.0.7727.15",
+  "platform": "darwin 27.0.0 arm64",
+  "node": "v26.10.0",
+  "timezone": "America/Santo_Domingo",
+  "reducedMotion": "reduce",
+  "deviceScaleFactor": 1,
+  "captureOnlyMask": "Next.js development indicator (nextjs-portal) hidden during screenshot capture only",
+  "language": "es-419",
+  "resolvedTheme": "antialiased h-full light",
+  "network": {
+    "forbidden": [],
+    "allowedRequests": 32,
+    "pageErrors": []
+  },
+  "limitations": [
+    "Local authored fixtures only",
+    "No model, provider, authentication or financial persistence exercised"
+  ]
+}

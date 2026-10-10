@@ -1,0 +1,27 @@
+(node:90854) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+Running 9 tests using 1 worker
+
+(node:90871) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:90871) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:90871) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+  ✓  1 e2e/ecosystem-preview-reference.gate.ts:145:7 › production-source-1440 (5.3s)
+
+  ✓  2 e2e/ecosystem-preview-reference.gate.ts:145:7 › production-source-834 (5.2s)
+
+  ✓  3 e2e/ecosystem-preview-reference.gate.ts:145:7 › production-source-390 (5.1s)
+
+  ✓  4 e2e/ecosystem-preview-reference.gate.ts:145:7 › integration-1440 (3.8s)
+
+  ✓  5 e2e/ecosystem-preview-reference.gate.ts:145:7 › integration-834 (3.2s)
+
+  ✓  6 e2e/ecosystem-preview-reference.gate.ts:145:7 › integration-390 (2.8s)
+  ✓  7 e2e/ecosystem-preview-reference.gate.ts:174:33 › preview-before-1440 (3.0s)
+  ✓  8 e2e/ecosystem-preview-reference.gate.ts:174:33 › preview-before-834 (3.0s)
+  ✓  9 e2e/ecosystem-preview-reference.gate.ts:174:33 › preview-before-390 (2.9s)
+
+  9 passed (35.0s)
