@@ -168,5 +168,6 @@ extension FinancialLoopUITests {
         let personal = app.buttons["household.personal"]
         if personal.waitForExistence(timeout: 2) { tapVisible(personal) }
         XCTAssertTrue(app.buttons["accounts.add"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["home-chart-loading"].firstMatch.waitForNonExistence(timeout: 45))
     }
 }

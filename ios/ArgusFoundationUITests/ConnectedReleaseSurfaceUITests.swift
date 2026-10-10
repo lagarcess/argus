@@ -131,7 +131,10 @@ extension FinancialLoopUITests {
         XCTAssertGreaterThanOrEqual(tray.frame.minY, app.frame.minY, "the menu does not run off the top of the screen")
         XCTAssertLessThanOrEqual(tray.frame.maxY, add.frame.minY, "and stops above the bar")
         for row in ["account", "transaction", "plan"] { XCTAssertTrue(app.buttons["add.tray." + row].exists, row) }
-        capture("release-surface-add-menu-landscape-large-text")
+        let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screen.name = "release-surface-add-menu-landscape-large-text"
+        screen.lifetime = .keepAlways
+        self.add(screen)
     }
 
     /// Search, Profile and Plan fold the bar into the + as they scroll, and expand it again, as Home does.
