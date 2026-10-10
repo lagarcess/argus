@@ -12,6 +12,22 @@ extension FinancialLoopUITests {
         case recorded(Decimal)
     }
 
+    func testMoneyReplacementHandlesEmptyGroupedAndZeroAmounts() throws {
+        try signIn()
+        openPersonalAccounts()
+        tapVisible(app.buttons["nav.add"])
+        tapVisible(app.buttons["add.tray.transaction"])
+        let amount = app.textFields["loop.amount"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 10))
+        for (input, expected) in [("200", "200"), ("1100", "1,100"), ("0.00", "0.00"), ("250", "250")] {
+            replaceMoneyField("loop.amount", with: input)
+            XCTAssertEqual(amount.value as? String, expected)
+        }
+        dismissMoneyKeyboard()
+        cancelEditor()
+        XCTAssertTrue(amount.waitForNonExistence(timeout: 5))
+    }
+
     func testRetainedHomeSurvivesReopening() throws {
         try signIn()
         let before = homeValue()
@@ -479,11 +495,15 @@ extension FinancialLoopUITests {
         if !old.isEmpty {
             field.press(forDuration: 1.1)
             let selectAll = app.menuItems["Select All"]
-            guard selectAll.waitForExistence(timeout: 3) else {
-                XCTFail("The field must offer Select All before replacing its text")
-                return
+            if selectAll.waitForExistence(timeout: 3) {
+                selectAll.tap()
+            } else {
+                guard old == field.placeholderValue else {
+                    XCTFail("The field must offer Select All before replacing its text")
+                    return
+                }
+                field.tap()
             }
-            selectAll.tap()
             XCTAssertTrue(app.keyboards.firstMatch.exists)
         }
         field.typeText(value)
