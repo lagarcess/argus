@@ -23,6 +23,9 @@ redesign stays parked. RevenueCat is outside scope. No more accessibility toolin
 TestFlight upload, new phone install, newer-code deployment or schema changes are authorized.
 Lucas subsequently approved the staging owner enabling only the money gate on
 the pinned `cad1cbe1e` backend, restarting it and arranging a synthetic test login.
+That setup is complete; the [staging evidence](../reports/evidence/consumer-staging-preflight-20261009/README.md)
+records authenticated HTTP 200 and one passed native account correction/relaunch
+test. Broader acceptance remains incomplete. No further hosted change is granted.
 Consumer must coordinate shared ingestion, auth, API, schema and runtime changes
 with their existing owners. Business and Marketing retain their own assignments.
 

@@ -55,10 +55,13 @@ current integration expects later Business schema columns. Verify the existing
 staged API before proposing any shared change. A healthy service and a stored
 conversation alone do not establish manual-money acceptance.
 
-The [read-only staging preflight](evidence/consumer-staging-preflight-20261009/README.md)
-confirmed that the shared manual-money feature gate is off: Accounts, Home, Plan
-and Search return `financial_accounts_unavailable`. Lucas subsequently approved
-staging-owner activation of that single gate on the existing pinned revision,
-the required restart and a synthetic test identity. The setup is assigned to the
-existing staging owner. The preflight itself made no hosted changes; its 404s
-must not be treated as the service state after the authorized setup completes.
+The [staging evidence](evidence/consumer-staging-preflight-20261009/README.md)
+records the initial disabled-gate 404s and the later approved setup. The staging
+owner enabled only `ARGUS_FINANCIAL_ACCOUNTS_ENABLED=true` and deployed the same
+`cad1cbe1e` revision after a restart alone did not apply the saved setting.
+Deploy `dep-db4qeilckfvc73fss4kg` is healthy and authenticated accounts return HTTP
+200. Other environment values and both migration ledgers are unchanged. The
+synthetic login is available through a private handoff. No further hosted change
+is authorized. The first native account correction/relaunch test passed;
+broader acceptance remains incomplete, with failed attempts retained in the
+evidence report.

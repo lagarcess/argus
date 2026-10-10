@@ -66,6 +66,12 @@ no longer renders. The currency reconciliation and release-surface tests both
 stopped while opening a second account. These are failed acceptance attempts;
 their cause remains under investigation. They do not establish transaction,
 budget, goal, search, Spanish or large-text acceptance against staging.
+[Money summary](money-summary.json) and [release-surface summary](release-summary.json)
+retain all four failures. A subsequent simulator probe found that a 180 ms press
+opened the account form while the automation tool's short tap left Home
+unchanged. Temporarily disabling the keyboard tap-away recognizer did not change
+the short-tap result; it was restored afterward. This narrows the input issue
+but does not establish its cause or turn either failed test into a pass.
 
 There is no hosted staging web/CAPTCHA bridge. Native sign-in used the repository's
 existing local CAPTCHA test page with its public test keys; credentials went to
