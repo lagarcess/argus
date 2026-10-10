@@ -100,8 +100,7 @@
 .audienceNav > a.activeNav {
   border-bottom-color: var(--ink);
 }
-.utilityNav > a:not(.buttonSmall),
-.languages a {
+.utilityNav > a:not(.buttonSmall) {
   padding-block: 14px;
 }
 .backLink {
@@ -115,16 +114,30 @@
   flex-shrink: 0;
 }
 .languages {
-  display: flex;
-  gap: 12px;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: fit-content;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 28px;
   font-size: 12px;
+  line-height: 1;
+}
+.languages a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 24px;
 }
 .languages a:not([aria-current]) {
   color: #606862;
 }
 .languages a[aria-current] {
-  text-decoration: underline;
-  text-underline-offset: 5px;
+  background: #e8ede3;
+  font-weight: 600;
 }
 .button,
 .buttonSmall {

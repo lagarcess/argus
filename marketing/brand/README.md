@@ -6,14 +6,14 @@ Source files for the Cuadrao mark, the wordmark and the mark-and-wordmark lockup
 
 | File | What it is | Use on |
 | --- | --- | --- |
-| `../app/icon.svg` | The mark on its deep-green tile. Source of the app icon and favicon | Home screen, favicon |
+| `../app/icon.svg`, `../app/favicon.ico`, `../app/apple-icon.png` | Generated from `cuadrao-mark-light.svg` on a paper tile by `node scripts/make-icons.mjs` | Home screen, favicon |
 | `cuadrao-mark-light.svg` | The mark without its tile, light-surface colours | Light backgrounds |
-| `cuadrao-mark-dark.svg` | The mark without its tile, the tiled icon's own colours | `#172b26` only (see below) |
+| `cuadrao-mark-dark.svg` | The mark without its tile, dark-surface colours | `#172b26` only (see below) |
 | `cuadrao-wordmark.svg`, `cuadrao-wordmark-dark.svg` | The lowercase wordmark as outlines, `#172b26` and `#fafbf8` | Light, dark |
 | `cuadrao-lockup-light.svg`, `cuadrao-lockup-dark.svg` | Mark and wordmark together, one composition | Light, dark |
 | `../scripts/make-brand-assets.py` | Generates the wordmark and the lockups from the font and the marks | |
 
-The tiled icon and the two marks draw the same three shapes with the same transform; `__tests__/brand-mark.test.ts` keeps them identical.
+The light mark owns the favicon artwork. Run `node scripts/make-icons.mjs` after changing it to regenerate all three browser icon files. The dark mark remains a separate palette for the pine footer.
 
 ## The wordmark
 
@@ -29,7 +29,7 @@ The earlier icon sheets showed a lighter, looser wordmark (weight 600, letter-sp
 
 ## Lockup
 
-Proposed geometry, in wordmark units where the wordmark's font size is 1 em. It matches the finalists sheet the founder reviewed; it becomes the guide once the founder agrees the welcome-screen mock.
+Canonical geometry, in wordmark units where the wordmark's font size is 1 em. The header, small footer identity, and phone welcome screen use these lockups. The large cropped footer wordmark stays text.
 
 - Mark height: **1 em** (the mark's ink is 53.2 units wide in its 64-unit grid, rounded corners included, so its width is 1.11 em). That is 2.06 times the x-height and 1.43 times the height of the d.
 - Gap: the lockup files place the mark's unrounded box **0.25 em** from the first letter, which leaves a visible gap of **0.28 em** between the mark's ink and the letter, and a 0.03 em margin at the left of the file.
