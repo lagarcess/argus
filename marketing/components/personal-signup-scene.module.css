@@ -22,6 +22,8 @@
 .smile { position: absolute; left: 19px; top: 27px; width: 8px; height: 4px; border: solid #173526; border-width: 0 1.5px 1.5px; border-radius: 0 0 6px 6px; }
 .foot { position: absolute; bottom: -4px; left: 8px; width: 11px; height: 5px; border-radius: 4px; background: #264c37; }
 .foot:last-child { left: auto; right: 8px; }
+.pet[data-pose="checking"] { --eye-x: -2px; --eye-y: 2px; transform: rotate(-7deg); animation: checking .38s ease-out; }
+.pet[data-pose="checking"] .eyes i { animation: blink .6s ease-in-out; }
 .pet[data-pose="excited"] { animation: excited .45s ease-in-out infinite alternate; }
 .pet[data-pose="excited"] .smile { height: 7px; top: 26px; background: #173526; }
 .pet[data-pose="delivered"] .eyes i { height: 6px; border: solid #173526; border-width: 2px 0 0; background: transparent; }
@@ -34,6 +36,8 @@
 .flyingPet .pet { margin: -22px 0 0 -23px; animation: none; }
 .envelope { width: 52px; height: 38px; margin: -19px 0 0 -26px; animation: envelope 1.1s cubic-bezier(.35, 0, .3, 1) both; }
 .envelope svg { display: block; width: 100%; height: 100%; }
+@keyframes checking { from { transform: rotate(0); } to { transform: rotate(-7deg); } }
+@keyframes blink { 0%, 35%, 70%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.15); } }
 @keyframes excited { from { transform: translateY(0) rotate(-4deg) scale(1.04, .97); } to { transform: translateY(-5px) rotate(4deg) scale(.97, 1.04); } }
 @keyframes delivery {
   0% { transform: translate(var(--pet-x), var(--pet-y)) rotate(-8deg); }
@@ -51,4 +55,4 @@
 }
 @keyframes ripple { 0%, 75% { opacity: 0; transform: scale(.5); } 83% { opacity: .8; transform: scale(.8); } 100% { opacity: 0; transform: scale(1.6); } }
 @media (max-width: 700px) { .device { border-radius: 31px; padding: 5px; } .screen { border-radius: 25px; box-shadow: 0 0 0 5px #050505; } }
-@media (prefers-reduced-motion: reduce) { .pet[data-pose], .ripple, .flyingPet, .envelope { animation: none; } .eyes i::after { transform: none; } }
+@media (prefers-reduced-motion: reduce) { .pet[data-pose], .pet[data-pose="checking"] .eyes i, .ripple, .flyingPet, .envelope { animation: none; } .eyes i::after { transform: none; } .pet[data-pose="checking"] .eyes i::after { transform: translate(-2px, 2px); } }

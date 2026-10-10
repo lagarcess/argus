@@ -34,7 +34,14 @@ try {
         captures.push({file,route,...viewport,state,mockedSignup:true});
       };
       await shot('idle', viewport.width < 700);
+      await page.locator('#personal-email').fill('oops');
+      await page.locator('button[type="submit"]').click();
+      await expect(page.locator('[data-signup-pet]')).toHaveAttribute('data-pose','checking');
+      await expect(page.locator('#signup-error')).toBeVisible();
+      await page.waitForTimeout(800);
+      await shot('invalid',viewport.width<700);
       await page.locator('#personal-email').fill('preview@example.test');
+      await expect(page.locator('[data-signup-pet]')).toHaveAttribute('data-pose','rest');
       await page.getByRole('button',{name:locale==='es'?'Avísame cuando pueda probarla':'Let me know when I can try it'}).click();
       await expect(page.locator('[data-signup-state]')).toHaveAttribute('data-signup-state','submitting');
       if(record){await page.waitForTimeout(400);await shot('pending');}

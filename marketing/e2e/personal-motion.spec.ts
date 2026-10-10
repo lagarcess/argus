@@ -53,6 +53,77 @@ test("failed and unexpected responses preserve the email without a flight, then 
   await expect(hero(page)).toHaveAttribute("data-signup-state", "success");
 });
 
+for (const locale of [
+  { path: "/personal", invalid: "Revisa tu correo e inténtalo de nuevo." },
+  { path: "/en/personal", invalid: "Check your email address and try again." },
+]) {
+  for (const attempt of [
+    { name: "empty click", email: "", enter: false },
+    { name: "malformed Enter", email: "not-an-email", enter: true },
+  ]) {
+    test(`${locale.path} gently checks ${attempt.name} without sending it`, async ({ page }, info) => {
+      await page.goto(locale.path);
+      const input = page.locator("#personal-email");
+      const pet = page.locator("[data-signup-pet]");
+      let requests = 0;
+      await page.route("**/api/signups", (route) => {
+        requests += 1;
+        return route.fulfill({ json: { status: "registered" } });
+      });
+      await input.fill(attempt.email);
+      await expect(pet).toHaveAttribute("data-pose", "rest");
+      await expect(page.locator("#signup-error")).toHaveCount(0);
+      if (attempt.enter) await input.press("Enter");
+      else await page.locator('button[type="submit"]').click();
+      await expect(hero(page).getByRole("alert")).toHaveText(locale.invalid);
+      await expect(input).toBeFocused();
+      await expect(input).toHaveValue(attempt.email);
+      await expect(input).toHaveAttribute("aria-invalid", "true");
+      await expect(pet).toHaveAttribute("data-pose", "checking");
+      await expect(page.locator("[data-signup-flight]")).toHaveCount(0);
+      await input.fill("still-incomplete");
+      await expect(pet).toHaveAttribute("data-pose", "checking");
+      await input.fill(uniqueAddress(info));
+      await expect(pet).toHaveAttribute("data-pose", "rest");
+      await expect(input).not.toHaveAttribute("aria-invalid");
+      await expect(page.locator("#signup-error")).toHaveCount(0);
+      expect(requests).toBe(0);
+      await input.press("Enter");
+      await expect(hero(page)).toHaveAttribute("data-signup-state", "success");
+      expect(requests).toBe(1);
+    });
+  }
+}
+
+for (const failure of [
+  { name: "rejected email", status: 400, pose: "checking" },
+  { name: "unavailable service", status: 503, pose: "rest" },
+  { name: "network failure", status: null, pose: "rest" },
+]) {
+  test(`${failure.name} uses the appropriate pet expression`, async ({ page }, info) => {
+    await page.goto("/personal");
+    await page.route("**/api/signups", (route) => failure.status === null
+      ? route.abort()
+      : route.fulfill({ status: failure.status, json: { status: "unavailable" } }));
+    const input = page.locator("#personal-email");
+    const address = uniqueAddress(info);
+    await input.fill(address);
+    await input.press("Enter");
+    await expect(hero(page).getByRole("alert")).toBeVisible();
+    await expect(input).toHaveValue(address);
+    await expect(page.locator("[data-signup-pet]")).toHaveAttribute("data-pose", failure.pose);
+    await expect(page.locator("[data-signup-flight]")).toHaveCount(0);
+    if (failure.status === 400) {
+      await expect(input).toHaveAttribute("aria-invalid", "true");
+      await input.fill(`corrected-${address}`);
+      await expect(page.locator("[data-signup-pet]")).toHaveAttribute("data-pose", "rest");
+      await expect(hero(page).getByRole("alert")).toHaveCount(0);
+    } else {
+      await expect(input).not.toHaveAttribute("aria-invalid");
+    }
+  });
+}
+
 test("fine-pointer eyes follow and reset without changing form focus", async ({ page }, info) => {
   test.skip(info.project.name === "mobile", "Touch does not track a pointer.");
   await desktop(page);
@@ -70,7 +141,12 @@ test("reduced motion confirms directly with a still pet", async ({ page }, info)
   await page.emulateMedia({ reducedMotion: "reduce" });
   await desktop(page);
   await page.route("**/api/signups", (route) => route.fulfill({ json: { status: "registered" } }));
+  await page.locator("#personal-email").fill("incomplete");
+  await page.locator("#personal-email").press("Enter");
+  await expect(page.locator("[data-signup-pet]")).toHaveAttribute("data-pose", "checking");
+  expect(await page.locator("[data-signup-pet]").evaluate((element) => [element, ...element.querySelectorAll("i")].every((part) => getComputedStyle(part).animationName === "none"))).toBe(true);
   await page.locator("#personal-email").fill(uniqueAddress(info));
+  await expect(page.locator("[data-signup-pet]")).toHaveAttribute("data-pose", "rest");
   await page.locator("#personal-email").press("Enter");
   await expect(page.getByRole("heading", { name: "Ya estás en la lista." })).toBeFocused();
   await expect(hero(page)).toHaveAttribute("data-flight-state", "settled");

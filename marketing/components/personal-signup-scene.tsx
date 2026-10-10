@@ -78,7 +78,7 @@ export function usePersonalSignupScene() {
 
 type Scene = ReturnType<typeof usePersonalSignupScene>;
 
-export function SignupPet({ petRef, pose = "rest" }: { petRef?: Scene["petRef"]; pose?: "rest" | "excited" | "delivered" }) {
+export function SignupPet({ petRef, pose = "rest" }: { petRef?: Scene["petRef"]; pose?: "rest" | "checking" | "excited" | "delivered" }) {
   return <span ref={petRef} className={styles.pet} data-signup-pet="" data-pose={pose} aria-hidden="true">
     <span className={styles.eyes}><i /><i /></span><span className={styles.smile} />
     <span className={styles.foot} /><span className={styles.foot} />

@@ -130,8 +130,15 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
               <fieldset className={styles.formFields} disabled={!hydrated}>
                 <label htmlFor="personal-email">{c.label}</label>
                 <div className={styles.emailShell}>
-                  <span className={styles.petPerch}><SignupPet petRef={petRef} pose={state.status === "submitting" ? "excited" : "rest"} /></span>
-                <input id="personal-email" type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-privacy" : "signup-privacy"} aria-invalid={(state.status === "error" && state.rejected) || undefined} readOnly={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
+                  <span className={styles.petPerch}><SignupPet petRef={petRef} pose={state.status === "submitting" ? "excited" : state.status === "error" && state.rejected ? "checking" : "rest"} /></span>
+                <input id="personal-email" type="email" name="email" value={email} onChange={(event) => {
+                  setEmail(event.currentTarget.value);
+                  if (state.status === "error" && state.rejected && event.currentTarget.validity.valid) setState({ status: "idle" });
+                }} onInvalid={(event) => {
+                  event.preventDefault();
+                  setState({ status: "error", message: c.invalid, rejected: true });
+                  event.currentTarget.focus();
+                }} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-privacy" : "signup-privacy"} aria-invalid={(state.status === "error" && state.rejected) || undefined} readOnly={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
                 </div>
                 <div className={styles.trap} aria-hidden="true">
                   <label htmlFor="personal-website">Website</label>
