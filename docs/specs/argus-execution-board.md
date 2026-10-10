@@ -33,6 +33,8 @@ with their existing owners. Business and Marketing retain their own assignments.
 
 [PR #884](https://github.com/lagarcess/argus/pull/884) delivers the bilingual Business and Personal marketing preview under its default-off flag. The [delivery record](../reports/2026-10-07-cuadrao-website-integration.md) owns its evidence and merge verification. Public launch, Business inquiry delivery and Supabase early-access capture remain open in #880, #881 and #882. This website assignment does not change the mobile roadmap, enable a Business app or authorize deployment.
 
+[PR #929](https://github.com/lagarcess/argus/pull/929) landed the historical Marketing evidence and rollback corrections as `4cb85949b4dea6855971c8268aac1bd1a0cacb01`. The [reconciliation and landing record](../reports/2026-10-10-pr-929-reconciliation.md) preserves source identity and verification. The accepted #939 design remains pending its own integration landing. #927 stays held against main; deployment and public forms remain on hold.
+
 ## Business connected-flow and E0 design checkpoint
 
 Lucas approved the [connected Business flow](cuadrao-business-connected-flow-spec.md)

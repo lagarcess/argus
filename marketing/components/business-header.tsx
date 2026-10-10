@@ -5,6 +5,7 @@ import { ArrowLeft, Menu, X } from "lucide-react";
 import { businessPath, type BusinessPage } from "@/lib/site-routes";
 import { businessContent, type BusinessLocale } from "./content";
 import styles from "./business.module.css";
+import shell from "./touchup-shell.module.css";
 import { siteCopy } from "./site-copy";
 
 export function BusinessHeader({
@@ -15,14 +16,21 @@ export function BusinessHeader({
   page?: BusinessPage;
 }) {
   const [open, setOpen] = useState(false);
+  const header = useRef<HTMLElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLElement>(null);
   const copy = businessContent[locale].navigation;
   const home = businessPath(locale);
   const personal = page === "personal";
   const secondary = page === "contact" || page === "privacy";
-  const primaryHref = personal ? "#early-access" : businessPath(locale, "contact");
-  const primaryLabel = personal ? locale === "es" ? "Acceso anticipado" : "Early access" : copy.demo;
+  const primaryHref = personal
+    ? "#early-access"
+    : businessPath(locale, "contact");
+  const primaryLabel = personal
+    ? locale === "es"
+      ? "Acceso anticipado"
+      : "Early access"
+    : copy.demo;
 
   useEffect(() => {
     if (!open) return;
@@ -37,8 +45,28 @@ export function BusinessHeader({
     return () => document.removeEventListener("keydown", closeOnEscape);
   }, [open]);
 
+  useEffect(() => {
+    let frame = 0;
+    const update = () => {
+      header.current?.style.setProperty(
+        "--scroll",
+        String(Math.min(1, Math.max(0, window.scrollY / 160))),
+      );
+      frame = 0;
+    };
+    const scroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+    update();
+    window.addEventListener("scroll", scroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", scroll);
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
   const languageLinks = (
-    <span className={styles.languages} aria-label={copy.language}>
+    <span className={styles.languages} role="group" aria-label={copy.language}>
       {(["es", "en"] as const).map((language) => (
         <a
           key={language}
@@ -64,13 +92,21 @@ export function BusinessHeader({
       <a className={styles.skip} href="#business-main">
         {copy.skip}
       </a>
-      <header className={styles.header}>
+      <header ref={header} className={`${styles.header} ${shell.header}`}>
         <a
           className={styles.wordmark}
           href={personal ? businessPath(locale, "personal") : home}
-          aria-label={page === "personal" ? "Cuadrao Personal" : "Cuadrao Business"}
+          aria-label={
+            page === "personal" ? "Cuadrao Personal" : "Cuadrao Business"
+          }
         >
-          cuadrao
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/cuadrao-site/cuadrao-lockup-light.svg"
+            width="150"
+            height="40"
+            alt="cuadrao"
+          />
         </a>
         <span className={styles.mobileAudience}>
           {page === "personal" ? copy.personal : copy.business}
@@ -97,16 +133,15 @@ export function BusinessHeader({
               backLink
             ) : !personal ? (
               <>
-                <a href={`${home}#el-producto`}>{locale === "es" ? "El producto" : "The product"}</a>
+                <a href={`${home}#el-producto`}>
+                  {copy.howItWorks}
+                </a>
                 <a href={`${home}#nosotros`}>{copy.about}</a>
               </>
             ) : null}
             {languageLinks}
             {!secondary && (
-              <a
-                className={styles.buttonSmall}
-                href={primaryHref}
-              >
+              <a className={styles.buttonSmall} href={primaryHref}>
                 {primaryLabel}
               </a>
             )}
@@ -146,11 +181,17 @@ export function BusinessHeader({
             >
               {copy.personal}
             </a>
-            {!personal && <a href={`${home}#la-idea`}>{siteCopy[locale].explore}</a>}
+            {!personal && (
+              <a href={`${home}#el-producto`}>{copy.howItWorks}</a>
+            )}
             {!personal && <a href={`${home}#nosotros`}>{copy.about}</a>}
-            {page !== "personal" && <a href={`${home}#preguntas`}>{siteCopy[locale].faqLink}</a>}
+            {page !== "personal" && (
+              <a href={`${home}#preguntas`}>{siteCopy[locale].faqLink}</a>
+            )}
             {languageLinks}
-            {secondary ? backLink : (
+            {secondary ? (
+              backLink
+            ) : (
               <a className={styles.button} href={primaryHref}>
                 {primaryLabel}
               </a>
