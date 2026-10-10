@@ -1,6 +1,28 @@
 import XCTest
 
 extension FinancialLoopUITests {
+    func testPlanAmountIdentityFollowsSelectedKind() throws {
+        try signIn()
+        app.openPlanSurface()
+        tapVisible(app.buttons["plan-create"])
+        let goalAmount = app.textFields["goal.target"]
+        let budgetAmount = app.textFields["budget.limit"]
+        XCTAssertTrue(goalAmount.waitForExistence(timeout: 5))
+        XCTAssertFalse(budgetAmount.exists)
+
+        tapVisible(app.buttons["plan-kind-budget"])
+        XCTAssertTrue(app.textFields["budget.name"].waitForExistence(timeout: 5))
+        XCTAssertTrue(budgetAmount.waitForExistence(timeout: 5))
+        XCTAssertFalse(goalAmount.exists)
+
+        tapVisible(app.buttons["plan-kind-goal"])
+        XCTAssertTrue(app.textFields["goal.name"].waitForExistence(timeout: 5))
+        XCTAssertTrue(goalAmount.waitForExistence(timeout: 5))
+        XCTAssertFalse(budgetAmount.exists)
+        tapVisible(app.buttons["Cancel"])
+        XCTAssertTrue(goalAmount.waitForNonExistence(timeout: 5))
+    }
+
     func testPlanDisclosuresAndExampleKeepRealForecastUnchanged() throws {
         try signIn()
         let bank = createMoneyAccount("Plan display " + UUID().uuidString.prefix(5), type: "checking", amount: "150")
