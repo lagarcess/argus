@@ -96,6 +96,8 @@ export function WelcomePhone({ logoRef, flying, alt, delivered }: { logoRef: Sce
       <div className={styles.screen}>
         <Image src={welcome.src} width={welcome.width} height={welcome.height} alt={alt} sizes="(max-width: 700px) 240px, 280px" priority />
         <span className={styles.wordmark} aria-hidden="true"><Image src="/cuadrao-site/cuadrao-lockup-light.svg" width={268} height={56} alt="" /></span>
+        <span className={styles.heroClearance} aria-hidden="true" />
+        <Image className={styles.heroMark} src="/cuadrao-site/cuadrao-mark-light.svg" width={60} height={52} alt="" style={{ left: `${welcome.logo.x}%`, top: `${welcome.logo.y}%` }} />
         <span ref={logoRef} className={styles.logo} style={{ left: `${welcome.logo.x}%`, top: `${welcome.logo.y}%` }} data-phone-logo="" aria-hidden="true">
           {flying && <span className={styles.ripple} />}
           {delivered && !flying && <span className={styles.deliveredPet}><SignupPet pose="delivered" /></span>}

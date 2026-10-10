@@ -9,6 +9,8 @@
 .screen img { display: block; width: 100%; height: 100%; }
 .wordmark { position: absolute; left: 25%; top: 8.5%; width: 50%; height: 5.5%; display: flex; align-items: center; justify-content: center; background: #fff; }
 .wordmark img { width: 86%; height: auto; }
+.heroClearance { position: absolute; inset: 26% 0 30%; background: #fff; }
+.screen .heroMark { position: absolute; width: 46%; height: auto; transform: translate(-50%, -50%); }
 .logo { position: absolute; width: 1px; height: 1px; pointer-events: none; }
 .pet { width: 46px; height: 43px; display: block; position: relative; border-radius: 13px 13px 10px 10px; border: 1.5px solid #264c37; background: linear-gradient(145deg, #e0f7a9, #b4d480); box-shadow: inset 2px 2px 0 #f1ffd180, 0 4px 0 #24412e16; pointer-events: none; transform-origin: 50% 100%; }
 .eyes { position: absolute; display: flex; gap: 7px; top: 12px; left: 10px; }
