@@ -1,5 +1,7 @@
 # Personal footer image sequence
 
+Superseded by the founder-requested [static wordmark ending](../personal-footer-wordmark/README.md). This folder retains the rejected trial as historical evidence.
+
 The founder requested a Granola-inspired reveal on Personal only. This iteration uses the existing founder-supplied dressmaker and artisan photos. The two-photo pair on Business stays unchanged. There are no player controls or continuous loops.
 
 ## Design decision
