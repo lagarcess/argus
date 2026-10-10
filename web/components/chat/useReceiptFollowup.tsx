@@ -57,6 +57,7 @@ export function useReceiptFollowup(options: Options) {
       const code = (error as { code?: string }).code;
       if (code === 'receipt_guest_choice_required' || code === 'receipt_guest_choice_stale') {
         try {
+          // A guest's public-receipt choice; guests only have Personal chats.
           const result = await listConversations({ limit: 2 });
           const existingId = result.items[0]?.id ?? null;
           setChoiceId(existingId);

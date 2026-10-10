@@ -119,13 +119,8 @@ struct CuadraoIdentityEditor: View {
             .navigationTitle(spanish ? "Tu perfil" : "Your profile")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(spanish ? "Cancelar" : "Cancel") { dismiss() }.accessibilityIdentifier("release.avatar.cancel")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(spanish ? "Guardar" : "Save") { selection = draft; dismiss() }
-                        .disabled(loading).accessibilityIdentifier("release.avatar.save")
-                }
+                CuadraoCancelToolbar(title: spanish ? "Cancelar" : "Cancel", identifier: "release.avatar.cancel") { dismiss() }
+                CuadraoConfirmToolbar(title: spanish ? "Guardar" : "Save", disabled: loading, identifier: "release.avatar.save") { selection = draft; dismiss() }
             }
             .sheet(item: $crop) { request in
                 CanvasAvatarCropSheet(request: request, spanish: spanish) { draft = .photo($0) }

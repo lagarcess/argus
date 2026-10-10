@@ -1,5 +1,6 @@
 import { authenticatedRequestHeaders } from "./chat-auth-ownership";
 import { apiFetch, ARGUS_API_BASE_URL, argusApiRequestHeaders } from "./argus-api-transport";
+import type { ArgusLanguage } from "./language-features";
 
 /**
  * The Business pilot's view of `/api/v1/business`. The backend owns every
@@ -20,6 +21,20 @@ export type ReceiptStatus =
 
 export type ReceiptChannel = "web" | "whatsapp";
 
+/** Why a `needs_attention` receipt needs the owner. The backend decides it. */
+export const RECEIPT_ATTENTIONS = [
+  "unreadable",
+  "ai_unavailable",
+  "interrupted",
+  "outcome_unknown",
+  "no_purchase_found",
+  "several_purchases",
+  "source_unavailable",
+  "check_details",
+  "other",
+] as const;
+export type ReceiptAttention = (typeof RECEIPT_ATTENTIONS)[number];
+
 export type ReceiptReviewFields = {
   merchant: string | null;
   occurred_on: string | null;
@@ -38,6 +53,11 @@ export type ReceiptSummary = ReceiptReviewFields & {
   received_at: string;
   status: ReceiptStatus;
   error_code: string | null;
+  attention: ReceiptAttention | null;
+  /** The owner may ask for a consented AI read now. */
+  preparable: boolean;
+  /** The owner may fill in the one purchase by hand from version 0. */
+  enterable: boolean;
   expense_id: string | null;
 };
 
@@ -73,9 +93,19 @@ export type BusinessWorkspaceInfo = {
   currencies: CurrencyCode[];
   /** Whether Business conversations can answer questions about saved expenses. */
   assistant_available: boolean;
+  /** Whether Business conversations can be started or continued at all. */
+  chat_available: boolean;
   /** What a receipt upload accepts. The backend's document settings own it. */
   receipt_limits: ReceiptLimits;
 };
+
+/**
+ * The one reader of `chat_available`. Closed until the backend says so, so a
+ * workspace still loading, or an older payload without the field, offers no chat.
+ */
+export function businessChatAvailable(workspace: BusinessWorkspaceInfo | null): boolean {
+  return workspace?.chat_available === true;
+}
 
 export type ReceiptLimits = {
   max_bytes: number;
@@ -109,7 +139,18 @@ export type BusinessUpdate = {
   receipt_id: string | null;
   expense_id: string | null;
   error_code: string | null;
+  attention: ReceiptAttention | null;
   label: string | null;
+};
+
+/**
+ * Business records matching a query, each list capped by `limit`. A receipt
+ * whose expense also matched is only under its expense, as `receipt_id`.
+ */
+export type BusinessSearchResult = {
+  expenses: BusinessExpense[];
+  receipts: ReceiptSummary[];
+  accounts: BusinessAccount[];
 };
 
 export type ExpenseInput = {
@@ -119,6 +160,22 @@ export type ExpenseInput = {
   merchant: string | null;
   category_id: string | null;
 };
+
+/** The owner's one Business space. Business records live only inside it. */
+export type BusinessSpace = { id: string; name: string };
+
+/**
+ * Starts the owner's Business space, or returns the one they already have.
+ * Every other Business route answers 404 until it exists. The server names a
+ * new space in `language`.
+ */
+export async function startBusinessSpace(language: ArgusLanguage): Promise<BusinessSpace> {
+  return apiFetch("/business/space", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language }),
+  });
+}
 
 export async function getBusinessWorkspace(): Promise<BusinessWorkspaceInfo> {
   return apiFetch("/business/workspace");
@@ -148,6 +205,11 @@ export async function getBusinessReceipt(id: string): Promise<ReceiptDetail> {
 export async function listBusinessUpdates(): Promise<BusinessUpdate[]> {
   const page = await apiFetch<{ items: BusinessUpdate[] }>("/business/updates");
   return page.items;
+}
+
+export async function searchBusiness(q: string, limit = 5): Promise<BusinessSearchResult> {
+  const query = new URLSearchParams({ q, limit: String(limit) });
+  return apiFetch(`/business/search?${query}`);
 }
 
 export async function listBusinessExpenses(

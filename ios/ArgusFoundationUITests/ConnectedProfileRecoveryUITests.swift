@@ -100,8 +100,9 @@ extension FinancialLoopUITests {
         for title in ["Memory", "Shared conversations", "Removed activity"] {
             XCTAssertFalse(app.buttons[title].exists, title)
         }
-        XCTAssertTrue(app.buttons["Files"].exists)
-        XCTAssertTrue(app.buttons["Conversations"].exists)
+        XCTAssertFalse(app.buttons["Files"].exists, "no stored files in the free tier yet")
+        XCTAssertFalse(app.buttons["Conversations"].exists, "no AI chats in the free tier")
+        XCTAssertFalse(app.staticTexts["Your data"].exists, "and no empty Your data header is left behind")
         app.navigationBars.buttons.firstMatch.tap()
         tapVisible(app.buttons["cuadrao.profile.preferences"])
         XCTAssertFalse(app.buttons["More options"].exists)

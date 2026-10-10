@@ -6,7 +6,8 @@ import {
   canOpenKeyboardShortcuts,
 } from "./chatKeyboardShortcutPolicy";
 import { hasOpenOverlay } from "@/components/layout/overlayStack";
-import { matchesKeyboardShortcut } from "@/lib/keyboard-shortcuts";
+import { useChatAvailable } from "@/components/chat/ChatWorkspace";
+import { KEYBOARD_SHORTCUTS, matchesKeyboardShortcut } from "@/lib/keyboard-shortcuts";
 import { nextSidebarRecentsState } from "@/lib/sidebar-shortcuts";
 
 type UseChatKeyboardShortcutsOptions = {
@@ -51,6 +52,7 @@ export function useChatKeyboardShortcuts(
   options: UseChatKeyboardShortcutsOptions,
 ) {
   const { enabled } = options;
+  const chatAvailable = useChatAvailable();
   const optionsRef = useRef(options);
   const [keyboardShortcutsOpen, setKeyboardShortcutsOpen] = useState(false);
   const [isRecentsQuickPeekOpen, setIsRecentsQuickPeekOpen] = useState(false);
@@ -106,7 +108,11 @@ export function useChatKeyboardShortcuts(
         // of these shortcuts acts on a surface that is open; they act on the
         // chat behind it, so anything open at all is a reason to stand down.
         // Quick Peek is still named because it does not register a layer.
-        hasOpenOverlay()
+        hasOpenOverlay() ||
+        (!chatAvailable &&
+          KEYBOARD_SHORTCUTS.some(
+            (shortcut) => shortcut.needsChat && matchesKeyboardShortcut(shortcut.id, event),
+          ))
       ) {
         return;
       }
@@ -179,7 +185,7 @@ export function useChatKeyboardShortcuts(
     };
     document.addEventListener("keydown", onKeyDown, true);
     return () => document.removeEventListener("keydown", onKeyDown, true);
-  }, [enabled, isRecentsQuickPeekOpen, keyboardShortcutsOpen]);
+  }, [chatAvailable, enabled, isRecentsQuickPeekOpen, keyboardShortcutsOpen]);
 
   return {
     keyboardShortcutsOpen,

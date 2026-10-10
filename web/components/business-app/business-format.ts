@@ -89,3 +89,14 @@ export const RECEIPT_CATEGORY_IDS = [
   "shopping",
   "interest_fees",
 ] as const;
+
+/** The first period filter whose range holds `day`, if any does. */
+export function periodContaining(day: string, now = new Date()): Period["key"] | null {
+  const keys: Period["key"][] = ["this_month", "last_month", "last_30_days"];
+  return (
+    keys.find((key) => {
+      const { from, to } = periodRange(key, now);
+      return from <= day && day <= to;
+    }) ?? null
+  );
+}

@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 from typing import Protocol
 from uuid import uuid4
 
+from argus.domain.owner_scope import OwnerScope, holds, space_id
 from argus.domain.recording.accounts import AccountFacts
 from argus.domain.recording.asset_model import AssetChange
 from argus.domain.recording.asset_schemas import AssetDetailsRequest
@@ -76,6 +77,7 @@ class FinancialAccountRepository(Protocol):
         request: AssetDetailsRequest,
         idempotency_key: str,
         identity_hash: str,
+        scope: OwnerScope,
     ) -> AssetDetailsResult: ...
 
     def mutate(
@@ -87,6 +89,7 @@ class FinancialAccountRepository(Protocol):
         identity_hash: str,
         expected_version: int,
         planner: Planner,
+        scope: OwnerScope,
     ) -> OperationResult: ...
 
     def create(
@@ -97,11 +100,16 @@ class FinancialAccountRepository(Protocol):
         identity_hash: str,
         account: NewAccount,
         opening: OpeningWrite | None,
+        scope: OwnerScope,
     ) -> CreateResult: ...
 
-    def list_accounts(self, *, user_id: str) -> list[StoredAccount]: ...
+    def list_accounts(
+        self, *, user_id: str, scope: OwnerScope
+    ) -> list[StoredAccount]: ...
 
-    def get_account(self, *, user_id: str, account_id: str) -> StoredAccount | None: ...
+    def get_account(
+        self, *, user_id: str, account_id: str, scope: OwnerScope
+    ) -> StoredAccount | None: ...
 
     def update_account(
         self,
@@ -110,6 +118,7 @@ class FinancialAccountRepository(Protocol):
         account_id: str,
         expected_version: int,
         changes: dict[str, object],
+        scope: OwnerScope,
     ) -> StoredAccount: ...
 
     def write_opening(
@@ -120,6 +129,7 @@ class FinancialAccountRepository(Protocol):
         expected_revision: int | None,
         expected_version: int,
         write: OpeningWrite,
+        scope: OwnerScope,
     ) -> StoredAccount: ...
 
 
@@ -134,6 +144,8 @@ class InMemoryFinancialAccountRepository:
         self._clock = clock
         self._lock = threading.Lock()
         self._accounts: dict[str, StoredAccount] = {}
+        # Account id to its stored ``owner_space_id``; null is Personal.
+        self._spaces: dict[str, str | None] = {}
         self._money_receipts: dict[
             tuple[str, str | None, str], tuple[str, str, int, tuple[str, ...]]
         ] = {}
@@ -148,13 +160,17 @@ class InMemoryFinancialAccountRepository:
         identity_hash: str,
         account: NewAccount,
         opening: OpeningWrite | None,
+        scope: OwnerScope,
     ) -> CreateResult:
         with self._lock:
             key = (user_id, CREATE_SCOPE, idempotency_key)
             reserved = self._reservations.get(key)
             if reserved is not None:
                 existing_hash, account_id = reserved
-                if existing_hash != identity_hash:
+                # The space joins the fingerprint, as in create_financial_account.
+                if existing_hash != identity_hash or not holds(
+                    scope, self._spaces[account_id]
+                ):
                     raise IdempotencyConflict()
                 return CreateResult(self._accounts[account_id], created=False)
             now = self._clock()
@@ -179,24 +195,33 @@ class InMemoryFinancialAccountRepository:
                 )
             stored = StoredAccount(facts, record)
             self._accounts[facts.id] = stored
+            self._spaces[facts.id] = space_id(scope)
             self._reservations[key] = (identity_hash, facts.id)
             return CreateResult(stored, created=True)
 
-    def list_accounts(self, *, user_id: str) -> list[StoredAccount]:
+    def held(self, user_id: str, scope: OwnerScope) -> list[StoredAccount]:
+        """The person's accounts in ``scope``; the caller holds ``_lock``."""
+
+        return [
+            item
+            for item in self._accounts.values()
+            if item.account.user_id == user_id
+            and holds(scope, self._spaces.get(item.account.id))
+        ]
+
+    def list_accounts(self, *, user_id: str, scope: OwnerScope) -> list[StoredAccount]:
         with self._lock:
-            owned = [
-                item
-                for item in self._accounts.values()
-                if item.account.user_id == user_id
-            ]
+            owned = self.held(user_id, scope)
         return sorted(owned, key=lambda item: (item.account.created_at, item.account.id))
 
-    def get_account(self, *, user_id: str, account_id: str) -> StoredAccount | None:
+    def get_account(
+        self, *, user_id: str, account_id: str, scope: OwnerScope
+    ) -> StoredAccount | None:
         with self._lock:
-            stored = self._accounts.get(account_id)
-        if stored is None or stored.account.user_id != user_id:
-            return None
-        return stored
+            try:
+                return self._owned(user_id, account_id, scope)
+            except AccountNotFound:
+                return None
 
     def get_any_account(self, *, account_id: str) -> StoredAccount | None:
         """Server-side lookup after household authorization already passed."""
@@ -211,9 +236,10 @@ class InMemoryFinancialAccountRepository:
         account_id: str,
         expected_version: int,
         changes: dict[str, object],
+        scope: OwnerScope,
     ) -> StoredAccount:
         with self._lock:
-            stored = self._owned(user_id, account_id)
+            stored = self._owned(user_id, account_id, scope)
             if stored.account.version != expected_version:
                 raise StaleVersion()
             from argus.domain.recording.asset_storage import validate_type_change
@@ -240,9 +266,10 @@ class InMemoryFinancialAccountRepository:
         expected_revision: int | None,
         expected_version: int,
         write: OpeningWrite,
+        scope: OwnerScope,
     ) -> StoredAccount:
         with self._lock:
-            stored = self._owned(user_id, account_id)
+            stored = self._owned(user_id, account_id, scope)
             current = stored.opening.current.revision if stored.opening else None
             if current != expected_revision or stored.account.version != expected_version:
                 raise StaleVersion()
@@ -271,11 +298,12 @@ class InMemoryFinancialAccountRepository:
         identity_hash: str,
         expected_version: int,
         planner: Planner,
+        scope: OwnerScope,
     ) -> OperationResult:
         from argus.domain.recording.loop_storage import OperationResult, apply
 
         with self._lock:
-            stored = self._owned(user_id, account_id)
+            stored = self._owned(user_id, account_id, scope)
             key = (user_id, account_id, idempotency_key)
             receipt = self._operations.get(key)
             if receipt:
@@ -305,6 +333,7 @@ class InMemoryFinancialAccountRepository:
         request: AssetDetailsRequest,
         idempotency_key: str,
         identity_hash: str,
+        scope: OwnerScope,
     ) -> AssetDetailsResult:
         from argus.domain.recording.asset_storage import memory_write
 
@@ -315,11 +344,16 @@ class InMemoryFinancialAccountRepository:
             request=request,
             idempotency_key=idempotency_key,
             identity_hash=identity_hash,
+            scope=scope,
         )
 
-    def _owned(self, user_id: str, account_id: str) -> StoredAccount:
+    def _owned(self, user_id: str, account_id: str, scope: OwnerScope) -> StoredAccount:
         stored = self._accounts.get(account_id)
-        if stored is None or stored.account.user_id != user_id:
+        if (
+            stored is None
+            or stored.account.user_id != user_id
+            or not holds(scope, self._spaces.get(account_id))
+        ):
             raise AccountNotFound()
         return stored
 

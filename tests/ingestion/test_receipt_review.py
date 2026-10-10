@@ -16,6 +16,7 @@ from argus.domain.ingestion.receipt_review import (
     receipt_ids,
     receipt_review,
 )
+from argus.domain.owner_scope import PERSONAL
 from argus.domain.recording.money_schemas import MoneyRequest
 
 from tests.ingestion.conftest import ALICE, bearer
@@ -90,16 +91,18 @@ def _upload(client, consent="true"):
 def _review(identities, receipt_id):
     service = documents_service()
     user = identities[ALICE]["id"]
-    draft = service.get(user_id=user, connection_id=receipt_id)
+    draft = service.get(user_id=user, connection_id=receipt_id, scope=PERSONAL)
     batch = service.store.get(user_id=user, connection_id=receipt_id)
-    events = service.hub.sink.list(user_id=user, states=RECEIPT_EVENT_STATES)
+    events = service.hub.sink.list(
+        user_id=user, states=RECEIPT_EVENT_STATES, scope=PERSONAL
+    )
     return receipt_review(draft, batch, events)
 
 
 def _receipt_ids(identities, activity_ids):
     service = documents_service()
     user = identities[ALICE]["id"]
-    with service.hub.sink.store.transaction(user) as tx:
+    with service.hub.sink.store.transaction(user, scope=PERSONAL) as tx:
         return receipt_ids(tx, service.store, user, activity_ids)
 
 
@@ -275,7 +278,7 @@ def test_review_corrects_and_confirms_without_rewriting_evidence(
     }
 
     documents_service().hub.disconnect(
-        user_id=identities[ALICE]["id"], connection_id=receipt_id
+        user_id=identities[ALICE]["id"], connection_id=receipt_id, scope=PERSONAL
     )
     assert _receipt_ids(identities, [activity["activity_id"]]) == {}
 
@@ -309,6 +312,7 @@ def test_activity_recorded_by_hand_has_a_receipt_only_once_linked(
             amount="1180.00",
             occurred_at=datetime(2026, 10, 3, 15, tzinfo=timezone.utc),
         ),
+        scope=PERSONAL,
     )
     manual = money.write(
         user_id=user,
@@ -316,6 +320,7 @@ def test_activity_recorded_by_hand_has_a_receipt_only_once_linked(
             update={"preview_token": preview["preview_token"]}
         ),
         idempotency_key=str(uuid4()),
+        scope=PERSONAL,
     )["activity"]["activity_id"]
     assert _receipt_ids(identities, [manual]) == {}
 

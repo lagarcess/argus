@@ -1434,7 +1434,7 @@ describe("Argus Alpha frontend contract", () => {
       ),
       "utf-8",
     );
-    const api = readFileSync(join(root, "lib/argus-api.ts"), "utf-8");
+    const api = ["lib/argus-api.ts", "lib/conversation-surface-api.ts"].map((file) => readFileSync(join(root, file), "utf-8")).join("\n");
 
     expect(palette).toContain("includeLedgerGroups: true");
     expect(palette).toContain("commandPaletteItemFromSearch");
@@ -1832,7 +1832,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).toContain("const isRecentsMode =");
     expect(historyEffect).toContain("!isRecentsMode");
     expect(historyEffect).toContain(
-      "[isGuest, isRecentsMode, retryNonce]",
+      "[chatAvailable, isGuest, isRecentsMode, retryNonce, searchSurface, surface]",
     );
     expect(historyRequestStart).toBeLessThan(
       palette.indexOf("const trimmed = query.trim()"),

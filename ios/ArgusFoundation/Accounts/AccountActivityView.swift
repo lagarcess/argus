@@ -85,7 +85,7 @@ struct AccountActivityView: View {
                     }.padding(24)
                 }.background(WelcomePalette.background)
                     .navigationTitle("loop.activity.title").navigationBarTitleDisplayMode(.inline)
-                    .toolbar { ToolbarItem(placement: .cancellationAction) { Button("action.close") { inspected = nil } } }
+                    .toolbar { CuadraoCancelToolbar(title: "action.close") { inspected = nil } }
             }.tint(WelcomePalette.pine).foregroundStyle(WelcomePalette.ink)
         }
     }

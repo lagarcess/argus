@@ -11,7 +11,12 @@ import {
 } from "lucide-react";
 import type { ChatShellBridge } from "@/components/chat/ChatWorkspace";
 import type { WorkspaceStarterEntry } from "@/components/chat/StarterActions";
-import type { BusinessOverview, BusinessWorkspaceInfo, ReceiptSummary } from "@/lib/business-api";
+import {
+  businessChatAvailable,
+  type BusinessOverview,
+  type BusinessWorkspaceInfo,
+  type ReceiptSummary,
+} from "@/lib/business-api";
 import type { BusinessPanelState } from "./BusinessWorkspace";
 import type { IntakeTarget } from "./ReceiptIntakeDialog";
 
@@ -66,6 +71,7 @@ export function useBusinessActions({
   const { t } = useTranslation();
   const awaiting = records.inbox?.length ?? 0;
   const canAsk =
+    businessChatAvailable(records.workspace) &&
     Boolean(records.workspace?.assistant_available) &&
     (records.overview?.totals ?? []).some((total) => total.count > 0);
 
