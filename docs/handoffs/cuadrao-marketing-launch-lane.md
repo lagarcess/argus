@@ -373,3 +373,8 @@ The founder authorized pushing all accepted changes to PR939 and obtaining green
 The original layout is now a durable [source archive and screenshot index](../reports/evidence/cuadrao-marketing-touchup/original-layout-archive/README.md). Its original files match source171779c97 and remain untouched. The old4511 process had stopped; a separate archive extraction now serves4511 with providers unset. Current4512 and fixture-only4513 serve the accepted design plus footer branding/favicon. Verify listener cwd before any later restart.
 
 PR939 remains draft targeting integration. No merge, deployment, hosted changes, public forms or real email. Read GitHub for terminal exact-head CI rather than assuming the previous head’s result. The current report and screenshots supersede historical footer-photo and old-icon descriptions.
+
+
+## Phone locale follow-up, October 9, 2026
+
+Runtime `d5436b7e861876fea205ac7cdb68ac943702c8fa` makes the Marketing phone preview follow the header language. Existing hand, angle, artwork and submission logic are unchanged. Build/lint/typecheck/modularity pass; focused signup/motion tests pass 35 with one intentional touch skip. ES/EN desktop/mobile WebKit captures and signup demo evidence are refreshed. Independent scoped review is clean. See [locale verification](../reports/evidence/cuadrao-marketing-touchup/personal-pet/locale-check/README.md). Integration remains `43fac94de2672600079f312258908f05747a9d63`. The following evidence-only commit retains this exact runtime evidence. Continue on the existing branch/PR939. Preview4512 and mock4513 are current; comparison4511 is preserved. Deployment and public forms stay on hold.

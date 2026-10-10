@@ -1,6 +1,6 @@
 {
-  "sourceCommit": "ece1aa067f6c810dd349fb57742a4eb0bd235ee9",
-  "capturedAt": "2026-10-10T02:31:44.858Z",
+  "sourceCommit": "d5436b7e861876fea205ac7cdb68ac943702c8fa",
+  "capturedAt": "2026-10-10T03:00:33.821Z",
   "baseURL": "http://127.0.0.1:4513",
   "signup": "Browser request intercepted with registered fixture. No signup reached the server or any provider.",
   "browser": "Playwright Chromium headless, isolated contexts",

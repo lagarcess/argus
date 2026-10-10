@@ -91,3 +91,8 @@ The accepted tag `codex/marketing-design-checkpoint-2026-10-09` remains unchange
 ### Signup demo synchronized with final branding
 
 Current capture source `ece1aa067f6c810dd349fb57742a4eb0bd235ee9`. Refreshed screenshots and clip use `http://127.0.0.1:4513` and include its simulation badge. Capture responses are intercepted fixtures; the real local proxy submission and Replay were separately verified in the in-app browser. The demo proxies the current4512 build, so footer branding, favicon and the accepted hand/phone scene stay in sync. No email is saved or sent.
+
+
+### Phone language correction
+
+Runtime `d5436b7e861876fea205ac7cdb68ac943702c8fa` localizes the phone CTA labels through the page locale. See [verification and tab identity notes](locale-check/README.md). The refreshed demo and screenshots include this correction.
