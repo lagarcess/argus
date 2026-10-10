@@ -392,3 +392,8 @@ This new reaction and its evidence are local, unpushed checkpoints. Remote PR939
 ## Reaction accepted for PR update
 
 The founder accepted the invalid-email pet reaction and authorized pushing it to PR939 and obtaining green CI. [Reaction acceptance](../reports/evidence/cuadrao-marketing-touchup/personal-pet/reaction-acceptance.md) supersedes the preceding local-only and pending-feedback instructions. Runtime remains `0455fa4c2`; exact-source evidence is retained. Integration is unchanged at `43fac94de`, with no new overlap and a passing merged-tree modularity check. The final CI result belongs to the publication head and is recorded in PR checks and the terminal verification comment. Deployment, hosted changes, real email and public forms remain on hold.
+
+
+## Integration preparation, October 10, 2026
+
+The [PR939 reconciliation record](../reports/2026-10-10-pr-939-reconciliation.md) supersedes earlier branch-status and local-only instructions. The accepted design is locked. PR929 landed as `4cb85949b4dea6855971c8268aac1bd1a0cacb01`; PR939 incorporates that remote integration head and the preserved PR929 landing records. Its runtime is unchanged from accepted published head `a706ed2284ad67f959d334baa2d4e0305217ac93`. Review and CI must cover the final reconciliation head before a separate merge slot. PR927 remains held against main. All publication and public-form holds remain unchanged.
