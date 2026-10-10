@@ -623,4 +623,4 @@ The founder approved these points after two audits of the Business core flows:
 - The default currency is DOP. The reviewer can change it before sign-off.
 - Build only what J1 to J3 need, then test with one real owner and one real accountant. Other work waits until real use asks for it.
 
-The [Business agent execution spec](lanes/cuadrao-business-agent-execution-spec.md) owns the contract, the work order and the six open decisions.
+The [Business agent execution spec](lanes/cuadrao-business-agent-execution-spec.md) owns the contract, the work order and the defaults. No decision is open.

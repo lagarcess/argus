@@ -38,8 +38,9 @@ Two people judge success:
 - The accountant prepares the agreed statements. The accountant does not
   rebuild a transaction that the package already explains.
 
-"Bank-credible" needs a named lender and loan product (decision F2). Until the
-founder names one, the finish line is the accountant's acceptance only.
+The test is the accountant's acceptance. A bank asks for financial
+statements that the accountant or the owner signs. It does not ask for the
+Cuadrao package.
 
 ## 3. Decisions
 
@@ -61,19 +62,18 @@ founder names one, the finish line is the accountant's acceptance only.
 | L12 | The OpenRouter key caps AI spend. Cuadrao adds no spend guard of its own. Before a PR makes model calls, the founder names the models for it (section 3.4). | 2026-10-10 |
 | L13 | The default currency is DOP. A draft marks a defaulted currency so the reviewer can change it before sign-off. | 2026-10-10 |
 
-### 3.2 Open founder decisions
+### 3.2 Defaults
 
-No open decision blocks J1. Each one has a recommendation. The "Blocks"
-column names the first work that stops.
+No decision is open. Each item below has a default. Change a default only when
+real use shows a need or a critical risk.
 
-| ID | Question | Recommendation | Blocks |
-| --- | --- | --- | --- |
-| F1 | What must the accountant's package contain? | Use the field list in section 10. Confirm it with the pilot accountant before K1. | K1 |
-| F2 | Which lender and loan product define "bank-credible"? | Name one, for example a Banreservas commercial loan. Add its document list to the J8 acceptance. The bank regulator floor depends on the loan size (Appendix A). Below RD$5M, the owner signs the statements. | J8 sign-off only |
-| F5 | What does WhatsApp do when the business has no AI consent? | Keep today's behavior. Save the message and send the fixed acknowledgement. Do not start an agent turn. | W1 |
-| F7 | How do we approve agent text that a model writes? | Approve Spanish style rules and a set of golden replies, in Spanish first. Keep the fixed copy for receipt acknowledgements. | T1 scorecard |
-| F9 | Do we capture fiscal fields (RNC, NCF or e-CF, ITBIS)? | Yes, as extracted facts marked "not verified". This is capture. It is not fiscal issuance or filing. | X1 |
-| F10 | What happens when a question is due after the WhatsApp 24-hour window closes? | The question waits. The agent asks it in the owner's next conversation. The accountant sees it in the web view. Template messages wait for #941. | W1 |
+| ID | Item | Default |
+| --- | --- | --- |
+| D1 | The accountant's package | A CSV and an Excel file, with the receipts attached. Add a QuickBooks connection only if the pilot accountant uses QuickBooks. |
+| D2 | Business AI consent is off | The consent is on for the pilot. If an admin turns it off, Cuadrao saves the message and sends the fixed acknowledgement. It starts no agent turn. |
+| D3 | The agent's Spanish replies | The prompt gives short style rules for WhatsApp. The founder reads sample replies in each scorecard. No approval for each reply. |
+| D4 | Tax numbers on receipts | J2 reads RNC, NCF or e-CF, and ITBIS. Each value is marked "not verified" until the accountant checks it. This is not tax filing. |
+| D5 | The WhatsApp 24-hour window | Version 1 only replies to the owner. An owner message opens a new window. Reminders after 24 hours of silence use Meta-approved templates after #941. |
 
 ### 3.3 Build now, build later
 
@@ -87,10 +87,12 @@ an item from the "later" list only when real use asks for it.
 - M1: income and owner funds only.
 - A1: one record page with the sources, the action ledger, the open questions
   and an approve button.
-- A simple CSV for the accountant, with a funding column.
+- X1, so that J2 reads the tax numbers (default D4).
+- A CSV and an Excel file for the accountant, with a funding column and the
+  receipts (default D1).
 - Then put J1 to J3 in front of one real owner and one real accountant.
 
-**Later:** M2, V1, X1, K1 beyond the simple CSV, R1, J4 to J8, and the formal
+**Later:** M2, V1, K1 beyond the CSV and Excel files, R1, J4 to J8, and the formal
 E2 and E3 tests.
 
 ### 3.4 PRs that make model calls
@@ -232,7 +234,7 @@ resolution and one version. C0 extends the resolution:
 - `business_share`: a fact. Values are `all`, `none` or a partial amount.
 - `receipt_state`: a fact. Values are `fiscal_receipt`, `informal_receipt`,
   `no_receipt` or `unknown`.
-- `fiscal`: optional facts for RNC, NCF or e-CF, and ITBIS (decision F9).
+- `fiscal`: optional facts for RNC, NCF or e-CF, and ITBIS (default D4).
 - `source_ids`: one source for each message and each attachment.
 - `review_state`: the existing review states.
 
@@ -378,7 +380,7 @@ are new.
 | N3. Two messages cannot join one draft | New | C0, T1 | #946 |
 | N4. An agent proposal has no source kind | New | C0 | #945 |
 | N5. "Mío" cannot be recorded, and the export shows no payer | New | M1, K1 | #947 |
-| N6. A question after 24 hours is dropped | New | W1 (decision F10) | #944 |
+| N6. A question after 24 hours is dropped | New | W1 (default D5) | #944 |
 | N7. "850" has no currency source | New | C0 (decision L13: default DOP) | #943 |
 | N8. `manual_capture.require_processable` has no callers | New, low | T1 deletes it | #945 |
 
@@ -487,7 +489,7 @@ that row first.
 
 ### 8.6 PR W1: connect WhatsApp to the agent
 
-**Depends on:** C0. Decisions F5 and F10.
+**Depends on:** C0. Defaults D2 and D5.
 
 **Build:**
 
@@ -552,10 +554,10 @@ that changes model-facing text.
 
 | PR | Does | Depends on |
 | --- | --- | --- |
-| X1 | Adds RNC, NCF or e-CF, and ITBIS to `ReceiptDetails`. Puts `_PROMPT` under the fingerprint first. | J1, F9 |
+| X1 | Adds RNC, NCF or e-CF, and ITBIS to `ReceiptDetails`. Puts `_PROMPT` under the fingerprint first. Needed for J2. | J1, D4 |
 | V1 | Accepts WhatsApp audio. Keeps the original audio. Transcribes it through OpenRouter. Gives the text to the agent. Tests Dominican speech. | J1 |
 | M2 | Adds transfers, refunds, owner withdrawals, credit purchases with later payment, and loans. | M1 |
-| K1 | Builds the period package (section 10). Uses `occurred_on`. Adds a version and freshness. Removes the 100-receipt limit with continuation. | M1, F1 |
+| K1 | Builds the period package (section 10). Uses `occurred_on`. Adds a version and freshness. Removes the 100-receipt limit with continuation. | M1, D1 |
 | R1 | Adds opening position, opening cash, cash count and the completeness check against statements. | M1 |
 | E2 | Runs the timed novice-owner test on real phones. Needs #941 for real WhatsApp. | J4 |
 | E3 | Runs the accountant workflow test on one month (J8). | K1, R1 |
@@ -579,7 +581,8 @@ delivery.
 
 ## 10. The accountant's package
 
-Status: proposal for decision F1. The research summary is in Appendix A.
+Status: the long-term field list. Start with default D1. The research summary
+is in Appendix A.
 
 The package has three parts:
 
