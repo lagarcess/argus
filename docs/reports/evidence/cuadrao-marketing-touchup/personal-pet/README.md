@@ -86,3 +86,8 @@ Runtime source `d81766f0b371d427f7346cdf1b8dcc1de052ca97` removes the design-rev
 Fresh build, typecheck, lint and diff checks pass. The focused signup/motion suite passes 33 checks with one expected pointer-only skip on touch. Independent scoped review is clean. Desktop/mobile ES/EN captures and the clip were refreshed at this exact runtime source; the parent inspected the rendered success view and verified the regular preview copy in the browser. [Copy browser results](copy-polish-browser-results.txt) and [copy build results](copy-polish-build-results.txt) record this pass. Earlier accessibility evidence is retained across this text/removal-only change, not claimed as a new run.
 
 The accepted tag `codex/marketing-design-checkpoint-2026-10-09` remains unchanged at `0a026651060576a0e359efd5f2b868c70222e556`. Continue on the existing branch/worktree. Preview 4512 was rebuilt with providers unset; mock 4513 remains separate and comparison 4511 is preserved. No push, merge, deployment, hosted change, real email or public-form activation occurred. Both delegated copy agents returned ownership and stopped.
+
+
+### Signup demo synchronized with final branding
+
+Current capture source `ece1aa067f6c810dd349fb57742a4eb0bd235ee9`. Refreshed screenshots and clip use `http://127.0.0.1:4513` and include its simulation badge. Capture responses are intercepted fixtures; the real local proxy submission and Replay were separately verified in the in-app browser. The demo proxies the current4512 build, so footer branding, favicon and the accepted hand/phone scene stay in sync. No email is saved or sent.

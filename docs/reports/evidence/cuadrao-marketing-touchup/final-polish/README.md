@@ -1,5 +1,19 @@
 # Final Personal polish and Business photo removal
 
+## Current branding and PR update
+
+The founder authorized updating PR939 and getting CI green while deployment and public forms remain held. Candidate `ece1aa067f6c810dd349fb57742a4eb0bd235ee9` adds canonical light/dark icon-and-wordmark lockups inside the existing footer columns; the large cropped wordmark remains text. Favicon SVG, ICO and Apple icon are generated from the canonical light mark on paper. No signup behavior or dark source artwork changed.
+
+Fresh build, typecheck/lint, 177 unit tests and all 183 browser checks pass (one expected pointer-only skip on touch). Refreshed manifest and 32 screenshots cover16 ES/EN desktop/mobile Chromium/WebKit combinations. Parent inspected footer alignment in both palettes. The local signup demo proxies the same current build; simulated submission and Replay were verified in the in-app browser. Its boundary test passes and refreshed screenshots/clip use only mocked responses. Independent review is clean; its lazy-logo test finding was corrected by scrolling the logo into view before checking load.
+
+Integration advanced during this pass from original base `bbf4da23f01296af4ac639386fe9a0960218a49f` to `43fac94de2672600079f312258908f05747a9d63` (iOS keyboard fix). Its native-only code/tests and native design rule do not overlap Marketing runtime owners, API/data contracts, UI state, migrations, environment variables or affected Marketing tests. Normal one-way merge `ece1aa067f6c810dd349fb57742a4eb0bd235ee9` reconciles the branch. Modularity passes on that merged tree. Marketing build bytes are unchanged by reconciliation; existing behavioral evidence is retained and screenshots pin the merged source. No product worktree/service was edited.
+
+[Original layout archive](../original-layout-archive/README.md) includes a source download, exact commit/tree, checksum, historical screenshot index and isolated replay instructions. The old comparison was restored from that archive on4511 after its old process stopped; original files remain untouched.
+
+CI status belongs to the latest PR939 head/checks. This documentation commit does not assert a future CI result. Deployment, public forms, provider configuration, real email, hosted changes and merge remain held.
+
+## Previous polish checkpoint
+
 October 9, 2026. Current local candidate: `8a45ab0a482b5d7674a50d7c90058915e4fabe00`; runtime source: `1d87ca636`. Later documentation/evidence commits preserve these runtime bytes. This report supersedes historical footer-photo/reveal and editorial-photo descriptions.
 
 ## Accepted design and final changes

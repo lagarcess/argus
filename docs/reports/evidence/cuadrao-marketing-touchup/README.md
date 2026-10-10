@@ -2,6 +2,8 @@
 
 ## Current final polish
 
+The authorized PR update includes footer icon-and-wordmark branding and the current favicon. [Old layout source and screenshots](original-layout-archive/README.md) remain available for inspiration. Deployment and public forms stay on hold.
+
 Personal is accepted and [locked](personal-accepted-checkpoint.md). [Final polish and replacement readiness](final-polish/README.md) is the current continuation authority. Business editorial people photos are removed; both pages now end at the static cropped wordmark. Historical photo/reveal descriptions below are superseded.
 
 ## Scope and holds
