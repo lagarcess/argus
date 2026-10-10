@@ -185,9 +185,9 @@ struct HouseholdContributionEditorView: View {
                 if let error = editor.errorKey { Text(LocalizedStringKey(error)).accessibilityIdentifier("sharedPlan.contribution.error") }
             }
             .navigationTitle(editor.correcting == nil ? "sharedPlan.record" : "household.correct")
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 CuadraoCancelToolbar(title: "accounts.cancel", disabled: editor.busy) { dismiss() }
-                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
             }.task { await editor.load() }
         }
     }

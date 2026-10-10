@@ -69,9 +69,6 @@ struct FinancialEditorView: View {
             .toolbar {
                 CuadraoCancelToolbar(title: NSLocalizedString("accounts.cancel", comment: ""),
                                      disabled: model.busy || model.phase == .uncertain) { dismiss() }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer(); Button("accounts.keyboard.done") { focused = false }
-                }
             }
             .interactiveDismissDisabled(model.busy || model.phase == .uncertain)
             .task { await model.loadCategories() }

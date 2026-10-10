@@ -50,6 +50,7 @@ struct CuadraoTransactionSheet<Content: View>: View {
             }.background(WelcomePalette.background)
                 .navigationTitle(title ?? (reviewing ? (spanish ? "Revisar movimiento" : "Review transaction") : (spanish ? "Añadir movimiento" : "Add transaction")))
                 .navigationBarTitleDisplayMode(.inline)
+                .scrollDismissesKeyboard(.interactively)
                 .toolbar {
                     CuadraoCancelToolbar(title: reviewing ? (spanish ? "Atrás" : "Back") : (spanish ? "Cancelar" : "Cancel"), disabled: cancelDisabled) {
                         if reviewing { back() } else { dismiss() }
