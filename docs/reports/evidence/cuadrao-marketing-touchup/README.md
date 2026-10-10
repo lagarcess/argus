@@ -2,7 +2,7 @@
 
 ## Scope and holds
 
-This work moves the proposed spacious touch-up into the maintained Next.js marketing app. The founder has not accepted the current design. Passing tests do not establish design approval. The current ownership and resume point are in the [Marketing handoff](../../../handoffs/cuadrao-marketing-launch-lane.md). Business, Personal, Contact and Privacy remain available in Spanish and English. Shared routes, form handlers, privacy text and consent logic remain the existing canonical implementations. No iframe or comparison-server dependency remains.
+This work moves the proposed spacious touch-up into the maintained Next.js marketing app. The founder accepted the progress so far as the [locked design baseline](accepted-design-checkpoint.md). Personal-footer refinements and final polish remain. Passing tests do not establish final replacement or launch approval. The current ownership and resume point are in the [Marketing handoff](../../../handoffs/cuadrao-marketing-launch-lane.md). Business, Personal, Contact and Privacy remain available in Spanish and English. Shared routes, form handlers, privacy text and consent logic remain the existing canonical implementations. No iframe or comparison-server dependency remains.
 
 The new text is a draft for founder review in [copy-review.md](copy-review.md). No merge, publication, hosted migration, Render service, provider secret, real email or domain action is authorized by this report. Public forms and the operator section retain the LLC/operator hold. A local start without provider configuration reports unavailable and cannot send mail.
 

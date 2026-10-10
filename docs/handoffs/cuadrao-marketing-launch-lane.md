@@ -330,3 +330,8 @@ Latest founder steering: keep the corrected grip and turn the phone slightly tow
 
 
 Latest phone cleanup source `1c4dca80a512919a523fc9649c8ccd1f96fa8539` removes the slogan inside the phone and replaces its older screenshot icon with the canonical light mark. The lockup and central mark now use the same approved greens and lime overlap. A code-native overlay preserves the original PNG; no Consumer screen was changed. Hand, reader-facing angle, welcome buttons and motion are retained. Typecheck/lint/build, 15 brand tests, refreshed exact-source browser captures and independent scoped review pass. The current source and provenance are in Personal evidence. Preview4512 and mock4513 remain local; no push, publication, provider activation or other-lane changes. All workers stopped.
+
+
+## Accepted baseline lock before final footer polish
+
+The founder requested locking all progress so far. [Accepted design checkpoint](../reports/evidence/cuadrao-marketing-touchup/accepted-design-checkpoint.md) is now the current continuation authority for this touch-up. It records baseline `ee4a93e04`, runtime `1c4dca80a`, the local annotated tag, preservation boundaries and the remaining Personal-footer/polish work. It supersedes earlier pending-design-acceptance wording only for the accepted baseline. Footer requests are awaited; no speculative footer edits were made. No launch, merge, push, publication, hosted change, public-form or real-email authorization is implied.
