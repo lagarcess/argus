@@ -5,6 +5,25 @@ import UniformTypeIdentifiers
 final class FinancialLoopUITests: XCTestCase {
     let app = XCUIApplication()
 
+    func testAccountEntryReopensAfterReturningFromDetails() throws {
+        try signIn()
+        openPersonalAccounts()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.'")).firstMatch
+        guard row.waitForExistence(timeout: 10) else {
+            throw XCTSkip("Requires an existing synthetic account to revisit its details.")
+        }
+        for _ in 0..<3 {
+            tapVisible(app.buttons["accounts.add"])
+            XCTAssertTrue(app.buttons["accounts.type.checking"].waitForExistence(timeout: 5))
+            let cancel = app.buttons["accounts.cancel"]
+            tapVisible(cancel)
+            XCTAssertTrue(cancel.waitForNonExistence(timeout: 5))
+            tapVisible(row)
+            XCTAssertTrue(app.buttons["accounts.record"].waitForExistence(timeout: 5))
+            openPersonalAccounts()
+        }
+    }
+
     func testArchiveManagementRestoresSameAccount() throws {
         try signIn(fresh: true)
         let baseline = homeValue()
@@ -247,9 +266,8 @@ final class FinancialLoopUITests: XCTestCase {
 
     func assertHome(_ expected: Decimal) {
         openPersonalAccounts()
-        app.revealConnectedTabBar()
-        XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
-        app.buttons["tab.home"].tap()
+        app.openHomeSurface()
+        XCTAssertTrue(selectHomeMoneyCurrency("DOP"))
         let value = app.staticTexts["home.netWorth.DOP"]
         let predicate = NSPredicate { _, _ in
             guard value.exists else { return false }
@@ -261,9 +279,8 @@ final class FinancialLoopUITests: XCTestCase {
 
     func homeValue() -> Decimal {
         openPersonalAccounts()
-        app.revealConnectedTabBar()
-        XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
-        app.buttons["tab.home"].tap()
+        app.openHomeSurface()
+        _ = selectHomeMoneyCurrency("DOP")
         let value = app.staticTexts["home.netWorth.DOP"]
         // A new identity has no DOP account yet: its recorded DOP net worth is zero, not a failure.
         if !value.waitForExistence(timeout: 10) {

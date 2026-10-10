@@ -14,7 +14,7 @@ extension XCUIApplication {
     /// Connected hides `CuadraoNavigationBar` while Home owns a pushed account detail.
     func revealConnectedTabBar() {
         for _ in 0..<6 {
-            if buttons["tab.home"].exists { return }
+            if buttons["tab.home"].exists && buttons["tab.home"].isHittable { return }
             let nativeBack = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
             if nativeBack.waitForExistence(timeout: 1) {
                 nativeBack.tap()
@@ -40,8 +40,26 @@ extension XCUIApplication {
                 buttons["sheet.close"].tap()
                 continue
             }
+            if buttons["nav.add"].exists && buttons["nav.add"].isHittable,
+               let visibleScroll = scrollViews.allElementsBoundByIndex.first(where: { $0.isHittable }) {
+                visibleScroll.swipeDown()
+                continue
+            }
             break
         }
+    }
+
+    func openHomeSurface() {
+        let home = scrollViews["screen.home"]
+        if home.exists && home.isHittable { return }
+        revealConnectedTabBar()
+        if home.exists && home.isHittable { return }
+        let homeTab = buttons["tab.home"]
+        guard homeTab.waitForExistence(timeout: 10), homeTab.isHittable else {
+            XCTFail("Home tab must be visible before opening Home")
+            return
+        }
+        homeTab.tap()
     }
 
     func openPlanSurface() {
@@ -89,12 +107,11 @@ extension XCUIApplication {
 
     /// Accounts live on Home in Connected; tip keeps a dedicated Accounts tab.
     func openAccountsList() {
-        revealConnectedTabBar()
         if buttons["tab.accounts"].waitForExistence(timeout: 2) {
+            revealConnectedTabBar()
             buttons["tab.accounts"].tap()
         } else {
-            XCTAssertTrue(buttons["tab.home"].waitForExistence(timeout: 10))
-            buttons["tab.home"].tap()
+            openHomeSurface()
         }
         if buttons["accounts.back"].waitForExistence(timeout: 1) {
             buttons["accounts.back"].tap()
