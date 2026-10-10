@@ -398,8 +398,9 @@ Other findings:
 
 ### 8.1 Order
 
-1. P0. The founder lands the work on `codex/cuadrao-business-sandbox`
-   (in progress on October 10, 2026). Nothing below can merge before P0.
+1. P0. Push `codex/cuadrao-business-sandbox` and open its PR to
+   `codex/private-alpha-next`. The founder assigns the owner. Nothing below
+   can merge before P0.
 2. C0. The contract. One writer.
 3. T1, M1, W1, A1 and E1 start in parallel against C0. Each uses the C0
    fixtures for the parts that are not built.
@@ -645,7 +646,8 @@ These items are out of scope for this spec:
 1. **The sandbox branch is not pushed.** `codex/cuadrao-business-sandbox` is
    105 commits ahead of `codex/private-alpha-next`. It exists on one machine.
    The issues link to `docs/specs/lanes/cuadrao-business-sandbox-contract.md`,
-   which exists only on that branch. The founder is landing it (P0).
+   which exists only on that branch. On October 10, 2026, the branch had no
+   PR and no assigned owner (P0).
 2. **#925 conflicts with the base.** T1 builds on its surface filter.
    Reconcile #925 or move its surface filter into T1.
 3. **#941 blocks real WhatsApp delivery.** Fixture and simulated proof can
