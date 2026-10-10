@@ -31,7 +31,12 @@
   "app_source_tree": "6f6e052f8ad348c247145915c5cb0c89c5d76c36",
   "app_source_unchanged_from_integration": false,
   "large_text_visual_acceptance": "open: transaction Date label wraps into a single-letter column",
-  "final_local_test_source": "125087e96",
+  "final_local_test_source": "7a66caad04e3c4ecadd48c8ae6a11042fd077bcc",
+  "source_summary_correction": {
+    "date": "2026-10-10",
+    "previous_value": "125087e96",
+    "reason": "The prior summary named the largest-text probe source. The later identifier regression and failed budget rerun used 7a66caad04e3c4ecadd48c8ae6a11042fd077bcc, as recorded in identifier-fix-source-provenance.json. Earlier native results retain their original sources; no tests were rerun for this correction."
+  },
   "app_source_delta": "CanvasDecimalInput identifier assignment moved into updateUIView",
   "identifier_regression": "passed:1 test,0 failures,0 skips"
 }

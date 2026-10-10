@@ -115,11 +115,14 @@ filter, saved the bill at DOP 35.00 and found that bill after a Spanish relaunch
 
 This is a partial checkpoint. No complete free-tier acceptance claim is made.
 The identifier regression passes, but the broader budget rerun failed during
-account-entry setup before any budget assertions. The founder has approved
-draft publication; new-branch CI has not run yet. Large-text money entry and
-cancellation passed, but
-visual acceptance remains open because the transaction Date label wraps into
-a single-letter column at the largest text size.
+account-entry setup before any budget assertions. As verified on October 10,
+draft [#952](https://github.com/lagarcess/argus/pull/952) is published at
+`9bba18fea6878049bbcff1f86d93fce7b3237f7f`, and its
+[push CI passed](https://github.com/lagarcess/argus/actions/runs/38034083813).
+The draft-triggered PR CI and smoke jobs were skipped. This status correction
+does not claim new native runs. Each native result retains its recorded source.
+Large-text money entry and cancellation passed, but visual acceptance remains
+open because the transaction Date label wraps into a single-letter column.
 
 | Journey | Native result | Canonical API result |
 | --- | --- | --- |
@@ -197,6 +200,7 @@ committed evidence contains only synthetic screenshots and aggregate results.
   is not claimed. English/Spanish money, Search and goal evidence is separate.
 - A first Search launch raced session restoration. Subsequent native sign-in
   runs passed; no shared auth implementation was changed.
-- Draft publication is approved and is being prepared. New-branch CI is pending.
-  Full local pytest also remains blocked at collection
+- Final integration reconciliation and checks on its resulting head remain
+  pending. The published-head CI above does not establish those later results.
+  Full local pytest remains blocked at collection
   by the pre-existing SciPy binary load error described in `local-checks.json`.
