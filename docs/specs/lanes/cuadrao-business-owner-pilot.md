@@ -1,23 +1,52 @@
 # Cuadrao Business owner pilot
 
-## Assignment and authority
+## Current authority and landing boundary
 
-This is the October 7, 2026 founder-scoped Business handoff. It scopes the whole
-first usable pilot, not only its UI. This PR contains planning only. The founder
-will assign the implementing Claude lane separately. No agent was dispatched.
+Reconciled October 10, 2026. Dates in the decision table are UTC. This document preserves the original owner-pilot
+requirements and records their later disposition. It is not a new implementation
+assignment or a statement that the complete pilot works.
 
-One full-stack owner assesses, builds, verifies and prepares integration landing.
-Use the [handoff](cuadrao-business-owner-pilot-handoff.md) to start that lane.
-The owner may divide delivery into reviewable PRs without splitting frontend and
-backend responsibility. Every delivered user job must work through real storage.
+Read [documentation authority](../../DOCUMENTATION_AUTHORITY.md) and the
+[MVEE](../argus-minimum-viable-ecosystem-experience.md) within their declared
+scopes. The [connected-flow spec](../cuadrao-business-connected-flow-spec.md) owns the
+wider workflow. The [Business handoff](../../handoffs/cuadrao-business-lane.md)
+records the October 8 implementation checkpoint and its evidence. Its pause
+predates the later founder continuations below. The
+[core-flow tracker](https://github.com/lagarcess/argus/issues/942) tracks remaining
+acceptance. The [API](../../API_CONTRACT.md), [data](../../DATA_MODEL.md), and
+[architecture](../../ARCHITECTURE.md) documents retain their technical ownership.
 
-Read [documentation authority](../../DOCUMENTATION_AUTHORITY.md), the
-[MVEE](../argus-minimum-viable-ecosystem-experience.md), and existing
-[API](../../API_CONTRACT.md), [data](../../DATA_MODEL.md) and
-[architecture](../../ARCHITECTURE.md) contracts. This assignment narrows the
-Business pilot. It does not rewrite consumer release decisions or imply every
-MVEE capability is in this pilot. Record applicable new experience decisions in
-the canonical documents with implementation, without overwriting another lane.
+| Work | Disposition for this landing |
+| --- | --- |
+| Owner API, S1–S3 isolation, and non-model-facing S4 chat separation | Already merged through #913, #914, and #918. #920 adds the default-off Business chat gate. Do not rebuild them. |
+| #900 and #910 | Documentation reconciliation only. They enable no feature and apply no migration. |
+| #925 | Preserve separately. Its model-facing restrictions, refusal UI, evaluation-budget changes, and scorecard work are excluded. Business chat stays off. |
+| Later local sandbox at `df208f7ec2379cd84efd55eea0deb685d67c5360` | Preserve on `codex/cuadrao-business-sandbox`. It is not included in these planning PRs. Local evidence does not establish hosted delivery or complete core-flow acceptance. |
+| Agent-first Business direction | Retain the direction for communication through defined Cuadrao tools. This docs landing adds no runtime, tool, prompt, voice, memory, or ledger action. |
+| E0 and wider UI work | No restart in this landing. The later capture work does not automatically authorize fiscal work or a broad redesign. |
+
+The founder's continuation decisions supersede the original narrow pilot where
+noted below. References identify human turns in Business Lane
+`01a0de75-29ee-71f0-8f58-0d2bb3934a33`.
+
+| Human decision | Effect on the original brief |
+| --- | --- |
+| October 9, turn `01a11fa2-0fcb-76e3-b986-1b728868a46d`: “don't wait on my permission use your best judgement” and a “full working sandboxed system with the plumbing ready” | Authorized continued local sandbox delivery after the earlier handoff pause. Preserve existing shell behavior and keep delivery claims tied to evidence. |
+| October 9, turn `01a12229-be2b-7de0-8a9f-fd2c5b19c45a`: “Approved proceed.” | Authorized the proposed Core Flow 2 work after the preceding scope discussion. |
+| October 9, turn `01a122a9-8d1e-7112-b157-222bf06c2411`: the supplied capture acceptance table | Added email, manual capture, multiple formats, routing, original bytes, duplicates, recovery, security, and honest status. Capture must not silently record an expense. |
+| October 10, turn `01a123db-ef52-7361-bfa2-89eb2a44293a`: “Laptop proof first; don’t point Meta/email at it until that passes. Prod untouched.” | Authorized scoped WhatsApp and staging follow-through then. This landing performs none of those external actions and makes no claim that their gates passed. |
+| October 10, turn `01a124c9-777f-7c63-9325-3250e4854406`: request to audit the agent/tool inventory | Establishes the newer agent-first investigation. It does not approve a new model-facing implementation through this PR. |
+
+Current landing constraints exclude main, hosted changes, paid evaluation,
+chat activation, and new product or copy work. The coordinator grants serialized
+merge slots. Preparing a PR does not grant its merge slot.
+
+## Original planning baseline
+
+The remaining sections describe the October 7 owner-pilot baseline, with explicit
+later dispositions where its requirements changed. Code pointers and initial
+verification targets belong to that baseline. Use the handoff and core-flow
+tracker above for delivery status, not future-tense requirements below.
 
 Planning base fetched on October 7 is
 `93571e593e1677561e1dd38f63b6475574942e2d` on
@@ -37,11 +66,12 @@ original receipt. Repeated delivery cannot silently create another expense.
 
 The owner can also see a small, accurate business overview and ask Cuadrao's
 built-in AI about saved expenses, with links back to the supporting records.
-The product is for business owners. It is not an accountant's workstation.
+The initial interface serves business owners. Later accountant feedback expanded
+the workflow to organized evidence, uncertainties, and accountant handoff.
 
-One owner operates each pilot business. No employee submissions, associate
-accounts, approver hierarchy or household sharing is included. Private Business
-records must remain separate from the same person's Personal and Household data.
+The original pilot used one owner per business. Later sandbox work explores firm
+access and custodian approval separately; this PR neither ships nor validates it.
+Private Business records must remain separate from the same person's Personal and Household data.
 The founder chose separate Personal and Business spaces on October 8; the
 [space slice plan](https://github.com/lagarcess/argus/pull/910) is the detailed
 isolation contract.
@@ -51,7 +81,8 @@ This pilot is stage B1 of the
 owns the wider Business roadmap: the offline fiscal engine (E0), the connected
 period pilot with invoices, collections and the accountant package (B2), and
 separately authorized live fiscal processing (L). This pilot implements none of
-those. E0 starts after this slice is finished.
+those. E0 has no automatic start when this slice finishes; the handoff records
+its hold and this landing does not lift it.
 
 ## Preserve the agreed experience
 
@@ -188,9 +219,9 @@ which contains existing answer/evidence receipt presentation.
 
 ### WhatsApp receipt intake
 
-WhatsApp and web upload are both part of the first pilot. Forwarded email follows
-next; connected read-only Gmail follows forwarded email. Neither email path is
-an implementation requirement here.
+WhatsApp and web upload were the first pilot inputs. The later Core Flow 2
+assignment added forwarded email. Connected Gmail remains separate. The original
+email deferral must not be used to discard the authorized sandbox email work.
 
 Use Meta's official Cloud API. During development use its test business number
 and approved testers, including the founder's personal WhatsApp as a sender.
@@ -205,8 +236,9 @@ claiming availability. Do not buy a number or subscribe to another provider.
 
 The narrow pilot proposal is receipt intake plus a receipt acknowledgement and
 an authenticated web review link. Correction and expense approval happen in the
-web app. The founder has not separately selected WhatsApp conversational review;
-show this boundary in the first assessment instead of silently expanding it.
+web app. This was the original review boundary. The newer agent-first direction
+requires a separate tool and approval contract before conversational review can
+be enabled.
 
 The implementation contract must cover:
 
@@ -251,22 +283,24 @@ These are requirements for an assessed contract, not instructions to create six
 new tables. Extend canonical owners only where the existing shape cannot express
 the approved behavior. Do not create a second ledger or a second approval state.
 
-Private Storage work in #778 is a real enablement dependency. Current source
-bytes live in Postgres. Coordinate ownership and complete private object storage,
+At the original planning base, source bytes lived in Postgres. The handoff now
+records merged private Storage work. Verify the target environment for private
+storage,
 source retrieval and cleanup before enabling receipt ingestion for the pilot.
 
-Preparation currently uses FastAPI BackgroundTasks. Persisted drafts do not prove
+The original preparation path used FastAPI BackgroundTasks. The handoff records
+the subsequent durable-job work. Persisted drafts alone do not prove
 that a process restart will finish a job. Reuse the existing job direction and
 coordinate #823/#826 to define durable dispatch, bounded retries, restart recovery
 and stale-result rejection. Do not introduce another worker platform by default.
 A closed browser must not cancel accepted intake. Provider timeouts with uncertain
 outcomes must not trigger unbounded duplicate spend.
 
-## Connect a bounded built-in assistant
+## Original assistant boundary and later direction
 
 Cuadrao provides its own AI by default. Preserve the existing LangGraph runtime,
-conversation persistence, streaming and grounded calculations. The initial
-Business job is read-only expense Q&A, for example "What did I spend this month?"
+conversation persistence, streaming and grounded calculations. The original proposed
+Business job was read-only expense Q&A, for example "What did I spend this month?"
 and "Show the receipt for this expense."
 
 - Read authorized Business records through a typed tool/service contract.
@@ -277,8 +311,9 @@ and "Show the receipt for this expense."
 - Recheck permissions on tool reads and source links. A changed conversation
   context cannot grant access to Personal or Household records.
 - Treat receipt text and attachments as untrusted data, never instructions.
-- Do not add autonomous writes, background agents, generic RAG, memory changes,
-  voice or a parallel interpreter. Model-facing changes require the repository's
+- This documentation landing adds no autonomous writes, background agents,
+  generic RAG, memory changes, voice, or parallel interpreter. Later agent work
+  follows its own explicit contract. Model-facing changes require the repository's
   applicable scorecard/evaluation gates and separately bounded live spend.
 
 The wider approved direction includes connecting an owner's external AI through
@@ -306,7 +341,7 @@ The existing marketing Business guide owns website presentation, not this app's
 availability. No WhatsApp adapter was verified in this scoped read. Claude must
 search before claiming it is absent or creating one.
 
-## Work in this order with one accountable lane
+## Original delivery sequence (not a restart instruction)
 
 1. Fetch remote integration. Record its SHA and assess this brief against code,
    open PRs and #778, #819, #823, #824, #826, #827 and #828. Return a short
@@ -379,9 +414,9 @@ local real-service success is not hosted pilot acceptance.
 
 ## Approval and completion boundaries
 
-The assigned Claude owner can perform local implementation, tests, PR edits and
-review follow-up. It drives landing preparation and the repository landing
-workflow after the authorized merge. Founder merge authority remains unless the
+The original assigned owner could perform local implementation, tests, PR edits
+and review follow-up. That assignment included landing preparation and the
+repository landing workflow after an authorized merge. Founder merge authority remains unless the
 founder explicitly delegates bounded integration merges when assigning the lane.
 No promotion to main, deployment, DNS, live migration, provider activation,
 credential creation, message sending or paid run is granted by this scope PR.
