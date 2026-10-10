@@ -1,7 +1,7 @@
 {
-  "commit": "eb7c6f59b",
+  "commit": "5d9a1f55aa03a56a1b8e3afb064f4b4c70e25aec",
   "origin": "http://127.0.0.1:4511",
-  "capturedAt": "2026-10-07T17:26:36.988Z",
+  "capturedAt": "2026-10-08T23:28:55.902Z",
   "pages": [
     {
       "path": "/",
@@ -23,9 +23,9 @@
         ]
       ],
       "icons": [
-        "/favicon.ico?favicon.0t190zg80o.zy.ico",
-        "/icon.svg?icon.0m9tf1wam3quu.svg",
-        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+        "/favicon.ico?favicon.12ltr7v7cw1-3.ico",
+        "/icon.svg?icon.0_yoj2ba9sv22.svg",
+        "/apple-icon.png?apple-icon.16ey1gi4ma9ll.png"
       ],
       "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-es.png",
       "cookies": "",
@@ -52,9 +52,9 @@
         ]
       ],
       "icons": [
-        "/favicon.ico?favicon.0t190zg80o.zy.ico",
-        "/icon.svg?icon.0m9tf1wam3quu.svg",
-        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+        "/favicon.ico?favicon.12ltr7v7cw1-3.ico",
+        "/icon.svg?icon.0_yoj2ba9sv22.svg",
+        "/apple-icon.png?apple-icon.16ey1gi4ma9ll.png"
       ],
       "ogImage": "https://cuadrao.ai/cuadrao-site/share-personal-es.png",
       "cookies": "",
@@ -81,9 +81,9 @@
         ]
       ],
       "icons": [
-        "/favicon.ico?favicon.0t190zg80o.zy.ico",
-        "/icon.svg?icon.0m9tf1wam3quu.svg",
-        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+        "/favicon.ico?favicon.12ltr7v7cw1-3.ico",
+        "/icon.svg?icon.0_yoj2ba9sv22.svg",
+        "/apple-icon.png?apple-icon.16ey1gi4ma9ll.png"
       ],
       "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-es.png",
       "cookies": "",
@@ -110,9 +110,9 @@
         ]
       ],
       "icons": [
-        "/favicon.ico?favicon.0t190zg80o.zy.ico",
-        "/icon.svg?icon.0m9tf1wam3quu.svg",
-        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+        "/favicon.ico?favicon.12ltr7v7cw1-3.ico",
+        "/icon.svg?icon.0_yoj2ba9sv22.svg",
+        "/apple-icon.png?apple-icon.16ey1gi4ma9ll.png"
       ],
       "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-es.png",
       "cookies": "",
@@ -139,9 +139,9 @@
         ]
       ],
       "icons": [
-        "/favicon.ico?favicon.0t190zg80o.zy.ico",
-        "/icon.svg?icon.0m9tf1wam3quu.svg",
-        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+        "/favicon.ico?favicon.12ltr7v7cw1-3.ico",
+        "/icon.svg?icon.0_yoj2ba9sv22.svg",
+        "/apple-icon.png?apple-icon.16ey1gi4ma9ll.png"
       ],
       "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-en.png",
       "cookies": "",
@@ -168,9 +168,9 @@
         ]
       ],
       "icons": [
-        "/favicon.ico?favicon.0t190zg80o.zy.ico",
-        "/icon.svg?icon.0m9tf1wam3quu.svg",
-        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+        "/favicon.ico?favicon.12ltr7v7cw1-3.ico",
+        "/icon.svg?icon.0_yoj2ba9sv22.svg",
+        "/apple-icon.png?apple-icon.16ey1gi4ma9ll.png"
       ],
       "ogImage": "https://cuadrao.ai/cuadrao-site/share-personal-en.png",
       "cookies": "",
@@ -197,9 +197,9 @@
         ]
       ],
       "icons": [
-        "/favicon.ico?favicon.0t190zg80o.zy.ico",
-        "/icon.svg?icon.0m9tf1wam3quu.svg",
-        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+        "/favicon.ico?favicon.12ltr7v7cw1-3.ico",
+        "/icon.svg?icon.0_yoj2ba9sv22.svg",
+        "/apple-icon.png?apple-icon.16ey1gi4ma9ll.png"
       ],
       "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-en.png",
       "cookies": "",
@@ -226,9 +226,9 @@
         ]
       ],
       "icons": [
-        "/favicon.ico?favicon.0t190zg80o.zy.ico",
-        "/icon.svg?icon.0m9tf1wam3quu.svg",
-        "/apple-icon.png?apple-icon.11ph.w0getz4r.png"
+        "/favicon.ico?favicon.12ltr7v7cw1-3.ico",
+        "/icon.svg?icon.0_yoj2ba9sv22.svg",
+        "/apple-icon.png?apple-icon.16ey1gi4ma9ll.png"
       ],
       "ogImage": "https://cuadrao.ai/cuadrao-site/share-business-en.png",
       "cookies": "",
@@ -283,19 +283,19 @@
       "path": "/icon.svg",
       "status": 200,
       "contentType": "image/svg+xml",
-      "bytes": 231
+      "bytes": 1007
     },
     {
       "path": "/favicon.ico",
       "status": 200,
       "contentType": "image/x-icon",
-      "bytes": 1424
+      "bytes": 1931
     },
     {
       "path": "/apple-icon.png",
       "status": 200,
       "contentType": "image/png",
-      "bytes": 3452
+      "bytes": 9309
     },
     {
       "path": "/manifest.json",

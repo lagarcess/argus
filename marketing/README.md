@@ -41,4 +41,4 @@ See the forms contract. Nothing here is read at build time except through `next.
 
 ## Reverting the extraction
 
-The package only added files under `marketing/`, a migration and docs, and removed the website from `web/`. Reverting the extraction commits restores the pre-extraction `web/` routes behind `CUADRAO_WEBSITE_PREVIEW`. It touches no application data. The signup table and its rows are untouched by a code revert; dropping the table is a separate, deliberate migration that must preserve registrations first.
+The package only added files under `marketing/`, a migration and docs, and removed the website from `web/`. On integration, reverting the extraction commits restores the pre-extraction `web/` routes behind `CUADRAO_WEBSITE_PREVIEW`. On `main`, which never had those routes, reverting the promotion commit removes `marketing/` and its migration file and nothing else. Either way it touches no application data. The signup table and its rows are untouched by a code revert; dropping the table is a separate, deliberate migration that must preserve registrations first.

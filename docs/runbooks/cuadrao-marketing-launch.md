@@ -169,7 +169,7 @@ After hosted acceptance and the founder's publication approval, coordinating wit
 - **Code.** Render, Deploys tab, choose the last successful deploy, Rollback. It reuses that deploy's build artifact, start command, health check and the environment variables it had, and a Dashboard rollback turns Auto-Deploy off (it is already off). It does not change custom domains or the instance type. Because it restores that deploy's environment values, a key rotated since then comes back as the old key; rotate again if that matters.
 - **Retention.** Render keeps artifacts according to the workspace plan, so only recent deploys are eligible. The first deploy cannot be rolled back to anything earlier.
 - **Data.** Rollback does not undo DNS or database writes. Registrations and suppression records are preserved. Dropping the signup table is a separate migration that must first preserve registrations.
-- **Extraction.** Reverting the extraction commits restores the pre-extraction `web/` routes and touches no data.
+- **Extraction.** On integration, reverting the extraction commits restores the pre-extraction `web/` routes; on `main`, which never had them, reverting the promotion commit removes `marketing/` and its migration file and nothing else. Neither touches data.
 - **Forms.** To stop collecting without a rollback, remove `RESEND_API_KEY` or `SUPABASE_SERVICE_ROLE_KEY` in Render and restart. The affected form then shows its unavailable state and the direct email address.
 
 ## 9. Open founder inputs
