@@ -28,6 +28,11 @@ part of this PR's gate. Their physical checks are unverified, not passed.
 The canonical integration checkout was clean and fast-forwarded to the squash
 commit. The final PR landing comment records terminal integration CI, smoke and
 any documentation housekeeping head so this report does not predate their result.
+GitHub rejected the direct housekeeping push because integration requires a pull
+request. The notes are preserved on `codex/cuadrao-consumer-lane`; canonical
+integration was restored clean at the merged remote head without discarding the
+documentation commit. The landing workflow requires Lucas to request a separate
+housekeeping PR before one is opened. Documentation landing therefore remains open.
 
 ## Assigned next outcome
 
@@ -49,3 +54,9 @@ staging owner's C0/C1 report pins backend `cad1cbe1ec27ff89c08eadbec31718a0e6273
 current integration expects later Business schema columns. Verify the existing
 staged API before proposing any shared change. A healthy service and a stored
 conversation alone do not establish manual-money acceptance.
+
+The [read-only staging preflight](evidence/consumer-staging-preflight-20261009/README.md)
+confirmed that the shared manual-money feature gate is off: Accounts, Home, Plan
+and Search return `financial_accounts_unavailable`. The prepared next step is
+staging-owner activation on the existing pinned revision plus a dedicated test
+identity, both requiring Lucas's explicit hosted approval. No hosted changes ran.
