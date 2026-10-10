@@ -40,7 +40,7 @@ export function BusinessFooter({
     <footer
       className={`${styles.footer} ${business ? styles.businessFooter : ""} ${shell.footer}`}
     >
-      <FooterMotion>
+      <FooterMotion presentation={personal ? "sequence" : "pair"}>
       {showClosing && (
         <section className={styles.closing} aria-labelledby="closing-title">
           <div>
