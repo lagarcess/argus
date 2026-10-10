@@ -36,8 +36,11 @@ readback require exact-candidate evidence before readiness.
 The 22:22 UTC continuation approved the existing Render workspace and named
 the runtime model choices. The later continuation selects Grok 4.3 as the
 first evaluation judge and prohibits Astra development runtime or judge API
-calls. The proposed $5 total synthetic live run remains pending. No calls, secret edits or persistent tester grants follow
-from this handoff. The manifest owns their concrete gates and the observed
+calls. The $5 total cap is approved for this test run only. The overall
+development spending limit remains awaited. Live calls remain held until it
+is set. Sonnet 5.5 needs a demonstrated need and fresh confirmation before
+use. The first-flow direct-accountant versus firm-delegation choice remains
+open. No calls, secret edits or persistent tester grants follow from this handoff. The manifest owns their concrete gates and the observed
 staging API revision. No separate staging web exists in that workspace. No production,
 main promotion, public signup, marketing/legal launch or Apple TestFlight is
 included. Consumer compatibility and existing shared migration ownership remain.

@@ -682,10 +682,23 @@ Do not turn model selection into a new model-platform build. Calibrate the
 judge with known-good and known-bad cases. Retain deterministic saved-state
 assertions, so same-model agreement is never the sole proof of correctness.
 
-The proposed $5 total synthetic live test run remains pending.
+At 22:26 UTC, Lucas approved a $5 total limit for this test run only.
+Provenance is `Sentinel_dadf8d7f1e70819182eb7974f221a5fd`. He requested
+identification of the development key before setting the overall development
+spending limit. That limit remains awaited. The coordinator holds live calls
+until it is set. The run cap is not unlimited development spending authority.
+
+Grok 4.3 remains the first judge. Sonnet 5.5 is a possible stretch choice only
+when a demonstrated need and fresh confirmation justify it. It is not an
+automatic fallback. No Astra development runtime or judge API call is approved.
+
+The first-flow L11 setup remains open. The founder must choose whether the
+first accountant uses a direct named grant or requires firm-to-human delegation
+from the start. Neither choice is selected here, and firm delegation is not
+claimed implemented. L11's grant-based approval requirement stays settled.
+
 No model call, secret change, persistent tester grant or live data transmission
 follows from this record. New paid services, credentials, expanded grants or
 security settings need a concrete scoped confirmation. The coordinator must
-confirm the setup and named tester authority before those actions. The L1 to
-L13 product decisions remain settled. These pending gates concern execution
-and access, not a reopened product design.
+confirm the setup and named tester authority before those actions. These
+pending gates concern execution and access, not a reopened product design.

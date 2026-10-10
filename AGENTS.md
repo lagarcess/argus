@@ -43,8 +43,9 @@ staging. It does not authorize main or production, public signup, marketing
 publication, Apple TestFlight or unrelated Consumer work. The root coordinator
 alone owns merge and staging actions. Workers act only within their assigned
 files and hand off exact commits. The Render workspace and named runtime model
-choices are approved. Grok 4.3 is the first evaluation judge. The total live test
-budget remains pending as recorded in the manifest.
+choices are approved. Grok 4.3 is the first evaluation judge. The $5 total cap
+is approved for this test run. Live calls remain held pending the development
+spending limit. The manifest records the open first-accountant delegation choice.
 
 "Pagué 850" is one example. Interpret varied natural-language transactions,
 follow-ups, uncertainty and corrections through the existing typed runtime.
