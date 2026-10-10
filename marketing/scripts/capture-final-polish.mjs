@@ -23,7 +23,7 @@ for (const browserType of [chromium, webkit]) {
           await image.scrollIntoViewIfNeeded();
           await image.evaluate(async node => { await node.decode(); });
         }
-        await expect(page.locator('footer img, [data-footer-peek], main img[src*="florist"], main img[src*="accountant"]')).toHaveCount(0);
+        await expect(page.locator('footer img:not([src$=".svg"]), [data-footer-peek], main img[src*="florist"], main img[src*="accountant"]')).toHaveCount(0);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
         await page.evaluate(() => scrollTo(0, 0));
         const prefix = `${browserType.name()}-${name}-${viewport.width}`;

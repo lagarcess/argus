@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { ArrowUpRight } from "lucide-react";
 import { businessPath } from "@/lib/site-routes";
 import { businessContent, type BusinessLocale } from "./content";
@@ -57,8 +58,8 @@ export function BusinessFooter({
       {business ? (
         <div className={styles.businessFooterGrid}>
           <div className={styles.footerIdentity}>
-            <a href={businessPath(locale)} className={styles.wordmark}>
-              cuadrao
+            <a href={businessPath(locale)} className={shell.footerBrand}>
+              <Image src="/cuadrao-site/cuadrao-lockup-dark.svg" width={268} height={56} alt="cuadrao" />
             </a>
             <span>{c.business}</span>
             <p>{c.footerTag}</p>
@@ -95,9 +96,9 @@ export function BusinessFooter({
         <div className={styles.footerLinks}>
           <a
             href={businessPath(locale, personal ? "personal" : "home")}
-            className={styles.wordmark}
+            className={shell.footerBrand}
           >
-            cuadrao
+            <Image src="/cuadrao-site/cuadrao-lockup-light.svg" width={268} height={56} alt="cuadrao" />
           </a>
           <p>
             {personal

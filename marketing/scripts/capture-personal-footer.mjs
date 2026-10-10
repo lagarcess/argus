@@ -19,7 +19,7 @@ try {
       await page.goto(new URL(route, baseURL).href);
       await expect(page.locator('#personal-email')).toBeEnabled();
       await page.evaluate(() => document.fonts.ready);
-      await expect(page.locator('footer img')).toHaveCount(0);
+      await expect(page.locator('footer img:not([src$=".svg"])')).toHaveCount(0);
       await expect(page.locator('[data-footer-peek]')).toHaveCount(0);
       await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
       await page.waitForTimeout(800);

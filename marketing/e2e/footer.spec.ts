@@ -5,7 +5,11 @@ for (const path of ["/", "/en", "/personal", "/en/personal"]) {
     await page.goto(path);
     await page.evaluate(() => document.fonts.ready);
     const footer = page.locator("footer");
-    await expect(footer.locator("img")).toHaveCount(0);
+    const brand = footer.getByRole("img", { name: "cuadrao", exact: true });
+    await expect(footer.locator("img")).toHaveCount(1);
+    await expect(brand).toHaveAttribute("src", `/cuadrao-site/cuadrao-lockup-${path.includes("personal") ? "light" : "dark"}.svg`);
+    await brand.scrollIntoViewIfNeeded();
+    await expect.poll(() => brand.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
     await expect(page.locator("[data-footer-peek]")).toHaveCount(0);
     const crop = footer.locator(':scope > div[aria-hidden="true"]');
     await expect(crop).toHaveText("cuadrao");
@@ -23,6 +27,6 @@ for (const path of ["/", "/en", "/personal", "/en/personal"]) {
     const after = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, scroll: scrollY }));
     expect(after.height).toBe(ending.height);
     expect(Math.abs(after.scroll - ending.scroll)).toBeLessThanOrEqual(1);
-    await expect(footer.locator("img")).toHaveCount(0);
+    await expect(footer.locator("img")).toHaveCount(1);
   });
 }
