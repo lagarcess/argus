@@ -378,3 +378,12 @@ PR939 remains draft targeting integration. No merge, deployment, hosted changes,
 ## Phone locale follow-up, October 9, 2026
 
 Runtime `d5436b7e861876fea205ac7cdb68ac943702c8fa` makes the Marketing phone preview follow the header language. Existing hand, angle, artwork and submission logic are unchanged. Build/lint/typecheck/modularity pass; focused signup/motion tests pass 35 with one intentional touch skip. ES/EN desktop/mobile WebKit captures and signup demo evidence are refreshed. Independent scoped review is clean. See [locale verification](../reports/evidence/cuadrao-marketing-touchup/personal-pet/locale-check/README.md). Integration remains `43fac94de2672600079f312258908f05747a9d63`. The following evidence-only commit retains this exact runtime evidence. Continue on the existing branch/PR939. Preview4512 and mock4513 are current; comparison4511 is preserved. Deployment and public forms stay on hold.
+
+
+## Invalid-email pet reaction, October 9, 2026
+
+Founder approved a subtle rejection reaction and refreshed demo. Runtime `0455fa4c2a7795064ea85b75879c83b09eec52e6` derives a small tilt/blink and fieldward gaze from existing SignupState rejection. Native validation still blocks invalid POSTs; valid correction resets the pose/error. Network and service failures keep the pet calm. Reduced motion uses a still expression. No hand, phone, Business page, API or provider changes.
+
+Build/lint/typecheck, demo boundary test and 49 focused browser checks pass, with one expected touch skip. Independent scoped review is clean. [Personal evidence](../reports/evidence/cuadrao-marketing-touchup/personal-pet/README.md) records exact-source ES/EN desktop/mobile captures, the refreshed clip and test output. Both preview4512 and mock4513 include the change. Demo is reset for founder tryout at http://127.0.0.1:4513/personal. Comparison4511 is preserved.
+
+This new reaction and its evidence are local, unpushed checkpoints. Remote PR939 remains `781e820f5986e1d009bbfb2fb61ffd6ea6912d56` with its earlier green CI; do not apply that CI result to the new local delta. Continue the existing branch, preserve earlier accepted design and wait for feedback on this reaction. No merge, deployment, hosted changes, public forms or real email. Workers stopped; Marketing ownership remains with this thread.

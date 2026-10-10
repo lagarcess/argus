@@ -96,3 +96,14 @@ Current capture source `ece1aa067f6c810dd349fb57742a4eb0bd235ee9`. Refreshed scr
 ### Phone language correction
 
 Runtime `d5436b7e861876fea205ac7cdb68ac943702c8fa` localizes the phone CTA labels through the page locale. See [verification and tab identity notes](locale-check/README.md). The refreshed demo and screenshots include this correction.
+
+
+## Gentle invalid-email reaction, October 9, 2026
+
+Runtime source `0455fa4c2a7795064ea85b75879c83b09eec52e6` adds one small tilt and blink when an empty or malformed email is submitted. The pet looks toward the field and the existing localized error explains the correction. Typing alone does not trigger rejection. A valid correction clears the error and restores the normal pose. Service and network failures retain the calm pose; reduced motion shows a still expression. Native email constraints own local validity, and the existing SignupState rejection owns the pet expression. This applies the Model the Domain principle without adding a second validation state or parser.
+
+The 4513 demo consumes the same 4512 page assets. Try `oops`, submit, then correct to `demo@example.test` and submit again. Replay resets the form. No email is saved or sent. The [updated clip](screens/personal-signup-demo.webm) includes rejection, correction and simulated success. The [capture manifest](screens/manifest.json) pins the source; desktop/mobile ES/EN screenshots include the invalid state. Parent visual inspection confirmed the inline error, field focus and small pose change at both sizes.
+
+Build, lint, typecheck and the demo HTTP boundary test pass. [Focused browser results](invalid-email-browser-results.txt) show 49 passing tests and one intentional touch/pointer skip. The first run exposed a test locator that also matched Next.js's route announcer; scoping it to the signup hero fixed the test without changing runtime behavior. Independent runtime review returned no findings. All workers returned ownership and stopped.
+
+This reaction is a local checkpoint for founder tryout. It has not been pushed; PR939 remains at `781e820f5986e1d009bbfb2fb61ffd6ea6912d56`, whose earlier CI passed. No new CI claim applies to this local delta. Preview4512 PID56318 and fixture-only4513 PID1265 are current observations; verify listeners before restarting. Comparison4511 remains untouched. Deployment, hosted changes, public forms and real email remain on hold.
