@@ -335,23 +335,50 @@ final class FinancialLoopUITests: XCTestCase {
             element.tap()
             return
         }
+        let scrollView = app.scrollViews.containing(element.elementType, identifier: reference).firstMatch
+        if !scrollView.exists {
+            guard element.isHittable && app.frame.contains(element.frame) else {
+                XCTFail("The fixed control is not visible: " + reference)
+                return
+            }
+            element.tap()
+            return
+        }
+        let top = max(app.frame.minY + 115, scrollView.frame.minY)
+        let bottom = min(app.frame.maxY - 130, scrollView.frame.maxY)
+        let start = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: app.frame.width / 2, dy: (top + bottom) / 2 - app.frame.minY))
         var scrolled = false
         for _ in 0..<12 {
-            if element.isHittable && element.frame.midY > 115 && element.frame.midY < app.frame.height - 130 { break }
-            let before = element.frame
-            if element.frame.midY < 115 { app.swipeDown() } else { app.swipeUp() }
+            let frame = element.frame
+            if element.isHittable && frame.minY >= top && frame.maxY <= bottom { break }
+            let distance: CGFloat
+            if frame.minY < top { distance = top - frame.minY + 24 }
+            else if frame.maxY > bottom { distance = bottom - frame.maxY - 24 }
+            else { break }
+            let limit = max(0, (bottom - top) / 2)
+            guard limit > 0 else { break }
+            let movement = max(-limit, min(limit, distance))
+            start.press(forDuration: 0.01, thenDragTo: start.withOffset(CGVector(dx: 0, dy: movement)),
+                        withVelocity: .slow, thenHoldForDuration: 0.2)
             scrolled = true
-            if element.isHittable && abs(element.frame.midY - before.midY) < 2 { break }
         }
         if scrolled {
-        var previous = element.frame
-        var lastMovement = Date()
-        let settled = NSPredicate { _, _ in
-            let frame = element.frame
-            if frame != previous { previous = frame; lastMovement = Date() }
-            return Date().timeIntervalSince(lastMovement) > 0.5
+            var previous = element.frame
+            var lastMovement = Date()
+            let settled = NSPredicate { _, _ in
+                let frame = element.frame
+                if frame != previous { previous = frame; lastMovement = Date() }
+                return Date().timeIntervalSince(lastMovement) > 0.5
+            }
+            guard XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: nil)], timeout: 5) == .completed else {
+                XCTFail("The control did not stop moving: " + reference)
+                return
+            }
         }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: nil)], timeout: 5), .completed)
+        guard element.isHittable && element.frame.minY >= top && element.frame.maxY <= bottom else {
+            XCTFail("The control could not reach the visible scroll area: " + reference)
+            return
         }
         element.tap()
     }

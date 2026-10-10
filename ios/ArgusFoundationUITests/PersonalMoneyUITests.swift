@@ -508,15 +508,24 @@ extension FinancialLoopUITests {
             if app.buttons["loop.confirm"].waitForExistence(timeout: 1) { break }
             let choices = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'loop.coverage.no.'")).allElementsBoundByIndex
             guard let choice = choices.first(where: { !answered.contains($0.identifier) }) else { continue }
-            let pieces = choice.identifier.split(separator: ".")
+            let questionID = choice.identifier
+            let pieces = questionID.split(separator: ".")
             let account = pieces.count >= 5 ? String(pieces[3]).lowercased() : ""
             let index = accountAnswers[account, default: 0]
             let answers = answersByAccount[account] ?? []
             let include = index < answers.count && answers[index]
+            let identifier = include ? questionID.replacingOccurrences(of: ".no.", with: ".yes.") : questionID
+            let target = app.buttons[identifier]
+            tapVisible(target)
+            let selected = NSPredicate { [app] _, _ in
+                app.buttons["loop.confirm"].exists || (target.exists && target.isSelected)
+            }
+            guard XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: selected, object: nil)], timeout: 10) == .completed else {
+                XCTFail("The coverage answer was not selected: " + identifier)
+                return
+            }
+            answered.insert(questionID)
             accountAnswers[account] = index + 1
-            let identifier = include ? choice.identifier.replacingOccurrences(of: ".no.", with: ".yes.") : choice.identifier
-            answered.insert(choice.identifier)
-            tapVisible(app.buttons[identifier])
         }
         XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 10))
         capture("personal-money-review")
