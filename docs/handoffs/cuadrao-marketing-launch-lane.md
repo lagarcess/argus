@@ -8,9 +8,73 @@ This document is the single pickup point. It links to the canonical contracts an
 
 **The successor's immediate scope is website aesthetics, worked with the founder, while Cuadrao LLC formation is pending.** Nothing is authorized to publish.
 
-**First action:** ask the founder which aesthetic tweaks they want, then branch from current `origin/codex/private-alpha-next` into a fresh worktree and read sections 1 and 5. Do not start anything listed under "Held" in section 1.
+**First action:** ask the founder which aesthetic tweaks they want. Resume the existing touch-up branch and worktree recorded below. Do not restart from integration or discard the current work. Do not start anything listed under "Held" in section 1.
 
 **The founder may change Business positioning after an interview with José.** Do not rewrite the website's promise, headlines or story from that interview or in anticipation of it. Visual work (spacing, type scale, color use, imagery, motion, layout polish) is in scope; changing what the Business site claims or who it speaks to is not, until the founder brings the outcome.
+
+## Touch-up ownership checkpoint, 2026-10-09
+
+The founder assigned this Codex chat ownership of Marketing only. This checkpoint
+supersedes the earlier fresh-branch instruction. Business and Consumer worktrees,
+code, and services are outside this assignment.
+
+**The founder has not accepted the current design.** Prior passing tests and
+review reports do not establish design approval. The first question was sent to
+the founder asking what to change and what to keep. The founder later requested the screenshot removal and footer correction recorded below. Whole-page design acceptance remains pending.
+New copy remains a draft in the [copy review](../reports/evidence/cuadrao-marketing-touchup/copy-review.md).
+
+Verified at 13:54 America/Chicago on 2026-10-09:
+
+- [PR #939](https://github.com/lagarcess/argus/pull/939) is open and draft, targeting `codex/private-alpha-next`.
+- Branch `codex/marketing-touchup-delivery` is checked out at `/Users/garces/.codex/worktrees/cuadrao-marketing-delivery/private-alpha-next`.
+- Local HEAD and GitHub PR head both equal `e09ee0e35b3c92546cf86c47f83b2fdbf10b47af`. The worktree was clean before these documentation updates.
+- The original integration base is `bbf4da23f01296af4ac639386fe9a0960218a49f`. No fetch, reconciliation, reset, or rebase was performed during pickup.
+- Updated preview `http://127.0.0.1:4512/` returns HTTP 200. Its existing process runs from this worktree's `marketing/` directory.
+- Original comparison `http://127.0.0.1:4511/` returns HTTP 200. Its existing process runs from `/Users/garces/.codex/visualizations/2026/09/26/01a0de75-29ee-71f0-8f58-0d2bb3934a33/cuadrao-marketing-touchup/canonical/marketing`.
+- Neither preview was restarted or changed. Preserve the comparison files and process.
+
+The [touch-up evidence](../reports/evidence/cuadrao-marketing-touchup/README.md)
+records the prior implementation and verification. Its screenshot manifest pins
+`85c8cdf2a17c4a8dc6ff2990b75d6d44451cc40e`. The only subsequent change under
+`marketing/` is test synchronization in `e2e/touchup.spec.ts`. Prior browser logs
+record 142 passing checks and six repeated footer checks. Those suites were not
+rerun during pickup, and no new visual acceptance or CI verdict is claimed.
+
+The repository-wide pstack checkpoint points to the older connected-preview lane,
+not this touch-up. Use this handoff, PR #939, and its committed evidence to continue.
+No private transcript is required.
+
+Next, record the founder's requested changes here before implementing them in
+`marketing/`. Keep new copy Spanish first for founder review. Use the isolated test
+ports in the evidence README so tests do not displace either comparison preview.
+Read the mandatory product and technical documents before code changes.
+
+No merge, publication, hosted change, real email, or public-form activation is
+authorized. Existing LLC, operator wording, and provider holds still apply.
+
+## Founder follow-up, 2026-10-09
+
+The founder requested removal of the Business product screenshot because the product is incomplete and the numbers are incorrect. The Marketing-only change removes its whole section, related copy and styles, and the served image. Historical source captures remain in the evidence folder. See the [touch-up correction record](../reports/evidence/cuadrao-marketing-touchup/README.md#founder-correction-2026-10-09).
+
+The founder confirmed the footer should rest at the cropped Cuadrao wordmark with photos fully hidden. Extra downward scrolling reveals a short photo peek, and release returns to the crop. The local Marketing implementation now removes autoplay, the grid and pause control, keeps normal page height and native upward/keyboard navigation, and disables peeking for reduced motion. Typecheck and lint pass. The rebuilt preview passes 20 focused browser checks. Fresh screenshots are committed under `docs/reports/evidence/cuadrao-marketing-touchup/footer-peek-screens/`; prior footer checks describe the removed animation.
+
+The founder supplied the replacement footer photos. The unchanged dressmaker PNG is on the left and the unchanged artisan JPG on the right, with native dimensions and CSS upper-body cropping. Original files and the main editorial photos are preserved. The crop was inspected locally; final design acceptance remains open. The [footer correction record](../reports/evidence/cuadrao-marketing-touchup/README.md#footer-correction-2026-10-09) owns implementation details and remaining verification. The capture script writes new evidence to `footer-peek-screens/` without replacing historical captures. No Business or Consumer runtime, services, forms, or original comparison files were changed.
+
+### Header and drag refinement request, 2026-10-09
+
+The founder approved changing the navigation label to **Cómo funciona** and separating the language controls visually from main navigation. The English counterpart is **How it works**. The founder also requested less footer drag resistance and asked for inspection of Granola first. The release captain visited [Granola](https://www.granola.ai/) and exercised its footer: extra scrolling readily revealed a shallow photo band, then the footer returned when input stopped. This is an interaction reference, not permission to copy its assets.
+
+The bounded Marketing implementation groups ES/EN separately and uses one localized navigation label for desktop and mobile. Footer input accumulates without losing movement between frames; touch holds the peek until release. Photos still hide fully at rest. Typecheck, lint, production build, 26 focused browser checks and 2 existing same-page language checks pass. The parent reviewed the diff and desktop/mobile screenshots. Source is `80cb9aca17b8a3789ea32f121928af1b48226484`; [current evidence](../reports/evidence/cuadrao-marketing-touchup/README.md#header-and-drag-refinement-2026-10-09) contains the manifest and logs. Both previews return 200. The original listener remains PID 11951. Work is committed locally, not pushed; the last verified GitHub head remains the pickup head above. Resume this branch without reset/rebase. Whole-page design acceptance remains pending. Existing release holds remain unchanged.
+
+### Scroll-driven receipt story request, 2026-10-09
+
+The founder said the latest header/footer view looks good, then requested that scrolling advance the receipt through Recibir, Revisar, and Aprobar. This feedback applies to the reviewed view, not publication or whole-page acceptance. The proposed pattern is a short sticky story with normal document scrolling, reverse progression on upward scroll, natural release after the final step, and click/keyboard rail shortcuts. A fit check must keep the receipt readable on phones; reduced motion keeps the plain manual presentation. The existing illustrated amounts and development disclosure remain unchanged.
+
+The founder confirmed holding the section through all three steps and asked whether the whole page should become a larger scroll story. The recommendation is one primary receipt transformation now, with quieter surrounding sections. A second sequence should wait for another concrete product story; no whole-page animation expansion is assigned.
+
+Implemented and verified at source `5c3c2d4a41ea2a1d1d76244b0158a1c32f28e805`. Normal scroll owns the active chapter and rail fill; each stage has half a viewport of travel, including a final reading interval before release. Desktop holds the complete scene. On phones the introduction scrolls away, then the rail, disclosure, and receipt pin together below the header. Reduced motion or insufficient height uses ordinary manual tabs without extra scroll distance. No product copy or claims changed.
+
+Fresh build, typecheck, lint, and **42 focused browser checks pass**. Initial screenshot review caught a clipped mobile heading; the final layout and added regression check correct it. The bounded final code review is clean. [Evidence and continuation](../reports/evidence/cuadrao-marketing-touchup/README.md#scroll-driven-receipt-story-2026-10-09) includes exact-source screenshots, logs, reproduction commands, and limits. The existing Marketing branch contains local commits only; PR #939 has not been pushed or merged. Preview 4512 serves the rebuilt source with real provider credentials unset. Original comparison 4511 remains preserved. Whole-page design acceptance and all release holds remain pending.
 
 ## 1. Scope and decisions
 
@@ -214,8 +278,8 @@ Pinned and hashed in the [pinned comment on #906](https://github.com/lagarcess/a
 
 **What the successor can do now (no approval beyond the founder's direction in conversation):**
 
-1. Ask the founder for the aesthetic tweaks. Create a fresh worktree from current `origin/codex/private-alpha-next`.
-2. For each tweak: change `marketing/` on a branch, run the checks in section 3 (build first), open a PR into integration, record review and landing on the PR and on #880 (integration is protected: no direct pushes, and landing records are not docs-only PRs).
+1. Ask the founder for the aesthetic tweaks. Resume `codex/marketing-touchup-delivery` in the existing worktree recorded in the ownership checkpoint.
+2. For each requested tweak, update `marketing/` on the existing branch and verify the affected behavior. Use the isolated test ports in the touch-up evidence README. Continue PR #939. Record any founder-authorized landing on the PR and #880. Integration remains protected.
 3. Keep new or changed user-facing words Spanish first and confirmed with the founder. Keep the Contact line and the privacy page consistent.
 4. After a tweak lands on a path #927 carries, refresh the candidate once (section 2) and update #927's body.
 5. Do not change product copy that expresses Business positioning until the founder reports the José interview outcome.
@@ -234,3 +298,102 @@ Pinned and hashed in the [pinned comment on #906](https://github.com/lagarcess/a
 Canonical, not copied here: the [launch record](../reports/2026-10-07-cuadrao-marketing-launch.md), [runbook](../runbooks/cuadrao-marketing-launch.md), [forms contract](../specs/cuadrao-marketing-forms-contract.md), [package README](../../marketing/README.md), [brand README](../../marketing/brand/README.md), [evidence](../reports/evidence/cuadrao-marketing-launch/README.md), [shared design guide](../../.agent/designs/cuadrao/DESIGN.md), and on #880 the [deployment request](https://github.com/lagarcess/argus/issues/880#issuecomment-6069169773), the [held migration and Render requests](https://github.com/lagarcess/argus/issues/880#issuecomment-6069364033) and the [checkpoint comment](https://github.com/lagarcess/argus/issues/880#issuecomment-6073256570).
 
 Optional, not needed to resume, and not committed: the working session's scratchpad held icon exploration sheets (rounds of mark variations and the finalists sheet, as images and HTML), screenshots of the local site, a one-off Cloudflare record script that read a scoped token from a local `.env` (the founder deleted the token), and review mutation scratch copies. The approved artwork and every hash needed to resume are in the repository and on #906; losing the scratchpad loses nothing required.
+
+### Current local verification
+
+The screenshot removal and footer peek pass a fresh production build and 20 focused browser checks. The hidden photo-loading failure found during the first run is fixed. See the touch-up evidence README for the result and photo provenance. Both implementation agents returned ownership and stopped. Only the updated Marketing preview on 4512 was rebuilt and restarted. The original comparison remains on 4511. Header feedback is advisory; no header changes were requested or made. No merge, push, publication, provider activation, or hosted change occurred.
+
+The final runtime source is `f98974687caecc01c24786007e448754a782d1a2`. Its fresh screenshot manifest pins that exact source. Later evidence-only changes preserve the runtime bytes. The local changes remain unpushed while the founder reviews the design.
+
+## Personal signup motion request, 2026-10-09
+
+The founder requested a more playful Personal early-access page using the Base reference composition with Cuadrao's existing copy/form on the left and a hand holding a phone on the right. The founder chose the mobile welcome screen with its logo and signup button. A square pet should peek out near the email input, follow the pointer with its eyes, get excited on submission, and travel with an envelope to the phone logo on success.
+
+The Marketing implementation will preserve signup truth and confirmation copy. Only a successful registered API response may trigger the delivery celebration, and confirmation must not wait for animation. Errors preserve the email. Keyboard, touch and reduced-motion visitors retain a complete form. No Consumer or Business code, services, simulator, hosted state, real email or public signup activation is authorized by this visual request.
+
+A historical native welcome capture was located in `docs/reports/evidence/cuadrao-release-ui/2026-10-03-w1/release-design-launch-light.png`. It shows the Cuadrao lockup, squares, tagline, Crear cuenta and Iniciar sesión. It is October 3 simulator design evidence, not a claim about the current shipping app. The unchanged image is copied as `marketing/public/cuadrao-site/personal-welcome-preview.png`; provenance stays with the release-UI evidence README. The hand illustration will be an original code-native graphic, not extracted Base artwork. Implemented and locally verified at `c8eab10647c56a49591033f5e5a026bb8a5befa6`. The scene uses the existing SignupState, a small decorative geometry record, and a single finite success flight. Confirmation is immediate. Errors produce no flight, and reduced motion/offscreen targets skip travel. The parent corrected a headline shift found in visual review. Fresh build, typecheck, lint, 33 signup/motion checks and four Personal accessibility checks pass; one pointer-only test is intentionally skipped for touch. Independent implementation and final-delta reviews are clean. [Personal pet evidence](../reports/evidence/cuadrao-marketing-touchup/personal-pet/README.md) contains provenance, exact-source captures, a short mock-response recording and reproduction instructions. The 4512 preview is rebuilt with real provider credentials unset. The original comparison and all other lane services remain untouched. Work is local only, with no push or publication. Founder visual acceptance of this new scene remains pending.
+
+
+### Personal hand and live demo refinement, 2026-10-09
+
+The founder liked the first scene and requested a hand closer to the supplied Base reference, current header lettering inside the phone, and a live local mock. Final runtime source is `7872970775ffdd4b92deeb9b43fe3586b6ea43ba`. The black hand has slimmer fingers and a fading wrist. The welcome screenshot remains unchanged on disk; a canonical header SVG overlay updates the rendered wordmark. This is a composite Marketing preview, not a Consumer app change.
+
+The safe live demo is `http://127.0.0.1:4513/personal`, with a bilingual no-email-saved badge and Replay. Start it with `node scripts/personal-demo.mjs` from `marketing/` while the provider-disabled 4512 server runs. Its loopback-only proxy discards signup bodies and returns a fixture; other mutations are blocked. Updated preview PID 2188 (4512), demo PID 1265 (4513); verify process cwd before restart. Original 4511/PID11951 is untouched. Build/typecheck/lint, one HTTP boundary test, 33 motion/signup checks and four accessibility checks passed, with one intentional touch skip. Behavioral checks are retained across the final SVG-only delta; final captures pin the final source. Independent final review is clean. Browser mock submission and Replay were verified. See the Personal pet evidence README and its refreshed recording. No push, hosted changes, public-form activation, real email, merge or publication occurred. Current design refinement remains for founder review. All workers returned ownership and stopped.
+
+
+### Reference angle and grip correction
+
+The founder rejected the earlier phone angle/hand geometry while retaining the rest of the scene. Final visual source `2e0cb71b84779b73d7f6b1d2d8ee8a24bce879bf` uses a shared reference frame, rising phone top edge, left-shifted lower edge, silver side and a continuous curled grip. Parent fixed two painting seams after render inspection. Thirteen focused motion checks pass with one intentional touch skip; build/typecheck/lint and final independent review are clean. Final desktop/mobile ES/EN captures and clip are refreshed. The supplied reference is now durable in `personal-pet/founder-hand-reference.png`; [Personal evidence](../reports/evidence/cuadrao-marketing-touchup/personal-pet/README.md) owns reproduction and provenance. Preview remains 4512 and simulated signup remains 4513. No form/runtime/provider or other-lane changes, no push, and no publication. Agents have returned ownership and stopped. Founder review of the corrected geometry remains pending.
+
+
+Latest founder steering: keep the corrected grip and turn the phone slightly toward the reader. Visual source `fbc064e0da41be93bfbdb1201e76031d1a915578` adds gentle perspective and narrows the silver edge through three CSS declarations. Fresh build and 13 motion checks pass (one intentional touch skip); exact-source captures/clip refreshed in Personal evidence. Preview 4512 and mock 4513 use the change. The hand, signup logic and other lanes remain untouched. Local only, unpushed.
+
+
+Latest phone cleanup source `1c4dca80a512919a523fc9649c8ccd1f96fa8539` removes the slogan inside the phone and replaces its older screenshot icon with the canonical light mark. The lockup and central mark now use the same approved greens and lime overlap. A code-native overlay preserves the original PNG; no Consumer screen was changed. Hand, reader-facing angle, welcome buttons and motion are retained. Typecheck/lint/build, 15 brand tests, refreshed exact-source browser captures and independent scoped review pass. The current source and provenance are in Personal evidence. Preview4512 and mock4513 remain local; no push, publication, provider activation or other-lane changes. All workers stopped.
+
+
+## Accepted baseline lock before final footer polish
+
+The founder requested locking all progress so far. [Accepted design checkpoint](../reports/evidence/cuadrao-marketing-touchup/accepted-design-checkpoint.md) is now the current continuation authority for this touch-up. It records baseline `ee4a93e04`, runtime `1c4dca80a`, the local annotated tag, preservation boundaries and the remaining Personal-footer/polish work. It supersedes earlier pending-design-acceptance wording only for the accepted baseline. Footer requests are awaited; no speculative footer edits were made. No launch, merge, push, publication, hosted change, public-form or real-email authorization is implied.
+
+
+### Personal copy polish after baseline lock
+
+At the founder’s request, source `d81766f0b371d427f7346cdf1b8dcc1de052ca97` removes the phone’s design-preview caption and repetitive signup wording in both languages. Privacy, early-access status and actual signup behavior remain. The separate mock keeps its simulation label. Fresh build/typecheck/lint and 33 signup/motion browser checks pass, with one expected touch skip; independent scoped review is clean. Exact-source screenshots and recording are refreshed in [Personal evidence](../reports/evidence/cuadrao-marketing-touchup/personal-pet/README.md). The accepted checkpoint tag is unchanged. The founder will send a footer inspiration clip; await it before changing the photos/reveal. Preview 4512 is rebuilt with real providers unset, mock 4513 and original comparison 4511 remain available. Local only, unpushed; no release approval or other-lane changes.
+
+
+### Personal footer sequence trial, October 9, 2026
+
+The founder approved trying the Granola-inspired image sequence on Personal only. Source `7f0f1354d68ee0638ed2ebca36425b7c359af428` layers the existing dressmaker and artisan photos and plays one finite swap during the extra-scroll reveal. No playback controls or continuous loop. Existing spring-back timing remains. Business keeps its photo pair; its desktop footer screenshot is byte-identical before and after.
+
+Fresh build/typecheck/lint, 42 focused browser checks, independent scoped review, and desktop/mobile visual inspection pass. [Personal footer evidence](../reports/evidence/cuadrao-marketing-touchup/personal-footer/README.md) owns the design tradeoff, exact-source captures, short clip, and reproduction. Preview 4512 is rebuilt with providers unset. Comparison 4511 and signup mock 4513 are preserved. The accepted baseline tag is unchanged. This new trial awaits founder feedback; no final replacement, hosted, merge, push, or activation authority is implied. All agents returned ownership and stopped.
+
+
+### Personal ends at the wordmark
+
+The founder requested removing Personal footer photos and ending at the cropped wordmark. Source `2ab403d6df815ea1ff66d792d504564cab44109d` bypasses FooterMotion on Personal and deletes the unused sequence option/styles. Business motion is restored to its pre-trial source and its screenshot is unchanged. Fresh build/typecheck/lint, 30 focused browser checks, scoped review and desktop/mobile visual inspection pass. [Current footer evidence](../reports/evidence/cuadrao-marketing-touchup/personal-footer-wordmark/README.md) supersedes the prior sequence trial. Preview4512 is rebuilt; comparison4511 and signupmock4513 are preserved. No push, hosted changes, merge, publication, real email or public activation. All delegated agents stopped.
+
+### Personal accepted lock and final Marketing polish, October 9, 2026
+
+Current continuation authority: [final polish and replacement-readiness report](../reports/evidence/cuadrao-marketing-touchup/final-polish/README.md). The founder accepted Personal; local tag `codex/marketing-personal-accepted-2026-10-09` locks `3a0f125e5`, with a durable [checkpoint](../reports/evidence/cuadrao-marketing-touchup/personal-accepted-checkpoint.md). Final audit found no new Personal design change needed.
+
+At the founder's request, Business editorial florist/accountant images, captions and disclosure are removed. Founder portrait/signature remain. Both pages and other shared Marketing footers now end at the static cropped wordmark; the obsolete photo-reveal component and styles are deleted. Runtime source `1d87ca636`, verified/captured candidate `8a45ab0a482b5d7674a50d7c90058915e4fabe00`. Later docs/evidence preserve runtime bytes. Business changes are available for founder visual review.
+
+Build/typecheck/lint and 177 unit tests pass. Full browser run: 181 passed, one intentional touch skip, two one-pixel rounding assertion failures; eight affected footer cases pass after correcting the assertion tolerance. No runtime fix was needed. Sixteen ES/EN desktop/narrow-view combinations pass in Chromium/WebKit with 32 durable screenshots. Independent scoped runtime review and final tooling/runbook delta review are clean. All three delegated agents returned ownership and stopped. Logs and exact-source manifest are in the final report.
+
+Remaining replacement gates: publish/reconcile accepted work into the release candidate and exact-head CI; confirm actual privacy operator wording; approved migration/configuration and hosted signup storage/dedupe/restart/removal checks; real-device Safari smoke; explicit promotion/deployment/public-form/cutover/indexing approval and rollback target. Signup backend already exists. The runbook now consistently reflects its prior analysis that the signup migration can be its own first ordered prefix; Personal does not depend on a Consumer product launch. Production status/tool readiness must be refreshed before execution.
+
+Preview4512/PID30054 uses the fresh provider-disabled build. Original4511/PID11951 and mock4513/PID1265 remain unchanged; all return HTTP200. Verify cwd/PIDs before restarting. Branch remains `codex/marketing-touchup-delivery`; no push, merge, hosted changes, public activation or real email. PR939 remains open draft at remote `e09ee0e35`; local acceptance is not remote release readiness. No Business/Consumer product worktrees or services changed.
+
+
+### Authorized PR update, footer branding and original-layout archive
+
+The founder authorized pushing all accepted changes to PR939 and obtaining green CI; deployment and public forms remain held. [Latest verification](../reports/evidence/cuadrao-marketing-touchup/final-polish/README.md) records candidate `ece1aa067f`, canonical small-footer lockups, regenerated light-mark favicon,177 unit tests,183 passing browser checks/one expected touch skip,16 browser/locale/viewport captures, synced mock signup and clean independent review. Original base `bbf4da23f` advanced to `43fac94de` through the iOS-only keyboard change. No Marketing semantic overlap; one-way reconciliation merge `ece1aa067f` and merged-tree modularity pass. No product worktree or service changed.
+
+The original layout is now a durable [source archive and screenshot index](../reports/evidence/cuadrao-marketing-touchup/original-layout-archive/README.md). Its original files match source171779c97 and remain untouched. The old4511 process had stopped; a separate archive extraction now serves4511 with providers unset. Current4512 and fixture-only4513 serve the accepted design plus footer branding/favicon. Verify listener cwd before any later restart.
+
+PR939 remains draft targeting integration. No merge, deployment, hosted changes, public forms or real email. Read GitHub for terminal exact-head CI rather than assuming the previous head’s result. The current report and screenshots supersede historical footer-photo and old-icon descriptions.
+
+
+## Phone locale follow-up, October 9, 2026
+
+Runtime `d5436b7e861876fea205ac7cdb68ac943702c8fa` makes the Marketing phone preview follow the header language. Existing hand, angle, artwork and submission logic are unchanged. Build/lint/typecheck/modularity pass; focused signup/motion tests pass 35 with one intentional touch skip. ES/EN desktop/mobile WebKit captures and signup demo evidence are refreshed. Independent scoped review is clean. See [locale verification](../reports/evidence/cuadrao-marketing-touchup/personal-pet/locale-check/README.md). Integration remains `43fac94de2672600079f312258908f05747a9d63`. The following evidence-only commit retains this exact runtime evidence. Continue on the existing branch/PR939. Preview4512 and mock4513 are current; comparison4511 is preserved. Deployment and public forms stay on hold.
+
+
+## Invalid-email pet reaction, October 9, 2026
+
+Founder approved a subtle rejection reaction and refreshed demo. Runtime `0455fa4c2a7795064ea85b75879c83b09eec52e6` derives a small tilt/blink and fieldward gaze from existing SignupState rejection. Native validation still blocks invalid POSTs; valid correction resets the pose/error. Network and service failures keep the pet calm. Reduced motion uses a still expression. No hand, phone, Business page, API or provider changes.
+
+Build/lint/typecheck, demo boundary test and 49 focused browser checks pass, with one expected touch skip. Independent scoped review is clean. [Personal evidence](../reports/evidence/cuadrao-marketing-touchup/personal-pet/README.md) records exact-source ES/EN desktop/mobile captures, the refreshed clip and test output. Both preview4512 and mock4513 include the change. Demo is reset for founder tryout at http://127.0.0.1:4513/personal. Comparison4511 is preserved.
+
+This new reaction and its evidence are local, unpushed checkpoints. Remote PR939 remains `781e820f5986e1d009bbfb2fb61ffd6ea6912d56` with its earlier green CI; do not apply that CI result to the new local delta. Continue the existing branch, preserve earlier accepted design and wait for feedback on this reaction. No merge, deployment, hosted changes, public forms or real email. Workers stopped; Marketing ownership remains with this thread.
+
+
+## Reaction accepted for PR update
+
+The founder accepted the invalid-email pet reaction and authorized pushing it to PR939 and obtaining green CI. [Reaction acceptance](../reports/evidence/cuadrao-marketing-touchup/personal-pet/reaction-acceptance.md) supersedes the preceding local-only and pending-feedback instructions. Runtime remains `0455fa4c2`; exact-source evidence is retained. Integration is unchanged at `43fac94de`, with no new overlap and a passing merged-tree modularity check. The final CI result belongs to the publication head and is recorded in PR checks and the terminal verification comment. Deployment, hosted changes, real email and public forms remain on hold.
+
+
+## Integration preparation, October 10, 2026
+
+The [PR939 reconciliation record](../reports/2026-10-10-pr-939-reconciliation.md) supersedes earlier branch-status and local-only instructions. The accepted design is locked. PR929 landed as `4cb85949b4dea6855971c8268aac1bd1a0cacb01`; PR939 incorporates that remote integration head and the preserved PR929 landing records. Its runtime is unchanged from accepted published head `a706ed2284ad67f959d334baa2d4e0305217ac93`. Review and CI must cover the final reconciliation head before a separate merge slot. PR927 remains held against main. All publication and public-form holds remain unchanged.

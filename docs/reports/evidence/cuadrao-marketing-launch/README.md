@@ -6,7 +6,7 @@ Evidence for the independent `marketing/` package. Each file names the commit it
 | --- | --- | --- |
 | [parity-results.json](parity-results.json), [parity.mjs](parity.mjs) | 48 of 48 full-page screenshots byte-identical between the legacy `/business` pages and the extracted package (Chromium and WebKit, 1440 and 390 pixels, es and en, light and dark) | `ca97f5389`, extraction only |
 | [storage-proof.md](storage-proof.md) | Signup route, PostgREST and Postgres end to end, operator removal and notice dry run, constraints. The migration was later hardened (explicit `service_role` revoke); its 11 table tests were rerun against a database whose default privileges hand `service_role` everything, as hosted Supabase does | `3e6cf00de`, migration rerun at `48174d8c3` |
-| [browser.json](browser.json), [screens/](screens/), [capture.mjs](capture.mjs) | Page identity, icons, redirects, health, robots, storage emptiness and screenshots of every page | `eb7c6f59b` (code; later commits change documents and evidence only) |
+| [browser.json](browser.json), [screens/](screens/), [capture.mjs](capture.mjs) | Page identity, icons, redirects, health, robots, storage emptiness and screenshots of every page | `5d9a1f55a` (integration after #926). Recaptured after review found the privacy and contact screenshots still showed text that #906 and #926 replaced; every other page is byte-identical to the earlier capture |
 | [verify-origin-local.json](verify-origin-local.json) | The read-only origin verifier passes both modes on local builds and rejects the wrong mode | the commit that adds `scripts/verify-origin.ts` |
 
 Hosted evidence (Render address, real inquiry receipt, hosted signup, domain) does not exist yet and is not claimed.

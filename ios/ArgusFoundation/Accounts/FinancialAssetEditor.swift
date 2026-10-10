@@ -163,7 +163,6 @@ struct FinancialAssetForm: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     CuadraoCancelToolbar(title: "accounts.cancel", disabled: model.phase == .saving, identifier: "assets.cancel") { dismiss() }
-                    ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = nil } }
                 }.interactiveDismissDisabled(model.phase == .saving)
         }
     }

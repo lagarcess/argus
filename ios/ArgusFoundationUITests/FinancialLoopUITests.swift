@@ -5,6 +5,41 @@ import UniformTypeIdentifiers
 final class FinancialLoopUITests: XCTestCase {
     let app = XCUIApplication()
 
+    func testAccountEntryOpensAfterScrollingHeaderOffscreen() throws {
+        try signIn()
+        openPersonalAccounts()
+        let add = app.buttons["accounts.add"]
+        for _ in 0..<5 {
+            if add.frame.minY < 0 { break }
+            app.scrollViews["screen.home"].swipeUp()
+        }
+        XCTAssertLessThan(add.frame.minY, app.frame.minY)
+        capture("account-entry-header-offscreen")
+        tapVisible(add)
+        XCTAssertTrue(app.buttons["accounts.type.checking"].waitForExistence(timeout: 5))
+        capture("account-entry-after-scroll")
+        tapVisible(app.buttons["accounts.cancel"])
+    }
+
+    func testAccountEntryReopensAfterReturningFromDetails() throws {
+        try signIn()
+        openPersonalAccounts()
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'accounts.row.'")).firstMatch
+        guard row.waitForExistence(timeout: 10) else {
+            throw XCTSkip("Requires an existing synthetic account to revisit its details.")
+        }
+        for _ in 0..<3 {
+            tapVisible(app.buttons["accounts.add"])
+            XCTAssertTrue(app.buttons["accounts.type.checking"].waitForExistence(timeout: 5))
+            let cancel = app.buttons["accounts.cancel"]
+            tapVisible(cancel)
+            XCTAssertTrue(cancel.waitForNonExistence(timeout: 5))
+            tapVisible(row)
+            XCTAssertTrue(app.buttons["accounts.record"].waitForExistence(timeout: 5))
+            openPersonalAccounts()
+        }
+    }
+
     func testArchiveManagementRestoresSameAccount() throws {
         try signIn(fresh: true)
         let baseline = homeValue()
@@ -14,7 +49,7 @@ final class FinancialLoopUITests: XCTestCase {
         let nickname = "Archive review " + UUID().uuidString.prefix(6)
         app.textFields["accounts.nickname"].tap(); app.textFields["accounts.nickname"].typeText(nickname)
         app.textFields["accounts.amount"].tap(); app.textFields["accounts.amount"].typeText("125")
-        app.buttons["Done"].tap(); app.buttons["accounts.save"].tap()
+        app.dismissKeyboard(); app.buttons["accounts.save"].tap()
         assertText("DOP 125.00")
         tapVisible(app.accountBack)
         let original = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", nickname)).firstMatch
@@ -83,7 +118,7 @@ final class FinancialLoopUITests: XCTestCase {
         amount.tap(); amount.typeText("25.50")
         app.buttons["accounts.amount.sign"].tap()
         XCTAssertEqual(amount.value as? String, "-25.50")
-        app.buttons["Done"].tap()
+        app.dismissKeyboard()
         capture("signed-balance-entry")
         app.buttons["accounts.save"].tap()
         XCTAssertTrue(app.buttons["opening.coverage.yes"].waitForExistence(timeout: 10))
@@ -109,7 +144,7 @@ final class FinancialLoopUITests: XCTestCase {
         let nickname = "Daily loop " + UUID().uuidString.prefix(6)
         app.textFields["accounts.nickname"].tap(); app.textFields["accounts.nickname"].typeText(nickname)
         app.textFields["accounts.amount"].tap(); app.textFields["accounts.amount"].typeText("10000")
-        app.buttons["Done"].tap(); app.buttons["accounts.save"].tap()
+        app.dismissKeyboard(); app.buttons["accounts.save"].tap()
         assertText("DOP 10,000.00")
         record(amount: "2000", note: "Loop groceries")
         assertText("DOP 8,000.00")
@@ -133,12 +168,12 @@ final class FinancialLoopUITests: XCTestCase {
         amount.typeText("2500")
         let reason = app.textFields["loop.reason"]
         reason.tap(); reason.typeText("Receipt correction")
-        app.buttons["Done"].tap()
+        app.dismissKeyboard()
         reviewAndConfirm()
         assertText("DOP 7,500.00")
         tapVisible(app.buttons["accounts.check"])
         app.textFields["loop.amount"].tap(); app.textFields["loop.amount"].typeText("7000")
-        app.buttons["Done"].tap(); app.buttons["loop.review"].tap()
+        app.dismissKeyboard(); app.buttons["loop.review"].tap()
         XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 10))
         capture("checked-balance-review")
         app.buttons["loop.confirm"].tap()
@@ -174,7 +209,7 @@ final class FinancialLoopUITests: XCTestCase {
         tapVisible(account)
         tapVisible(app.buttons["accounts.check"])
         app.textFields["loop.amount"].tap(); app.textFields["loop.amount"].typeText("50")
-        app.buttons["Listo"].tap()
+        app.dismissKeyboard()
         app.buttons["loop.review"].tap()
         XCTAssertTrue(app.buttons["loop.confirm"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "loop.")).firstMatch.exists)
@@ -187,7 +222,7 @@ final class FinancialLoopUITests: XCTestCase {
         XCTAssertTrue(app.textFields["loop.amount"].waitForExistence(timeout: 5))
         app.textFields["loop.amount"].tap(); app.textFields["loop.amount"].typeText(amount)
         app.textFields["loop.note"].tap(); app.textFields["loop.note"].typeText(note)
-        app.buttons["Done"].tap()
+        app.dismissKeyboard()
         reviewAndConfirm(coverageAnswers: coverageAnswers)
     }
 
@@ -247,9 +282,8 @@ final class FinancialLoopUITests: XCTestCase {
 
     func assertHome(_ expected: Decimal) {
         openPersonalAccounts()
-        app.revealConnectedTabBar()
-        XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
-        app.buttons["tab.home"].tap()
+        app.openHomeSurface()
+        XCTAssertTrue(selectHomeMoneyCurrency("DOP"))
         let value = app.staticTexts["home.netWorth.DOP"]
         let predicate = NSPredicate { _, _ in
             guard value.exists else { return false }
@@ -261,9 +295,8 @@ final class FinancialLoopUITests: XCTestCase {
 
     func homeValue() -> Decimal {
         openPersonalAccounts()
-        app.revealConnectedTabBar()
-        XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 10))
-        app.buttons["tab.home"].tap()
+        app.openHomeSurface()
+        _ = selectHomeMoneyCurrency("DOP")
         let value = app.staticTexts["home.netWorth.DOP"]
         // A new identity has no DOP account yet: its recorded DOP net worth is zero, not a failure.
         if !value.waitForExistence(timeout: 10) {
@@ -318,23 +351,65 @@ final class FinancialLoopUITests: XCTestCase {
             element.tap()
             return
         }
+        let scrollView = app.scrollViews.containing(element.elementType, identifier: reference).firstMatch
+        if !scrollView.exists {
+            guard element.isHittable && app.frame.contains(element.frame) else {
+                XCTFail("The fixed control is not visible: " + reference)
+                return
+            }
+            element.tap()
+            return
+        }
+        let topBars = app.navigationBars.allElementsBoundByIndex + app.statusBars.allElementsBoundByIndex
+        let top = topBars.filter { $0.isHittable && $0.frame.intersects(scrollView.frame) }
+            .reduce(max(app.frame.minY, scrollView.frame.minY)) { max($0, $1.frame.maxY) }
+        let lowerControls = app.buttons.allElementsBoundByIndex
+            + app.toolbars.allElementsBoundByIndex + app.tabBars.allElementsBoundByIndex
+            + app.keyboards.allElementsBoundByIndex
+        let bottom = lowerControls.reduce(min(app.frame.maxY, scrollView.frame.maxY)) { edge, control in
+            let frame = control.frame
+            guard frame.intersects(scrollView.frame), frame.intersects(app.frame),
+                  control.elementType == .keyboard || frame.minY >= scrollView.frame.midY else { return edge }
+            let controlReference = control.identifier.isEmpty ? control.label : control.identifier
+            let inScroll = scrollView.descendants(matching: control.elementType)
+                .matching(identifier: controlReference).allElementsBoundByIndex
+                .contains { $0.frame == frame }
+            guard !inScroll && control.isHittable else { return edge }
+            return min(edge, frame.minY)
+        }
+        let start = app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: app.frame.width / 2, dy: (top + bottom) / 2 - app.frame.minY))
         var scrolled = false
         for _ in 0..<12 {
-            if element.isHittable && element.frame.midY > 115 && element.frame.midY < app.frame.height - 130 { break }
-            let before = element.frame
-            if element.frame.midY < 115 { app.swipeDown() } else { app.swipeUp() }
+            let frame = element.frame
+            if element.isHittable && frame.minY >= top && frame.maxY <= bottom { break }
+            let distance: CGFloat
+            if frame.minY < top { distance = top - frame.minY + 24 }
+            else if frame.maxY > bottom { distance = bottom - frame.maxY - 24 }
+            else { distance = (top + bottom) / 2 - frame.midY }
+            let limit = max(0, (bottom - top) / 2)
+            guard limit > 0 else { break }
+            let movement = max(-limit, min(limit, distance))
+            start.press(forDuration: 0.01, thenDragTo: start.withOffset(CGVector(dx: 0, dy: movement)),
+                        withVelocity: .slow, thenHoldForDuration: 0.2)
             scrolled = true
-            if element.isHittable && abs(element.frame.midY - before.midY) < 2 { break }
         }
         if scrolled {
-        var previous = element.frame
-        var lastMovement = Date()
-        let settled = NSPredicate { _, _ in
-            let frame = element.frame
-            if frame != previous { previous = frame; lastMovement = Date() }
-            return Date().timeIntervalSince(lastMovement) > 0.5
+            var previous = element.frame
+            var lastMovement = Date()
+            let settled = NSPredicate { _, _ in
+                let frame = element.frame
+                if frame != previous { previous = frame; lastMovement = Date() }
+                return Date().timeIntervalSince(lastMovement) > 0.5
+            }
+            guard XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: nil)], timeout: 5) == .completed else {
+                XCTFail("The control did not stop moving: " + reference)
+                return
+            }
         }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: nil)], timeout: 5), .completed)
+        guard element.isHittable && element.frame.minY >= top && element.frame.maxY <= bottom else {
+            XCTFail("The control could not reach the visible scroll area: " + reference)
+            return
         }
         element.tap()
     }

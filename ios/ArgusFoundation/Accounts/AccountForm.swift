@@ -71,10 +71,6 @@ struct AccountForm: View {
                 CuadraoCancelToolbar(title: NSLocalizedString("accounts.cancel", comment: ""),
                                      disabled: model.busy || model.openingUncertain,
                                      identifier: "accounts.cancel") { model.discard() }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("accounts.keyboard.done") { focusedField = nil }
-                }
             }
             .interactiveDismissDisabled()
         }

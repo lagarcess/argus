@@ -91,7 +91,6 @@ struct FinancialExpectationForm: View {
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     CuadraoCancelToolbar(title: "accounts.cancel", disabled: model.saving) { dismiss() }
-                    ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
                 }
                 .interactiveDismissDisabled(model.saving)
                 .onChange(of: draft.currency) { _, _ in draft.accountId = nil }

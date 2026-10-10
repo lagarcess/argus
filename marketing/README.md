@@ -14,6 +14,10 @@ bun run build && bun run start -- -p 3000
 bunx playwright install chromium && bun run test:e2e   # needs a build
 ```
 
+The touch-up review and exact ES/EN draft copy live in [the delivery record](../docs/reports/evidence/cuadrao-marketing-touchup/README.md). Dev and build derive the served header lockup from `brand/`; edit the canonical source, not its public copy.
+
+For parallel local lanes, override `MARKETING_E2E_SITE_PORT`, `MARKETING_E2E_PUBLIC_PORT` and `MARKETING_E2E_MOCK_PORT` together. The browser suite reads the existing production build, so rebuild after every product change. `MARKETING_CAPTURE_URL=http://127.0.0.1:4512 node scripts/capture-touchup.mjs` captures all routes in an isolated headless browser; run it only against the committed build named in its manifest.
+
 Provider settings are optional locally. Without them each form shows its unavailable state.
 
 ## Layout
@@ -37,4 +41,4 @@ See the forms contract. Nothing here is read at build time except through `next.
 
 ## Reverting the extraction
 
-The package only added files under `marketing/`, a migration and docs, and removed the website from `web/`. Reverting the extraction commits restores the pre-extraction `web/` routes behind `CUADRAO_WEBSITE_PREVIEW`. It touches no application data. The signup table and its rows are untouched by a code revert; dropping the table is a separate, deliberate migration that must preserve registrations first.
+The package only added files under `marketing/`, a migration and docs, and removed the website from `web/`. On integration, reverting the extraction commits restores the pre-extraction `web/` routes behind `CUADRAO_WEBSITE_PREVIEW`. On `main`, which never had those routes, reverting the promotion commit removes `marketing/` and its migration file and nothing else. Either way it touches no application data. The signup table and its rows are untouched by a code revert; dropping the table is a separate, deliberate migration that must preserve registrations first.
