@@ -52,9 +52,9 @@ struct HouseholdPlanActionSheet: View {
                 else if let error { Text(LocalizedStringKey(error)); Button("accounts.retry") { Task { await load() } } }
             }
             .navigationTitle(allocating ? "sharedPlan.allocate" : "sharedPlan.link")
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 CuadraoCancelToolbar(title: "accounts.cancel") { dismiss() }
-                ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("accounts.keyboard.done") { focused = false } }
             }
             .task { await load() }
         }

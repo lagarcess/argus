@@ -6,6 +6,7 @@ import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parents[2]
+subprocess.run(["python3", str(root / "ios/DesignPreviewTests/run_no_keyboard_accessory.py")], check=True)
 with tempfile.TemporaryDirectory(prefix="argus-financial-models-") as temporary:
     package = Path(temporary)
     source = package / "Sources/FinancialModels"

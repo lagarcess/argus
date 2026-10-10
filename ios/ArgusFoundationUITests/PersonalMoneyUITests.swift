@@ -455,8 +455,7 @@ extension FinancialLoopUITests {
     }
 
     func dismissMoneyKeyboard() {
-        if app.buttons["Done"].exists { app.buttons["Done"].tap() }
-        else if app.buttons["Listo"].exists { app.buttons["Listo"].tap() }
+        app.dismissKeyboard()
     }
 
     func reviewMoney(answersByAccount: [String: [Bool]] = [:]) {

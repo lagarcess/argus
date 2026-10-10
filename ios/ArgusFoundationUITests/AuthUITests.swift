@@ -97,8 +97,7 @@ final class AuthUITests: XCTestCase {
             XCTAssertEqual(email.value as? String, "contrast@example.test")
             XCTAssertTrue(app.buttons["auth.submit"].isEnabled)
             capture("connected-\(appearance)-filled-fields")
-            if app.buttons["Done"].exists { app.buttons["Done"].tap() }
-            else { app.scrollViews.firstMatch.swipeDown() }
+            app.dismissKeyboard()
             try app.performAccessibilityAudit(for: [.contrast])
             capture("connected-\(appearance)-contrast")
             app.terminate()

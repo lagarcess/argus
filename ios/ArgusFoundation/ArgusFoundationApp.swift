@@ -47,6 +47,7 @@ struct ArgusFoundationApp: App {
     }
 
     @ViewBuilder private var connectedContent: some View {
+        Group {
             if CuadraoDesignPreview.isActive {
 
                 CuadraoCanvas()
@@ -57,6 +58,7 @@ struct ArgusFoundationApp: App {
                     .modifier(SessionLifecycle(model: auth))
                     .preferredColorScheme(appearance.colorScheme)
             }
+        }.background(KeyboardTapAway())
     }
 }
 
