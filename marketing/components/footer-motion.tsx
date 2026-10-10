@@ -4,13 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, type ReactNode } from "react";
 import styles from "./touchup-shell.module.css";
 
-export function FooterMotion({
-  children,
-  presentation = "pair",
-}: {
-  children: ReactNode;
-  presentation?: "pair" | "sequence";
-}) {
+export function FooterMotion({ children }: { children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLDivElement>(null);
   const photos = useRef<HTMLDivElement>(null);
@@ -34,10 +28,6 @@ export function FooterMotion({
       returning = true;
       moving.style.transitionDuration = "500ms";
       moving.style.setProperty("--footer-peek", "0px");
-      if (presentation === "sequence" && new DOMMatrixReadOnly(getComputedStyle(moving).transform).m42 === 0) {
-        reveal = 0;
-        frame.removeAttribute("data-revealing");
-      }
     };
     const peek = (delta: number) => {
       if (delta <= 0 || !atBottom() || reducedMotion.matches) {
@@ -49,9 +39,6 @@ export function FooterMotion({
         returning = false;
       }
       reveal = Math.min(strip.offsetHeight, reveal + delta * 0.75);
-      if (presentation === "sequence" && reveal > 0 && !frame.hasAttribute("data-revealing")) {
-        frame.setAttribute("data-revealing", "");
-      }
       clearTimeout(returnTimer);
       moving.style.transitionDuration = "60ms";
       moving.style.setProperty("--footer-peek", `${reveal}px`);
@@ -82,16 +69,9 @@ export function FooterMotion({
     };
     const reset = () => {
       touchY = undefined;
-      frame.removeAttribute("data-revealing");
       settle();
     };
-    const returned = (event: TransitionEvent) => {
-      if (event.target !== moving || event.propertyName !== "transform" || !returning) return;
-      reveal = 0;
-      frame.removeAttribute("data-revealing");
-    };
 
-    moving.addEventListener("transitionend", returned);
     window.addEventListener("wheel", wheel, { passive: true });
     window.addEventListener("touchstart", touchStart, { passive: true });
     window.addEventListener("touchmove", touchMove, { passive: true });
@@ -102,7 +82,6 @@ export function FooterMotion({
     reducedMotion.addEventListener("change", reset);
     return () => {
       clearTimeout(returnTimer);
-      moving.removeEventListener("transitionend", returned);
       window.removeEventListener("wheel", wheel);
       window.removeEventListener("touchstart", touchStart);
       window.removeEventListener("touchmove", touchMove);
@@ -112,18 +91,18 @@ export function FooterMotion({
       window.removeEventListener("resize", reset);
       reducedMotion.removeEventListener("change", reset);
     };
-  }, [presentation]);
+  }, []);
 
   return (
     <div ref={panel} className={styles.motion} data-footer-peek>
       <div ref={track} className={styles.peekTrack}>
         {children}
-        <div ref={photos} className={`${styles.photoStrip} ${presentation === "sequence" ? styles.photoSequence : ""}`} aria-hidden="true">
+        <div ref={photos} className={styles.photoStrip} aria-hidden="true">
           <Image
             src="/cuadrao-site/footer-dressmaker.png"
             width={1456}
             height={1360}
-            sizes={presentation === "sequence" ? "100vw" : "50vw"}
+            sizes="50vw"
             loading="eager"
             alt=""
           />
@@ -131,7 +110,7 @@ export function FooterMotion({
             src="/cuadrao-site/footer-artisan.jpg"
             width={1728}
             height={1152}
-            sizes={presentation === "sequence" ? "100vw" : "50vw"}
+            sizes="50vw"
             loading="eager"
             alt=""
           />

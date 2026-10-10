@@ -74,22 +74,6 @@
   inset: 0;
   background: #d7ddc035;
 }
-.photoSequence {
-  grid-template-columns: minmax(0, 1fr);
-}
-.photoSequence img {
-  grid-area: 1 / 1;
-}
-.photoSequence img:last-child {
-  opacity: 0;
-}
-.motion[data-revealing] .photoSequence img:last-child {
-  animation: photoChange 320ms ease-out both;
-}
-@keyframes photoChange {
-  0%, 28% { opacity: 0; }
-  69%, 100% { opacity: 1; }
-}
 @media (prefers-reduced-motion: reduce) {
   .peekTrack {
     transform: none;

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { businessPath } from "@/lib/site-routes";
 import { businessContent, type BusinessLocale } from "./content";
@@ -36,11 +37,12 @@ export function BusinessFooter({
   personal?: boolean;
 }) {
   const c = siteCopy[locale];
+  const FooterContent = personal ? Fragment : FooterMotion;
   return (
     <footer
       className={`${styles.footer} ${business ? styles.businessFooter : ""} ${shell.footer}`}
     >
-      <FooterMotion presentation={personal ? "sequence" : "pair"}>
+      <FooterContent>
       {showClosing && (
         <section className={styles.closing} aria-labelledby="closing-title">
           <div>
@@ -140,7 +142,7 @@ export function BusinessFooter({
         <div className={styles.wordmarkCrop} aria-hidden="true">
           <span>cuadrao</span>
         </div>
-      </FooterMotion>
+      </FooterContent>
     </footer>
   );
 }
