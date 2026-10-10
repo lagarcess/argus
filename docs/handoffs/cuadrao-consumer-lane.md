@@ -71,8 +71,8 @@ confirms identical reviewed and landed trees, successful merge CI, and actual
 local smoke. #952 also has an identical reviewed and landed tree. Its merge
 checks are [full CI](https://github.com/lagarcess/argus/actions/runs/38082813475)
 and [local smoke](https://github.com/lagarcess/argus/actions/runs/38082813551).
-The merged PR records their terminal result. These checks do not establish
-complete native, staging, or phone acceptance.
+Use the merged PR and these runs to verify their terminal results. These checks
+do not establish complete native, staging, or phone acceptance.
 
 The [#937 landing record](https://github.com/lagarcess/argus/blob/cd14c9883f180876d27c121f0787b25a73529492/docs/reports/2026-10-09-pr-937-integration-landing.md)
 owns the accepted source, four simulator journeys, and physical-test limits.
