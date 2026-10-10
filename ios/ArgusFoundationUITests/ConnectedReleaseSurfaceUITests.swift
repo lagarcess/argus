@@ -131,7 +131,77 @@ extension FinancialLoopUITests {
         XCTAssertGreaterThanOrEqual(tray.frame.minY, app.frame.minY, "the menu does not run off the top of the screen")
         XCTAssertLessThanOrEqual(tray.frame.maxY, add.frame.minY, "and stops above the bar")
         for row in ["account", "transaction", "plan"] { XCTAssertTrue(app.buttons["add.tray." + row].exists, row) }
-        capture("release-surface-add-menu-landscape-large-text")
+        let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        screen.name = "release-surface-add-menu-landscape-large-text"
+        screen.lifetime = .keepAlways
+        self.add(screen)
+    }
+
+    func testReleaseSurfaceMoneyFormsRemainUsableAtLargestTextWithoutSaving() throws {
+        try signIn()
+        app.terminate()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "--cuadrao-release-gates",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        XCUIDevice.shared.orientation = .portrait
+        app.launch()
+        openPersonalAccounts()
+
+        func captureForm(_ stage: String) {
+            let screen = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+            screen.name = "release-surface-large-text-money-" + stage
+            screen.lifetime = .keepAlways
+            self.add(screen)
+        }
+
+        let add = app.buttons["nav.add"]
+        tapVisible(add)
+        tapVisible(app.buttons["add.tray.account"])
+        tapVisible(app.buttons["accounts.type.checking"])
+        let nickname = "Unsaved large text " + String(UUID().uuidString.prefix(4))
+        fillMoneyField("accounts.nickname", with: nickname)
+        fillMoneyField("accounts.amount", with: "1250")
+        let accountAmount = app.textFields["accounts.amount"]
+        XCTAssertEqual(accountAmount.value as? String, "1,250")
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        captureForm("account-keyboard")
+        dismissMoneyKeyboard()
+        XCTAssertEqual(accountAmount.value as? String, "1,250.00")
+        XCTAssertEqual(app.textFields["accounts.nickname"].value as? String, nickname)
+        for id in ["accounts.cancel", "accounts.save"] {
+            let control = app.buttons[id]
+            XCTAssertTrue(control.waitForExistence(timeout: 5), id)
+            XCTAssertTrue(control.isEnabled && control.isHittable, id)
+            XCTAssertTrue(app.frame.contains(control.frame), id)
+        }
+        captureForm("account-ready-unsaved")
+        cancelEditor()
+        XCTAssertTrue(accountAmount.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["accounts.save"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(add.isHittable)
+        captureForm("account-cancelled")
+
+        tapVisible(add)
+        tapVisible(app.buttons["add.tray.transaction"])
+        tapVisible(app.buttons["loop.kind.expense"])
+        fillMoneyField("loop.amount", with: "25")
+        let transactionAmount = app.textFields["loop.amount"]
+        XCTAssertEqual(transactionAmount.value as? String, "25")
+        XCTAssertTrue(app.keyboards.firstMatch.exists)
+        captureForm("transaction-keyboard")
+        dismissMoneyKeyboard()
+        let displayedAmount = try XCTUnwrap(transactionAmount.value as? String)
+        XCTAssertEqual(Decimal(string: displayedAmount.replacingOccurrences(of: ",", with: "")), Decimal(25))
+        for control in [app.buttons["Cancel"], app.buttons["loop.review"]] {
+            XCTAssertTrue(control.waitForExistence(timeout: 5))
+            XCTAssertTrue(control.isEnabled && control.isHittable)
+            XCTAssertTrue(app.frame.contains(control.frame))
+        }
+        captureForm("transaction-ready-unreviewed")
+        cancelEditor()
+        XCTAssertTrue(transactionAmount.waitForNonExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["loop.review"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(add.isHittable)
+        captureForm("transaction-cancelled")
     }
 
     /// Search, Profile and Plan fold the bar into the + as they scroll, and expand it again, as Home does.
