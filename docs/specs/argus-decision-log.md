@@ -685,8 +685,9 @@ assertions, so same-model agreement is never the sole proof of correctness.
 At 22:26 UTC, Lucas approved a $5 total limit for this test run only.
 Provenance is `Sentinel_dadf8d7f1e70819182eb7974f221a5fd`. He requested
 identification of the development key before setting the overall development
-spending limit. That limit remains awaited. The coordinator holds live calls
-until it is set. The run cap is not unlimited development spending authority.
+spending limit. At that checkpoint, the limit was awaited and the coordinator
+held live calls. The 22:32 UTC continuation below supersedes that run cap and
+spending hold.
 
 Grok 4.3 remains the first judge. Sonnet 5.5 is a possible stretch choice only
 when a demonstrated need and fresh confirmation justify it. It is not an
@@ -703,8 +704,32 @@ Synthetic grants in isolated tests are authorized. Creating a real persistent
 grant still requires the actual business's authorization and the named
 accountant's scoped setup. The agent never holds approval permission.
 
-No model call, secret change, persistent tester grant or live data transmission
-follows from this record. New paid services, credentials, expanded grants or
-security settings need a concrete scoped confirmation. The coordinator must
-confirm the setup and named tester authority before those actions. These
-pending gates concern execution and access, not a reopened product design.
+At 22:32 UTC, Lucas authorized the existing development
+`OPENROUTER_API_KEY` until its allowance is exhausted or it expires.
+Provenance is `Sentinel_c52a9cf3b5308191b363e9c59f5993fa`. This supersedes
+the $5 test-run cap and the hold for an overall development spending limit.
+Use this existing development key only. Do not swap in a registered or guest
+key, rotate credentials or expand the authorization to another key.
+
+The coordinator's safe provider read reported total usage of $227.432355357.
+Subtracting that from the authorized $300 ceiling gives a conservative
+$72.567644643 remaining allowance before concurrent usage. The key expires at
+`2026-10-12T02:21:00Z`. This is an operational snapshot, not a new constant.
+The provider's larger monthly-remaining figure is not the authorized allowance.
+The root coordinator alone coordinates live calls, reservations, concurrency
+and token bounds. Refresh usage before calls and account for outstanding work.
+All calls, judges, fallbacks and retries consume the same allowance. Use only
+synthetic data. Stop when the conservative allowance is exhausted or the key
+expires. Do not infer unlimited spend or an automatic reset of authorization.
+
+Grok 4.3 and the earlier named runtime candidates retain their scope. No Astra
+runtime or judge API call is approved. Sonnet 5.5 still needs demonstrated need
+and fresh confirmation. No live call has occurred at this documentation
+checkpoint because C0, runtime and evaluation readiness are still incomplete.
+
+Tonight's target is online verification, contingent on the build, staging web
+setup and candidate acceptance. It is not a readiness promise. The existing
+staging-only deployment grant remains. New costs or access expansion need
+concrete scoped confirmation. No secret change, real customer-data transmission
+or persistent tester grant follows from this record. Named testers and real
+grants still need actual business authorization and scoped setup.

@@ -36,14 +36,18 @@ readback require exact-candidate evidence before readiness.
 The 22:22 UTC continuation approved the existing Render workspace and named
 the runtime model choices. The later continuation selects Grok 4.3 as the
 first evaluation judge and prohibits Astra development runtime or judge API
-calls. The $5 total cap is approved for this test run only. The overall
-development spending limit remains awaited. Live calls remain held until it
-is set. Sonnet 5.5 needs a demonstrated need and fresh confirmation before
-use. The coordinator sequences a direct named-accountant per-business grant
+calls. The 22:32 UTC grant authorizes only the existing development
+`OPENROUTER_API_KEY` until its conservative allowance is exhausted or it
+expires at `2026-10-12T02:21:00Z`. It supersedes the $5 cap and spending hold.
+Do not swap to registered or guest keys or rotate credentials. The manifest
+owns the remaining-allowance snapshot. The root coordinator alone controls
+synthetic live calls, reservations, concurrency and token bounds. C0, runtime
+and evaluation readiness are incomplete; no call has occurred. Sonnet 5.5
+still needs a demonstrated need and fresh confirmation before use. The coordinator sequences a direct named-accountant per-business grant
 for the existing one-owner, one-authorized-accountant milestone. Full L11 firm
 delegation remains later work and is not claimed complete. Isolated synthetic
 test grants are authorized. Real grants still need actual business authorization.
-No calls, secret edits or persistent tester grants follow from this handoff. The manifest owns their concrete gates and the observed
+No secret edits or persistent tester grants follow from this handoff. The manifest owns their concrete gates and the observed
 staging API revision. No separate staging web exists in that workspace. No production,
 main promotion, public signup, marketing/legal launch or Apple TestFlight is
 included. Consumer compatibility and existing shared migration ownership remain.

@@ -58,10 +58,17 @@ approves workspace `tea-d5rdkfk9c44c73e7a1ig` and names the runtime model
 choices. The later continuation selects Grok 4.3 as the first evaluation
 judge and prohibits Astra development runtime or judge API calls. Calibrate
 known-good and known-bad cases and retain deterministic state assertions.
-The [22:26 UTC spending decision](argus-decision-log.md#october-10-2026-hosted-business-beta-and-build-grant)
-approves a $5 total cap for this test run only. The overall development spending
-limit remains awaited after development-key identification. Live calls stay
-held until that limit is set. No secret edits follow from the run-cap approval.
+The [22:32 UTC development-key grant](argus-decision-log.md#october-10-2026-hosted-business-beta-and-build-grant)
+supersedes the $5 test cap and pending-development-limit call hold. Use only the
+existing development `OPENROUTER_API_KEY`, until its conservative allowance is
+exhausted or its expiry at `2026-10-12T02:21:00Z`. Do not swap to a registered
+or guest key or rotate credentials. The coordinator's safe read gives
+$72.567644643 before concurrent usage, from $300 less total usage
+$227.432355357. The larger provider monthly-remaining figure is not all
+spending authority. Refresh usage before calls and subtract outstanding work.
+Only the root coordinator controls live calls, reservations, concurrency and
+token bounds. Judges, fallbacks and retries share this allowance. Synthetic
+data only. No live call has occurred; C0, runtime and evaluations are not ready.
 Sonnet 5.5 is a potential stretch choice that needs a demonstrated need and
 fresh confirmation. It is not an automatic judge or runtime fallback.
 
@@ -74,7 +81,10 @@ authorized. Real persistent grants and named live testers still require actual
 business authorization and concrete scoped setup confirmation.
 New paid services, credentials, expanded grants and security settings also need
 that confirmation. The root coordinator owns the hosted
-web delivery choice because no separate staging web exists.
+web delivery choice because no separate staging web exists. Tonight's target
+is online verification, contingent on the build, staging web setup and candidate
+acceptance. The existing staging-only deployment grant remains; new costs and
+access expansion still need concrete scoped confirmation.
 Retain #925 at `1426404d82ade9ac1eaed255b0e68ed7db9d4a1a` and the sandbox at
 `df208f7ec2379cd84efd55eea0deb685d67c5360` as exclusions. T1 defines any needed
 tool filter through the canonical catalog, without depending on #925's wording
