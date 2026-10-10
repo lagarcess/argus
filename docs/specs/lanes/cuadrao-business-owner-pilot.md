@@ -2,6 +2,8 @@
 
 ## Current authority and landing boundary
 
+**October 10, 2026 update.** The founder approved the Business agent direction later the same day. The [Business agent execution spec](cuadrao-business-agent-execution-spec.md) now owns the Business build order, the agent contract and the open decisions. Where this document says "Business chat stays off" or that the agent audit approves no model-facing implementation, that spec takes priority for build work. Business chat stays off in hosted environments. Each model-facing change still needs a committed scorecard.
+
 Reconciled October 10, 2026. Dates in the decision table are UTC. This document preserves the original owner-pilot
 requirements and records their later disposition. It is not a new implementation
 assignment or a statement that the complete pilot works.
