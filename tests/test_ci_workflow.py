@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -13,6 +14,7 @@ AGENT_RUNTIME_WORKFLOW_PATH = (
     ROOT / ".github" / "workflows" / "agent-runtime-regression.yml"
 )
 RUNBOOK_PATH = ROOT / "docs" / "PRIVATE_LAUNCH_RUNBOOK.md"
+MARKETING_RUNBOOK_PATH = ROOT / "docs" / "runbooks" / "cuadrao-marketing-launch.md"
 
 
 def _workflow() -> dict:
@@ -131,6 +133,50 @@ def test_ci_runs_guest_release_gates_with_disposable_local_supabase() -> None:
     assert "live_provider" not in joined_steps
 
 
+def test_marketing_checks_prove_the_runtime_and_tooling_render_will_use() -> None:
+    """CI and the Render service must agree on Node and Bun.
+
+    The runbook owns the Render settings; CI derives its pins from the same
+    values instead of keeping a second copy that can drift.
+    """
+    workflow = _workflow()
+    job = workflow["jobs"]["marketing-checks"]
+    steps = job["steps"]
+    runs = "\n".join(str(step.get("run", "")) for step in steps)
+    runbook = MARKETING_RUNBOOK_PATH.read_text(encoding="utf-8")
+
+    node_pin = re.search(r"\| `NODE_VERSION` \| `([0-9.]+)` \|", runbook)
+    assert node_pin, "the runbook must state the Render NODE_VERSION"
+    setup_node = next(
+        step for step in steps if step.get("uses") == "actions/setup-node@v4"
+    )
+    assert setup_node["with"]["node-version"] == node_pin.group(1)
+
+    bun_pin = re.search(r"npm install -g bun@([0-9.]+)", runbook)
+    assert bun_pin, "the runbook build command must pin Bun"
+    assert bun_pin.group(1) == workflow["env"]["ARGUS_CI_BUN_VERSION"]
+    setup_bun = next(step for step in steps if step.get("uses") == "oven-sh/setup-bun@v2")
+    assert setup_bun["with"]["bun-version"] == "${{ env.ARGUS_CI_BUN_VERSION }}"
+
+    # Each gate runs inside the independent package, in the order a deploy needs.
+    ordered = [
+        "cd marketing && bun install --frozen-lockfile",
+        "cd marketing && bun run lint",
+        "cd marketing && bun run typecheck",
+        "cd marketing && bun test",
+        "cd marketing && bun run build",
+        "cd marketing && bun run test:e2e",
+    ]
+    positions = [runs.index(command) for command in ordered]
+    assert positions == sorted(positions)
+    assert "cd web" not in runs
+
+    # The Render start command must be a script the package really defines.
+    scripts = json.loads((ROOT / "marketing" / "package.json").read_text())["scripts"]
+    start = re.search(r"\| Start command \| `npm run (\w+)", runbook)
+    assert start and start.group(1) in scripts
+
+
 def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
     jobs = _workflow()["jobs"]
 
@@ -138,6 +184,7 @@ def test_ci_aggregator_requires_all_active_quality_jobs() -> None:
         "ownership-gate",
         "backend-checks",
         "frontend-checks",
+        "marketing-checks",
         "guest-release-gates",
     ]
 

@@ -108,6 +108,51 @@ jobs:
       - name: Verify browser storage matches the privacy disclosure
         run: cd web && bunx playwright test e2e/browser-storage-disclosure.spec.ts
 
+  marketing-checks:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.ARGUS_CI_BUN_VERSION }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.21.0"
+
+      - name: Install marketing dependencies
+        run: cd marketing && bun install --frozen-lockfile
+
+      - name: Lint marketing
+        run: cd marketing && bun run lint
+
+      - name: Typecheck marketing
+        run: cd marketing && bun run typecheck
+
+      - name: Run marketing tests
+        run: cd marketing && bun test
+
+      - name: Build marketing
+        run: cd marketing && bun run build
+
+      - name: Install Playwright chromium
+        run: cd marketing && bunx playwright install --with-deps chromium
+
+      - name: Run marketing browser journeys
+        run: cd marketing && bun run test:e2e
+
+      - name: Upload marketing browser report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: marketing-playwright-report
+          path: marketing/playwright-report
+
   guest-release-gates:
     runs-on: ubuntu-latest
     if: github.event.pull_request.draft == false || github.event_name == 'push'
@@ -215,6 +260,7 @@ jobs:
       - ownership-gate
       - backend-checks
       - frontend-checks
+      - marketing-checks
       - guest-release-gates
     steps:
       - name: All checks passed
