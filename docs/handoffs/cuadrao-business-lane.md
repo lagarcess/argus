@@ -1,6 +1,28 @@
-# Cuadrao Business lane: handoff (paused October 9, 2026)
+# Cuadrao Business lane handoff
 
-**Status: paused by the founder.** Claude usage is reserved for the Consumer lane. This document and the GitHub records it links let another agent resume. No private notes, chat transcripts or scratch folders are needed.
+**Current checkpoint, October 10, 2026.** Integration is
+`35fae200034c51ef27cee64d76adc4a903c19672`. The default-off foundation is
+integrated. Planning [#900](https://github.com/lagarcess/argus/pull/900) landed
+as `2754b0114948b20136b183debd7e8a7a14eab430` and
+[#910](https://github.com/lagarcess/argus/pull/910) landed as
+`e895014f44fd7d3052a6cd6b489c6f5b9d96d05f`. Their exact postmerge CI and smoke
+passed, as recorded in those PRs. #930 also landed. Consumer #916, #952 and
+#938 are integrated; Consumer retains their acceptance ownership.
+
+The [Business agent execution spec](../specs/lanes/cuadrao-business-agent-execution-spec.md)
+owns the new direction and future build order. L12 and section 3.4 own model
+selection and spend. This #953 landing changes only documents. Business chat
+stays off in this landing. Future hosted pilot activation follows J1 and
+founder approval. #925 and the local sandbox at `df208f7ec` remain excluded.
+No wholesale sandbox publication or new live calls follow from this handoff.
+
+## Historical October 9 checkpoint
+
+The remaining sections preserve the original checkpoint and its evidence.
+Their old holds, PR states, merge order and next steps are historical, not
+current assignments. Use the current checkpoint above and the execution spec
+for current direction. In particular, do not rerun or reconcile #925 from the
+old instructions below. Its historical tests do not establish current readiness.
 
 **Founder holds, in force:**
 - New product work and E0 are on hold.

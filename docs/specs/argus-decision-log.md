@@ -35,6 +35,7 @@ supersession rules. These decisions do not assert implementation completion.
 | 2026-10-04 | Lock the AI providers (2:20 PM CT): OpenRouter for the chat models (GPT and Grok) and vision extraction, Grok voice for the planned chat voice-call feature, and Perplexity for finance search. All three stay behind the server and never write saved balances. Detailed record: [October 4 AI providers](#ai-providers). | Lucas |
 | 2026-10-04 | Lock the space-model timing (2:21 PM CT): the space-model change lands before TestFlight. The model itself still needs its own lock. Detailed record: [October 4 space model timing](#space-model-timing). | Lucas |
 | 2026-10-07 | Approve the connected Business workflow and offline E0 plan with task-by-task independent review. Counsel may publish and land the docs-only PR; Lucas coordinates Business implementation. Detailed record: [Business connected flow and E0](#october-7-2026-business-connected-flow-and-offline-e0-plan). | Lucas |
+| 2026-10-10 | Approve the Business agent direction. One agent in the existing runtime talks only to the owner in WhatsApp and completes each record through Business tools. The accountant works in the web view. Reuse the runtime and services; no second loop, extractor, ledger or vendor. Contract first, then parallel streams; the "Pagué 850" journey is the first proof; evals gate merges. Cuadrao branches from `codex/private-alpha-next`. Detailed record: [Business agent direction](#october-10-2026-business-agent-direction). | Lucas |
 
 ## October 7, 2026 Business connected flow and offline E0 plan
 
@@ -606,3 +607,20 @@ release 1 (#818 and #826), and the consent scope and versioning policy (#828).
 This entry does not authorize implementation, a model-instruction change, a paid
 provider run, hosted activation or deployment. The #826 contract still precedes
 #827.
+
+## October 10, 2026: Business agent direction
+
+The founder approved these points after two audits of the Business core flows:
+
+- The roadmap captured evidence and then stopped. A record was not complete. One agent now carries each conversation to a complete draft.
+- Version 1 talks only to the owner. The accountant answers in the web view.
+- The model reads the message. The tools enforce permissions, approval, exact money and record-once rules.
+- Reuse LangGraph, OpenRouter, the tool registry, WhatsApp intake, document jobs, money services and server flags. Jev and an MCP server are deferred.
+- `main` stays as the Argus tribute. Cuadrao work branches from `codex/private-alpha-next`.
+- "I paid with my own money" is recorded against an owner funds source. The accountant classifies it.
+- Approval is a permission, not a fixed role. The business admin holds it and can grant it to an associate. An accounting firm gets it for each client through that client's grant. An action ledger shows who did each action, through which grant and for whom.
+- The OpenRouter key caps AI spend. The founder names the models for each PR that makes model calls.
+- The default currency is DOP. The reviewer can change it before sign-off.
+- Build only what J1 to J3 need, then test with one real owner and one real accountant. Other work waits until real use asks for it.
+
+The [Business agent execution spec](lanes/cuadrao-business-agent-execution-spec.md) owns the contract, the work order and the defaults. No decision is open.
