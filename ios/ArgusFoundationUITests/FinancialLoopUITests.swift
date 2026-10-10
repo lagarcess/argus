@@ -363,7 +363,20 @@ final class FinancialLoopUITests: XCTestCase {
         let topBars = app.navigationBars.allElementsBoundByIndex + app.statusBars.allElementsBoundByIndex
         let top = topBars.filter { $0.isHittable && $0.frame.intersects(scrollView.frame) }
             .reduce(max(app.frame.minY, scrollView.frame.minY)) { max($0, $1.frame.maxY) }
-        let bottom = min(app.frame.maxY - 130, scrollView.frame.maxY)
+        let lowerControls = app.buttons.allElementsBoundByIndex
+            + app.toolbars.allElementsBoundByIndex + app.tabBars.allElementsBoundByIndex
+            + app.keyboards.allElementsBoundByIndex
+        let bottom = lowerControls.reduce(min(app.frame.maxY, scrollView.frame.maxY)) { edge, control in
+            let frame = control.frame
+            guard frame.intersects(scrollView.frame), frame.intersects(app.frame),
+                  control.elementType == .keyboard || frame.minY >= scrollView.frame.midY else { return edge }
+            let controlReference = control.identifier.isEmpty ? control.label : control.identifier
+            let inScroll = scrollView.descendants(matching: control.elementType)
+                .matching(identifier: controlReference).allElementsBoundByIndex
+                .contains { $0.frame == frame }
+            guard !inScroll && control.isHittable else { return edge }
+            return min(edge, frame.minY)
+        }
         let start = app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: app.frame.width / 2, dy: (top + bottom) / 2 - app.frame.minY))
         var scrolled = false
