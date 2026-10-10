@@ -692,10 +692,16 @@ Grok 4.3 remains the first judge. Sonnet 5.5 is a possible stretch choice only
 when a demonstrated need and fresh confirmation justify it. It is not an
 automatic fallback. No Astra development runtime or judge API call is approved.
 
-The first-flow L11 setup remains open. The founder must choose whether the
-first accountant uses a direct named grant or requires firm-to-human delegation
-from the start. Neither choice is selected here, and firm delegation is not
-claimed implemented. L11's grant-based approval requirement stays settled.
+The coordinator interprets the existing one-owner, one-authorized-accountant,
+one-Business-at-a-time milestone as a direct named-accountant grant for the
+first bounded flow. This is implementation sequencing under existing authority,
+not a new founder decision. Full firm-to-human delegation does not gate that
+first acceptance. Preserve L11's firm-delegation requirement for later work;
+it is not claimed complete. Do not invent a firm identity for the pilot.
+
+Synthetic grants in isolated tests are authorized. Creating a real persistent
+grant still requires the actual business's authorization and the named
+accountant's scoped setup. The agent never holds approval permission.
 
 No model call, secret change, persistent tester grant or live data transmission
 follows from this record. New paid services, credentials, expanded grants or

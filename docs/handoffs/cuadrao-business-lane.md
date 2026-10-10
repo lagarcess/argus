@@ -39,8 +39,11 @@ first evaluation judge and prohibits Astra development runtime or judge API
 calls. The $5 total cap is approved for this test run only. The overall
 development spending limit remains awaited. Live calls remain held until it
 is set. Sonnet 5.5 needs a demonstrated need and fresh confirmation before
-use. The first-flow direct-accountant versus firm-delegation choice remains
-open. No calls, secret edits or persistent tester grants follow from this handoff. The manifest owns their concrete gates and the observed
+use. The coordinator sequences a direct named-accountant per-business grant
+for the existing one-owner, one-authorized-accountant milestone. Full L11 firm
+delegation remains later work and is not claimed complete. Isolated synthetic
+test grants are authorized. Real grants still need actual business authorization.
+No calls, secret edits or persistent tester grants follow from this handoff. The manifest owns their concrete gates and the observed
 staging API revision. No separate staging web exists in that workspace. No production,
 main promotion, public signup, marketing/legal launch or Apple TestFlight is
 included. Consumer compatibility and existing shared migration ownership remain.

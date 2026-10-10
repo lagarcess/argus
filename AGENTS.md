@@ -45,7 +45,8 @@ alone owns merge and staging actions. Workers act only within their assigned
 files and hand off exact commits. The Render workspace and named runtime model
 choices are approved. Grok 4.3 is the first evaluation judge. The $5 total cap
 is approved for this test run. Live calls remain held pending the development
-spending limit. The manifest records the open first-accountant delegation choice.
+spending limit. First acceptance uses one direct named-accountant grant for one
+Business. The manifest preserves the later L11 firm-delegation requirement.
 
 "Pagué 850" is one example. Interpret varied natural-language transactions,
 follow-ups, uncertainty and corrections through the existing typed runtime.

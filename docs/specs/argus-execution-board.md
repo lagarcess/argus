@@ -65,11 +65,15 @@ held until that limit is set. No secret edits follow from the run-cap approval.
 Sonnet 5.5 is a potential stretch choice that needs a demonstrated need and
 fresh confirmation. It is not an automatic judge or runtime fallback.
 
-The first-flow L11 setup remains open. The founder must choose a direct named
-accountant grant first or firm-to-human delegation from the start. Do not infer
-a selection or claim firm delegation is complete. Persistent hosted grants and
-named live testers still need concrete scoped setup confirmation. New paid services, credentials, expanded grants and security
-settings also need that confirmation. The root coordinator owns the hosted
+First acceptance uses one owner, one authorized accountant and one Business
+at a time. The coordinator sequences a direct named-accountant per-business
+grant within that existing milestone. Full firm-to-human delegation remains an
+L11 roadmap requirement, not a blocker for the first bounded flow or a completed
+capability. Do not invent a firm identity. Isolated synthetic test grants are
+authorized. Real persistent grants and named live testers still require actual
+business authorization and concrete scoped setup confirmation.
+New paid services, credentials, expanded grants and security settings also need
+that confirmation. The root coordinator owns the hosted
 web delivery choice because no separate staging web exists.
 Retain #925 at `1426404d82ade9ac1eaed255b0e68ed7db9d4a1a` and the sandbox at
 `df208f7ec2379cd84efd55eea0deb685d67c5360` as exclusions. T1 defines any needed
