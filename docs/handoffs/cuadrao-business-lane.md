@@ -2,6 +2,11 @@
 
 **Status: paused by the founder.** Claude usage is reserved for the Consumer lane. This document and the GitHub records it links let another agent resume. No private notes, chat transcripts or scratch folders are needed.
 
+**Update, October 10, 2026 (America/Chicago).** The product-direction discussion took place. The founder approved the Business agent direction. The [Business agent execution spec](../specs/lanes/cuadrao-business-agent-execution-spec.md) now owns the Business build order. These holds change:
+- The hold on new product work is lifted for the work in that spec.
+- "Business chat stays off" is lifted as a build hold. Business chat stays off in hosted environments.
+- Live calls, the spend limit, deployment, hosted migration, activation and merges stay held. The spec lists the open spend-limit decision (F6).
+
 **Founder holds, in force:**
 - New product work and E0 are on hold.
 - The founder is reassessing the Business pilot after an interview with an accounting firm. **No new roadmap is approved.** That interview is not recorded in the repository, and the successor must not infer its content.
