@@ -5,6 +5,22 @@ import UniformTypeIdentifiers
 final class FinancialLoopUITests: XCTestCase {
     let app = XCUIApplication()
 
+    func testAccountEntryOpensAfterScrollingHeaderOffscreen() throws {
+        try signIn()
+        openPersonalAccounts()
+        let add = app.buttons["accounts.add"]
+        for _ in 0..<5 {
+            if add.frame.minY < 0 { break }
+            app.scrollViews["screen.home"].swipeUp()
+        }
+        XCTAssertLessThan(add.frame.minY, app.frame.minY)
+        capture("account-entry-header-offscreen")
+        tapVisible(add)
+        XCTAssertTrue(app.buttons["accounts.type.checking"].waitForExistence(timeout: 5))
+        capture("account-entry-after-scroll")
+        tapVisible(app.buttons["accounts.cancel"])
+    }
+
     func testAccountEntryReopensAfterReturningFromDetails() throws {
         try signIn()
         openPersonalAccounts()
@@ -344,7 +360,9 @@ final class FinancialLoopUITests: XCTestCase {
             element.tap()
             return
         }
-        let top = max(app.frame.minY + 115, scrollView.frame.minY)
+        let topBars = app.navigationBars.allElementsBoundByIndex + app.statusBars.allElementsBoundByIndex
+        let top = topBars.filter { $0.isHittable && $0.frame.intersects(scrollView.frame) }
+            .reduce(max(app.frame.minY, scrollView.frame.minY)) { max($0, $1.frame.maxY) }
         let bottom = min(app.frame.maxY - 130, scrollView.frame.maxY)
         let start = app.coordinate(withNormalizedOffset: .zero)
             .withOffset(CGVector(dx: app.frame.width / 2, dy: (top + bottom) / 2 - app.frame.minY))
@@ -355,7 +373,7 @@ final class FinancialLoopUITests: XCTestCase {
             let distance: CGFloat
             if frame.minY < top { distance = top - frame.minY + 24 }
             else if frame.maxY > bottom { distance = bottom - frame.maxY - 24 }
-            else { break }
+            else { distance = (top + bottom) / 2 - frame.midY }
             let limit = max(0, (bottom - top) / 2)
             guard limit > 0 else { break }
             let movement = max(-limit, min(limit, distance))
