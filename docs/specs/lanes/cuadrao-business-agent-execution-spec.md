@@ -4,9 +4,11 @@
 This document is a plan. It does not claim built behavior. It authorizes no
 hosted action, no live WhatsApp message, no paid model call and no merge.
 
-**Base branch:** `codex/private-alpha-next`. Most Business code is on the local
-branch `codex/cuadrao-business-sandbox` at `df208f7ec`. That branch is not
-pushed. Section 13 lists this as a blocker.
+**Base branch:** `codex/private-alpha-next`, reconciled at
+`35fae200034c51ef27cee64d76adc4a903c19672`. The default-off Business foundation
+and planning PRs #900 and #910 are integrated. The local sandbox at
+`df208f7ec2379cd84efd55eea0deb685d67c5360` is separate audit evidence.
+This documentation landing does not publish or merge that sandbox or #925.
 
 **Tracker:** [#942](https://github.com/lagarcess/argus/issues/942). Flow
 issues: #943 to #949.
@@ -215,7 +217,7 @@ Each draft field is a fact.
 | `value` | The value, or null. |
 | `state` | `known`, `unknown`, `owner_does_not_know`. |
 | `origin` | `extracted`, `owner_stated`, `member_set`, `matched`, `default` (currency only). |
-| `verified` | `false` for an extracted fiscal fact until the accountant marks it. |
+| `verified` | `false` for an extracted fiscal fact until an authorized approver signs off under D4. |
 | `source_ids` | The evidence and message IDs that support the value. |
 
 One fact can have a default. If the owner names no currency, `currency` is DOP with origin `default`. The reviewer sees the default and can change it before sign-off. No other fact has a default. A value with no source stays `unknown`.
@@ -388,8 +390,9 @@ Other findings:
 - Business chat resolves the business through the old owner-only lookup
   (`conversation_surface.py:45-56`). T1 replaces it with the authorized
   context.
-- The production runtime has no dollar cap. The #925 guard is for tests only.
-  T1 adds the production guard.
+- The #925 dollar guard is for tests only. L12 owns the spend decision.
+  T1 records cost and preserves bounded calls and retries. It adds no new
+  Cuadrao dollar cap.
 - Audio is dropped when the webhook is parsed (`payload.py:112-114`). No
   transcription code exists. V1 adds it.
 - WhatsApp has no ordering for each sender (`durable_store.py:201`). W1 adds
@@ -399,9 +402,10 @@ Other findings:
 
 ### 8.1 Order
 
-1. P0. Push `codex/cuadrao-business-sandbox` and open its PR to
-   `codex/private-alpha-next`. The founder assigns the owner. Nothing below
-   can merge before P0.
+1. P0. Use the integrated default-off foundation and the landed #900/#910
+   plans. Before runtime work, identify any missing sandbox dependency and
+   scope its reconciliation separately. Do not publish the sandbox wholesale.
+   This docs-only landing neither selects nor implements a runtime subset.
 2. C0. The contract. One writer.
 3. T1, M1, W1, A1 and E1 start in parallel against C0. Each uses the C0
    fixtures for the parts that are not built.
@@ -523,7 +527,8 @@ that row first.
 
 - The page shows only backend state. It invents no state.
 - An accountant edit and a WhatsApp reply write to one revision history.
-- Desktop, keyboard and touch checks pass. Spanish copy is approved first.
+- Desktop, keyboard and touch checks pass. The Spanish-first approval rule applies to fixed UI copy only. Generated
+  replies follow D3 and E1, without approval of each reply.
 
 ### 8.8 PR E1: make J1 a merge gate
 
@@ -569,7 +574,7 @@ delivery.
 
 | ID | The owner sends | Cuadrao must |
 | --- | --- | --- |
-| J1 | "Pagué 850 de materiales." Then "Mío. No tengo recibo." | Ask "¿Con dinero del negocio o tuyo?". Make one expense draft with `owner_funds` and `no_receipt`. Get approval from an authorized member. Record it once. Put it in the package with its messages and the accountant action "informal supplier: B11 or E41 may be needed". |
+| J1 | "Pagué 850 de materiales." Then "Mío. No tengo recibo." | Ask "¿Con dinero del negocio o tuyo?". Make one expense draft with `owner_funds` and `no_receipt`. Get approval from an authorized member. Record it once. Put it in the package with its messages and the accountant action "receipt missing; verify supplier status and applicable fiscal document". |
 | J2 | A photo of a fiscal receipt with a caption. | Extract the amount, the date, the supplier, RNC, NCF and ITBIS as "not verified". Ask only for missing facts. |
 | J3 | "Me pagaron 5,000 por la reparación." | Make one income draft. Ask for the account if it is not known. |
 | J4 | A receipt with business and personal items. | Propose the business share. Record only the business part. Flag the split for the accountant. |
@@ -645,17 +650,20 @@ These items are out of scope for this spec:
 
 ## 13. Blockers and preconditions
 
-1. **The sandbox branch is not pushed.** `codex/cuadrao-business-sandbox` is
-   105 commits ahead of `codex/private-alpha-next`. It exists on one machine.
-   The issues link to `docs/specs/lanes/cuadrao-business-sandbox-contract.md`,
-   which exists only on that branch. On October 10, 2026, the branch had no
-   PR and no assigned owner (P0).
-2. **#925 conflicts with the base.** T1 builds on its surface filter.
-   Reconcile #925 or move its surface filter into T1.
+1. **Runtime reconciliation is separate work.** P0 uses the integrated
+   foundation. The sandbox contract at
+   `docs/specs/lanes/cuadrao-business-sandbox-contract.md` is a local-only
+   historical source at `df208f7ec`, not a published integration contract.
+   Use this spec and the [landed space plan](cuadrao-business-space-slice-plan.md)
+   for published direction. C0 defines the future shared contract.
+2. **#925 remains excluded.** Plan the per-surface filter inside T1, through its canonical tool
+   catalog. This avoids making the excluded PR's refusal wording and eval
+   guard a dependency. Reuse from #925, if useful, needs scoped review and
+   T1's required scorecard. This documentation landing does not repair or merge #925.
 3. **#941 blocks real WhatsApp delivery.** Fixture and simulated proof can
    continue.
 4. **Holds from the handoff.** The October 10 decision lifts "Business chat
-   stays off". Business chat is the agent's surface, so the agent needs it on. Build it now. It turns on in hosted environments for pilot businesses, through server flags, after J1 passes and the founder approves. Hosted actions, live calls and merges stay held
+   stays off". Business chat is a future implementation surface in this plan. This PR changes documents only. Hosted pilot activation uses server flags after J1 passes and the founder approves. Hosted actions, live calls and merges stay held
    until then.
 
 ## 14. Documents this spec changes
@@ -687,14 +695,17 @@ of the next month, also with no activity.
 - An e-NCF has 13 characters: "E", a 2-digit type and a 10-digit sequence.
 - A B02 consumer receipt does not support an ITBIS credit or an ISR deduction.
 - The DGII portal checks validity. Cuadrao marks each value "not verified"
-  until the accountant marks it.
+  until an authorized approver signs off under D4.
 
-**Informal suppliers.** This rule applies to J1. A purchase from an
-unregistered seller needs a B11 or E41 that the buyer issues. The buyer
-withholds 100% of the ITBIS. DGII Consulta 10 (June 2025) says a B13 with
-informal notes is not acceptable for this case. Cuadrao records the purchase.
-The accountant issues the document. Source:
-[DGII Consulta 10](https://dgii.gov.do/legislacion/consultas/Consultas%20Tecnicas%202025/Junio/Consulta%2010-Reporte%20compras%20proveedores%20informales.pdf).
+**Missing receipts and supplier status.** A missing receipt does not establish
+that a supplier is unregistered. J1 records the missing receipt and leaves supplier status unknown for the
+accountant. Norma 05-2019 Article 7 requires registry verification for its
+Comprobante de Compras treatment and specifies retention of invoiced ITBIS.
+The accountant determines whether B11 or E41 applies. The June 2025
+consultation concerns a bakery buying inputs from state farmers-market
+sellers without NCF. It is not a ruling on every receiptless purchase. Sources:
+[Norma 05-2019](https://dgii.gov.do/legislacion/normasGenerales/Documents/NG%20sobre%20Comprobantes%20Fiscales/Norma05-19.pdf)
+and [DGII Consulta 10](https://dgii.gov.do/legislacion/consultas/Consultas%20Tecnicas%202025/Junio/Consulta%2010-Reporte%20compras%20proveedores%20informales.pdf).
 
 **Owner spending.**
 
@@ -704,16 +715,19 @@ The accountant issues the document. Source:
 - The accounting entries for owner contributions, owner withdrawals and mixed
   receipts are practitioner convention. Not verified.
 
-**Banks.**
+**Banks (historical research, outside the pilot finish line).**
 
-- Banreservas asks for 3 years of financial statements, proof of filing with
+- The named Banreservas commercial-loan product asks for 3 years of financial statements, proof of filing with
   DGII and 3 months of bank statements. If the last close is more than 6
-  months old, it asks for interim statements. Source:
+  months old, it asks for interim statements. Applications above RD$10M
+  require audit-firm financials. This is one product's list. Source:
   [Banreservas commercial loans](https://www.banreservas.com/empresarial/financiamientos/prestamos-comerciales/).
-- The Superintendencia de Bancos rules from 2017 set a floor by loan size.
-  Below RD$5M, the owner signs. From RD$5M to RD$10M, the company's CPA
-  prepares the statements. From RD$10M to RD$25M, an independent CPA prepares
-  them. From RD$25M, the statements are audited. Later changes: not verified.
+- The 2017 Superintendencia de Bancos table uses consolidated debt in the
+  financial system, not an individual loan amount. Below RD$5M, the debtor
+  signs. From RD$5M to below RD$10M, the company CPA prepares the statements
+  (a contracted CPA for individuals). From RD$10M to below RD$25M, an
+  independent CPA prepares them. From RD$25M, an audit firm audits them.
+  Later amendments are not verified. This is not a claim about current rules.
 - The 6-month interim rule supports a monthly package.
 
 **Accounting software.** QuickBooks Online bill import needs bill number,

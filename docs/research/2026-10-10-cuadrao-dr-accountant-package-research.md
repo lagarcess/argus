@@ -1,6 +1,6 @@
 # DR accountant facts for Cuadrao (research, 2026-10-10)
 
-Scope: what a Dominican contador needs from a capture tool, grounded in DGII, Superintendencia de Bancos and bank sources. Every primary document cited below was opened this session (PDFs downloaded and text-extracted with `pdftotext`, pages read with WebFetch or the browser pane). Anything not confirmed from a primary source is marked **UNVERIFIED**.
+Scope: what a Dominican contador needs from a capture tool, grounded in DGII, Superintendencia de Bancos and bank sources. The original October 10 research session reported opening each primary document cited below (PDFs downloaded and text-extracted with `pdftotext`, pages read with WebFetch or the browser pane). Anything not confirmed from a primary source is marked **UNVERIFIED**.
 
 Research only. It records public sources. It makes no product decision.
 
@@ -178,7 +178,7 @@ From NG05-19 Art. 7, G05-19 and C10-25:
 - The issuer must first verify on the DGII portal (Herramientas > Consultas > RNC Contribuyente) that the person is **not** registered. If DGII finds the person is registered, the expense is not admitted for ISR or ITBIS (Art. 7 Párrafo I). The 606 then raises the "NCF de Compras" alert (I606).
 - **100% retention of the ITBIS invoiced** applies in every case this comprobante is issued (Art. 7 Párrafo II).
 - The buyer must put the seller's name and cédula on it (GNCF).
-- C10-25 (June 2025), on the exact Cuadrao case of a bakery buying inputs at a state farmers' market from sellers without NCF who asked whether B13 + informal receipts would do: **No**. DGII answered they must issue Comprobante de Compras, apply the corresponding retentions per Art. 7 NG05-19, and report the payments in the 606 as gastos por servicios y suministros or costo de venta. B13 is not the vehicle for informal suppliers.
+- C10-25 (June 2025), on the specific case of a bakery buying inputs at a state farmers' market from sellers without NCF who asked whether B13 + informal receipts would do: **No**. DGII answered they must issue Comprobante de Compras, apply the corresponding retentions per Art. 7 NG05-19, and report the payments in the 606 as gastos por servicios y suministros or costo de venta. B13 is not the vehicle for informal suppliers.
 - C7-21: the special 2% ISR treatment of Norma General 07-2007 for informal labor applies only to the construction sector. Other businesses paying unregistered persons for services must issue Comprobante de Compras.
 - ISR retention rates on payments to individuals (commonly cited 10% honorarios/alquileres under Código art. 309, 2% for certain services) are **UNVERIFIED** from a primary source here (DGII Guía 11 returned 404). The 606 code list for Tipo de Retención ISR (1.2) is verified.
 - Practical implication: the receipt photo for an informal purchase is not the fiscal document. The fiscal document is a B11/E41 the business itself must issue (in practice the contador or the business's invoicing system). Cuadrao should capture what the contador needs to issue it: seller full name, cédula, date, description (bien vs servicio), amount, payment method, and evidence (photo of handwritten note, transfer receipt).
@@ -242,7 +242,7 @@ What Cuadrao should capture per row so the contador can decide: a three-way inte
 
 **Banco Caribe** requirements PDF (search snippet only, PDF blocked): audited statements from RD$5M, IR-2 from RD$5M, 3-4 months of other-bank statements, cash flow. **UNVERIFIED**.
 
-### 4.2 Regulator floor (primary): Superintendencia de Bancos, REA
+### 4.2 Historical 2017 table: Superintendencia de Bancos, REA
 
 SB CC/010/17 notifies Junta Monetaria's REA (Segunda Resolución 28/09/2017, partial entry into force 26/10/2017). Commercial debtors are segmented by consolidated debt in the system, and the bank must require (Tabla No. 1):
 
@@ -258,8 +258,8 @@ Whether these thresholds were amended after 2017 is **UNVERIFIED** (no later res
 
 ### 4.3 Is a CPA signature needed?
 
-- For a Cuadrao-sized business borrowing under RD$5M, the regulator floor is a statement signed by the owner, reviewed by the bank. A CPA is not required by the REA at that tier.
-- From RD$5M a CPA must prepare the statements; from RD$10M an independent CPA; from RD$25M an audit firm (SB). Banreservas tightens this: audited above RD$10M (BR).
+- The cited 2017 table uses consolidated debt in the financial system. Below RD$5M it lists a debtor-signed statement reviewed by the bank. This does not establish the current requirement for an individual loan.
+- In that historical table, RD$5M to below RD$10M requires the company CPA, or a contracted CPA for individuals; RD$10M to below RD$25M requires an independent CPA; RD$25M and above requires an audit firm. Later amendments are unverified. The named Banreservas product separately asks for audit-firm financials above RD$10M (BR).
 - Banks also want proof the statements were filed with DGII (BR "constancia de depósito"). For sociedades that is the IR-2 with anexos (G10 describes the IR-2 as declaring income and "el patrimonio de la entidad al cierre"). The precise IR-2 annex that carries the balance sheet is **UNVERIFIED**.
 - Banks commonly ask for 3 months of bank statements (BR) and interim statements if the close is over 6 months old (BR, BHD). This is the strongest argument for a monthly package: it makes interim statements cheap.
 - Personas físicas: IR-1 vs RST declaration as the filed proof is **UNVERIFIED** at bank level.
