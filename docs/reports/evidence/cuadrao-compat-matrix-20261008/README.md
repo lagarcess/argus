@@ -1,12 +1,16 @@
 # Compatibility matrix (October 8, 2026)
 
+This is historical evidence for the pinned code and schema states below. The
+October 10 documentation correction changes no result, test source, migration,
+or hosted state. It does not establish acceptance of the current integration tip.
+
 Local, synthetic, nothing hosted. Throwaway databases on the Supabase CLI's local Postgres 17.6. Candidate `cad1cbe1ec27ff89c08eadbec31718a0e627383c` (the Build 1 freeze). Previous production code is `main` `a9286b21886eb03df7a21f2f4b7d5e79af570679`.
 
 `compat_matrix.py` builds three schema states from a production-equivalent fixture (effects of `main`'s files plus production's 81 ledger rows), each through the real applier, then runs each code version's real-Postgres test files (`tests/*postgres*.py`) against a fresh copy of each state.
 
 | Schema state | Previous production code (34 files) | Build 1 code (73 files) |
 | --- | --- | --- |
-| **S0** today | 379 passed, 27 skipped, 1 failed | 409 passed, 227 failed, 304 errors (needs the new tables) |
+| **S0** October 8 fixture | 379 passed, 27 skipped, 1 failed | 409 passed, 227 failed, 304 errors (needs the new tables) |
 | **S1** after C0 (website migration alone) | 379 passed, 27 skipped, 1 failed | 420 passed, 216 failed, 304 errors (still needs C1) |
 | **S2** after C1 (consumer files, plus the unrecorded `20260505000001`) | 379 passed, 27 skipped, 1 failed | **722 passed, 31 skipped, 1 failed, 0 errors** |
 
@@ -53,8 +57,6 @@ Business's current report, not independently reproduced here: a hung run of the 
 - Code that reads or deletes B2 to B4 data (spaces, WhatsApp links, preparation jobs): the later integration code that carries it, as named in the enable request for each flag.
 The first hosted write of new-format data in a table sets the minimum for that table. Rolling back below the code that can read and delete it means turning that feature's flag off and fixing forward.
 
-- Final integration also fails `test_document_jobs_postgres.py::test_two_running_instances_recover_a_dead_worker_without_restart` (`needs_attention` instead of `review_ready`). It passes when run alone on the same database and fails again in a full-suite run on a fresh copy, so it is order-dependent in this local macOS run. The same commit's CI is green on Linux. Cause not found; reported to Business.
-
 ## What it shows
 
 - **Deploy order.** Build 1 code needs C1 first. On today's schema, or after C0 only, it fails on the missing tables. C1 must be applied and verified before Build 1 deploys.
@@ -65,5 +67,5 @@ The first hosted write of new-format data in a table sets the minimum for that t
 ## What it does not show
 
 - These are database-level suites. They do not drive the old or new API end to end, and they do not cover the web client.
-- B1 to B4 (Business) are not in this table. Their compatibility, including B4's effect on Personal, is Business's evidence on #914.
+- The first table covers C0 and C1. The later tables record local B1 to B4 database results, including their failures and skips. They do not prove Business end-to-end behavior or Build 1 read/delete compatibility with new-format rows. Business's separate evidence is on #914.
 - Hosted behavior (pooler, extensions, Auth) is not covered.
