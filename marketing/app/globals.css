@@ -4,6 +4,10 @@
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
 }
 
+html {
+  overscroll-behavior-y: none;
+}
+
 body {
   background: #ffffff;
   color: #000000;
