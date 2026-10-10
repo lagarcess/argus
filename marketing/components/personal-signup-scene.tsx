@@ -88,9 +88,9 @@ export function SignupPet({ petRef, pose = "rest" }: { petRef?: Scene["petRef"];
 export function WelcomePhone({ logoRef, flying, alt, delivered }: { logoRef: Scene["logoRef"]; flying: boolean; alt: string; delivered: boolean }) {
   const wrist = useId();
   return <div className={styles.scene} data-welcome-phone="">
-    <svg className={styles.palm} viewBox="0 0 460 690" aria-hidden="true">
-      <defs><linearGradient id={wrist} x1="0" y1="0" x2="0" y2="1"><stop offset=".78" stopColor="#050505" /><stop offset="1" stopColor="#050505" stopOpacity="0" /></linearGradient></defs>
-      <path fill={`url(#${wrist})`} d="M91 690C103 637 74 593 61 548C48 502 50 444 54 396L64 283C66 261 79 251 92 257C106 263 107 277 105 298L103 374C127 345 171 306 229 259L384 151C400 133 424 135 431 151C440 169 430 184 415 199L365 263L376 330C403 369 405 404 388 456L345 568C333 606 321 647 315 690Z" />
+    <svg className={styles.palm} viewBox="0 0 480 820" aria-hidden="true">
+      <defs><linearGradient id={wrist} x1="0" y1="0" x2="0" y2="1"><stop offset=".73" stopColor="#050505" /><stop offset="1" stopColor="#050505" stopOpacity="0" /></linearGradient></defs>
+      <path fill={`url(#${wrist})`} d="M0 820L12 782L13 745Q19 734 34 732C22 694 18 650 17 607L16 543C15 512 25 480 28 445C32 405 23 396 28 372L38 320C43 298 34 276 45 260C55 245 77 243 96 260L116 285L102 653Q180 711 337 687L387 264L391 183C393 167 409 151 425 147C441 143 457 151 461 166C470 192 444 220 426 253L425 286L452 314L461 386L449 441L450 517C460 541 457 564 442 592L418 640C408 664 407 690 389 720L324 820Z" />
     </svg>
     <div className={styles.device}>
       <div className={styles.screen}>
@@ -102,11 +102,11 @@ export function WelcomePhone({ logoRef, flying, alt, delivered }: { logoRef: Sce
         </span>
       </div>
     </div>
-    <svg className={styles.fingers} viewBox="0 0 460 690" aria-hidden="true">
+    <svg className={styles.fingers} viewBox="0 0 480 820" aria-hidden="true">
       <g fill="#050505">
-        <path d="M348 270C366 260 389 272 391 290C394 310 382 327 365 327L327 323C310 321 302 307 307 293C312 279 333 279 348 270Z" />
-        <path d="M351 350C370 342 391 354 391 372C392 391 379 405 362 404L312 397C296 395 290 383 295 370C301 355 333 358 351 350Z" />
-        <path d="M344 428C360 421 378 432 377 448C376 466 363 478 348 474L319 468C304 466 298 453 304 442C312 430 330 434 344 428Z" />
+        <path d="M368 259C346 259 341 274 346 292C350 309 365 313 390 312L390 340Q389 358 383 375L436 405C460 394 476 374 476 352L477 309C477 281 459 261 433 260Z" />
+        <path d="M319 379C296 375 282 381 280 400C278 425 294 446 319 447L371 446L367 482L423 522L468 457C480 439 483 424 471 407C456 385 432 380 405 379Z" />
+        <path d="M346 514C328 516 315 525 316 540C317 558 332 568 351 569L375 570L375 594L416 627L443 582C455 564 451 541 441 522C432 505 415 502 399 505Z" />
       </g>
     </svg>
   </div>;
