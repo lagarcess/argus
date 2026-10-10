@@ -42,13 +42,13 @@ struct CanvasDecimalInput: UIViewRepresentable {
         field.adjustsFontForContentSizeCategory = true
         field.adjustsFontSizeToFitWidth = true; field.minimumFontSize = 17
         field.backgroundColor = .clear
-        field.accessibilityIdentifier = identifier
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         context.coordinator.field = field
         return field
     }
     func updateUIView(_ field: UITextField, context: Context) {
         context.coordinator.parent = self
+        field.accessibilityIdentifier = identifier
         field.font = CuadraoTypography.moneyFont(size, category: contentSizeCategory)
         field.textAlignment = alignment
         if context.coordinator.pending == 0 && raw != context.coordinator.raw {
