@@ -31,8 +31,8 @@ any documentation housekeeping head so this report does not predate their result
 GitHub rejected the direct housekeeping push because integration requires a pull
 request. The notes are preserved on `codex/cuadrao-consumer-lane`; canonical
 integration was restored clean at the merged remote head without discarding the
-documentation commit. The landing workflow requires Lucas to request a separate
-housekeeping PR before one is opened. Documentation landing therefore remains open.
+documentation commit. Lucas subsequently requested the documentation-only PR.
+Documentation landing therefore remains open until that PR is reviewed and merged.
 
 ## Assigned next outcome
 
@@ -57,6 +57,8 @@ conversation alone do not establish manual-money acceptance.
 
 The [read-only staging preflight](evidence/consumer-staging-preflight-20261009/README.md)
 confirmed that the shared manual-money feature gate is off: Accounts, Home, Plan
-and Search return `financial_accounts_unavailable`. The prepared next step is
-staging-owner activation on the existing pinned revision plus a dedicated test
-identity, both requiring Lucas's explicit hosted approval. No hosted changes ran.
+and Search return `financial_accounts_unavailable`. Lucas subsequently approved
+staging-owner activation of that single gate on the existing pinned revision,
+the required restart and a synthetic test identity. The setup is assigned to the
+existing staging owner. The preflight itself made no hosted changes; its 404s
+must not be treated as the service state after the authorized setup completes.

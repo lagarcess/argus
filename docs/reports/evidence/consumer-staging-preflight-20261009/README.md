@@ -19,19 +19,24 @@ The native account, money, plan and Search transport files are unchanged between
 the deployed backend's source commit and the merged native checkpoint. This
 supports proceeding with compatibility tests; it does not prove them passed.
 
-## Prepared unblock, requiring Lucas's approval
+## Subsequently approved unblock
+
+Lucas approved the bounded staging setup after reading this preflight: enable
+the financial-accounts gate on `cad1cbe1e`, restart and obtain a synthetic test
+login. The existing staging owner is assigned that work. The request results
+above record the pre-activation state, not a claim about the later service.
 
 The staging owner must enable only `ARGUS_FINANCIAL_ACCOUNTS_ENABLED=true` on
 this service, retaining its currently pinned backend revision and applied C0/C1
 schema. Do not deploy current integration, which needs later Business columns.
 Applying the environment change requires a service restart or deploy using that
-same pinned revision. This is a hosted change, so the current instruction does
-not authorize it.
+same pinned revision. No newer code, migrations, guest mode or production change
+is authorized.
 
 The staging owner's existing synthetic user's temporary credentials were removed
 after its persistence probe. Arrange a dedicated signed-in test identity and
 private credential handoff before native acceptance; do not reset a real user's
-password. Auth/admin fixture changes also need explicit hosted authorization.
+password. The approved synthetic setup does not authorize changes to real users.
 
 Once available, use the dedicated Consumer simulator with sign-in enabled and
 preview mode off. Check accounts, transactions, budgets, goals, search/find later,

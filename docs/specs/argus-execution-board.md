@@ -20,7 +20,9 @@ remains open until the assigned connected journeys are accepted.
 
 Guest mode, saved receipts and shared plans remain locked. The transaction-sheet
 redesign stays parked. RevenueCat is outside scope. No more accessibility tooling,
-TestFlight upload, new phone install, deployment or hosted changes are authorized.
+TestFlight upload, new phone install, newer-code deployment or schema changes are authorized.
+Lucas subsequently approved the staging owner enabling only the money gate on
+the pinned `cad1cbe1e` backend, restarting it and arranging a synthetic test login.
 Consumer must coordinate shared ingestion, auth, API, schema and runtime changes
 with their existing owners. Business and Marketing retain their own assignments.
 
