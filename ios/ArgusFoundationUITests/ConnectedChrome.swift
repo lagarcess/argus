@@ -89,11 +89,15 @@ extension XCUIApplication {
 
     func returnFromDetail(_ legacyIdentifier: String) {
         let nativeBack = navigationBars.buttons.matching(identifier: "BackButton").firstMatch
-        if nativeBack.waitForExistence(timeout: 2) { nativeBack.tap() }
-        else {
-            XCTAssertTrue(buttons[legacyIdentifier].waitForExistence(timeout: 5))
-            buttons[legacyIdentifier].tap()
+        let back = nativeBack.waitForExistence(timeout: 2) ? nativeBack : buttons[legacyIdentifier]
+        let ready = XCTNSPredicateExpectation(
+            predicate: NSPredicate { _, _ in back.exists && back.isHittable }, object: nil
+        )
+        guard XCTWaiter.wait(for: [ready], timeout: 10) == .completed else {
+            XCTFail("Back must be hittable before leaving the detail")
+            return
         }
+        back.tap()
     }
 
     func swipeBack(cancel: Bool = false) {
