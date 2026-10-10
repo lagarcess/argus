@@ -61,8 +61,23 @@ final class ConnectedReleaseSurfaceTests: XCTestCase {
         XCTAssertEqual(chosen.id, first.id)
     }
 
-    func testAddWithAccountsInMoreThanOneCurrencyAsksWhich() throws {
-        guard case .choose = ConnectedAddMovement.target(for: [try account(), try account(currency: "USD")], loaded: true) else { return XCTFail("expected choose") }
+    func testAddWithAccountsInMoreThanOneCurrencyOpensThePrimaryCurrencyAccountWithoutAsking() throws {
+        let dop = try account(), usd = try account(currency: "USD")
+        guard case .record(let chosen) = ConnectedAddMovement.target(for: [dop, usd], loaded: true, preferredCurrency: "USD") else { return XCTFail("expected record") }
+        XCTAssertEqual(chosen.id, usd.id, "the person's primary currency decides, not the list order")
+        guard case .record(let lowercase) = ConnectedAddMovement.target(for: [dop, usd], loaded: true, preferredCurrency: "usd") else { return XCTFail("expected record") }
+        XCTAssertEqual(lowercase.id, usd.id, "the currency code is compared without case")
+    }
+
+    func testAddFallsBackToTheFirstMoneyAccountWhenThePrimaryCurrencyHasNoneOrIsUnknown() throws {
+        let dop = try account(), usd = try account(currency: "USD")
+        guard case .record(let none) = ConnectedAddMovement.target(for: [dop, usd], loaded: true, preferredCurrency: "EUR") else { return XCTFail("expected record") }
+        XCTAssertEqual(none.id, dop.id)
+        guard case .record(let unknown) = ConnectedAddMovement.target(for: [dop, usd], loaded: true) else { return XCTFail("expected record") }
+        XCTAssertEqual(unknown.id, dop.id)
+        let card = try account(currency: "USD", nature: "liability", type: "credit_card")
+        guard case .record(let money) = ConnectedAddMovement.target(for: [card, dop], loaded: true, preferredCurrency: "USD") else { return XCTFail("expected record") }
+        XCTAssertEqual(money.id, dop.id, "a card in the primary currency is not a starting account while a money account exists")
     }
 
     func testAMoneyAccountIsPreferredOverALiabilityAsTheStartingAccount() throws {

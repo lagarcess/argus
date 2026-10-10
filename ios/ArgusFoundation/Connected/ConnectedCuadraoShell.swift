@@ -9,6 +9,9 @@ struct ConnectedCuadraoShell: View {
     @State private var destination: AppDestination = .home
     @State private var sheet: FoundationSheet?
     @State private var navigationScroll = CuadraoNavigationScroll()
+    @State private var planScroll = CuadraoNavigationScroll()
+    @State private var searchScroll = CuadraoNavigationScroll()
+    @State private var profileScroll = CuadraoNavigationScroll()
     @State private var homePath: [ConnectedHomeRoute] = []
     @State private var profilePath: [CanvasProfileRoute] = []
     @State private var avatar: CuadraoAvatarSelection = .none
@@ -16,8 +19,8 @@ struct ConnectedCuadraoShell: View {
     @State private var chatEditing = false
     @State private var searchDetail = false
     @State private var addNotice: AddNotice?
-    @State private var choosingAddAccount = false
     @State private var creatingPlan = false
+    @State private var capturing: ReceiptSourceChoice?
 
     private var spanish: Bool { locale.language.languageCode?.identifier == "es" }
 
@@ -45,7 +48,7 @@ struct ConnectedCuadraoShell: View {
 
     private func shell(allowsHouseholdNavigation: Bool) -> some View {
         CuadraoAppShell(selection: $tab, chat: chat, spanish: spanish,
-            showsNavigation: showsNavigation && allowsHouseholdNavigation, compact: tab == .home && navigationScroll.compact,
+            showsNavigation: showsNavigation && allowsHouseholdNavigation, compact: scroll(for: tab)?.compact ?? false,
             avatar: avatar, profileName: auth.profile?.displayName ?? "", addItems: addItems) { _ in
             ForEach(CuadraoTab.allCases.filter { $0 != .assistant || CuadraoFirstRelease.hasAssistant }) { item in
                 tabContent(item)
@@ -84,12 +87,20 @@ struct ConnectedCuadraoShell: View {
                     .foregroundStyle(ArgusStyle.ink)
             }
         }
-        .confirmationDialog("loop.chooseAccount", isPresented: $choosingAddAccount, titleVisibility: .visible) {
-            ForEach(addableAccounts) { account in
-                Button(account.nickname ?? NSLocalizedString("accounts.type." + account.type, comment: "")) {
-                    auth.financialLoop?.record(account)
-                }.accessibilityIdentifier("nav.add.account." + account.id.uuidString)
-            }
+        .savedReceiptOutcome(auth.savedReceipts, spanish: spanish)
+        .fullScreenCover(item: $capturing) { source in
+            ReceiptNativePicker(source: source, spanish: spanish) { result in
+                capturing = nil
+                switch result {
+                case .success(let files):
+                    let prepared = SavedReceiptFiles.prepared(files, source: source, spanish: spanish)
+                    Task { await auth.savedReceipts?.save(prepared) }
+                case .failure(let error) where (error as NSError).code != NSUserCancelledError || (error as NSError).domain != NSCocoaErrorDomain:
+                    auth.savedReceipts?.fail(.unusableFile)
+                case .failure:
+                    break
+                }
+            }.ignoresSafeArea()
         }
         .sheet(isPresented: $creatingPlan) {
             if let loop = auth.financialLoop { ConnectedPlanEditor(loop: loop, seed: .create(kind: nil)) }
@@ -146,6 +157,7 @@ struct ConnectedCuadraoShell: View {
                 FinancialPlanDestination(showProfile: { tab = .profile }, nativeNavigation: true, audience: planAudience)
                     .toolbar(.hidden, for: .navigationBar)
             }
+            .modifier(CuadraoNavigationScrollObserver(scroll: planScroll, enabled: tab == .plan && sheet == nil))
         case .assistant:
             NavigationStack {
                 CuadraoChatCanvas(store: chat, spanish: spanish, editing: $chatEditing, showsPreviewNotice: true)
@@ -153,8 +165,21 @@ struct ConnectedCuadraoShell: View {
             }
         case .search:
             FinancialSearchDestination(active: tab == .search, showProfile: { tab = .profile }, nativePlanNavigation: true, detailChanged: { searchDetail = $0 })
+                .modifier(CuadraoNavigationScrollObserver(scroll: searchScroll, enabled: tab == .search && !searchDetail))
         case .profile:
             ConnectedCuadraoProfile(appearance: $appearance, avatar: $avatar, path: $profilePath)
+                .modifier(CuadraoNavigationScrollObserver(scroll: profileScroll, enabled: tab == .profile && profilePath.isEmpty))
+        }
+    }
+
+    /// Each tab folds the bar from its own scroll, so a long Plan, Search or Profile folds it as Home does.
+    private func scroll(for item: CuadraoTab) -> CuadraoNavigationScroll? {
+        switch item {
+        case .home: navigationScroll
+        case .plan: planScroll
+        case .search: searchScroll
+        case .profile: profileScroll
+        case .assistant: nil
         }
     }
 
@@ -171,7 +196,7 @@ struct ConnectedCuadraoShell: View {
     private var addItems: [CuadraoAddItem] {
         let household = auth.household
         return CuadraoAddAction.available(
-            receiptsConnected: false,
+            receiptsConnected: CuadraoFirstRelease.savedReceipts,
             householdsAvailable: household?.isAvailable == true,
             inHousehold: household?.active == true
         ).compactMap { action in
@@ -180,9 +205,25 @@ struct ConnectedCuadraoShell: View {
             case .transaction: CuadraoAddItem(action: action, perform: addMovement)
             case .plan: CuadraoAddItem(action: action, perform: addPlan)
             case .group, .invite: CuadraoAddItem(action: action) { household?.showManagement = true }
-            case .scanCamera, .choosePhoto, .chooseFile: nil
+            case .scanCamera: CuadraoAddItem(action: action) { capture(.scan) }
+            case .choosePhoto: CuadraoAddItem(action: action) { capture(.photos) }
+            case .chooseFile: CuadraoAddItem(action: action) { capture(.file) }
             }
         }
+    }
+
+    private func capture(_ source: ReceiptSourceChoice) {
+        #if DEBUG
+        if CuadraoFirstRelease.savedReceiptsSample {
+            Task { await auth.savedReceipts?.save(SampleSavedReceiptsTransport.files(for: source)) }
+            return
+        }
+        #endif
+        if source == .scan && !SavedReceiptFiles.scannerAvailable {
+            auth.savedReceipts?.fail(.scannerUnavailable)
+            return
+        }
+        capturing = source
     }
 
     private func addAccount() {
@@ -234,11 +275,10 @@ struct ConnectedCuadraoShell: View {
         }
         Task {
             if !accounts.hasLoaded { await accounts.load() }
-            switch ConnectedAddMovement.target(for: addableAccounts, loaded: accounts.hasLoaded) {
+            switch ConnectedAddMovement.target(for: addableAccounts, loaded: accounts.hasLoaded, preferredCurrency: auth.profile?.currency) {
             case .loadAccounts: addNotice = AddNotice(title: accounts.errorKey ?? "accounts.loading", message: nil)
             case .createAccount: accounts.create()
             case .record(let account): loop.record(account)
-            case .choose: choosingAddAccount = true
             }
         }
     }

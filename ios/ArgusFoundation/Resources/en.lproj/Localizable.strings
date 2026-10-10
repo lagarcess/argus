@@ -186,7 +186,6 @@
 "accounts.share.help" = "100 means you own all of it; 50 means half. This does not share the account or grant access.";
 "accounts.error.share" = "Enter a share from 0.01 to 100, using a decimal point.";
 "accounts.setup.hint" = "Start with what you know.";
-"accounts.keyboard.done" = "Done";
 "accounts.type.change" = "Change";
 "accounts.amount.sign" = "Change amount sign";
 "loop.home.welcome" = "Your financial picture";
