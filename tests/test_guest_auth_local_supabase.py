@@ -25,6 +25,7 @@ from argus.api.routers import agent as agent_router
 from argus.api.routers import auth as auth_router
 from argus.api.schemas import GuestPendingAction, Message
 from argus.domain.guest_cleanup import cleanup_expired_guest_workspaces
+from argus.domain.owner_scope import PERSONAL
 from argus.domain.store import utcnow
 from argus.domain.username_signup import serialized_username_signup
 from argus.domain.visitor_usage import visitor_key_for
@@ -635,6 +636,7 @@ def test_cleanup_deletes_real_anonymous_auth_user_through_admin() -> None:
         auth_user_id = str(auth_user["id"])
         profile = gateway.get_or_create_profile_for_auth_user(auth_user)
         conversation = gateway.create_conversation(
+            scope=PERSONAL,
             user_id=profile.id,
             title="expired guest proof",
             title_source="system_default",
@@ -983,6 +985,7 @@ def test_signup_creates_profile_before_first_login_claims_pending_handoff(
             created_at=guest_profile.created_at,
         )
         conversation = gateway.create_conversation(
+            scope=PERSONAL,
             user_id=source_user_id,
             title="First login claim proof",
             title_source="system_default",
@@ -1127,6 +1130,7 @@ def test_existing_account_claim_preserves_same_conversation_and_deletes_source_o
             created_at=guest_profile.created_at,
         )
         conversation = gateway.create_conversation(
+            scope=PERSONAL,
             user_id=source_user_id,
             title="Claim proof",
             title_source="system_default",

@@ -2199,11 +2199,16 @@
       "shopping": "Shopping",
       "interest_fees": "Interest and fees"
     },
-    "error": {
-      "document_unreadable": "We couldn't read this receipt. Enter the details yourself or send a clearer photo.",
-      "document_preparation_interrupted": "Preparation stopped before it finished. Try again.",
-      "extraction_unavailable": "AI preparation isn't available right now. Your receipt is saved. Try again later or enter the details yourself.",
-      "generic": "Something went wrong with this receipt. It is still saved."
+    "attention": {
+      "unreadable": "We couldn't read this receipt. Enter the details yourself or send a clearer photo.",
+      "ai_unavailable": "AI preparation isn't available right now. Your receipt is saved. Try again later or enter the details yourself.",
+      "interrupted": "Preparation stopped before it finished. Your receipt is saved. Try again or enter the details yourself.",
+      "outcome_unknown": "We couldn't recover the AI reading result. Your receipt is still saved. Try again or enter the details yourself.",
+      "no_purchase_found": "Cuadrao read this receipt but didn't find a purchase to save. Enter the details yourself.",
+      "several_purchases": "Cuadrao couldn't match this receipt to one purchase. Enter the details yourself to save one expense.",
+      "source_unavailable": "The original file is no longer available. Enter the details yourself.",
+      "check_details": "Cuadrao couldn't read every part of this receipt. Check the details against the original before you confirm.",
+      "other": "Something went wrong with this receipt. It is still saved. Enter the details yourself."
     },
     "actions": {
       "upload_receipt": "Upload receipt",
@@ -2239,6 +2244,8 @@
       "source": "Original receipt",
       "download": "Download",
       "error": "This receipt isn't available. It may have been removed.",
+      "retry": "Try again with AI",
+      "retry_consent": "Trying again sends this receipt to our AI provider.",
       "prepare_failed": "We couldn't start preparation. Your receipt is saved. Try again.",
       "stale": "This receipt changed since you opened it. Review the current details before confirming.",
       "confirm_failed": "We couldn't confirm this expense. Nothing was saved twice. Try again.",
@@ -2330,6 +2337,15 @@
     "composer_receipt": {
       "saved": "Saved to Inbox",
       "dismiss": "Dismiss"
+    },
+    "search": {
+      "placeholder": "Search expenses, receipts and chats",
+      "placeholder_records": "Search expenses and receipts",
+      "no_results_hint": "Try a merchant or a file name.",
+      "region": "Business records",
+      "loading": "Searching your business",
+      "failed": "We couldn't search your business.",
+      "receipts": "Receipts"
     }
   },
   "money": {

@@ -186,7 +186,6 @@
 "accounts.share.help" = "100 significa que todo es tuyo; 50 significa la mitad. Esto no comparte la cuenta ni permite el acceso.";
 "accounts.error.share" = "Ingresa una parte de 0.01 a 100, usando un punto decimal.";
 "accounts.setup.hint" = "Empieza con lo que sabes.";
-"accounts.keyboard.done" = "Listo";
 "accounts.type.change" = "Cambiar";
 "accounts.amount.sign" = "Cambiar signo del monto";
 "loop.home.welcome" = "Tu situación financiera";

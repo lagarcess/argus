@@ -17,6 +17,7 @@ final class ProfileAuthModel: ObservableObject {
     @Published private(set) var household: HouseholdModel?
     @Published private(set) var invitations: InvitationsModel?
     @Published private(set) var financialSearch: FinancialSearchModel?
+    @Published private(set) var savedReceipts: SavedReceiptsModel?
     @Published private(set) var deletion: AccountDeletionModel?
     let configuration: NativeAuthConfiguration?
     /// Native Apple and Google buttons; `.off` unless email auth is configured too.
@@ -58,6 +59,16 @@ final class ProfileAuthModel: ObservableObject {
             financialSearch = FinancialSearchModel(controller: loadedController, prefix: (loadedConfiguration?.session.storagePrefix ?? "") + ".search.")
             financialSearch?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             accounts = AccountsModel(controller: loadedController)
+            #if DEBUG
+            if CuadraoFirstRelease.savedReceiptsSample {
+                savedReceipts = SavedReceiptsModel(transport: SampleSavedReceiptsTransport(), currentSession: { await loadedController.snapshot() })
+            } else {
+                savedReceipts = SavedReceiptsModel(controller: loadedController)
+            }
+            #else
+            savedReceipts = SavedReceiptsModel(controller: loadedController)
+            #endif
+            savedReceipts?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             accounts?.financialChanged = { [weak self] in self?.financialSearch?.invalidate() }
             accounts?.sessionChanged = { [weak self] snapshot in self?.accept(snapshot) }
             if let accounts, let loadedConfiguration {
@@ -210,6 +221,7 @@ final class ProfileAuthModel: ObservableObject {
         guard let controller else { return }
         household?.bind(nil)
         financialSearch?.bind(nil)
+        savedReceipts?.bind(nil)
         accounts?.bind(nil)
         financialLoop?.bind(nil)
         await perform { try await controller.signOut() }
@@ -245,6 +257,7 @@ final class ProfileAuthModel: ObservableObject {
         household?.bind(snapshot)
         invitations?.bind(snapshot)
         financialSearch?.bind(snapshot)
+        savedReceipts?.bind(snapshot)
         accounts?.bind(snapshot)
         financialLoop?.bind(snapshot)
         profile = snapshot.profile

@@ -78,6 +78,7 @@ export function useInitialChatSession({
         const activeRoute = readActiveConversationRouteState();
         let activeConversationId = activeRoute.conversationId;
         if (!activeConversationId && meResponse?.account_kind === "guest") {
+          // Guests have no Business space, so this is always the Personal list.
           const { items } = await listConversations({ limit: 2 });
           if (cancelled || hasAcceptedUserInputRef.current) return;
           activeConversationId = items[0]?.id ?? null;

@@ -1,16 +1,15 @@
 "use client";
 
-import Image from "next/image";
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { businessPath } from "@/lib/site-routes";
 import type { BusinessLocale } from "./content";
 import { businessContactEmail } from "./site-copy";
 import styles from "./personal-early-access.module.css";
+import { SignupFlight, SignupPet, usePersonalSignupScene, WelcomePhone } from "./personal-signup-scene";
 
 type SignupState = { status: "idle" } | { status: "submitting" } | { status: "success" } | { status: "error"; message: string; rejected: boolean };
 
-const homePreview = { src: "/cuadrao-site/personal-home-preview.png", width: 1206, height: 2622 } as const;
 const subscribeToHydration = (): (() => void) => () => {};
 const clientSnapshot = (): boolean => true;
 const serverSnapshot = (): boolean => false;
@@ -20,7 +19,7 @@ const copy = {
     eyebrow: "CUADRAO PERSONAL · ACCESO ANTICIPADO",
     title: "Tus finanzas, en orden.",
     benefit: "Tus cuentas y el próximo pago, a la vista.",
-    body: "Estamos preparando la app. Déjanos tu correo y te avisaremos cuando puedas probarla.",
+    body: "Déjanos tu correo y te avisaremos cuando puedas probar Cuadrao.",
     label: "Correo electrónico",
     button: "Avísame cuando pueda probarla",
     saving: "Guardando tu registro…",
@@ -28,20 +27,21 @@ const copy = {
     privacyLink: "Política de privacidad",
     rateLimited: "Hiciste varios intentos seguidos. Espera unos minutos e inténtalo de nuevo.",
     success: "Ya estás en la lista.",
-    saved: "Tu correo quedó registrado para el acceso anticipado.",
-    next: "Cuando haya invitaciones disponibles, podremos contactarte. Registrarte no garantiza acceso inmediato.",
+    next: "Te avisaremos cuando haya una invitación para ti.",
     error: `No pudimos guardar tu correo. Inténtalo de nuevo o escríbenos a ${businessContactEmail}.`,
     invalid: "Revisa tu correo e inténtalo de nuevo.",
     noScript: "Activa JavaScript para usar este formulario.",
-    caption: "Vista previa · datos de ejemplo. El diseño puede cambiar.",
-    nextPayment: "Tu próximo pago",
-    alt: "Inicio de Cuadrao Personal con datos de ejemplo: saludo a Alex, balance disponible y próximo pago de Internet.",
+    phone: {
+      alt: "Pantalla de bienvenida de Cuadrao Personal con su logo y el botón para crear una cuenta.",
+      createAccount: "Crear cuenta",
+      signIn: "Iniciar sesión",
+    },
   },
   en: {
     eyebrow: "CUADRAO PERSONAL · EARLY ACCESS",
     title: "Your finances, in order.",
     benefit: "Your accounts and next payment, at a glance.",
-    body: "We’re preparing the app. Leave your email and we’ll let you know when you can try it.",
+    body: "Leave your email and we’ll let you know when you can try Cuadrao.",
     label: "Email address",
     button: "Let me know when I can try it",
     saving: "Saving your signup…",
@@ -49,14 +49,15 @@ const copy = {
     privacyLink: "Privacy policy",
     rateLimited: "You made several attempts in a row. Wait a few minutes and try again.",
     success: "You're on the list.",
-    saved: "Your email is registered for early access.",
-    next: "We can contact you when invitations become available. Signing up does not guarantee immediate access.",
+    next: "We’ll email you when an invitation is available for you.",
     error: `We couldn't save your email. Try again or write to ${businessContactEmail}.`,
     invalid: "Check your email address and try again.",
     noScript: "Enable JavaScript to use this form.",
-    caption: "Preview in Spanish · sample data. The design may change.",
-    nextPayment: "Your next payment",
-    alt: "Cuadrao Personal Home preview in Spanish with sample data: a greeting to Alex, available balance and an upcoming Internet payment.",
+    phone: {
+      alt: "Cuadrao Personal welcome screen with its logo and create-account button.",
+      createAccount: "Create account",
+      signIn: "Sign in",
+    },
   },
 } as const;
 
@@ -65,11 +66,12 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
   const hydrated = useSyncExternalStore(subscribeToHydration, clientSnapshot, serverSnapshot);
   const [email, setEmail] = useState("");
   const [state, setState] = useState<SignupState>({ status: "idle" });
+  const { rootRef, petRef, buttonRef, logoRef, flight, celebrate, finish } = usePersonalSignupScene();
   const confirmation = useRef<HTMLHeadingElement>(null);
   const pending = useRef(false);
 
   useEffect(() => {
-    if (state.status === "success") confirmation.current?.focus();
+    if (state.status === "success") confirmation.current?.focus({ preventScroll: true });
   }, [state.status]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -89,6 +91,7 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
       });
       const result: unknown = await response.json();
       if (response.ok && typeof result === "object" && result !== null && "status" in result && result.status === "registered") {
+        celebrate();
         setState({ status: "success" });
       } else {
         setState({
@@ -106,7 +109,7 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
   }
 
   return (
-    <section className={styles.hero} aria-labelledby="personal-title">
+    <section ref={rootRef} className={styles.hero} aria-labelledby="personal-title" data-signup-state={state.status} data-flight-state={flight ? "flying" : state.status === "success" ? "settled" : "rest"}>
       <div className={styles.content}>
         <p className={styles.eyebrow}>{c.eyebrow}</p>
         <h1 id="personal-title">{c.title}</h1>
@@ -119,7 +122,6 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
             <div className={styles.confirmation}>
               <span className={styles.check}><Check size={24} aria-hidden="true" /></span>
               <h2 ref={confirmation} tabIndex={-1}>{c.success}</h2>
-              <p>{c.saved}</p>
               <p>{c.next}</p>
             </div>
           ) : (
@@ -127,12 +129,22 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
               <noscript><p className={styles.local}>{c.noScript}</p></noscript>
               <fieldset className={styles.formFields} disabled={!hydrated}>
                 <label htmlFor="personal-email">{c.label}</label>
-                <input id="personal-email" type="email" name="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-privacy" : "signup-privacy"} aria-invalid={(state.status === "error" && state.rejected) || undefined} readOnly={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
+                <div className={styles.emailShell}>
+                  <span className={styles.petPerch}><SignupPet petRef={petRef} pose={state.status === "submitting" ? "excited" : state.status === "error" && state.rejected ? "checking" : "rest"} /></span>
+                <input id="personal-email" type="email" name="email" value={email} onChange={(event) => {
+                  setEmail(event.currentTarget.value);
+                  if (state.status === "error" && state.rejected && event.currentTarget.validity.valid) setState({ status: "idle" });
+                }} onInvalid={(event) => {
+                  event.preventDefault();
+                  setState({ status: "error", message: c.invalid, rejected: true });
+                  event.currentTarget.focus();
+                }} autoComplete="email" inputMode="email" maxLength={254} required aria-describedby={state.status === "error" ? "signup-error signup-privacy" : "signup-privacy"} aria-invalid={(state.status === "error" && state.rejected) || undefined} readOnly={state.status === "submitting"} placeholder={locale === "es" ? "tu@correo.com" : "you@example.com"} />
+                </div>
                 <div className={styles.trap} aria-hidden="true">
                   <label htmlFor="personal-website">Website</label>
                   <input id="personal-website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
                 </div>
-                <button type="submit" disabled={!hydrated} aria-disabled={state.status === "submitting"}>
+                <button ref={buttonRef} type="submit" disabled={!hydrated} aria-disabled={state.status === "submitting"}>
                   {state.status === "submitting" ? c.saving : c.button}
                   <ArrowRight size={19} aria-hidden="true" />
                 </button>
@@ -144,19 +156,9 @@ export function PersonalEarlyAccess({ locale }: { locale: BusinessLocale }) {
         <p className={styles.privacy} id="signup-privacy">{c.privacy} <a href={`mailto:${businessContactEmail}`}>{businessContactEmail}</a>. <a href={businessPath(locale, "privacy")}>{c.privacyLink}</a>.</p>
       </div>
       <figure className={styles.preview}>
-        <div className={styles.previewBackdrop}>
-          <div className={styles.phone}>
-            <Image {...homePreview} alt={c.alt} sizes="(max-width: 700px) 230px, 300px" priority />
-          </div>
-          <div className={styles.paymentCloseup} aria-hidden="true">
-            <span>{c.nextPayment}</span>
-            <div className={styles.paymentCrop}>
-              <Image {...homePreview} alt="" sizes="(max-width: 700px) 320px, 340px" />
-            </div>
-          </div>
-        </div>
-        <figcaption>{c.caption}</figcaption>
+        <WelcomePhone logoRef={logoRef} flying={Boolean(flight)} copy={c.phone} delivered={state.status === "success"} />
       </figure>
+      <SignupFlight flight={flight} onFinish={finish} />
     </section>
   );
 }

@@ -124,7 +124,8 @@ Home, Plan, Chat results and expanded insights.
 - Home greeting: native title2 semibold system type, not a second expressive hero.
 - Navigation bars, Forms, menus and standard native controls retain system semantics.
 - Profile identity, avatar initials, icons, voice timers and the Cuadrao wordmark
-  have distinct roles. Their existence does not authorize a blanket serif migration.
+  have distinct roles; the wordmark is brand artwork, not a text style (see
+  [Brand identity](#brand-identity-mark-wordmark-and-lockup)). Their existence does not authorize a blanket serif migration.
 - Invitation artwork and estimated completion dates are not financial amount roles.
   Keep their approved treatment and ensure artwork does not hide required text.
 - Chart ticks may use native caption2. Numeric chart callouts should use a compact
@@ -132,6 +133,55 @@ Home, Plan, Chat results and expanded insights.
 
 Any new exception needs a named purpose and a gallery specimen. Don't override a
 shared money role with a local weight, design or hardcoded size.
+
+### Brand identity: mark, wordmark and lockup
+
+One source for all three lanes (iPhone, web, Business). Marketing owns the artwork;
+it lives in `marketing/brand/` and `marketing/app/icon.svg`, pinned at commit
+`73286f8cac6f8d335ad17980002590b0c0fefb60` (PR #906), with the full spec in
+`marketing/brand/README.md`. The lockup SVGs are pinned at commit
+`acf1b180a70eb8e40a792c5dc0838d024d0ab17f` (they gained an intrinsic width and height so
+the asset compiler does not store oversized bitmaps; paths unchanged). Take the SVGs as they are: do not redraw, approximate,
+re-colour or re-set them in a font.
+
+- **Wordmark.** Lowercase `cuadrao`, Space Grotesk 2.0.0, weight 700, letter-spacing
+  -0.085em, line-height 1, with the font's kerning on (a-d, r-a, a-o), the website's
+  `.wordmark`; SIL OFL 1.1. Native code shows it only as the outlined SVG, which
+  already carries the kerning, never as live text, so the font is neither shipped nor
+  approximated. Earlier icon sheets used 600 / -0.045em; that was an approximation.
+- **Lockup.** Mark and wordmark as one composition. With the wordmark's font size as
+  1 em: mark height 1 em (the mark's ink is about 1.11 em wide), gap 0.25 em from the
+  mark's unrounded box (about 0.28 em between ink and first letter), the mark's centre
+  0.35 em above the baseline, clear space 0.5 em on every side. The lockup SVGs'
+  viewBox is authoritative; do not recompute these numbers from prose. Minimum: wordmark at 20 px font size,
+  mark alone at 16 px.
+- **Files.** Each brand SVG names its gradients `a`, `b`, `c`: use them as image files
+  (asset catalog), never inline two of them in one document. `cuadrao-lockup-light.svg` / `cuadrao-lockup-dark.svg` (welcome),
+  `icon.svg` (app icon and favicon, tiled), `cuadrao-mark-light.svg` (mark alone on
+  light), `cuadrao-mark-dark.svg` (mark alone on `#172b26` only).
+- **Colours.** Light surface `#fafbf8`: wordmark `#172b26`; mark front `#2f5a49` to
+  `#1d4236`, back `#cfdccf` to `#bccdbf`, overlap `#a6e06a` to `#6fbf46`. Dark surface
+  `#172b26`: wordmark `#fafbf8`; mark front `#fffcf2` to `#e3dcc2`, back `#8fa38f` to
+  `#5b7566` at 55% opacity, overlap `#b6e87a` to `#7fcb4f`. Gradients run top-left to
+  bottom-right. The dark artwork is drawn for `#172b26`; on any other dark its
+  translucent back square changes tone slightly. The welcome screen therefore uses
+  `#172b26`; the invitation card and the chat empty state keep their palette
+  backgrounds and accept that small shift rather than change their layout.
+- **One component.** `CuadraoBrand` draws the lockup everywhere in the app (welcome at
+  268 pt wide through `CuadraoWelcomeLockup`, the invitation card and the chat empty
+  state at the compact 153 pt, which keeps the 32 pt height the old lockup had; the chat
+  empty state applies its existing 0.85 scale, so it shows about 130 pt wide).
+  Never redraw it or set the wordmark as text.
+- **Large decorative mark.** Invitation pages keep their large mark (208 pt frame):
+  `CuadraoMark` in the asset catalog, `cuadrao-mark-light.svg` on light and
+  `cuadrao-mark-dark.svg` on dark (not the tiled icon), so it is the same size in both. On
+  the invitation page's palette background it accepts the same slight back-square tone
+  shift as the lockup there.
+- **App icon.** `icon.svg` rendered full-bleed at 1024 x 1024 with the tile corner
+  radius 0 (iOS rounds it and rejects transparency). Dark and tinted variants are not
+  designed yet; a new founder decision is needed first.
+- **Typography roles stay native.** The brand adds no text style. Buttons, headings,
+  forms and amounts keep the roles in the table above.
 
 ## 4. Components and selection
 
@@ -143,6 +193,30 @@ Keep touch targets at least 44 points. Show error text alongside semantic color.
 The money editor retains its short grouping fade and respects Reduce Motion.
 Scroll-edge materials belong behind persistent chrome, never across interactive
 content. Surface-specific gestures retain their existing meanings.
+
+### Sheet controls
+
+Every sheet closes and confirms the same way, through three components in
+`CuadraoSheetToolbar.swift` and `CuadraoCancelToolbar.swift`. None has a glass
+oval, rim or underline.
+
+- **Cancel, Close or Back** is plain text on the leading side.
+- **Confirm** is a check mark on the trailing side, used only when the sheet has no
+  primary button of its own (Edit profile, crop photo, Reorder Home, receipt item,
+  exact amount). A sheet with its own button shows Cancel only, so two confirms never
+  compete. A disabled check is dimmed and still announced.
+- **Done** is plain text on the trailing side, used only on sheets that show something
+  and have nothing to confirm (filters, spaces, people, currency list, updates, saved
+  receipt viewer).
+- Nothing sits above the keyboard: no Done button, keyboard toolbar item or input
+  accessory view, because on iOS 26 each floats as a blue pill over the sheet's own
+  button. A keyboard closes by tapping away from the field (one rule for the whole
+  app in `KeyboardTapAway`), by scrolling, or with Return. A tap on or right beside the
+  field being edited keeps the keyboard. `ios/DesignPreviewTests/run_no_keyboard_accessory.py`
+  fails the model-test run when a source adds one.
+
+Do not add raw `ToolbarItem(.cancellationAction)` or `(.confirmationAction)` items to
+a sheet. Alerts and confirmation dialogs keep the system look.
 
 ### Choices and currency
 
@@ -823,6 +897,22 @@ Do not promise that previously emailed support copies are erased. Deletion
 completion, retention and resolved successor facts belong to the connected
 contract. Ordinary leave, removal and archive keep their distinct
 history rules. Account deletion must not silently redefine them.
+
+### Welcome screen
+
+One main brand composition and the two native actions; nothing else.
+
+- The lockup is the only brand element: no repeated header lockup, no tagline.
+  Marketing's lockup SVG, at most 268 pt wide, narrowing on small screens instead of
+  clipping, centred in the space above the buttons (about 40% down a 874 pt screen).
+- Background is the website's paper `#fafbf8` on light and `#172b26` on dark. This
+  applies to the welcome screen only; other screens keep their palette backgrounds.
+- Actions keep their native treatment: `Crear cuenta` / `Create account` as the
+  filled primary and `Iniciar sesión` / `Sign in` as the outlined secondary, 56 pt
+  high, 16 pt corners, 28 pt side margins, 12 pt apart, native body semibold type that
+  follows Dynamic Type. The screen scrolls at large text sizes; nothing is clipped.
+- Accessibility: the lockup is one element labelled `cuadrao`. Identifiers:
+  `cuadrao.welcome.lockup`, `cuadrao.welcome.signup`, `cuadrao.welcome.signin`.
 
 ### Authentication and invitation purpose
 

@@ -90,20 +90,23 @@ struct CuadraoAppShell<Content: View>: View {
                         })
                         .accessibilityHidden(true)
                         .accessibilityIdentifier("add.scrim")
-                    CuadraoAddTray(items: addItems, spanish: spanish) { item in
+                    CuadraoAddTray(items: addItems, spanish: spanish, layout: atRight ? .stack : .card,
+                                   maxHeight: proxy.size.height - CuadraoAppShellMetrics.navigationHeight - 12) { item in
                         closeAdd()
                         item.perform()
                     }
-                    .frame(maxWidth: 300)
+                    .frame(maxWidth: atRight ? .infinity : 300, alignment: atRight ? .trailing : .center)
                     .frame(maxWidth: .infinity, alignment: atRight ? .trailing : .center)
-                    .padding(.horizontal, atRight ? 20 : 0)
-                    .padding(.bottom, barBottom + 8)
+                    // The collapsed + sits 48pt in from the edge, which is the centre of a 48pt round button.
+                    .padding(.trailing, atRight ? 24 : 0)
+                    .padding(.bottom, atRight ? barBottom - 10 : barBottom - 2)
                     .transition(reduceMotion ? .opacity
-                        : .scale(scale: 0.4, anchor: atRight ? .bottomTrailing : .bottom).combined(with: .opacity))
+                        : .scale(scale: 0.3, anchor: atRight ? .bottomTrailing : .bottom).combined(with: .opacity))
                     .accessibilityAction(.escape) { closeAdd() }
                 }
+                // The proxy above still reports the safe area; only the layer itself runs under it.
+                .ignoresSafeArea()
             }
-            .ignoresSafeArea()
         }
     }
 

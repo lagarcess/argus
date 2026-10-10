@@ -26,11 +26,12 @@ extension FinancialLoopUITests {
         for row in ["account", "transaction", "plan"] {
             XCTAssertTrue(app.buttons["add.tray." + row].waitForExistence(timeout: 5), row)
         }
-        for row in ["scan", "group", "invite"] { XCTAssertFalse(app.buttons["add.tray." + row].exists, row) }
+        for row in ["scanCamera", "choosePhoto", "chooseFile", "group", "invite"] { XCTAssertFalse(app.buttons["add.tray." + row].exists, row) }
         XCTAssertLessThan(app.buttons["add.tray.transaction"].frame.maxY, add.frame.minY, "the tray sits above the bar")
         let tray = app.descendants(matching: .any)["add.tray"]
         XCTAssertTrue(tray.exists)
         XCTAssertLessThan(tray.frame.height, 3 * 70 + 40, "the tray hugs its three rows")
+        XCTAssertLessThanOrEqual(tray.frame.maxY, add.frame.minY, "the card and its nub stop above the bar")
         XCTAssertLessThan(app.buttons["add.tray.account"].frame.minY - tray.frame.minY, 40, "with no empty space above the first row")
         capture("release-surface-add-tray")
         app.buttons["add.tray.transaction"].tap()
@@ -76,6 +77,9 @@ extension FinancialLoopUITests {
         capture("release-surface-bar-collapsed")
         add.tap()
         XCTAssertTrue(app.buttons["add.tray.transaction"].waitForExistence(timeout: 5), "the collapsed + opens the tray")
+        XCTAssertGreaterThan(app.buttons["add.tray.transaction"].frame.maxX, app.frame.width - 40, "the collapsed menu stacks round buttons at the right edge")
+        XCTAssertLessThan(app.buttons["add.tray.plan"].frame.maxY, add.frame.minY, "above the +")
+        capture("release-surface-add-stack")
         add.tap()
         let closed = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["add.tray.transaction"])
         XCTAssertEqual(XCTWaiter.wait(for: [closed], timeout: 5), .completed, "the + (now an X) closes the tray")
@@ -94,6 +98,11 @@ extension FinancialLoopUITests {
         XCTAssertTrue(app.buttons["search.filter.all"].exists)
         for kind in ["chats", "files", "memory"] { XCTAssertFalse(app.buttons["search.filter." + kind].exists, kind) }
         capture("release-surface-search-filters")
+        app.buttons["search.filter.plans"].tap()
+        let copy = app.staticTexts["Create a goal, budget or debt plan with the + button."]
+        let rows = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH 'search.row.'"))
+        if rows.firstMatch.waitForExistence(timeout: 5) == false { XCTAssertTrue(copy.waitForExistence(timeout: 10), "empty Plans points to the + button") }
+        app.buttons["search.filter.all"].tap()
 
         // The tray does not outlive the screen it was opened on.
         app.buttons["tab.home"].tap()
@@ -103,5 +112,50 @@ extension FinancialLoopUITests {
         let leftBehind = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.buttons["add.tray.plan"])
         XCTAssertEqual(XCTWaiter.wait(for: [leftBehind], timeout: 5), .completed, "changing tab closes the tray")
         XCTAssertEqual(add.label, "Add", "and the + is a + again")
+    }
+
+    /// Large text on a short landscape screen leaves little room above the bar; the + menu scrolls instead of leaving the screen.
+    func testReleaseSurfaceAddMenuStaysOnScreenAtLargeTextInLandscape() throws {
+        try signIn()
+        app.terminate()
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "--cuadrao-release-gates",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        app.launch()
+        let add = app.buttons["nav.add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 20))
+        add.tap()
+        let tray = app.descendants(matching: .any)["add.tray"]
+        XCTAssertTrue(tray.waitForExistence(timeout: 5))
+        XCTAssertGreaterThanOrEqual(tray.frame.minY, app.frame.minY, "the menu does not run off the top of the screen")
+        XCTAssertLessThanOrEqual(tray.frame.maxY, add.frame.minY, "and stops above the bar")
+        for row in ["account", "transaction", "plan"] { XCTAssertTrue(app.buttons["add.tray." + row].exists, row) }
+        capture("release-surface-add-menu-landscape-large-text")
+    }
+
+    /// Search, Profile and Plan fold the bar into the + as they scroll, and expand it again, as Home does.
+    func testReleaseSurfaceBarFoldsOnSearchProfileAndPlan() throws {
+        try signIn()
+        app.terminate()
+        // Large text makes every tab taller than the screen, so each one has something to scroll.
+        app.launchArguments = ["-AppleLanguages", "(en)", "-AppleLocale", "en_US", "--cuadrao-release-gates",
+                               "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
+        app.launch()
+        let add = app.buttons["nav.add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 20))
+        for tab in ["tab.search", "header.profile", "tab.plan"] {
+            XCTAssertTrue(app.buttons[tab].waitForExistence(timeout: 10), tab)
+            app.buttons[tab].tap()
+            XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 5))
+            let openLeft = app.buttons["tab.home"].frame.minX
+            for _ in 0..<5 { app.swipeUp(velocity: .fast) }
+            XCTAssertGreaterThan(add.frame.midX, app.frame.width - 60, "\(tab): scrolling folds the bar into the + at the right")
+            XCTAssertFalse(app.buttons["tab.home"].isHittable, "\(tab): the other slots are folded away")
+            capture("release-surface-fold-" + tab.replacingOccurrences(of: ".", with: "-"))
+            for _ in 0..<5 { app.swipeDown(velocity: .fast) }
+            XCTAssertTrue(app.buttons["tab.home"].waitForExistence(timeout: 5), "\(tab): scrolling back expands the bar")
+            XCTAssertEqual(app.buttons["tab.home"].frame.minX, openLeft, accuracy: 2, "\(tab): the open bar is where it was")
+        }
     }
 }

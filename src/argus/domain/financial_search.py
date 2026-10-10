@@ -9,6 +9,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
+from argus.domain.owner_scope import PERSONAL, OwnerScope
 from argus.domain.planning import claims, debt_projection, goal_projection, storage
 from argus.domain.planning.budget_schemas import BudgetDefinition
 from argus.domain.planning.budgets import definition
@@ -103,18 +104,27 @@ def digest(value: object) -> str:
     ).hexdigest()
 
 
-def search(
+def query_text(q: str) -> str:
+    return " ".join(fold(q).split())
+
+
+def hits(
     service: FinancialAccountService,
     owner: str,
     *,
-    q: str = "",
+    scope: OwnerScope,
+    query: str,
     kind: Kind | None = None,
     currency: str | None = None,
-    limit: int = 20,
-    cursor: str | None = None,
-) -> SearchPage:
-    query = " ".join(fold(q).split())
-    state, accounts = storage.read(service._repository, owner)
+) -> list[Hit]:
+    """Every record in ``scope`` that ``query`` (from ``query_text``) matches, in
+    Search order. Plans belong to Personal, so a Business space has none."""
+
+    if scope == PERSONAL:
+        state, accounts = storage.read(service._repository, owner)
+    else:
+        state = storage.empty()
+        accounts = service.list_accounts(user_id=owner, scope=scope)
     archived = {s.account.id: s.account.archived for s in accounts}
     rows: list[tuple[str, str, str, Hit]] = []
 
@@ -175,7 +185,25 @@ def search(
         item = DebtProgress.model_validate(debt)
         add(DebtHit(debt=item), item.debt.name, item.debt.id, item.debt.currency)
     rows.sort(key=lambda row: row[:3])
-    items = [row[3] for row in rows]
+    return [row[3] for row in rows]
+
+
+def search(
+    service: FinancialAccountService,
+    owner: str,
+    *,
+    q: str = "",
+    kind: Kind | None = None,
+    currency: str | None = None,
+    limit: int = 20,
+    cursor: str | None = None,
+) -> SearchPage:
+    """The person's Personal records, a page at a time."""
+
+    query = query_text(q)
+    items = hits(
+        service, owner, scope=PERSONAL, query=query, kind=kind, currency=currency
+    )
     scope = digest([owner, query, kind, currency])
     snapshot = digest([item.model_dump(mode="json") for item in items])
     offset = 0

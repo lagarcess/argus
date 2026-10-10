@@ -109,6 +109,7 @@ export function WorkspaceMain({
   setCurrentView,
 }: WorkspaceMainProps) {
   const composer = workspace.composer(bridge);
+  const hasComposer = workspace.chatAvailable && workspace.panelHasComposer;
   // The conversation opens while the send is admitted; a refused send comes
   // back to the panel with its text.
   const send = async (text: string, mentions?: ChatMention[]) => {
@@ -126,11 +127,11 @@ export function WorkspaceMain({
       <div
         data-testid="workspace-panel-region"
         className="argus-scrollbar flex-1 overflow-y-auto px-4 pt-[86px] tablet:px-8"
-        style={{ paddingBottom: workspace.panelHasComposer ? 190 : 48 }}
+        style={{ paddingBottom: hasComposer ? 190 : 48 }}
       >
         {workspace.panel(bridge)}
       </div>
-      {workspace.panelHasComposer ? (
+      {hasComposer ? (
         <>
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-40 bg-[#f9f9f9]/80 backdrop-blur-[0.8px] [mask-image:linear-gradient(to_top,black_50%,transparent_100%)] dark:bg-[#141517]/80" />
           <div className="pointer-events-none absolute inset-x-0 bottom-6 z-20 px-4">

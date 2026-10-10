@@ -75,7 +75,7 @@ private struct CanvasCurrencyPicker: View {
             }.listStyle(.plain)
                 .searchable(text: $query, prompt: spanish ? "Nombre o código" : "Name or code")
                 .navigationTitle(spanish ? "Moneda" : "Currency").navigationBarTitleDisplayMode(.inline)
-                .toolbar { ToolbarItem(placement: .confirmationAction) { Button(spanish ? "Listo" : "Done") { dismiss() } } }
+                .toolbar { CuadraoDoneToolbar(title: spanish ? "Listo" : "Done") { dismiss() } }
         }.tint(WelcomePalette.pine)
     }
 }

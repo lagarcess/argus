@@ -47,7 +47,9 @@ test.describe("page identity", () => {
       expect(response.headers()["content-type"], href!).toMatch(/image\//);
     }
     const svg = await (await request.get("/icon.svg")).text();
-    expect(svg).toContain("#172b26");
+    expect(svg).toContain('fill="#fafbf8"');
+    expect(svg).toContain('stop-color="#2f5a49"');
+    expect(svg).toContain("skewX(-12)");
     expect((await request.get("/manifest.json")).status()).toBe(404);
   });
 

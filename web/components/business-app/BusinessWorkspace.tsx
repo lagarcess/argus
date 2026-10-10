@@ -18,12 +18,14 @@ import {
   type ChatShellView,
   type ChatWorkspace,
 } from "@/components/chat/ChatWorkspace";
-import type {
-  BusinessOverview,
-  BusinessWorkspaceInfo,
-  ReceiptSummary,
+import {
+  businessChatAvailable,
+  type BusinessOverview,
+  type BusinessWorkspaceInfo,
+  type ReceiptSummary,
 } from "@/lib/business-api";
-import type { BusinessDataSource } from "./business-data";
+import { normalizeEnabledLanguage } from "@/lib/language-features";
+import { withBusinessSpace, type BusinessDataSource } from "./business-data";
 import { periodRange, type Period } from "./business-format";
 import { useBusinessActions, type BusinessActions } from "./business-actions";
 import BusinessSidebarNav from "./BusinessSidebarNav";
@@ -33,11 +35,12 @@ import BusinessHome from "./BusinessHome";
 import ComposerAttachControl from "./ComposerAttachControl";
 import ReceiptIntakeDialog, { type IntakeTarget } from "./ReceiptIntakeDialog";
 import RecordExpenseDialog from "./RecordExpenseDialog";
+import { useBusinessSearch } from "./useBusinessSearch";
 
 export type BusinessPanelState =
   | { kind: "overview" }
   | { kind: "inbox" }
-  | { kind: "expenses" }
+  | { kind: "expenses"; expenseId?: string }
   | { kind: "updates" }
   | { kind: "receipt"; receiptId: string };
 
@@ -71,11 +74,12 @@ export function useBusiness(): BusinessContextValue {
   return value;
 }
 
+const NO_ACCOUNTS: never[] = [];
 const PANEL_KINDS = new Set(["overview", "inbox", "expenses", "updates"]);
 
-function panelFromUrl(): BusinessPanelState {
-  if (typeof window === "undefined") return { kind: "overview" };
-  const params = new URL(window.location.href).searchParams;
+// Read from the route's search params, not window.location: on a client-side
+// navigation (the sign-in return path) this renders before the address bar moves.
+function panelFromSearch(params: URLSearchParams): BusinessPanelState {
   const receiptId = params.get("receipt");
   if (receiptId) return { kind: "receipt", receiptId };
   const view = params.get("view");
@@ -85,9 +89,7 @@ function panelFromUrl(): BusinessPanelState {
   return { kind: "overview" };
 }
 
-function initialShellView(): ChatShellView {
-  if (typeof window === "undefined") return "workspace";
-  const params = new URL(window.location.href).searchParams;
+function shellViewFromSearch(params: URLSearchParams): ChatShellView {
   return params.has("conversation") || params.get("view") === "chat" ? "chat" : "workspace";
 }
 
@@ -112,15 +114,24 @@ function writePanelToUrl(view: ChatShellView, panel: BusinessPanelState) {
 }
 
 export function BusinessWorkspaceProvider({
-  source,
+  source: apiSource,
   children,
 }: {
   source: BusinessDataSource;
   children: ReactNode;
 }) {
-  const { t } = useTranslation();
-  const [panel, setPanel] = useState<BusinessPanelState>(panelFromUrl);
-  const [initialView] = useState<ChatShellView>(initialShellView);
+  const { t, i18n } = useTranslation();
+  const source = useMemo(
+    () => withBusinessSpace(apiSource, () => normalizeEnabledLanguage(i18n.language)),
+    [apiSource, i18n],
+  );
+  const searchParams = useSearchParams();
+  const [panel, setPanel] = useState<BusinessPanelState>(() =>
+    panelFromSearch(new URLSearchParams(searchParams.toString())),
+  );
+  const [initialView] = useState<ChatShellView>(() =>
+    shellViewFromSearch(new URLSearchParams(searchParams.toString())),
+  );
   const [periodKey, setPeriodKey] = useState<Period["key"]>("this_month");
   const period = useMemo(() => periodRange(periodKey), [periodKey]);
   const [records, setRecords] = useState<Records>({
@@ -165,7 +176,7 @@ export function BusinessWorkspaceProvider({
 
   // The shell may replace the route while leaving a conversation; writing again
   // once that navigation lands keeps the panel in the address bar.
-  const search = useSearchParams().toString();
+  const search = searchParams.toString();
   useEffect(() => {
     if (bridge) writePanelToUrl(bridge.currentView, panel);
   }, [bridge, panel, search]);
@@ -204,6 +215,15 @@ export function BusinessWorkspaceProvider({
     [actions, attachedReceipt, bridge, openPanel, panel, period, records, reload, revision, source],
   );
 
+  const chatAvailable = businessChatAvailable(records.workspace);
+  const businessSearch = useBusinessSearch({
+    source,
+    chatAvailable,
+    accounts: records.workspace?.accounts ?? NO_ACCOUNTS,
+    openPanel,
+    setPeriod: setPeriodKey,
+  });
+
   const composerPlaceholder = records.workspace?.assistant_available
     ? t("business.composer.placeholder_ask", "Ask about your saved expenses")
     : t("business.composer.placeholder", "Write a message");
@@ -211,6 +231,8 @@ export function BusinessWorkspaceProvider({
     const draftKeyFor = (shell: ChatShellBridge) => shell.conversationId ?? "new";
     return {
       id: "business",
+      conversationSurface: "business",
+      chatAvailable,
       initialView,
       profileInHeader: true,
       panelHasComposer: panel.kind === "overview",
@@ -221,6 +243,7 @@ export function BusinessWorkspaceProvider({
       panel: () => <BusinessPanel />,
       starterEntries: () => actions.starterEntries,
       emptyChatLead: () => <BusinessHome variant="new_chat" />,
+      search: businessSearch,
       composer: (shell) => {
         const key = draftKeyFor(shell);
         return {
@@ -240,7 +263,7 @@ export function BusinessWorkspaceProvider({
       },
       onShellChange: (shell) => setBridge(shell),
     };
-  }, [actions.starterEntries, composerPlaceholder, draftRevision, initialView, panel.kind]);
+  }, [actions.starterEntries, chatAvailable, composerPlaceholder, draftRevision, initialView, panel.kind, businessSearch]);
 
   return (
     <BusinessContext.Provider value={value}>

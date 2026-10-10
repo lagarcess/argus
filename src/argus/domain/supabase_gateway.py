@@ -38,6 +38,7 @@ from argus.domain.decision_attachment import (
     DECISION_STATE_METADATA_KEY,
 )
 from argus.domain.evidence import CapturedEvidence, attach_decision_to_result_card
+from argus.domain.owner_scope import OwnerScope, postgrest_scoped, scope_of, space_id
 from argus.domain.postgres_history_reader import (
     PostgresHistoryReader,
     history_reader_for_database_url,
@@ -528,10 +529,16 @@ class SupabaseGateway(
         return User.model_validate(row) if row else None
 
     def create_conversation(
-        self, *, user_id: str, title: str, title_source: str, language: str | None
+        self,
+        *,
+        user_id: str,
+        title: str,
+        title_source: str,
+        language: str | None,
+        scope: OwnerScope,
     ) -> Conversation:
         now = _now_iso()
-        payload = {
+        payload: dict[str, Any] = {
             "user_id": user_id,
             "title": title,
             "title_source": title_source,
@@ -541,6 +548,8 @@ class SupabaseGateway(
             "pinned": False,
             "archived": False,
         }
+        if (owner_space_id := space_id(scope)) is not None:
+            payload["owner_space_id"] = owner_space_id
         created = self.client.table("conversations").insert(payload).execute()
         return Conversation.model_validate(_row_one(created))
 
@@ -548,6 +557,7 @@ class SupabaseGateway(
         self,
         *,
         user_id: str,
+        scope: OwnerScope,
         limit: int | None,
         archived: bool | None = None,
         deleted: bool = False,
@@ -571,6 +581,7 @@ class SupabaseGateway(
             try:
                 keyset_rows = self.keyset_reader.list_conversation_rows(
                     user_id=user_id,
+                    scope=scope,
                     limit=limit,
                     archived=archived,
                     deleted=deleted,
@@ -605,7 +616,11 @@ class SupabaseGateway(
                 raise ConversationCursorError("invalid conversation cursor pivot")
             cursor_pinned = pinned
 
-        query = self.client.table("conversations").select("*").eq("user_id", user_id)
+        query = postgrest_scoped(
+            self.client.table("conversations").select("*").eq("user_id", user_id),
+            scope,
+            "owner_space_id",
+        )
         if deleted:
             query = query.not_.is_("deleted_at", "null")
         else:
@@ -675,16 +690,31 @@ class SupabaseGateway(
         )
         return bool(result.data)
 
-    def soft_delete_all_conversations(self, *, user_id: str) -> int:
+    def soft_delete_all_conversations(self, *, user_id: str, scope: OwnerScope) -> int:
         now = _now_iso()
-        result = (
+        query = (
             self.client.table("conversations")
             .update({"deleted_at": now, "updated_at": now})
             .eq("user_id", user_id)
             .is_("deleted_at", "null")
+        )
+        result = postgrest_scoped(query, scope, "owner_space_id").execute()
+        return len(result.data or [])
+
+    def conversation_scope(
+        self, *, user_id: str, conversation_id: str
+    ) -> OwnerScope | None:
+        """The stored conversation's scope, or None when the person has no such row."""
+        rows = (
+            self.client.table("conversations")
+            .select("owner_space_id")
+            .eq("user_id", user_id)
+            .eq("id", conversation_id)
+            .limit(1)
             .execute()
         )
-        return len(result.data or [])
+        row = _row_one(rows)
+        return scope_of(row.get("owner_space_id")) if row else None
 
     def create_backtest_run(self, *, user_id: str, run: BacktestRun) -> BacktestRun:
         self._require_owned_conversation(
@@ -1798,6 +1828,7 @@ class SupabaseGateway(
         self,
         *,
         user_id: str,
+        scope: OwnerScope,
         limit: int,
         archived: bool = False,
         deleted: bool = False,
@@ -1810,6 +1841,7 @@ class SupabaseGateway(
             raise RuntimeError("Persistent History requires its Postgres reader.")
         return self.history_reader.list_rows(
             user_id=user_id,
+            scope=scope,
             limit=limit,
             archived=archived,
             deleted=deleted,
@@ -1832,6 +1864,7 @@ class SupabaseGateway(
         self,
         *,
         user_id: str,
+        scope: OwnerScope,
         query: str,
         source_limit: int,
         cursor_updated_at: datetime | None = None,
@@ -1846,6 +1879,7 @@ class SupabaseGateway(
             raise RuntimeError("Persistent Search requires its Postgres reader.")
         kwargs: dict[str, Any] = {
             "user_id": user_id,
+            "scope": scope,
             "query": query,
             "source_limit": source_limit,
             "cursor_updated_at": cursor_updated_at,
