@@ -1,0 +1,35 @@
+{
+  "readback_unit_tests": {
+    "passed": 5,
+    "failed": 0
+  },
+  "changed_python_ruff": "passed",
+  "modularity_budget": "passed against integration base plus test changes",
+  "branch_ownership": "No policy for this branch; enforcement skipped by the repository script.",
+  "repository_ruff": {
+    "errors": 652,
+    "reported_files": 111,
+    "reported_tracked_files_changed_from_integration": []
+  },
+  "repository_pytest": {
+    "status": "blocked during collection",
+    "collection_errors": 24,
+    "cause": "Local SciPy _spropack binary cannot load on this macOS environment.",
+    "live_evals_enabled": false
+  },
+  "scope": "No production source, dependency or hosted configuration changed.",
+  "ci_scope_ruff": "passed: src tests workflows scripts",
+  "native_release_build": "passed: LargeTextMoney.xctestproducts",
+  "test_delta_reviews": {
+    "empty_amount": "clean",
+    "footer_boundary": "clean",
+    "back_readiness": "clean",
+    "search_filter_summary": "clean",
+    "goal_search_navigation": "clean",
+    "large_text_money": "clean"
+  },
+  "app_source_tree": "0d9584a4489c5081a1856665e2fa2aba392b5ec2",
+  "app_source_unchanged_from_integration": true,
+  "large_text_visual_acceptance": "open: transaction Date label wraps into a single-letter column",
+  "final_local_test_source": "125087e96"
+}
