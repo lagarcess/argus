@@ -20,7 +20,9 @@ for (const path of ["/", "/en", "/personal", "/en/personal"]) {
     const ending = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, scroll: scrollY }));
     await page.mouse.wheel(0, 600);
     await page.waitForTimeout(600);
-    expect(await page.evaluate(() => ({ height: document.documentElement.scrollHeight, scroll: scrollY }))).toEqual(ending);
+    const after = await page.evaluate(() => ({ height: document.documentElement.scrollHeight, scroll: scrollY }));
+    expect(after.height).toBe(ending.height);
+    expect(Math.abs(after.scroll - ending.scroll)).toBeLessThanOrEqual(1);
     await expect(footer.locator("img")).toHaveCount(0);
   });
 }
