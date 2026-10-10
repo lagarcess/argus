@@ -38,9 +38,8 @@ Two people judge success:
 - The accountant prepares the agreed statements. The accountant does not
   rebuild a transaction that the package already explains.
 
-The test is the accountant's acceptance. A bank asks for financial
-statements that the accountant or the owner signs. It does not ask for the
-Cuadrao package.
+The goal is alignment and clarity between a client and its accounting firm.
+The test is the accountant's acceptance. Banks are not part of this scope.
 
 ## 3. Decisions
 
@@ -70,10 +69,10 @@ real use shows a need or a critical risk.
 | ID | Item | Default |
 | --- | --- | --- |
 | D1 | The accountant's package | A CSV and an Excel file, with the receipts attached. Add a QuickBooks connection only if the pilot accountant uses QuickBooks. |
-| D2 | Business AI consent is off | The consent is on for the pilot. If an admin turns it off, Cuadrao saves the message and sends the fixed acknowledgement. It starts no agent turn. |
-| D3 | The agent's Spanish replies | The prompt gives short style rules for WhatsApp. The founder reads sample replies in each scorecard. No approval for each reply. |
-| D4 | Tax numbers on receipts | J2 reads RNC, NCF or e-CF, and ITBIS. Each value is marked "not verified" until the accountant checks it. This is not tax filing. |
-| D5 | The WhatsApp 24-hour window | Version 1 only replies to the owner. An owner message opens a new window. Reminders after 24 hours of silence use Meta-approved templates after #941. |
+| D2 | Who answers the owner | The AI agent answers each message. No person answers on the Cuadrao side. AI is on for each pilot business. |
+| D3 | The agent's replies | No person approves the words. The model follows the platform policies and the Cuadrao prompt rules. Evals measure behavior: the correct record, the correct question and no invented facts. No word lists and no regex. |
+| D4 | Tax numbers on receipts | J2 reads RNC, NCF or e-CF, and ITBIS. Each value is "not verified" until the admin or an authorized associate signs off. This is not tax filing. |
+| D5 | The WhatsApp 24-hour window | The agent replies within seconds of each owner message, so each reply is inside the window. The window limits only a message that Cuadrao starts after 24 hours of owner silence, for example a reminder. Those messages use Meta-approved templates after #941. |
 
 ### 3.3 Build now, build later
 
