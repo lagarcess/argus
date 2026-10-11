@@ -1,3 +1,213 @@
+## Claude continuation checkpoint — October 11, 2026
+
+This checkpoint supersedes historical next-step instructions below. Lucas's
+22:40 UTC direction is to close the nearest already-started loop, preserve a
+handoff for Claude, and stop before another task. His 22:42 instruction adds
+bounded cleanup. This is a handoff freeze, not a claim of hosted acceptance.
+The designated coordinator alone owns integration merge and staging actions;
+lane workers retain their assigned source ownership.
+
+### Claude first action: read-only catch-up
+
+Read repository `CLAUDE.md`, which imports `AGENTS.md`; the latter already
+links this handoff under Current Business assignment. Then read the chosen
+lane's current local handoff in the authoritative folder below. Reconstruct
+context and tell Lucas what is verified, what is pending and the nearest next
+step before making edits. Do not start implementation or resume stopped phases
+merely because Claude has opened the checkout.
+
+Existing Claude user plugin registry and settings confirm
+`pstack@pstack-claude` is installed and enabled at version0.9.30, path
+`/Users/garces/.claude/plugins/cache/pstack-claude/pstack/0.9.30`.
+Its `skills/recall/SKILL.md` owns the context capsule; `skills/why/SKILL.md`
+and `skills/unslop/SKILL.md` are existing related entry points. Use the supplied
+handoff capsule rather than re-mining unrelated chat history. Verify current
+branch/HEAD and read the scoped source of truth, then give a plain-language
+catch-up. No plugin installation, update or new environment is needed.
+
+Suggested starting instruction: “Read CLAUDE.md, AGENTS.md and the latest lane
+handoff, plus the coordinator checkpoint in docs/handoffs/cuadrao-business-lane.md
+on canonical integration. Use the installed pstack recall skill for read-only
+context reconstruction. Catch me up on the verified outcome, current source,
+remaining defects and nearest next step. Preserve all local settings/evidence
+and wait before edits. Only one writer may own this worktree.”
+
+### Verified source and stopping points
+
+- **C0 preparation foundation:** [#975](https://github.com/lagarcess/argus/pull/975)
+  landed at `a6f1f4b3171837d50c82268effa7a12a83df590e` from reviewed
+  `c44d89b3fa446d74df8aa10e1e4ec9a655f2ad85`. Squash tree
+  `9656b93fe4dd008f6b572d599a827f005af3fb42` equals the reviewed head.
+  Final PR CI 38180338273 and smoke 38180338228 succeeded; its clean 124-migration schema
+  CI proof includes 1,040 PostgreSQL and 13 Auth tests with zero failures/errors/skips.
+  Exact landed-commit CI 38181310050 succeeded at 22:53:31UTC and smoke 38181310054 at 22:41:30UTC. No linked issue was auto-closed.
+- **Shared extraction:** [draft #976](https://github.com/lagarcess/argus/pull/976)
+  is frozen at `5ace5564253ff76585b4201845f57366ac44caa2`, based on landed
+  C0 at `a6f1f4b`. Its additive ownership conflict is reconciled; all 13 prior
+  source/config/evidence blobs and five canonical C0 blobs are byte-identical.
+  Root verified 456 affected tests, zero failures/errors/skips, exactly 14 paths.
+  Final reconciled-head push CI 38181484702 succeeded at 22:56:31UTC. Draft PR/smoke skips are not passes.
+  The PR body is the durable lane handoff; review, ready transition and merge
+  remain for the next owner. Native Mac SciPy collection failure is preserved.
+- **Measured extractor outcome:** unchanged original synthetic DOP250.50 receipt
+  passed 12/12 checks and unreadable fixture 6/6 using native Gemini schema;
+  two actual POSTs, no retries, known total $0.01072725. Measurement SHA256
+  `a711348c19f82115063d1e2bd94a236360fb36810616f6882c715f2ab39dd220`.
+  This proves those extractor cases, not the assembled receipt journey.
+- **Receipt bridge:** frozen `ae9e9604ae9536a70efca23153309376f58a7c03`,
+  last runtime `edad3afb555c71dac6c61596fe38e35982d60ced`, no PR.
+  75 offline and 19 disposable PostgreSQL tests passed on retained source. Its existing
+  worktree is `/private/tmp/cuadrao-business-receipt-bridge-clean-20261011`;
+  its uncommitted documentation-only handoff contains the exact actor trace,
+  commands and evidence. Reconciliation waits for an actually landed shared PR.
+  Do not overwrite the current extractor with older imported bridge copies.
+- **Business web/export:** [#973](https://github.com/lagarcess/argus/pull/973)
+  is landed at `53d2a234`; [#974](https://github.com/lagarcess/argus/pull/974)
+  stays open at `7a279654b42b49007a8b8eca940073f7818f197a`.
+  62 focused tests, exact-head CI/smoke and source/allocation reviews passed.
+  Normal authenticated local screen/download and hosted receipt pipeline proof
+  remain unperformed. Do not call seeded fixture data extraction acceptance.
+
+### Existing lane handoffs
+
+- [Consumer handoff](cuadrao-consumer-lane.md) and current owner worktree
+  `/Users/garces/.codex/worktrees/4a54/private-alpha-next`: native configuration
+  source `09a179f00` is built/reviewed but not installed or real-login tested. Local handoff HEAD is `88a0ffbb17788699c5e5b69de7196dd807857144`; no push started.
+  Last Search run stopped at sign-in before its financial assertions. Keep
+  manual financial flows separate from paid agent capabilities and Full grants;
+  preserve local buffered-chat/UI candidates and all baseline failures.
+  Earlier manual Money, Budget and Goal journeys passed their recorded native/API/relaunch checks; final Search remains open. The exact local handoff is the authoritative detailed evidence record.
+- [Marketing handoff](cuadrao-marketing-launch-lane.md) and
+  [durable #939 handoff](https://github.com/lagarcess/argus/pull/939#issuecomment-6114756187):
+  #939/#929 landed, #927/main and publication/public forms remain held.
+  No preview listens on 4511–4513. Restored 382a tracked source is clean at
+  e09ee0e35; reconstructed `.venv` is not byte-exact recovery and SciPy repair
+  stopped. Pre-archive `.env`/ignored-file completeness is unverified.
+- Stag-deploy owner `/Users/garces/.codex/worktrees/aa8a/private-alpha-next`
+  preserves existing staging reports and Consumer credentials; #896 remains
+  held by Lucas's superseding “nothing my bad Leave it.” No new hosted phase.
+  Legal #781, web #732 and chat #646 also retain their independent acceptance holds.
+- Cleanup worker's approved 44 generated Build/cache paths were removed:
+  14.51 GiB allocated, observed Data free 13.52 GB → 28.94 GB. No whole worktree or
+  branch ref removed; source/config/logs/xcresult/accounts-local evidence retained.
+  No further permanent deletion is authorized by this handoff.
+
+### Authoritative local resume folders and writer state
+
+At 22:58 UTC all four named Codex lane threads were idle after their bounded
+checkpoint. Root implementation/review workers and cleanup worker are stopped.
+Keep every checkout UNARCHIVED; Lucas chose local Claude continuation. Start
+one writer per worktree. No remote-only archive safety is asserted.
+
+| Lane | Authoritative folder | Branch / HEAD | Read first |
+| --- | --- | --- | --- |
+| Coordinator | `/Users/garces/.codex/worktrees/7086031b-3547-4387-b461-0bf0f7973e17/private-alpha-next` | `codex/private-alpha-next`; C0 source `a6f1f4b`, followed only by this handoff commit | `AGENTS.md`, then this document |
+| Business bridge | `/private/tmp/cuadrao-business-receipt-bridge-clean-20261011` | `codex/cuadrao-business-receipt-bridge-clean-20261011`, `ae9e9604ae9536a70efca23153309376f58a7c03` | `docs/handoffs/cuadrao-business-lane.md` (latest header is uncommitted) |
+| Shared extractor | `/tmp/cuadrao-shared-receipt-extractor-20261011` | `codex/cuadrao-shared-receipt-extractor-20261011`, `5ace5564253ff76585b4201845f57366ac44caa2` | draft976 body; exact local proof `/tmp/cuadrao-shared-extractor-5ace-final-handoff.json` |
+| Business web | `/tmp/cuadrao-hosted-web-20261010` | `codex/cuadrao-hosted-web-20261010`, `7a279654b42b49007a8b8eca940073f7818f197a` | PR974 and `/tmp/cuadrao-web-pr974-scope-handoff-20261011.md` |
+| Mobile / Consumer | `/Users/garces/.codex/worktrees/4a54/private-alpha-next` | `codex/consumer-free-tier-completion`, `88a0ffbb17788699c5e5b69de7196dd807857144` | `docs/handoffs/cuadrao-consumer-lane.md` |
+| Marketing | `/Users/garces/.codex/worktrees/cuadrao-marketing-delivery/private-alpha-next` | `codex/marketing-touchup-delivery`, `b7ac69db19062d75700ab0331122e1485f76d64b` | `docs/handoffs/cuadrao-marketing-launch-lane.md`, latest October11 section |
+| Staging / ops | `/Users/garces/.codex/worktrees/aa8a/private-alpha-next` | detached `f3aa1e8cd7142346260894d24c4a01d9e17989d6` | `docs/reports/evidence/staging-consumer-financial-gate-20261009/README.md` and sibling `staging-consumer-c0-c1-20261009/README.md` |
+
+Business baaf and Marketing 382a chat folders are historical alternatives,
+not the current bridge/design source. Staging's credential target folder is
+not its authoritative resume folder. Mobile's separate buffered-chat, Goal,
+startup and toggle worktrees remain parked with exact pointers in its handoff.
+The untracked Consumer finish-line report, seven Marketing `.audit` notes,
+Marketing/Business handoff edits and two Staging README edits stay preserved.
+No branch reset, worktree archive or ignored-file cleanup follows from this map.
+
+Remote backup limits: Mobile `88a0ffbb` and required local candidates are not pushed;
+bridge `ae9e9604` and its handoff and local fixture helpers are not yet a verified remote resume;
+Staging detached snapshot/README edits, private login, backup and `.env` link are
+Mac-dependent. Marketing source/design is durably landed and its freeze record
+is in #939, but local notes and ignored recovery completeness are not certified.
+Leave all four lanes unarchived. The smallest immediate continuation is to start
+Claude in these existing folders; no environment migration is required. A later
+remote-only transition would first back up each owner's approved source/docs,
+summarize required local evidence and deliberately provision fresh synthetic
+fixtures/settings through the recorded approved scope; never commit secrets.
+
+Lucas's read-only seven-branch retirement check is separate from this freeze:
+keep #714, #723–726 and #774; #762 alone is a remote-deletion candidate because exact `a509ceb`
+is retained by two live successor refs. Preserve at least one successor. Exact
+branches, heads, closure context and unique artifacts are in coordinator cwd
+`closed-branch-retirement-check-20261011.md`. No branch was deleted.
+
+### Hosted and local runtime truth
+
+Staging API remains `cad1cbe1ec27ff89c08eadbec31718a0e627383c` on
+`srv-db4mrrvlk1mc73d733j0`; web public-key build `53d2a234` is LIVE on
+`srv-db5ihr7lot8c73f3b3h0`, deploy `dep-db609m3bc2fs73abpjog`. Staging Auth project
+`skedzwocnmrhfigiwyzi` has the dedicated staging Turnstile verifier saved manually
+by Lucas. Root verified new staging public key compiled and old production key
+absent. Production project/widget/services remain separate and unchanged.
+
+Hosted ledger 115 lacks the nine reviewed prerequisites in
+`cuadrao-staging-reviewed-migration-manifest-20261011.json` under coordinator
+cwd. Manifest SHA256 `019a4285b0a456c1367756a9d93a0ff539053249f390dc6add146fed7fdc3f00.
+It is PREPARED_NOT_APPLIED; final assembled integration SHA does not exist yet.
+Exclude held WhatsApp worker/AI-consent migrations and do not promote local API `4b39d290`
+with its 125-migration/held runtime superset wholesale.
+
+Lucas approved two synthetic staging users and one Business with limited
+accountant read/prepare at 22:35 UTC, and one controlled local test-app restart.
+No hosted accounts, schema changes or API deployment were performed. The actual
+new-upload route selects the signed-in user's own Business and ALSO requires a
+live read+prepare grant; owners have no exemption. A client accountant grant
+cannot select another Business for new upload. Preserve this known route gap;
+the proposed fixture needs explicit owner preparation and accountant grants.
+Seeded trusted grant setup would not prove UI onboarding or grant approve/Money.
+
+Local controlled restart completed with source `7a279654` dummy build, then root stopped
+only owned unused web/API/proxy session 90751 / web PID 12100 on ports 56500–56502 after
+Business confirmed no consumer. Matching dummy Auth helper was never started;
+normal browser proof was not attempted. Fixture session 27273 / PID 55483,
+private credentials `/tmp/cuadrao-one-accountant-14e74eda40e44e98b727763241e13b12-credentials.json`,
+Postgres lease `/tmp/cuadrao-w1-current-postgres-active.lock`, original healthy
+Auth `06ace019` and all Mobile source/build/simulator data stay protected. Do not
+reseed/reset/stop them or copy secrets. Frozen web/API sources and XlsxWriter
+dependency remain in place for resume.
+
+Coordinator cwd: `/Users/garces/Documents/Codex/2026-10-10/task`.
+Resume existing local service command only after explicit task resumption:
+`PYTHONDONTWRITEBYTECODE=1 /Users/garces/.codex/worktrees/7086031b-3547-4387-b461-0bf0f7973e17/private-alpha-next/.venv/bin/python cuadrao_export_one_accountant_diagnostic_services.py --serve-existing-production-build-and-api`.
+Reviewed Auth helper SHA256 `888666716fe3b4bf224cc4c0077a2cb56519e1842b57c8a91a27127c0d3ba86e`
+and exact protected PID/socket/rollback protocol are in
+`/tmp/cuadrao-accountant-export-committed-handoff.json`. Start services before
+its protected-container baseline; no token/session injection or verifier bypass.
+
+### Resume boundaries and evidence
+
+Serial next steps, once Claude resumes: final review/release/CI and merge shared,
+owner one-way bridge reconciliation against actual landed integration, reviewed
+exact-head bridge/web landing, reverify nine migration blobs against that final
+candidate, staging-only API/schema/config/fixture assembly, then normal receipt
+and accountant export proof. Recheck checks after each integration advance.
+Keep #925/chat/WhatsApp, production/main, broad cleanup and new model/prompt work
+outside this flow. No Full grant, TestFlight/phone install or paid-agent activation.
+
+Configuration names without values: ARGUS_BUSINESS_PILOT_ENABLED,
+ARGUS_INGESTION_ENABLED, ARGUS_DOCUMENT_EXTRACTION_ENABLED,
+ARGUS_VISION_MODEL=google/gemini-3.8-flash, NEXT_PUBLIC_BUSINESS_PILOT_ENABLED,
+NEXT_PUBLIC_ENABLE_SPANISH, NEXT_PUBLIC_SUPABASE_URL/ANON_KEY,
+NEXT_PUBLIC_CUADRAO_TURNSTILE_SITE_KEY (legacy alias preserved).
+Development provider key approval expires 2026-10-12T02:21:00Z; verify remaining
+allowance before any new paid call. Do not substitute the observed staging
+production-key credential. No document-jobs/chat/WhatsApp activation follows.
+
+Root evidence under coordinator cwd:
+`cuadrao-c0-final-premerge-gate-20261011.json`,
+`cuadrao-c0-remote-landing-readback-20261011.json`,
+`cuadrao-c0-clean124-ci-proof-20261011.json`,
+`cuadrao-shared-final-handoff-root-verification-20261011.json`,
+`cuadrao-local-restart-cleanup-handoff-proof-20261011.json`,
+`cuadrao-staging-new-public-key-client-proof-20261011.json`,
+`cuadrao-hosted-receipt-next-action-proposal-20261011.md`.
+No acceptance issue is closed by source/fixture evidence alone.
+
+---
+
 # Cuadrao Business lane handoff
 
 **Current October 11 coordinator checkpoint.** #970 MERGED at canonical
