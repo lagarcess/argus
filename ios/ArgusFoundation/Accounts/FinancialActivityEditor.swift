@@ -21,7 +21,7 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     @Published private(set) var kind: FinancialActivityKind
     @Published var accountId: UUID? { didSet { changed(accountId != oldValue) } }
     @Published var sourceAccountId: UUID? { didSet { changed(sourceAccountId != oldValue) } }
-    @Published var destinationAccountId: UUID? { didSet { changed(destinationAccountId != oldValue) } }
+    @Published var destinationAccountId: UUID? { didSet { changed(destinationAccountId != oldValue); payCardIfChosen() } }
     @Published var amount = "" { didSet { changed(amount != oldValue) } }
     @Published var principal = "" { didSet { changed(principal != oldValue) } }
     @Published var interest = "" { didSet { changed(interest != oldValue) } }
@@ -136,10 +136,17 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
     var sourceChoices: [FinancialAccount] {
         choices(types: options?.eligibility[kind.rawValue]).filter { $0.id != destinationAccountId && (returning == nil || $0.id == sourceAccountId) }
     }
+    /// Transfer also lists credit cards: people pay a card from Transfer, and choosing one makes it a card payment.
     var destinationChoices: [FinancialAccount] {
-        choices(types: options?.destinationEligibility[kind.rawValue]).filter { $0.id != sourceAccountId && (goal == nil || $0.id == goal?.destinationAccountId) && (debt == nil || $0.id == debt?.debtAccountId) && (returning == nil || $0.id == destinationAccountId) }
+        let cards = kind == .transfer && availableKinds.contains(.cardPayment) ? options?.destinationEligibility[FinancialActivityKind.cardPayment.rawValue] ?? [] : []
+        return choices(types: (options?.destinationEligibility[kind.rawValue] ?? []) + cards).filter { $0.id != sourceAccountId && (goal == nil || $0.id == goal?.destinationAccountId) && (debt == nil || $0.id == debt?.debtAccountId) && (returning == nil || $0.id == destinationAccountId) }
     }
     var linkedPurchase: FinancialActivityDetail? { purchases.first { $0.activityId == purchaseActivityId } }
+    /// The account the sheet names: the one chosen, the "From" side for paired kinds, else where it opened.
+    var headerAccount: FinancialAccount {
+        let chosen = kind == .paymentReversal ? destinationAccountId : kind.isPaired ? sourceAccountId : accountId
+        return options?.accounts.first { $0.id == chosen } ?? origin
+    }
 
     func load() async {
         do {
@@ -160,6 +167,18 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         kind = next; categoryId = nil; sourceId = nil; purchaseActivityId = nil
         answers = []; invalidate(); setAccounts(for: next)
         if next == .refund { Task { await loadPurchases() } }
+    }
+
+    /// A credit card chosen as a Transfer's "To" turns it into a card payment, keeping amount, date, note and "From".
+    private func payCardIfChosen() {
+        guard kind == .transfer, let card = destinationAccountId, let options,
+              let type = options.accounts.first(where: { $0.id == card })?.type,
+              options.destinationEligibility[kind.rawValue]?.contains(type) != true,
+              options.destinationEligibility[FinancialActivityKind.cardPayment.rawValue]?.contains(type) == true else { return }
+        let source = sourceAccountId
+        setKind(.cardPayment)
+        guard kind == .cardPayment else { return }
+        sourceAccountId = source; destinationAccountId = card
     }
 
     private func setAccounts(for kind: FinancialActivityKind) {
@@ -227,6 +246,20 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
         await review(locale: locale)
     }
 
+    /// A movement timed after a balance was recorded cannot be part of that balance, so its question is answered
+    /// "No, apply it" for the person. Only a movement at or before a recorded balance is still asked.
+    static func answersAfterChecks(_ preview: FinancialActivityPreview, movement: Date,
+                                   answered: [FinancialAccountCoverage]) -> [FinancialAccountCoverage] {
+        preview.affectedAccounts.flatMap { affected in
+            affected.observations.compactMap { observation -> FinancialAccountCoverage? in
+                guard observation.included == nil,
+                      !answered.contains(where: { $0.accountId == affected.accountId && $0.observationId == observation.observationId }),
+                      let recorded = AccountPresentation.parseDate(observation.asOf), movement > recorded else { return nil }
+                return .init(accountId: affected.accountId, observationId: observation.observationId, included: false)
+            }
+        }
+    }
+
     func review(locale: Locale) async {
         guard !busy, phase != .uncertain else { return }
         phase = .loading; errorKey = nil
@@ -272,6 +305,12 @@ final class FinancialActivityEditor: ObservableObject, Identifiable {
                 next = try await controller.financialActivityPreview(command, activityId: correcting?.activityId, expectedIdentity: identity)
             }
             guard !(await retireIfNeeded()) else { return }
+            let automatic = Self.answersAfterChecks(next, movement: date, answered: answers)
+            if !automatic.isEmpty {
+                answers += automatic
+                phase = .editing
+                return await review(locale: locale)
+            }
             preview = next
             if next.ready, var reviewed = next.reviewedRequest, let token = next.previewToken {
                 reviewed.previewToken = token
