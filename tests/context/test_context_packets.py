@@ -2,21 +2,13 @@ from __future__ import annotations
 
 from datetime import date
 
-import pytest
 from argus.context import (
-    ContextPacket,
-    attach_context_packet_to_run,
     build_alpaca_corporate_actions_packet,
     build_alpaca_market_movers_packet,
     build_alpaca_most_actives_packet,
     build_alpaca_news_packet,
 )
 from argus.context.rendering import context_packet_fact_summary
-from pydantic import ValidationError
-
-
-
-
 
 
 def test_alpaca_news_packet_is_symbol_scoped_not_feed() -> None:
@@ -83,9 +75,7 @@ def test_alpaca_market_movers_packet_is_short_lived_context() -> None:
 def test_alpaca_most_actives_packet_is_narrow_stocks_context() -> None:
     packet = build_alpaca_most_actives_packet(
         by="volume",
-        most_actives=[
-            {"symbol": "NVDA", "volume": 123_000_000, "trade_count": 400_000}
-        ],
+        most_actives=[{"symbol": "NVDA", "volume": 123_000_000, "trade_count": 400_000}],
     )
 
     assert packet.packet_type == "most_actives"

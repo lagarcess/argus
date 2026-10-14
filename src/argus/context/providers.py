@@ -39,7 +39,9 @@ def fetch_alpaca_news_packet(
     items = payload.get("news")
     if not isinstance(items, list):
         items = []
-    return build_alpaca_news_packet(symbols=symbols, news_items=items, start=start, end=end)
+    return build_alpaca_news_packet(
+        symbols=symbols, news_items=items, start=start, end=end
+    )
 
 
 def build_alpaca_news_packet(
@@ -259,8 +261,6 @@ def build_alpaca_most_actives_packet(
             "Most-actives data cannot alter simulation truth or imply causality.",
         ),
     )
-
-
 
 
 def _alpaca_news_fact(item: dict[str, Any]) -> ContextPacketFact | None:

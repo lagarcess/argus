@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from argus.api import state as api_state
@@ -78,7 +78,9 @@ def _conversation() -> Conversation:
 
 def _historical_macro_packet(series_id: str = "CPIAUCSL") -> ContextPacket:
     # Stored context remains readable; no retired provider is called.
-    return ContextPacket(provider="fred", packet_type="macro", scope={"series_id": series_id})
+    return ContextPacket(
+        provider="fred", packet_type="macro", scope={"series_id": series_id}
+    )
 
 
 def test_collect_context_packets_uses_run_window_and_current_provider_scope(
