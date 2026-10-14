@@ -78,7 +78,7 @@ def _conversation() -> Conversation:
 
 def _historical_macro_packet(series_id: str = "CPIAUCSL") -> ContextPacket:
     # Stored context remains readable; no retired provider is called.
-    return ContextPacket(
+    return ContextPacket.model_construct(
         provider="fred", packet_type="macro", scope={"series_id": series_id}
     )
 
