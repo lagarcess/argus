@@ -133,9 +133,12 @@ and experience documents link here rather than maintain separate state lists.
 The founder authorized removal of legacy backtests, Tavily and FRED on the strip
 worker branch. The [bounded spec](superpowers/specs/2026-10-14-argus-strip.md) owns
 this change; dated preservation statements below describe the earlier product.
-Backtest execution and exclusive discovery/result surfaces are retired in this
-candidate. Shared Cuadrao accounting, calculations, auth, conversations and
-Business/Consumer services remain. This is no hosted availability claim.
+This candidate removes FRED fetches, Tavily/FRED tracked key templates, simulation
+API and chat execution actions, registered tools, workers and Run/Retest controls.
+Shared Cuadrao accounting, calculations, auth, conversations and Business/Consumer
+services remain. The internal engine-launch adapter was skipped after automatic
+approval rejection; its engine and required dependencies remain internally
+callable. This is a partial engine strip and no hosted availability claim.
 
 ---
 

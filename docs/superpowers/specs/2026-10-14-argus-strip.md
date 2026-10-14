@@ -35,11 +35,13 @@ Cuadrao uses canonical financial records, exact calculations, current permission
 
 ## 5. Execution contract
 
-One draft PR targeting codex/private-alpha-next, with coherent conventional commits. Commit this spec first.
+The founder's later scoped instruction requires manual module edits, one source
+module per verified commit. Skip a rejected module without an equivalent retry.
+Do not create a PR or blocker-report file. This replaces the earlier PR endpoint.
 
-Required proof: removal/import reachability audit, compile/import and type checks, focused retained backend/frontend tests, hermetic mocked runtime and eval-harness checks, route absence and retained calculation/Business tests, modularity budgets on current integration reconciliation, plus a committed full removed-file manifest and exact results. Provider keys are blank; no hosted or paid work. Mocked browser evidence can verify removed controls and retained rendering without tokens. Missing real hosted/live evidence remains explicit.
+Required proof: removal/import reachability audit, compile/import and type checks, focused retained backend/frontend tests, hermetic mocked runtime and eval-harness checks, route absence and retained calculation/Business tests, modularity budgets on current integration reconciliation, plus the exact removed-file list and results in the coordinator handoff. Provider keys are blank; no hosted or paid work. Missing real hosted/live evidence remains explicit.
 
-Before handoff fetch integration, record current SHA, reconcile one-way if needed and audit semantic overlap. Preserve exact evidence; never rebase published/evidenced work. Push only the worker branch and attach the one draft PR. Stop at ready-for-Priya handoff. Founder/coordinator alone owns merge and staging.
+Before handoff fetch integration, record current SHA, reconcile one-way if needed and audit semantic overlap. Preserve exact evidence; never rebase published/evidenced work. Report skipped internal modules and reachable behavior plainly. Stop after coordinator handoff. Founder/coordinator alone owns merge and staging.
 
 ## 6. Stop conditions
 

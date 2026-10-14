@@ -14,13 +14,15 @@
 The founder authorized removal of legacy backtests, Tavily and FRED on the strip
 worker branch. The [bounded spec](superpowers/specs/2026-10-14-argus-strip.md) owns
 this change; dated preservation statements below describe the earlier product.
-Backtest execution and exclusive discovery/result surfaces are retired in this
-candidate. Shared Cuadrao accounting, calculations, auth, conversations and
-Business/Consumer services remain. This is no hosted availability claim.
-
-Retired execution contracts: `/backtests/run`, `/backtests/jobs`, job retry/cancel,
-`/backtests/{id}`, and their chat Run/retest/result actions. They are absent from
-the executable API. Shared calculation and conversational routes remain.
+This candidate removes `POST /api/v1/backtests/run`,
+`GET /api/v1/backtests/{run_id}` and
+`GET /api/v1/backtest-jobs/by-action/{confirmation_id}`. Chat action validation
+rejects `run_backtest` and `retest_run`. Registered simulation tools and the
+simulation workflow task are absent. The owner-scoped
+`GET /api/v1/backtest-jobs/{job_id}` remains for research and stored job history.
+Shared Cuadrao APIs and historical strategy/result types remain. The skipped
+internal engine-launch adapter and its dependencies are still internally callable;
+this is a partial engine strip and no hosted availability claim.
 
 ---
 
