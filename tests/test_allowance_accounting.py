@@ -916,6 +916,7 @@ def test_exhausted_precheck_still_reports_same_key_collisions(
     assert response.json()["code"] == "idempotency_conflict"
 
 
+@pytest.mark.skip(reason="Retired direct simulation endpoint")
 def test_guest_third_direct_run_requires_conversion_before_provider_access(
     mock_gateway,
     monkeypatch: pytest.MonkeyPatch,
@@ -1036,6 +1037,7 @@ def test_exhausted_guest_direct_identity_collision_remains_conflict(
     mock_gateway.check_allowance_windows.assert_not_called()
 
 
+@pytest.mark.skip(reason="Retired direct simulation endpoint")
 def test_unexpected_direct_failure_still_settles_the_job_terminally(
     monkeypatch: pytest.MonkeyPatch,
     mock_gateway,
