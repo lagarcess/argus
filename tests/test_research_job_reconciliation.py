@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+
 class _FakeTerminalTaskRunClient:
     def __init__(self, payload: dict[str, object]) -> None:
         self.payload = payload
