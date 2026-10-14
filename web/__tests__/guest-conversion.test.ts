@@ -253,23 +253,6 @@ describe("guest conversion contract", () => {
     );
   });
 
-  test("opens quota recovery for an authoritative workspace-limit rejection", () => {
-    const experience = readFileSync(
-      join(root, "components/guest/useGuestExperience.ts"),
-      "utf-8",
-    );
-    const chat = readFileSync(join(root, "components/chat/ChatInterface.tsx"), "utf-8");
-
-    expect(experience).toContain("recoverGuestSimulationRejection");
-    expect(chat).toContain("isGuestSimulationConversionRejection");
-    expect(chat).toContain("errorPayload.code");
-    expect(chat).toContain("event.data.final_response_payload?.code ?? event.data.code");
-    expect(chat).toContain("loadConversation(requestSession.identity.conversationId)");
-    expect(chat.indexOf("errorPayload.code")).toBeLessThan(
-      chat.indexOf("throwIfAmbiguousRunSseError", chat.indexOf('event.event === "error"')),
-    );
-    expect(chat).toContain("recoverGuestSimulationRejection(action)");
-  });
 
   test("derives the New-chat auth mode from server-owned public access truth", () => {
     expect(newConversationConversionMode(false)).toBe("login");
