@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test";
+import { describe, test } from "bun:test";
+import assert from "node:assert/strict";
 import i18next from "i18next";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -15,7 +16,8 @@ function confirmation(
   return {
     title: "Ready to test",
     status: "ready_to_run",
-    statusLabel: "Ready to run",    strategy_type: strategyType,
+    statusLabel: "Ready to run",
+    strategy_type: strategyType,
     rows: [
       { key: "assets", label: "Assets", value: symbols.join(", ") },
       { key: "period", label: "Period", value: "Last 12 months" },
@@ -64,7 +66,7 @@ describe("StrategyConfirmationCard asset heading", () => {
 
     const markup = await renderConfirmationMarkup(payload, true);
 
-    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>.*Cancel/);
+    assert.match(markup, /<button[^>]*disabled=""[^>]*>.*Cancel/);
   });
 
   test("reads stored confirmations without offering simulation execution", async () => {
@@ -74,21 +76,22 @@ describe("StrategyConfirmationCard asset heading", () => {
       { id: "retest", type: "retest_run", label: "Retest" },
     ];
     const markup = await renderConfirmationMarkup(payload);
-    expect(markup).not.toContain("<button");
-    expect(markup).toContain("AAPL");
+    assert.equal(markup.includes("<button"), false);
+    assert.equal(markup.includes("Ready to run"), false);
+    assert.ok(markup.includes("AAPL"));
   });
 
   test("renders a single entity symbol once when no strategy label exists", async () => {
     const text = await renderConfirmation(confirmation(["AAPL"]));
 
-    expect(wordCount(text, "AAPL")).toBe(1);
+    assert.equal(wordCount(text, "AAPL"), 1);
   });
 
   test("renders each symbol once for a two-asset confirmation", async () => {
     const text = await renderConfirmation(confirmation(["AAPL", "SPY"]));
 
-    expect(wordCount(text, "AAPL")).toBe(1);
-    expect(wordCount(text, "SPY")).toBe(1);
+    assert.equal(wordCount(text, "AAPL"), 1);
+    assert.equal(wordCount(text, "SPY"), 1);
   });
 
   test("keeps a typed strategy label beside the entity token", async () => {
@@ -96,16 +99,16 @@ describe("StrategyConfirmationCard asset heading", () => {
       confirmation(["AAPL"], "buy_and_hold"),
     );
 
-    expect(wordCount(text, "AAPL")).toBe(1);
-    expect(text).toContain("Buy and Hold");
+    assert.equal(wordCount(text, "AAPL"), 1);
+    assert.ok(text.includes("Buy and Hold"));
   });
 
   test("keeps the aggregate heading above two assets", async () => {
     const text = await renderConfirmation(confirmation(["AAPL", "MSFT", "SPY"]));
 
-    expect(text).toContain("3 assets");
-    expect(wordCount(text, "AAPL")).toBe(1);
-    expect(wordCount(text, "MSFT")).toBe(1);
-    expect(wordCount(text, "SPY")).toBe(1);
+    assert.ok(text.includes("3 assets"));
+    assert.equal(wordCount(text, "AAPL"), 1);
+    assert.equal(wordCount(text, "MSFT"), 1);
+    assert.equal(wordCount(text, "SPY"), 1);
   });
 });

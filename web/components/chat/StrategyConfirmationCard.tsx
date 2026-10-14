@@ -142,7 +142,7 @@ export default function StrategyConfirmationCard({
             )}
           </div>
         </div>
-        <span
+        {displayState.status !== "ready_to_run" && <span
           className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium tracking-tight ${artifactStatusToneClassName(displayState.tone)}`}
           data-confirmation-status={displayState.status}
         >
@@ -151,7 +151,7 @@ export default function StrategyConfirmationCard({
             className={`h-3.5 w-3.5 ${displayState.isSpinning ? "animate-spin" : ""}`}
           />
           {displayState.statusLabel}
-        </span>
+        </span>}
       </div>
 
       {(viewModel.summaryRows.length > 0 || viewModel.detailRows.length > 0) && (
