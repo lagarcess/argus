@@ -1042,6 +1042,7 @@ export default function ChatInterface() {
       : starterSelection
         ? undefined
         : (mentionsOrAction as ChatActionOption | undefined);
+    if (action?.type === "run_backtest" || action?.type === "retest_run") return false;
     const isDeferredGuestSubmission =
       guestBootstrapRequired && !options?.bypassGuestGate;
     sendAdmissionInFlightRef.current = true;
