@@ -758,7 +758,6 @@ class PaginatedSearch(BaseModel):
 
 
 ChatActionType = Literal[
-    "run_backtest",
     "change_dates",
     "change_asset",
     "adjust_assumptions",
@@ -769,7 +768,6 @@ ChatActionType = Literal[
     "retry_failed_action",
     "select_response_option",
     "select_discovery_candidate",
-    "retest_run",
     "calculation_offer",
 ]
 
