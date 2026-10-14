@@ -9,7 +9,6 @@ import {
 import type { ChatActionOption, Message } from "@/components/chat/types";
 import { normalizeConfirmationHistory } from "@/components/chat/artifact-history";
 import {
-  apiFetch,
   ChatStreamError,
   getBacktestJob,
   type BacktestJobResponse,
@@ -54,14 +53,6 @@ export function throwIfAmbiguousRunStreamTermination(
     "The Run response ended before durable status was confirmed.",
     0,
     "run_stream_ended_ambiguously",
-  );
-}
-
-export async function getBacktestJobByAction(
-  confirmationId: string,
-): Promise<BacktestJobResponse> {
-  return apiFetch<BacktestJobResponse>(
-    `/backtest-jobs/by-action/${encodeURIComponent(confirmationId)}`,
   );
 }
 
