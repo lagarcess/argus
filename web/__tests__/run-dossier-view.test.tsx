@@ -125,26 +125,25 @@ describe("single-run dossier view", () => {
       />,
     );
 
-  test("offers a normal Retest only when new data is available", () => {
+  test("keeps historical runs readable without a Retest control", () => {
     const html = renderRetestState(retestAction({
       state: "new_data_available",
     }));
 
-    expect(html).toContain("Retest with current data");
-    expect(html).not.toContain('data-retest-location="card-header" disabled=""');
+    expect(retestButtonMarkup(html)).toBe("");
+    expect(html).not.toContain("Retest with current data");
   });
 
-  test("shows same-period truth before click and disables Retest", () => {
+  test("preserves the historical same-period note without Retest", () => {
     const html = renderRetestState(retestAction({
       state: "no_new_data",
     }));
 
-    expect(html).toContain("Already up to date");
     expect(html).toContain("No new market data is available since this run.");
-    expect(retestButtonMarkup(html)).toContain('disabled=""');
+    expect(retestButtonMarkup(html)).toBe("");
   });
 
-  test("offers the exact server repair and leaves timeframe failures disabled", () => {
+  test("preserves historical dates and timeframe notes without controls", () => {
     const repairable = renderRetestState(retestAction({
       state: "cant_do_it",
       reason_code: "provider_history_start_unavailable",
@@ -160,18 +159,16 @@ describe("single-run dossier view", () => {
       repair: null,
     }));
 
-    expect(repairable).toContain("Use available dates");
     expect(repairable).toContain("Jan 1, 2016");
     expect(repairable).toContain("Jul 30, 2026");
-    expect(retestButtonMarkup(repairable)).not.toContain('disabled=""');
-    expect(deadEnd).toContain("Retest unavailable");
+    expect(retestButtonMarkup(repairable)).toBe("");
     expect(deadEnd).toContain(
       "This run’s timeframe is not available for this market.",
     );
-    expect(retestButtonMarkup(deadEnd)).toContain('disabled=""');
+    expect(retestButtonMarkup(deadEnd)).toBe("");
   });
 
-  test("reserves generic hover help for the actionable current-data state", () => {
+  test("renders no Retest control for any stored availability state", () => {
     const normal = renderRetestState(retestAction({
       state: "new_data_available",
     }));
@@ -193,13 +190,12 @@ describe("single-run dossier view", () => {
       repair: null,
     }));
 
-    expect(retestButtonMarkup(normal)).toContain('style="cursor:pointer"');
-    expect(retestButtonMarkup(samePeriod)).not.toContain("cursor:pointer");
-    expect(retestButtonMarkup(repairable)).not.toContain("cursor:pointer");
-    expect(retestButtonMarkup(unavailable)).not.toContain("cursor:pointer");
+    for (const html of [normal, samePeriod, repairable, unavailable]) {
+      expect(retestButtonMarkup(html)).toBe("");
+    }
   });
 
-  test("connects every visible Retest reason to its button", () => {
+  test("keeps every historical reason readable without an action", () => {
     const samePeriod = renderRetestState(retestAction({
       state: "no_new_data",
     }));
@@ -221,9 +217,7 @@ describe("single-run dossier view", () => {
     for (const html of [samePeriod, repairable, unavailable]) {
       const detailId = retestDetailId(html);
       expect(detailId).not.toBeNull();
-      expect(retestButtonMarkup(html)).toContain(
-        `aria-describedby="${detailId}"`,
-      );
+      expect(retestButtonMarkup(html)).toBe("");
     }
   });
 
@@ -427,7 +421,7 @@ describe("single-run dossier view", () => {
     ).toBeFalse();
   });
 
-  test("puts the existing retest action in the card header with honest copy", () => {
+  test("removes the stored retest action from the card header", () => {
     const html = renderToStaticMarkup(
       <RunDossierView
         dossier={dossierWithWatchingDecisionAndMultilineNote}
@@ -441,12 +435,10 @@ describe("single-run dossier view", () => {
     );
     const text = visibleText(html);
 
-    expect(text).toContain("Retest with current data");
+    expect(text).not.toContain("Retest with current data");
     expect(text).not.toContain("Run it fresh");
-    expect(html.indexOf("Retest with current data")).toBeLessThan(
-      html.indexOf("Weekly GLD pullback"),
-    );
-    expect(html).toContain('data-retest-location="card-header"');
+    expect(text).toContain("Weekly GLD pullback");
+    expect(retestButtonMarkup(html)).toBe("");
   });
 
   test("shows one quiet undecided state and an add action", () => {

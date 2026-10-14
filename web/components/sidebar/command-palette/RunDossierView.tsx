@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, ChevronRight, PencilLine, RotateCcw } from "lucide-react";
+import { ArrowLeft, ChevronRight, PencilLine } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -19,7 +19,6 @@ import {
   formatRunDossierSetup,
 } from "@/lib/run-dossier-items";
 import type { GuestDossierDecisionResumeTarget } from "@/lib/guest-conversion";
-import { Tooltip } from "@/components/ui/Tooltip";
 import { compactDateDisplay } from "@/lib/date-range-display";
 import { resultReadoutFacts } from "@/lib/result-readout-facts";
 import { resultQuickTakeText } from "@/lib/result-readout-display";
@@ -117,13 +116,11 @@ export function RunDossierView({
   onBackToLatest,
   onOpenHistory,
   onOpenConversation,
-  onRetest,
   onSaveDecision,
   onDecisionUnavailable,
   resumeDecisionTarget,
   onDecisionResumeHandled,
   openConversationDisabled = false,
-  retestDisabled = false,
 }: RunDossierViewProps) {
   const { t, i18n } = useTranslation();
   const retestDetailId = useId();
@@ -233,20 +230,8 @@ export function RunDossierView({
   const conversationUnavailable =
     openConversationDisabled || dossier.result_message_id === null;
   const retestRepair = retestAction?.repair ?? null;
-  const retestUnavailable =
-    retestAction?.state === "no_new_data" ||
-    (retestAction?.state === "cant_do_it" && retestRepair === null);
-  const retestButtonDisabled = retestDisabled || retestUnavailable;
   const repairStart = compactDateDisplay(retestRepair?.start_date, locale);
   const repairEnd = compactDateDisplay(retestRepair?.end_date, locale);
-  const retestLabel =
-    retestAction?.state === "no_new_data"
-      ? t("command_palette.retest_already_current", "Already up to date")
-      : retestRepair
-        ? t("command_palette.retest_available_dates", "Use available dates")
-        : retestAction?.state === "cant_do_it"
-          ? t("command_palette.retest_unavailable", "Retest unavailable")
-          : t("command_palette.retest_current_data", "Retest with current data");
   const retestDetail =
     retestAction?.state === "no_new_data"
       ? t(
@@ -266,19 +251,6 @@ export function RunDossierView({
               "This run’s timeframe is not available for this market.",
             )
           : null;
-  const retestButton = retestAction ? (
-    <button
-      type="button"
-      data-retest-location="card-header"
-      aria-describedby={retestDetail ? retestDetailId : undefined}
-      disabled={retestButtonDisabled}
-      onClick={() => void onRetest(retestAction.source_run_id)}
-      className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-black/10 bg-white/60 px-3 text-[11px] font-medium text-black/65 transition-colors hover:bg-black/[0.03] disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-white/[0.04] dark:text-white/65 dark:hover:bg-white/[0.08]"
-    >
-      <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-      {retestLabel}
-    </button>
-  ) : null;
 
   return (
     <div
@@ -310,22 +282,6 @@ export function RunDossierView({
               </span>
             )}
           </div>
-          {retestButton &&
-          retestAction?.state === "new_data_available" &&
-          !retestButtonDisabled ? (
-            <Tooltip
-              content={t(
-                "command_palette.retest_tooltip",
-                "Reuse this setup with the latest available data. You’ll review it before it runs.",
-              )}
-              side="bottom"
-              delay={150}
-            >
-              {retestButton}
-            </Tooltip>
-          ) : (
-            retestButton
-          )}
         </div>
 
         {retestDetail ? (
