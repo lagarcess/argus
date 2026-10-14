@@ -578,7 +578,7 @@ def latest_market_close(symbol: str) -> tuple[float, str] | None:
     """The latest daily close Argus's own market data has for a symbol, and its date."""
     try:
         # Shared symbol resolution does not need the simulation compute stack.
-        from argus.domain.backtesting.config import classify_symbol
+        from argus.domain.market_data.classification import classify_symbol
         from argus.domain.market_data.new_york_clock import new_york_today
         from argus.domain.market_data.provider import fetch_price_series
 
