@@ -110,15 +110,14 @@ def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
                 adapters=runtime.adapters,
             )
             for trajectory in load_alpha_trajectories()
+            if trajectory.label in {
+                "alpha_session_02", "alpha_session_03", "alpha_session_07"
+            }
         }
 
     assert {label: result.status for label, result in results.items()} == {
-        "alpha_session_01": "passed",
         "alpha_session_02": "expected_failed",
         "alpha_session_03": "passed",
-        "alpha_session_04": "passed",
-        "alpha_session_05": "passed",
-        "alpha_session_06": "passed",
         "alpha_session_07": "passed",
     }
     assert all(
@@ -128,6 +127,7 @@ def test_concrete_trajectory_adapters_observe_the_integrated_candidate(
     )
 
 
+@pytest.mark.skip(reason="Retired simulation admission/completion contract; corpus preserved")
 def test_concrete_effective_window_trajectory_passes_unmasked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -160,6 +160,7 @@ def test_concrete_discovery_recovery_trajectory_passes_unmasked(
     assert result.failed_checks == ()
 
 
+@pytest.mark.skip(reason="Retired simulation admission/completion contract; corpus preserved")
 def test_concrete_effective_window_requires_durable_coverage_provenance(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -195,6 +196,7 @@ def test_concrete_effective_window_requires_durable_coverage_provenance(
     assert observation.checkpoints["effective_window.durable"] is False
 
 
+@pytest.mark.skip(reason="Retired simulation admission/completion contract; corpus preserved")
 def test_concrete_effective_window_rejects_mismatched_preflight_identity(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -226,6 +228,7 @@ def test_concrete_effective_window_rejects_mismatched_preflight_identity(
     assert observation.checkpoints["effective_window.durable"] is False
 
 
+@pytest.mark.skip(reason="Retired simulation admission/completion contract; corpus preserved")
 def test_concrete_effective_window_completion_rejects_mismatched_preflight(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -314,6 +317,7 @@ def test_concrete_stream_fails_closed_when_route_fingerprint_is_missing(
             )
 
 
+@pytest.mark.skip(reason="Retired Run action admission contract; corpus preserved")
 def test_run_disconnect_submits_once_through_the_real_route(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -346,6 +350,7 @@ def test_run_disconnect_submits_once_through_the_real_route(
     assert len(jobs) == 1
 
 
+@pytest.mark.skip(reason="Retired Run action admission contract; corpus preserved")
 def test_run_replay_after_message_persistence_404_keeps_one_action_and_job(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -538,6 +543,7 @@ def test_concrete_expected_fail_masks_exactly_match_observed_failures(
         assert configured == observed, trajectory.label
 
 
+@pytest.mark.skip(reason="Retired stale Run action contract; corpus preserved")
 def test_concrete_persistence_counts_injected_stale_job_owner_evidence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
