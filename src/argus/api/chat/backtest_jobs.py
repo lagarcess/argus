@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from copy import deepcopy
@@ -14,18 +14,12 @@ from typing import Any, Literal
 import httpx
 from loguru import logger
 
-from argus.agent_runtime.confirmation_artifacts import canonical_launch_identity_payload
-from argus.api.chat.backtest_job_envelopes import (
-    admission_rejection_envelope,
-    async_backtest_job_envelope,
-)
 from argus.api.chat.backtest_task_runs import (
     _task_run_completed_at,
     _task_run_error,
     _workflow_task_failure,
 )
 from argus.api.chat.confirmation import (
-    consume_confirmation_for_admitted_run,
     restore_pending_card_for_failed_job,
 )
 from argus.api.chat.research_job_reconciliation import (
@@ -37,7 +31,6 @@ from argus.domain.backtest_admission import (
     DEFAULT_GLOBAL_RUNNING_LIMIT,
     DEFAULT_USER_QUEUED_LIMIT,
     DEFAULT_USER_RUNNING_LIMIT,
-    chat_run_identity_hash,
 )
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
@@ -780,268 +773,3 @@ def _terminal_task_run_metadata(
 
 def _dict_or_empty(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, dict) else {}
-
-
-class ShadowBacktestJobTool:
-    def __init__(
-        self,
-        *,
-        delegate: Any | None,
-        gateway_getter: Callable[[], Any | None],
-        dev_memory_fallback_getter: Callable[[], bool],
-        dispatcher_getter: Callable[[], Any | None] | None = None,
-    ) -> None:
-        self._delegate = delegate
-        self._gateway_getter = gateway_getter
-        self._dev_memory_fallback_getter = dev_memory_fallback_getter
-        self._dispatcher_getter = dispatcher_getter or (
-            lambda: RenderWorkflowDispatcher()
-        )
-
-    def run(self, payload: dict[str, Any]) -> dict[str, Any]:
-        job, rejection = self._maybe_create_shadow_job(payload)
-        if rejection is not None:
-            return rejection
-        if self._should_return_async_job(job):
-            return async_backtest_job_envelope(job)
-        if self._delegate is None:
-            raise RuntimeError(
-                "Backtest workflow execution is enabled, but no async job was "
-                "created for this request."
-            )
-        return self._delegate.run(payload)
-
-    def _maybe_create_shadow_job(
-        self, payload: dict[str, Any]
-    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-        from argus.api.guest_observability import guest_session_allowance_present
-
-        context = current_backtest_job_shadow_context()
-        guest_admission_required = (
-            context is not None
-            and guest_session_allowance_present(context.allowance_limits)
-        )
-        if not backtest_jobs_shadow_enabled() and not guest_admission_required:
-            return None, None
-
-        if context is None:
-            logger.warning(
-                "Backtest job shadow flag enabled without request context; skipping",
-            )
-            return None, None
-
-        try:
-            gateway = self._gateway_getter()
-            if gateway is None:
-                raise RuntimeError(
-                    "Supabase persistence is required for shadow backtest jobs."
-                )
-            payload_digest = payload_hash(canonical_launch_identity_payload(payload))
-            confirmation_id = None
-            if isinstance(context.chat_action, dict):
-                raw_confirmation = context.chat_action.get("confirmation_id")
-                if isinstance(raw_confirmation, str) and raw_confirmation.strip():
-                    confirmation_id = raw_confirmation.strip()
-            identity_hash = chat_run_identity_hash(
-                conversation_id=context.conversation_id,
-                confirmation_id=confirmation_id or context.idempotency_key,
-                launch_payload_hash=payload_digest,
-            )
-            admission = self._admit_durable_job(
-                gateway=gateway,
-                context=context,
-                identity_hash=identity_hash,
-                payload_digest=payload_digest,
-                launch_payload=shadow_launch_payload(
-                    payload=payload,
-                    context=context,
-                ),
-            )
-            if admission.decision not in ("admitted", "replay"):
-                rejected_job = admission.job
-                if (
-                    isinstance(rejected_job, dict)
-                    and str(rejected_job.get("status") or "").lower() == "failed"
-                ):
-                    context.admission_decision = admission.decision
-                    rejected_job_id = str(rejected_job.get("id") or "").strip()
-                    context.created_job_id = rejected_job_id or None
-                    return dict(rejected_job), None
-                return None, admission_rejection_envelope(admission.decision)
-            job = admission.job
-            if job is None:
-                return None, admission_rejection_envelope("missing_job")
-            context.admission_decision = admission.decision
-            job_id = str(job.get("id") or "").strip()
-            consumption_refusal = consume_confirmation_for_admitted_run(
-                gateway=gateway,
-                user_id=context.user_id,
-                conversation_id=context.conversation_id,
-                confirmation_message_id=context.confirmation_message_id,
-                chat_action=context.chat_action,
-                job_id=job_id,
-                utcnow_iso=_utcnow_iso,
-            )
-            if consumption_refusal is not None:
-                return None, consumption_refusal
-            if job_id:
-                context.created_job_id = job_id
-                if admission.decision == "replay":
-                    _restore_declared_tool_identity(job)
-                    self._restore_existing_dispatch_context(context=context, job=job)
-                    return dict(job), None
-                if backtest_jobs_shadow_enabled():
-                    job = self._maybe_dispatch_shadow_job(
-                        gateway=gateway,
-                        context=context,
-                        job_id=job_id,
-                        job=job,
-                        payload_digest=payload_digest,
-                    )
-                return dict(job), None
-        except Exception as exc:
-            if guest_admission_required or not self._dev_memory_fallback_getter():
-                raise
-            logger.warning(
-                "Shadow backtest job creation failed; continuing in-process execution",
-                error=str(exc),
-                user_id=context.user_id,
-                conversation_id=context.conversation_id,
-            )
-        return None, None
-
-    def _admit_durable_job(
-        self,
-        *,
-        gateway: Any,
-        context: BacktestJobShadowContext,
-        identity_hash: str,
-        payload_digest: str,
-        launch_payload: dict[str, Any],
-    ):
-        from argus.api.chat.backtest_admission_flow import admit_durable_chat_job
-
-        return admit_durable_chat_job(
-            gateway=gateway,
-            context=context,
-            identity_hash=identity_hash,
-            payload_digest=payload_digest,
-            launch_payload=launch_payload,
-            reconcile_blockers=_reconcile_backpressure_blockers,
-        )
-
-    @staticmethod
-    def _should_return_async_job(job: dict[str, Any] | None) -> bool:
-        if job is None:
-            return False
-        context = current_backtest_job_shadow_context()
-        if context is not None and context.admission_decision == "replay":
-            return True
-        status = str(job.get("status") or "").strip().lower()
-        if status in {"failed", "canceled", "expired"}:
-            # A terminal pre-start receipt is the result of this attempt even
-            # when asynchronous execution itself is disabled.
-            return True
-        if not (
-            backtest_jobs_shadow_enabled()
-            and backtest_jobs_dispatch_enabled()
-            and backtest_workflow_execution_enabled()
-        ):
-            return False
-        launch_payload = job.get("launch_payload")
-        if not isinstance(launch_payload, dict):
-            return False
-        if launch_payload.get("kind") != REAL_BACKTEST_JOB_KIND:
-            return False
-        if context is None or context.created_job_id is None:
-            return False
-        if status == "succeeded":
-            return True
-        return (
-            context.admission_decision == "admitted" or context.workflow_dispatch_started
-        )
-
-    def _maybe_dispatch_shadow_job(
-        self,
-        *,
-        gateway: Any,
-        context: BacktestJobShadowContext,
-        job_id: str,
-        job: dict[str, Any],
-        payload_digest: str,
-    ) -> dict[str, Any]:
-        if not backtest_jobs_dispatch_enabled():
-            return job
-        if self._restore_existing_dispatch_context(context=context, job=job):
-            return job
-        if job.get("result_run_id"):
-            return job
-        job_status = str(job.get("status") or "").strip().lower()
-        if job_status and job_status != "queued":
-            return job
-        try:
-            dispatcher = self._dispatcher_getter()
-            if dispatcher is None:
-                raise RuntimeError("Backtest job dispatch is not configured.")
-            result = dispatcher.dispatch(
-                job_id=job_id, nonce=payload_digest.removeprefix("sha256:")
-            )
-        except Exception as exc:
-            context.workflow_dispatch_error = str(exc)
-            logger.warning(
-                "Workflow dispatch failed; terminalizing queued job",
-                error=str(exc),
-                user_id=context.user_id,
-                conversation_id=context.conversation_id,
-                job_id=job_id,
-            )
-            return fail_job_without_task_run(
-                gateway=gateway, user_id=context.user_id, job=job
-            )
-        task_run_id = str(result.get("id") or "").strip() or None
-        context.workflow_dispatch_started, context.workflow_task_run_id = (
-            True,
-            task_run_id,
-        )
-        try:
-            gateway.merge_backtest_job_execution_metadata(
-                user_id=context.user_id,
-                job_id=job_id,
-                execution_metadata={
-                    "workflow_dispatch": {
-                        "task": _workflow_task_id(),
-                        "task_run_id": task_run_id,
-                        "status": result.get("status"),
-                        "dispatched_at": _utcnow_iso(),
-                    }
-                },
-            )
-        except Exception as exc:
-            logger.warning(
-                "Workflow dispatch metadata persistence failed",
-                error=str(exc),
-                user_id=context.user_id,
-                conversation_id=context.conversation_id,
-                job_id=job_id,
-                workflow_task_run_id=task_run_id,
-                workflow_dispatch_started=True,
-            )
-        return job
-
-    @staticmethod
-    def _restore_existing_dispatch_context(
-        *,
-        context: BacktestJobShadowContext,
-        job: dict[str, Any],
-    ) -> bool:
-        metadata = job.get("execution_metadata")
-        if not isinstance(metadata, dict):
-            return False
-        workflow_dispatch = metadata.get("workflow_dispatch")
-        if not isinstance(workflow_dispatch, dict):
-            return False
-
-        context.workflow_dispatch_started = True
-        task_run_id = str(workflow_dispatch.get("task_run_id") or "").strip()
-        context.workflow_task_run_id = task_run_id or None
-        return True
