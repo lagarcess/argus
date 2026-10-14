@@ -667,7 +667,8 @@ describe("Argus Alpha frontend contract", () => {
     expect(message).toContain("<StrategyConfirmationCard");
     const markup = await renderConfirmationMessage("backtest");
     expect(markup).toContain("argus-confirmation-reveal");
-    expect(markup.match(/Run backtest/g)).toHaveLength(1);
+    expect(markup).not.toContain("Run backtest");
+    expect(markup).toContain("AAPL");
     expect(message).toContain("onAction={onAction}");
   });
 
@@ -1213,8 +1214,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("message.confirmation.actions");
   });
 
-  test.each([undefined, "backtest"])("only active recognized confirmation kind %p renders Run", async (kind) => {
-    expect(await renderConfirmationMessage(kind)).toContain("Run backtest");
+  test.each([undefined, "backtest"])("recognized confirmation kind %p preserves history without Run", async (kind) => {
+    expect(await renderConfirmationMessage(kind)).not.toContain("Run backtest");
+    expect(await renderConfirmationMessage(kind)).toContain("AAPL");
     expect(await renderConfirmationMessage(kind, false)).not.toContain("Run backtest");
     expect(await renderConfirmationMessage("future_calculation")).not.toContain("Run backtest");
   });
@@ -1377,8 +1379,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("hydrateMessagesFromApi");
     expect(chat).toContain("void loadConversation(item.id)");
     expect(chat).toContain("loadConversationForRun");
-    expect(chat).toContain("getBacktestRun(item.id)");
-    expect(api).toContain("export async function getBacktestRun");
+    expect(chat).not.toContain("getBacktestRun(item.id)");
+    expect(chat).toContain("void loadConversation(item.conversation_id)");
+    expect(api).toContain("export async function getBacktestJob");
     expect(chat).not.toContain(
       'kind: m.content.includes("result") ? "strategy_result" : "text"',
     );
@@ -1622,7 +1625,7 @@ describe("Argus Alpha frontend contract", () => {
     expect(palette).not.toContain("run_backtest");
   });
 
-  test("omnisearch disables Retest while another turn owns the stream", () => {
+  test("omnisearch preserves turn guards without a Retest execution control", () => {
     const chat = readFileSync(
       join(root, "components/chat/ChatInterface.tsx"),
       "utf-8",
@@ -1642,10 +1645,10 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).toContain("turnInFlight={turnInFlight}");
     expect(palette).toContain("turnInFlight?: boolean");
     expect(palette).toContain("retestDisabled={turnInFlight}");
-    expect(dossier).toContain(
-      "retestButtonDisabled = retestDisabled || retestUnavailable",
-    );
-    expect(dossier).toContain("disabled={retestButtonDisabled}");
+    expect(dossier).not.toContain("data-retest-location");
+    expect(dossier).not.toContain("onClick={() => void onRetest");
+    expect(dossier).toContain("onOpenConversation");
+    expect(dossier).toContain("onSaveDecision");
     expect(dossier).toContain("disabled:cursor-not-allowed");
     expect(dossier).toContain("disabled:opacity-50");
   });

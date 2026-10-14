@@ -45,7 +45,6 @@ import {
   createConversation,
   deleteConversation,
   postFeedback,
-  getBacktestRun,
   listConversations,
   logoutFromApi,
   patchConversation,
@@ -148,11 +147,6 @@ import {
   backtestJobMessage,
 } from "@/lib/chat-backtest-jobs";
 import {
-  applyRecoverableRunReconciliation,
-  ambiguousRunConfirmationId,
-  applyReconciledBacktestJobResponse,
-  getBacktestJobByAction,
-  reconcileAmbiguousRunResponse,
   throwIfAmbiguousRunSseError,
   throwIfAmbiguousRunStreamTermination,
   useBacktestJobPolling,
@@ -854,15 +848,6 @@ export default function ChatInterface() {
     if (item.conversation_id) {
       void loadConversation(item.conversation_id);
       return;
-    }
-    try {
-      const { run } = await getBacktestRun(item.id);
-      if (run.conversation_id) {
-        void loadConversation(run.conversation_id);
-        return;
-      }
-    } catch {
-      // Fall through to the chat surface if the run is unavailable.
     }
     setCurrentView("chat");
     closeTransientSidebar();
@@ -1678,63 +1663,6 @@ export default function ChatInterface() {
             finishRequestTransport(requestSession);
           }
           return;
-        }
-        const confirmationId = ambiguousRunConfirmationId(action, err);
-        if (confirmationId) {
-          if (!requestSessions.authorize(requestSession, "run_replay")) return;
-          conversationActivity.progressRequest(
-            requestSession.identity.conversationId,
-            requestSession.identity.requestId,
-            "checking",
-          );
-          if (canApplyVisibleStreamUpdate()) {
-            setStreamStatus(t("chat.status.checking"));
-            setMessages((prev) =>
-              settleConfirmationAfterActionTransportError(prev, action, {
-                durableStateUnknown: true,
-              }),
-            );
-          }
-          const reconciliation = await reconcileAmbiguousRunResponse({
-            lookup: () => getBacktestJobByAction(confirmationId),
-            replay: () =>
-              streamToConversation(requestSession.identity.conversationId),
-          });
-          if (!requestSessions.authorize(requestSession, "run_replay")) return;
-          if (reconciliation.kind === "replayed") return;
-          if (reconciliation.kind === "durable") {
-            if (canApplyVisibleStreamUpdate()) {
-              setMessages((prev) =>
-                normalizeDurableRetryActionHistory(
-                  normalizeConfirmationHistory(
-                    applyReconciledBacktestJobResponse(
-                      prev,
-                      reconciliation.response,
-                      assistantId,
-                    ),
-                  ),
-                ),
-              );
-            }
-            terminalReadiness.finish(true);
-            finishRequestTransport(requestSession);
-            return;
-          }
-          if (reconciliation.kind === "recoverable") {
-            if (canApplyVisibleStreamUpdate()) {
-              setMessages((prev) =>
-                applyRecoverableRunReconciliation(
-                  prev,
-                  assistantId,
-                  requestSession.identity.conversationId,
-                  reconciliation.error,
-                ),
-              );
-            }
-            terminalReadiness.finish(true);
-            finishRequestTransport(requestSession);
-            return;
-          }
         }
         if (!requestSessions.authorize(requestSession, "catch")) return;
         const canApplyVisibleUpdate = canApplyVisibleStreamUpdate();
