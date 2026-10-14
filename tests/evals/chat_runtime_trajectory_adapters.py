@@ -15,9 +15,7 @@ from argus.agent_runtime.stages.interpret import (
 )
 from argus.agent_runtime.stages.interpret_types import AssetDiscoveryRequest
 from argus.agent_runtime.state.models import StrategySummary
-from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.api import state as api_state
-from argus.api.chat.backtest_jobs import ShadowBacktestJobTool
 from argus.api.chat.turn_lifecycle_hooks import ChatTurnLifecycleHooks
 from argus.api.main import app
 from argus.domain import backtest_admission
@@ -521,12 +519,7 @@ class ConcreteTrajectoryRuntime:
         self._provider_router = respx.mock(assert_all_called=False)
         self._backtest_gateway = _MemoryBacktestGateway()
         self._workflow = build_workflow(
-            tool=ShadowBacktestJobTool(
-                delegate=None,
-                gateway_getter=lambda: self._backtest_gateway,
-                dev_memory_fallback_getter=lambda: False,
-                dispatcher_getter=lambda: _DeterministicDispatcher(),
-            ),
+            tool=None,
             structured_interpreter=_DeterministicInterpreter(),
             checkpointer=MemorySaver(),
         )
@@ -1876,16 +1869,7 @@ class ConcreteTrajectoryRuntime:
         raw_job_id = job.get("id") if isinstance(job, dict) else None
         if not isinstance(raw_job_id, str) or not raw_job_id:
             return {}
-        from workflows.backtest_job import run_backtest_job
-
-        with self._monkeypatch.context() as completion_env:
-            completion_env.setenv("OPENROUTER_API_KEY", "")
-            result = run_backtest_job(
-                self._backtest_gateway,
-                job_id=raw_job_id,
-                backtest_tool=RealBacktestTool(),
-            )
-        return result
+        raise RuntimeError("Simulation workflow execution has been retired")
 
     @classmethod
     def _completed_result_matches_approval(
