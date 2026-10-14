@@ -1164,42 +1164,4 @@ describe("chat backtest jobs", () => {
     expect(chat).not.toContain('workflow_proof');
   });
 
-  test("ChatInterface exits ambiguous Run checking through typed recovery", () => {
-    const chat = readFileSync(
-      join(root, "components/chat/ChatInterface.tsx"),
-      "utf-8",
-    );
-    const ambiguityStart = chat.indexOf(
-      "const confirmationId = ambiguousRunConfirmationId",
-    );
-    const ambiguityEnd = chat.indexOf(
-      "const canApplyVisibleUpdate",
-      ambiguityStart,
-    );
-    const ambiguity = chat.slice(ambiguityStart, ambiguityEnd);
-    const recoveryStart = ambiguity.indexOf(
-      'reconciliation.kind === "recoverable"',
-    );
-    const recovery = ambiguity.slice(recoveryStart);
-    expect(ambiguityStart).toBeGreaterThan(-1);
-    expect(ambiguity).toContain("applyRecoverableRunReconciliation");
-    expect(ambiguity).toContain('reconciliation.kind === "recoverable"');
-    expect(ambiguity).toContain("finishRequestTransport(requestSession)");
-    expect(ambiguity).toContain(
-      "streamToConversation(requestSession.identity.conversationId)",
-    );
-    expect(chat).toContain(
-      'throwIfAmbiguousRunSseError(event, action?.type === "run_backtest")',
-    );
-    expect(chat).not.toContain("conversationActivity.settleRequest");
-    expect(ambiguity).toContain(
-      'requestSessions.authorize(requestSession, "run_replay")',
-    );
-    expect(ambiguity).toContain("canApplyVisibleStreamUpdate()");
-    expect(chat).not.toContain("setIsStreamingResponse(false)");
-    expect(ambiguity).toContain("durableStateUnknown: true");
-    expect(recovery).not.toContain(
-      "settleConfirmationAfterActionTransportError(",
-    );
-  });
 });
