@@ -63,6 +63,25 @@ def test_effective_tool_catalog_has_no_simulation_executor() -> None:
         ) is None
 
 
+def test_retest_request_is_rejected_before_persisted_action_dispatch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from argus.api.routers import agent
+    from fastapi.testclient import TestClient
+
+    def forbidden_dispatch(*args: object, **kwargs: object) -> None:
+        raise AssertionError("Retired action reached persisted-action dispatch")
+
+    monkeypatch.setattr(agent, "persisted_chat_action", forbidden_dispatch)
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={"action": {"type": "retest_run", "payload": {}}},
+        )
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+
+
 def test_search_declares_bounded_visible_conversation_recall(
     generated: dict,
 ) -> None:

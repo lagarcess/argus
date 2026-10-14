@@ -92,10 +92,7 @@ _ACTION_TYPE_LABEL_KEYS = {
     "refine_strategy": "chat.result_card.refine_idea",
     "save_strategy": "chat.result_card.save",
     "retry_failed_action": "common.retry",
-    "retest_run": "command_palette.retest_current_data",
 }
-
-_BACKEND_OWNED_LABEL_ACTIONS = frozenset({"retest_run"})
 
 
 @dataclass(frozen=True)
@@ -109,16 +106,6 @@ def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") ->
     if payload.action is None:
         return payload.message or ""
     action_type = payload.action.type
-    if action_type in _BACKEND_OWNED_LABEL_ACTIONS:
-        # Backend-owned product actions: the client's display copy carries no
-        # authority, so the turn text always comes from the canonical label key.
-        return (
-            _localized_action_label(
-                _ACTION_TYPE_LABEL_KEYS[action_type],
-                language=language,
-            )
-            or _ACTION_TYPE_LABEL_KEYS[action_type]
-        )
     if action_type == "select_discovery_candidate":
         # The chip label is the exact natural-language turn the user saw and
         # tapped; the runtime interprets it as ordinary text.
@@ -297,18 +284,6 @@ def persisted_chat_action(payload: ChatStreamRequest) -> dict[str, Any] | None:
     if payload.action is None:
         return None
     action = payload.action.model_dump(mode="python")
-    if payload.action.type == "retest_run":
-        from argus.api.chat.retest import (
-            retest_action_source_run_id,
-            sanitized_retest_action,
-        )
-
-        source_run_id = retest_action_source_run_id(payload.action.payload)
-        return (
-            sanitized_retest_action(source_run_id)
-            if source_run_id is not None
-            else action
-        )
     if payload.action.type != "select_response_option":
         return action
     action["payload"] = {
