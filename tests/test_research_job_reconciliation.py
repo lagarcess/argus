@@ -10,10 +10,49 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from tests.test_backtest_jobs_async import (
-    _FakeTerminalTaskRunClient,
-    _StaleJobScanGateway,
-)
+class _FakeTerminalTaskRunClient:
+    def __init__(self, payload: dict[str, object]) -> None:
+        self.payload = payload
+        self.calls: list[str] = []
+
+    def get_task_run(self, task_run_id: str) -> dict[str, object]:
+        self.calls.append(task_run_id)
+        return dict(self.payload)
+
+
+class _StaleJobScanGateway:
+    """Research job owner with the same compare-and-set settlement contract."""
+
+    def __init__(self) -> None:
+        self.jobs: list[dict[str, object]] = []
+        self.failed_updates: list[dict[str, object]] = []
+
+    def list_backtest_jobs(
+        self, *, status: str, user_id: str | None = None,
+        limit: int = 100, oldest_first: bool = False,
+    ) -> list[dict[str, object]]:
+        return [dict(job) for job in self.jobs
+                if job.get("status") == status
+                and (user_id is None or job.get("user_id") == user_id)][:limit]
+
+    def get_backtest_job(
+        self, *, user_id: str, job_id: str,
+    ) -> dict[str, object] | None:
+        return next((dict(job) for job in self.jobs
+                     if job.get("user_id") == user_id and job.get("id") == job_id), None)
+
+    def mark_backtest_job_failed(self, **payload: object) -> dict[str, object]:
+        self.failed_updates.append(payload)
+        for job in self.jobs:
+            if job["id"] != payload["job_id"]:
+                continue
+            if job.get("status") != payload.get("expected_status"):
+                return {}
+            if job.get("updated_at") != payload.get("expected_updated_at"):
+                return {}
+            job.update({"status": "failed", **payload})
+            return dict(job)
+        raise AssertionError("unknown research job")
 
 
 def test_stale_scan_settles_a_research_job_whose_poller_died() -> None:
