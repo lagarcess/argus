@@ -6,7 +6,9 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field
 
-ContextProvider = Literal["fred", "alpaca"]
+# Provider names are stored provenance, including historical retired sources.
+# Fetch capability belongs to the active provider adapters, not this reader.
+ContextProvider = str
 ContextPacketType = Literal[
     "macro",
     "news",
