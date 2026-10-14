@@ -698,16 +698,10 @@ def _stream_events_from_runtime(runtime):
 
 @pytest.fixture(autouse=True)
 def _patch_runtime_io(monkeypatch: pytest.MonkeyPatch) -> None:
-    from argus.api import backtest_service
     from argus.api import state as api_state
     from argus.api.chat import persistence as chat_persistence
 
     monkeypatch.setattr(api_state, "supabase_gateway", None)
-    monkeypatch.setattr(
-        backtest_service,
-        "classify_symbol",
-        lambda symbol: SymbolAsset(symbol=symbol.strip().upper(), asset_class="equity"),
-    )
     monkeypatch.setattr(
         chat_persistence,
         "classify_symbol",
