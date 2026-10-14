@@ -59,7 +59,7 @@ def test_effective_tool_catalog_has_no_simulation_executor() -> None:
 
     for include_unavailable in (False, True):
         assert get_tool_catalog(include_unavailable=include_unavailable).get(
-            "run_backtest"
+            "backtest"
         ) is None
 
 
