@@ -131,8 +131,11 @@ export function applyChatHttpErrorToMessages(
 export function chatActionRequestFromAction(
   action: ChatActionOption,
 ): ChatActionRequest {
+  if (!action.type || action.type === "run_backtest" || action.type === "retest_run") {
+    throw new TypeError("Retired or missing request action type");
+  }
   return {
-    type: action.type as NonNullable<ChatActionOption["type"]>,
+    type: action.type,
     label: action.label,
     labelKey: action.labelKey,
     payload: action.payload,
