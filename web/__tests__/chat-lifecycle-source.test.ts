@@ -358,7 +358,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     const sendEnd = chat.indexOf("// \u2500\u2500 Action routing", sendStart);
     const send = chat.slice(sendStart, sendEnd);
 
-    expect(send).toContain('action?.type !== "run_backtest"');
+    expect(send).toContain('action?.type === "run_backtest" || action?.type === "retest_run"');
     expect(send).toContain("snapshotOrdinaryTransportMessageIds");
     expect(send).toContain("ordinaryTransportMessageIds");
     expect(send).toContain("resolveOrdinaryTransportAmbiguityView");
@@ -367,7 +367,7 @@ describe("chat archive/delete lifecycle source contract", () => {
     );
     const ambiguityStart = send.indexOf("if (isOrdinaryTransportAmbiguity)");
     const ambiguityEnd = send.indexOf(
-      "const confirmationId = ambiguousRunConfirmationId",
+      'if (!requestSessions.authorize(requestSession, "catch"))',
       ambiguityStart,
     );
     expect(send.slice(ambiguityStart, ambiguityEnd)).not.toContain(

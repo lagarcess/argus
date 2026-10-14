@@ -147,8 +147,6 @@ import {
   backtestJobMessage,
 } from "@/lib/chat-backtest-jobs";
 import {
-  throwIfAmbiguousRunSseError,
-  throwIfAmbiguousRunStreamTermination,
   useBacktestJobPolling,
 } from "@/lib/chat-run-reconciliation";
 import { isConfirmationAction } from "@/lib/chat-action-ownership";
@@ -1183,8 +1181,7 @@ export default function ChatInterface() {
     const streamInput: string | ChatActionRequest = action?.type
       ? chatActionRequestFromAction(action)
       : trimmed;
-    const requestKind =
-      action?.type === "run_backtest" ? "backtest_job" : "chat_turn";
+    const requestKind = "chat_turn";
     const initialRequestSession = requestSessions.begin(
       targetConversationId,
       requestKind, options?.requestId,
@@ -1194,12 +1191,9 @@ export default function ChatInterface() {
     let requestSession: ChatRequestSession = initialRequestSession;
     const clearObservedDailyCap = dailyCap.captureSuccessClear();
     const terminalReadiness = beginConversationActivityTerminalReadiness(() => requestSession);
-    const ordinaryTransportMessageIds =
-      action?.type === "run_backtest"
-        ? null
-        : await snapshotOrdinaryTransportMessageIds(async () =>
-            loadAllConversationMessagePages(targetConversationId),
-          );
+    const ordinaryTransportMessageIds = await snapshotOrdinaryTransportMessageIds(async () =>
+      loadAllConversationMessagePages(targetConversationId),
+    );
 
     const canApplyVisibleStreamUpdate = () =>
       requestSessions.canWriteVisible(requestSession);
@@ -1238,7 +1232,6 @@ export default function ChatInterface() {
         clearNeutralGuestSubmission();
         const errorPayload = event.data as typeof event.data & Record<string, unknown>;
         if (recoverQuotaRejectedRun(errorPayload.code)) return;
-        throwIfAmbiguousRunSseError(event, action?.type === "run_backtest");
         if (!canApplyVisibleStreamUpdate()) {
           finishRequestTransport(requestSession);
           return;
@@ -1570,15 +1563,11 @@ export default function ChatInterface() {
       return true;
     };
     const streamToConversation = async (nextTargetConversationId: string) => {
-      let runStreamFinalSeen = false;
       await streamChatMessage(
         nextTargetConversationId,
         streamInput,
         i18n.language,
-        (event) => {
-          runStreamFinalSeen ||= event.event === "final";
-          handleStreamEvent(event);
-        },
+        handleStreamEvent,
         // Discovery selections retain their resolver identity; other action
         // turns drop composer mentions.
         action?.type && action.type !== "select_discovery_candidate"
@@ -1590,10 +1579,6 @@ export default function ChatInterface() {
           signal: requestSession.controller.signal,
           failedAssistantId: replacementAssistantId,
         },
-      );
-      throwIfAmbiguousRunStreamTermination(
-        action?.type === "run_backtest",
-        runStreamFinalSeen,
       );
     };
 
@@ -1629,8 +1614,7 @@ export default function ChatInterface() {
         if (err instanceof ChatAccountChangedError) { accountBoundary.invalidate(); return; }
         clearNeutralGuestSubmission();
         const isOrdinaryTransportAmbiguity =
-          action?.type !== "run_backtest" &&
-          (!(err instanceof ChatStreamError) || err.status === 0);
+          !(err instanceof ChatStreamError) || err.status === 0;
         if (isOrdinaryTransportAmbiguity) {
           if (!requestSessions.authorize(requestSession, "ambiguity")) return;
           conversationActivity.progressRequest(
