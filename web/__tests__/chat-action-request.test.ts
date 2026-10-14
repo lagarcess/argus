@@ -14,3 +14,12 @@ test("supported actions preserve their label, payload and ownership", () => {
     ...action, labelKey: undefined, presentation: undefined,
   });
 });
+
+test("retired client exports are absent while shared job reads remain", async () => {
+  const api = await import("../lib/argus-api");
+  const reconciliation = await import("../lib/chat-run-reconciliation");
+  assert.equal("runBacktest" in api, false);
+  assert.equal("getBacktestRun" in api, false);
+  assert.equal("getBacktestJobByAction" in reconciliation, false);
+  assert.equal(typeof api.getBacktestJob, "function");
+});
