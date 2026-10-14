@@ -1,6 +1,5 @@
 import {
   CalendarDays,
-  Check,
   CheckCircle2,
   CircleSlash2,
   type LucideIcon,
@@ -13,10 +12,8 @@ import {
   Send,
   SlidersHorizontal,
   TriangleAlert,
-  X,
 } from "lucide-react";
 import type { TFunction } from "i18next";
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   artifactLifecycleTone,
@@ -39,14 +36,9 @@ import {
   type StrategyConfirmationPayload,
   type StrategyConfirmationStatus,
 } from "./types";
-import {
-  ConfirmationDirectEditControls,
-  inlineEditControlClassName,
-  inlineEditFieldClassName,
-} from "./ConfirmationDirectEdit";
+import { ConfirmationDirectEditControls } from "./ConfirmationDirectEdit";
 import { splitPeriodDisplay } from "./card-formatting";
 import { EntityToken } from "./entity-token";
-import { inlineFailureTextClass } from "@/lib/failure-treatment";
 import {
   confirmationActionLabelKey,
   confirmationStatusAllowsActions,
