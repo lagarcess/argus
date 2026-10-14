@@ -4,9 +4,9 @@ from copy import deepcopy
 from types import SimpleNamespace
 
 import pytest
-from argus.api import backtest_service
 from argus.api.artifact_presentation import reader_payload
-from argus.api.schemas import BacktestRunResponse
+from argus.api.schemas import BacktestRun, BacktestRunResponse
+from argus.domain.backtesting.cards import build_result_card
 from argus.domain.backtest_message_projection import result_fact_bank
 from argus.domain.backtest_run_builder import build_backtest_run_from_result
 from argus.domain.dca_capital import dca_capital_plan_from_config
@@ -14,7 +14,7 @@ from argus.domain.public_excerpt_turns import project_backtest_turn
 from argus.domain.public_excerpts import PublicExcerptSourceError
 from argus.domain.result_readout_facts import engine_config_from_snapshot
 from argus.domain.run_dossiers import project_run_dossier
-from fastapi import Request
+from argus.domain.store import utcnow
 
 from tests.public_excerpt_factories import (
     generated_card_config,
@@ -23,22 +23,21 @@ from tests.public_excerpt_factories import (
 
 
 def direct_run(config, monkeypatch, faker):
-    """Use the current direct API's run/card builder with injected engine output."""
-    monkeypatch.setattr(
-        backtest_service,
-        "compute_alpha_metrics",
-        lambda *_args, **_kwargs: generated_card_metrics(),
-    )
-    monkeypatch.setattr(
-        backtest_service, "build_result_chart", lambda *_args, **_kwargs: None
-    )
-    return backtest_service.create_run_from_payload(
-        {},
-        Request({"type": "http", "method": "POST", "path": "/api/v1/backtests/run"}),
+    """Read a stored direct-run shape without invoking its retired API writer."""
+    metrics = generated_card_metrics()
+    return BacktestRun(
+        id=faker.uuid4(),
         conversation_id=faker.uuid4(),
-        run_id=faker.uuid4(),
-        persist_in_memory=False,
-        prepared_execution=backtest_service.PreparedBacktestExecution(config, None),
+        status="completed",
+        asset_class=config["asset_class"],
+        symbols=config["symbols"],
+        allocation_method="equal_weight",
+        benchmark_symbol=config["benchmark_symbol"],
+        metrics=metrics,
+        config_snapshot=deepcopy(config),
+        conversation_result_card=build_result_card(config, metrics),
+        created_at=utcnow(),
+        chart=None,
     )
 
 
