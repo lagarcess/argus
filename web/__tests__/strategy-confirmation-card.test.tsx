@@ -59,12 +59,23 @@ describe("StrategyConfirmationCard asset heading", () => {
   test("keeps confirmation actions disabled while another turn is in flight", async () => {
     const payload = confirmation(["AAPL"], "buy_and_hold");
     payload.actions = [
-      { id: "run-fresh", type: "run_backtest", label: "Run backtest" },
+      { id: "cancel", type: "cancel_confirmation", label: "Cancel" },
     ];
 
     const markup = await renderConfirmationMarkup(payload, true);
 
-    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>.*Run backtest/);
+    expect(markup).toMatch(/<button[^>]*disabled=""[^>]*>.*Cancel/);
+  });
+
+  test("reads stored confirmations without offering simulation execution", async () => {
+    const payload = confirmation(["AAPL"], "buy_and_hold");
+    payload.actions = [
+      { id: "run", type: "run_backtest", label: "Run backtest" },
+      { id: "retest", type: "retest_run", label: "Retest" },
+    ];
+    const markup = await renderConfirmationMarkup(payload);
+    expect(markup).not.toContain("<button");
+    expect(markup).toContain("AAPL");
   });
 
   test("renders a single entity symbol once when no strategy label exists", async () => {

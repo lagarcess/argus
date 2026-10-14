@@ -101,14 +101,14 @@ async function renderLocalized(
 }
 
 describe("Retest confirmation period disclosure", () => {
-  test("renders an extended provider-effective period and keeps the normal Run label", async () => {
+  test("reads the stored extended period without a Run action", async () => {
     const html = await renderLocalized(confirmation(EXTENDED_PERIOD), "en");
 
     expect(html).toContain(
       "Jan 1, 2024 – Dec 31, 2024 → Jan 1, 2024 – Jun 30, 2026",
     );
     expect(html).toContain("Updated span: about 2.5 years");
-    expect(html).toContain("Run backtest");
+    expect(html).not.toContain("Run backtest");
     expect(html).not.toContain("Run anyway — no new data");
     expect(html).not.toContain("No new data since the original run.");
 
@@ -128,7 +128,7 @@ describe("Retest confirmation period disclosure", () => {
       "1 ene 2024 – 31 dic 2024 → 1 ene 2024 – 30 jun 2026",
     );
     expect(html).toContain("Duración actualizada: aproximadamente 2.5 años");
-    expect(html).toContain("Ejecutar backtest");
+    expect(html).not.toContain("Ejecutar backtest");
     expect(html).not.toContain("Ejecutar de todos modos — no hay datos nuevos");
   });
 

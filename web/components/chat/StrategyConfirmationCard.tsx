@@ -102,7 +102,11 @@ export default function StrategyConfirmationCard({
   const canShowActions =
     (confirmation.confirmation_state === "active" || !confirmation.confirmation_state) &&
     confirmationStatusAllowsActions(displayState.status);
-  const activeActions = canShowActions ? confirmation.actions ?? [] : [];
+  const activeActions = canShowActions
+    ? (confirmation.actions ?? []).filter(
+        (action) => action.type !== "run_backtest" && action.type !== "retest_run",
+      )
+    : [];
   const canDirectEdit =
     canShowActions &&
     !disabled &&
