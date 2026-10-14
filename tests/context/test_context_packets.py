@@ -4,66 +4,19 @@ from datetime import date
 
 import pytest
 from argus.context import (
-    DEFAULT_FRED_CONTEXT_SERIES,
     ContextPacket,
     attach_context_packet_to_run,
     build_alpaca_corporate_actions_packet,
     build_alpaca_market_movers_packet,
     build_alpaca_most_actives_packet,
     build_alpaca_news_packet,
-    build_fred_macro_packet,
-    fred_context_series_from_env,
 )
 from argus.context.rendering import context_packet_fact_summary
 from pydantic import ValidationError
 
 
-def test_fred_macro_packet_is_context_only_and_replayable_snapshot() -> None:
-    packet = build_fred_macro_packet(
-        series_id="FEDFUNDS",
-        observation_start=date(2024, 1, 1),
-        observation_end=date(2024, 3, 31),
-        observations=[
-            {"date": "2024-01-01", "value": "5.33"},
-            {"date": "2024-02-01", "value": "5.33"},
-            {"date": "2024-03-01", "value": "5.25"},
-        ],
-    )
-
-    assert packet.provider == "fred"
-    assert packet.packet_type == "macro"
-    assert packet.not_for == "simulation_truth"
-    assert packet.coverage_start == date(2024, 1, 1)
-    assert packet.facts[0].label == "FEDFUNDS latest observation"
-    assert packet.facts[1].kind == "macro_observation_change"
-
-    attachment = attach_context_packet_to_run(packet, run_id="run-1")
-    assert attachment.packet_id == packet.id
-    assert attachment.immutable_snapshot is True
-    with pytest.raises(ValidationError):
-        ContextPacket.model_validate(
-            {**packet.model_dump(mode="python"), "not_for": "execution_truth"}
-        )
 
 
-def test_default_fred_context_series_prefers_adjusted_macro_context() -> None:
-    assert DEFAULT_FRED_CONTEXT_SERIES == (
-        "FEDFUNDS",
-        "DGS10",
-        "DGS2",
-        "T10Y2Y",
-        "CPIAUCSL",
-        "CPILFESL",
-        "UNRATE",
-        "PAYEMS",
-        "INDPRO",
-        "USREC",
-    )
-    assert fred_context_series_from_env(" unrate, cpiaucsl, UNRATE ") == (
-        "UNRATE",
-        "CPIAUCSL",
-    )
-    assert fred_context_series_from_env("") == DEFAULT_FRED_CONTEXT_SERIES
 
 
 def test_alpaca_news_packet_is_symbol_scoped_not_feed() -> None:

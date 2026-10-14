@@ -17,8 +17,6 @@ from argus.context import (
     fetch_alpaca_market_movers_packet,
     fetch_alpaca_most_actives_packet,
     fetch_alpaca_news_packet,
-    fetch_fred_macro_packet,
-    fred_context_series_from_env,
 )
 
 ContextPacketFetcher = Callable[[], ContextPacket]
@@ -48,9 +46,7 @@ def context_packet_budget_seconds() -> float:
 def collect_context_packets_for_completed_run(
     run: BacktestRun,
     *,
-    fred_series: tuple[str, ...] | None = None,
     budget_seconds: float | None = None,
-    fetch_fred_macro_packet_func: Callable[..., ContextPacket] = fetch_fred_macro_packet,
     fetch_alpaca_news_packet_func: Callable[
         ..., ContextPacket
     ] = fetch_alpaca_news_packet,
@@ -66,9 +62,7 @@ def collect_context_packets_for_completed_run(
 ) -> list[ContextPacket]:
     return collect_context_packet_result_for_completed_run(
         run,
-        fred_series=fred_series,
         budget_seconds=budget_seconds,
-        fetch_fred_macro_packet_func=fetch_fred_macro_packet_func,
         fetch_alpaca_news_packet_func=fetch_alpaca_news_packet_func,
         fetch_alpaca_corporate_actions_packet_func=(
             fetch_alpaca_corporate_actions_packet_func
@@ -81,9 +75,7 @@ def collect_context_packets_for_completed_run(
 def collect_context_packet_result_for_completed_run(
     run: BacktestRun,
     *,
-    fred_series: tuple[str, ...] | None = None,
     budget_seconds: float | None = None,
-    fetch_fred_macro_packet_func: Callable[..., ContextPacket] = fetch_fred_macro_packet,
     fetch_alpaca_news_packet_func: Callable[
         ..., ContextPacket
     ] = fetch_alpaca_news_packet,
@@ -104,20 +96,6 @@ def collect_context_packet_result_for_completed_run(
         return ContextPacketCollectionResult(packets=[], statuses=[])
     start, end = window
     tasks: list[tuple[str, ContextPacketFetcher]] = []
-
-    for series_id in (
-        fred_context_series_from_env() if fred_series is None else fred_series
-    ):
-        tasks.append(
-            (
-                f"fred:{series_id}",
-                lambda series_id=series_id: fetch_fred_macro_packet_func(
-                    series_id=series_id,
-                    observation_start=start,
-                    observation_end=end,
-                ),
-            )
-        )
 
     if run.asset_class == "equity" and run.symbols:
         symbols = list(run.symbols)

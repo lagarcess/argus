@@ -19,7 +19,6 @@ from argus.context import (
     build_alpaca_market_movers_packet,
     build_alpaca_most_actives_packet,
     build_alpaca_news_packet,
-    build_fred_macro_packet,
 )
 from argus.domain.backtest_finalization import (
     MemoryBacktestFinalizationGateway,
@@ -77,16 +76,9 @@ def _conversation() -> Conversation:
     )
 
 
-def _fred_packet(series_id: str = "CPIAUCSL") -> ContextPacket:
-    return build_fred_macro_packet(
-        series_id=series_id,
-        observations=[
-            {"date": "2025-11-01", "value": "310.0"},
-            {"date": "2025-12-01", "value": "311.5"},
-        ],
-        observation_start=date(2025, 1, 1),
-        observation_end=date(2025, 12, 31),
-    )
+def _historical_macro_packet(series_id: str = "CPIAUCSL") -> ContextPacket:
+    # Stored context remains readable; no retired provider is called.
+    return ContextPacket(provider="fred", packet_type="macro", scope={"series_id": series_id})
 
 
 def test_collect_context_packets_uses_run_window_and_current_provider_scope(
@@ -97,9 +89,7 @@ def test_collect_context_packets_uses_run_window_and_current_provider_scope(
 
     packets = collect_context_packets_for_completed_run(
         run,
-        fred_series=("CPIAUCSL",),
         budget_seconds=2.0,
-        fetch_fred_macro_packet_func=lambda **kwargs: _fred_packet(kwargs["series_id"]),
         fetch_alpaca_news_packet_func=lambda **kwargs: build_alpaca_news_packet(
             symbols=kwargs["symbols"],
             news_items=[
@@ -144,7 +134,6 @@ def test_collect_context_packets_uses_run_window_and_current_provider_scope(
 
     packet_types = {packet.packet_type for packet in packets}
     assert packet_types == {
-        "macro",
         "news",
         "corporate_actions",
         "market_movers",
@@ -166,7 +155,6 @@ def test_context_packet_collection_skips_stale_packets_with_status(
 
     result = collect_context_packet_result_for_completed_run(
         _run(),
-        fred_series=(),
         budget_seconds=2.0,
         fetch_alpaca_news_packet_func=lambda **_: stale_news,
         fetch_alpaca_corporate_actions_packet_func=lambda **_: (_ for _ in ()).throw(
@@ -220,7 +208,7 @@ def test_enriched_run_records_context_collection_status_without_live_fetch() -> 
 
 
 def test_enriched_run_replays_attached_context_packet_facts() -> None:
-    enriched = enrich_run_with_context_packets(_run(), [_fred_packet()])
+    enriched = enrich_run_with_context_packets(_run(), [_historical_macro_packet()])
     fact_bank = result_fact_bank(enriched)
 
     assert enriched.conversation_result_card["context_packet_ids"]
@@ -252,7 +240,7 @@ def test_checkpoint_context_detection_prefers_enriched_result_reference() -> Non
         artifact_id="run-1",
         artifact_status="completed",
         metadata=result_fact_bank(
-            enrich_run_with_context_packets(_run(), [_fred_packet()])
+            enrich_run_with_context_packets(_run(), [_historical_macro_packet()])
         ),
     )
 
@@ -306,7 +294,7 @@ def test_persist_runtime_backtest_run_attaches_immutable_context_packets(
     monkeypatch.setattr(
         "argus.api.chat.persistence.collect_context_packet_result_for_completed_run",
         lambda run: ContextPacketCollectionResult(
-            packets=[_fred_packet()],
+            packets=[_historical_macro_packet()],
             statuses=[],
         ),
     )

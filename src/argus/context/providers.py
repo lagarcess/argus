@@ -9,114 +9,7 @@ import httpx
 from argus.context.packets import ContextPacket, ContextPacketFact
 from argus.domain.market_data.new_york_clock import new_york_today
 
-FRED_API_BASE = "https://api.stlouisfed.org/fred"
 ALPACA_DATA_BASE = "https://data.alpaca.markets"
-
-DEFAULT_FRED_CONTEXT_SERIES: tuple[str, ...] = (
-    "FEDFUNDS",
-    "DGS10",
-    "DGS2",
-    "T10Y2Y",
-    "CPIAUCSL",
-    "CPILFESL",
-    "UNRATE",
-    "PAYEMS",
-    "INDPRO",
-    "USREC",
-)
-
-
-def fred_context_series_from_env(value: str | None = None) -> tuple[str, ...]:
-    raw = value if value is not None else os.getenv("ARGUS_FRED_CONTEXT_SERIES")
-    if not raw:
-        return DEFAULT_FRED_CONTEXT_SERIES
-    normalized: list[str] = []
-    for item in raw.split(","):
-        series_id = item.strip().upper()
-        if series_id and series_id not in normalized:
-            normalized.append(series_id)
-    return tuple(normalized) or DEFAULT_FRED_CONTEXT_SERIES
-
-
-def fetch_fred_macro_packet(
-    *,
-    series_id: str,
-    observation_start: date,
-    observation_end: date,
-    api_key: str | None = None,
-) -> ContextPacket:
-    key = (api_key or os.getenv("FRED_API_KEY") or "").strip()
-    if not key:
-        raise ValueError("fred_api_key_required")
-    response = httpx.get(
-        f"{FRED_API_BASE}/series/observations",
-        params={
-            "series_id": series_id,
-            "api_key": key,
-            "file_type": "json",
-            "observation_start": observation_start.isoformat(),
-            "observation_end": observation_end.isoformat(),
-        },
-        timeout=8.0,
-    )
-    response.raise_for_status()
-    payload = response.json()
-    observations = payload.get("observations")
-    if not isinstance(observations, list):
-        observations = []
-    return build_fred_macro_packet(
-        series_id=series_id,
-        observations=observations,
-        observation_start=observation_start,
-        observation_end=observation_end,
-    )
-
-
-def build_fred_macro_packet(
-    *,
-    series_id: str,
-    observations: list[dict[str, Any]],
-    observation_start: date,
-    observation_end: date,
-) -> ContextPacket:
-    parsed = [
-        observation
-        for observation in (
-            _fred_observation_fact(series_id=series_id, observation=item)
-            for item in observations
-        )
-        if observation is not None
-    ]
-    facts: list[ContextPacketFact] = []
-    if parsed:
-        facts.append(parsed[-1])
-    if len(parsed) >= 2:
-        previous = parsed[-2]
-        latest = parsed[-1]
-        change = _as_float(latest.value) - _as_float(previous.value)
-        facts.append(
-            ContextPacketFact(
-                kind="macro_observation_change",
-                label=f"{series_id} change from previous observation",
-                value=round(change, 4),
-                observed_at=latest.observed_at,
-                source_id=latest.source_id,
-            )
-        )
-    return ContextPacket(
-        provider="fred",
-        packet_type="macro",
-        scope={"series_id": series_id},
-        source_ids=tuple(f"{series_id}:{fact.observed_at}" for fact in facts),
-        coverage_start=observation_start,
-        coverage_end=observation_end,
-        freshness="unknown",
-        facts=tuple(facts),
-        limitations=(
-            "FRED macro observations are contextual backdrop only.",
-            "This packet cannot alter simulation metrics, trades, or benchmarks.",
-        ),
-    )
 
 
 def fetch_alpaca_news_packet(
@@ -368,22 +261,6 @@ def build_alpaca_most_actives_packet(
     )
 
 
-def _fred_observation_fact(
-    *,
-    series_id: str,
-    observation: dict[str, Any],
-) -> ContextPacketFact | None:
-    observed_at = _parse_date(observation.get("date"))
-    value = observation.get("value")
-    if observed_at is None or value in (None, ".", ""):
-        return None
-    return ContextPacketFact(
-        kind="macro_observation",
-        label=f"{series_id} latest observation",
-        value=_as_float(value),
-        observed_at=observed_at,
-        source_id=f"{series_id}:{observed_at.isoformat()}",
-    )
 
 
 def _alpaca_news_fact(item: dict[str, Any]) -> ContextPacketFact | None:
