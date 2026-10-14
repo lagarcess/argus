@@ -69,17 +69,8 @@ def _job_response(
     if run is not None:
         from argus.domain.result_readout_content import stored_readout_metadata
 
-        metadata = job.get("execution_metadata")
-        metadata = metadata if isinstance(metadata, dict) else {}
-        readout = next(
-            (
-                value
-                for key in ("result_readout", "result_narrative")
-                if isinstance(value := metadata.get(key), str) and value.strip()
-            ),
-            None,
-        )
-        readout_metadata.update(stored_readout_metadata(metadata))
+        readout = _result_readout_from_job(job)
+        readout_metadata.update(_result_readout_metadata_from_job(job))
         readout_metadata.update(stored_readout_metadata(run.conversation_result_card))
     return BacktestJobResponse(
         job=BacktestJob.model_validate(job),
@@ -88,6 +79,43 @@ def _job_response(
         result_readout=readout,
         **readout_metadata,
     )
+
+
+def _result_readout_from_job(job: dict[str, object]) -> str | None:
+    execution_metadata = job.get("execution_metadata")
+    if not isinstance(execution_metadata, dict):
+        return None
+    workflow_metadata = execution_metadata.get("workflow_backtest")
+    if not isinstance(workflow_metadata, dict):
+        return None
+    result_readout = workflow_metadata.get("result_readout")
+    if not isinstance(result_readout, str):
+        return None
+    normalized = result_readout.strip()
+    return normalized or None
+
+
+def _result_readout_metadata_from_job(job: dict[str, object]) -> dict[str, Any]:
+    execution_metadata = job.get("execution_metadata")
+    if not isinstance(execution_metadata, dict):
+        return {}
+    workflow_metadata = execution_metadata.get("workflow_backtest")
+    if not isinstance(workflow_metadata, dict):
+        return {}
+    metadata: dict[str, Any] = {}
+    source = workflow_metadata.get("result_readout_source")
+    if isinstance(source, str) and source.strip():
+        metadata["result_readout_source"] = source.strip()
+    fallback_used = workflow_metadata.get("result_readout_fallback_used")
+    if isinstance(fallback_used, bool):
+        metadata["result_readout_fallback_used"] = fallback_used
+    failure_mode = workflow_metadata.get("result_readout_failure_mode")
+    if isinstance(failure_mode, str) and failure_mode.strip():
+        metadata["result_readout_failure_mode"] = failure_mode.strip()
+    next_experiments = workflow_metadata.get("next_experiments")
+    if isinstance(next_experiments, dict):
+        metadata["next_experiments"] = next_experiments
+    return metadata
 
 
 def _research_result_message(
