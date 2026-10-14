@@ -9,8 +9,9 @@ from argus.domain.backtesting.date_window import validate_backtest_date_window
 from argus.domain.backtesting.rules import validate_rule_spec
 from argus.domain.capability_registry import ALLOWED_TEMPLATES
 from argus.domain.indicators import normalize_indicator_parameters
-from argus.domain.market_data.classification import SymbolAsset, classify_symbol
 from argus.domain.market_data.capabilities import validate_market_data_window
+from argus.domain.market_data.classification import SymbolAsset as SymbolAsset
+from argus.domain.market_data.classification import classify_symbol
 from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
 
