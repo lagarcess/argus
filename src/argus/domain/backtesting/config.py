@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import math
 import os
-from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Literal
 
@@ -10,7 +9,7 @@ from argus.domain.backtesting.date_window import validate_backtest_date_window
 from argus.domain.backtesting.rules import validate_rule_spec
 from argus.domain.capability_registry import ALLOWED_TEMPLATES
 from argus.domain.indicators import normalize_indicator_parameters
-from argus.domain.market_data import resolve_asset
+from argus.domain.market_data.classification import SymbolAsset, classify_symbol
 from argus.domain.market_data.capabilities import validate_market_data_window
 from argus.domain.market_data.new_york_clock import new_york_today
 from argus.domain.strategy_capabilities import STRATEGY_CAPABILITIES
@@ -41,17 +40,6 @@ _COST_RATE_CAPS = {
     "fee_bps": MAX_FEE_RATE * 10000,
     "slippage_bps": MAX_SLIPPAGE_RATE * 10000,
 }
-
-
-@dataclass(frozen=True)
-class SymbolAsset:
-    symbol: str
-    asset_class: AssetClass
-
-
-def classify_symbol(symbol: str, *, resolve_asset_func=resolve_asset) -> SymbolAsset:
-    resolved = resolve_asset_func(symbol)
-    return SymbolAsset(symbol=resolved.canonical_symbol, asset_class=resolved.asset_class)
 
 
 def default_benchmark(asset_class: AssetClass, symbols: list[str] | None = None) -> str:
