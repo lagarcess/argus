@@ -158,11 +158,7 @@ def chat_request_message(payload: ChatStreamRequest, *, language: str = "en") ->
 def chat_display_message(payload: ChatStreamRequest, *, language: str = "en") -> str:
     if payload.action is None:
         return payload.message or ""
-    label_key = (
-        _ACTION_TYPE_LABEL_KEYS[payload.action.type]
-        if payload.action.type in _BACKEND_OWNED_LABEL_ACTIONS
-        else payload.action.label_key or _ACTION_TYPE_LABEL_KEYS.get(payload.action.type)
-    )
+    label_key = payload.action.label_key or _ACTION_TYPE_LABEL_KEYS.get(payload.action.type)
     if label_key:
         localized = _localized_action_label(label_key, language=language)
         if localized:
