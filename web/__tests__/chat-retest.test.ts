@@ -321,20 +321,20 @@ describe("retest failure recovery", () => {
       label: "Retry",
       type: "retry_last_turn",
       payload: {
-        message: "Retest with current data",
+        message: "Explain this saved result",
         request_message_id: "user-retest-1",
-        chat_action: PERSISTED_ACTION,
+        chat_action: { type: "show_breakdown", label: "Explain result", payload: { run_id: "run-42" } },
       },
     };
 
     const replay = retryLastTurnChatActionFromAction(retryAction);
 
-    expect(replay?.type).toBe("retest_run");
-    expect(replay?.payload).toEqual(PERSISTED_ACTION.payload);
+    expect(replay?.type).toBe("show_breakdown");
+    expect(replay?.payload).toEqual({ run_id: "run-42" });
   });
 
   test("the live failure frame keeps the amber assistant recovery block", () => {
-    // Mirrors ChatInterface's `final` branch for the retest failure payload.
+    // Mirrors the surviving stored-result explanation failure payload.
     const finalPayload = {
       stage_outcome: "ready_to_respond",
       assistant_response:
@@ -342,15 +342,15 @@ describe("retest failure recovery", () => {
       message_id: "assistant-failed",
       recovery: { code: "runtime_failure", retryable: true },
       retry_last_turn: {
-        message: "Retest with current data",
-        action: PERSISTED_ACTION,
+        message: "Explain this saved result",
+        action: { type: "show_breakdown", label: "Explain result", payload: { run_id: "run-42" } },
       },
     };
     const retry = retryLastTurnActionFromMetadata(finalPayload, {
       assistantMessageId: "assistant-failed",
     });
     const rendered = normalizeDurableRetryActionHistory([
-      { id: "user-retest-1", role: "user", kind: "action", content: "Retest with current data" },
+      { id: "user-retest-1", role: "user", kind: "action", content: "Explain result" },
       {
         id: "assistant-failed",
         role: "ai",
@@ -366,7 +366,8 @@ describe("retest failure recovery", () => {
     expect(rendered[1].assistantRecoveryCode).toBe("runtime_failure");
     expect(
       retryLastTurnChatActionFromAction(rendered[1].actions?.[0])?.type,
-    ).toBe("retest_run");
+    ).toBe("show_breakdown");
+    expect(rendered[1].recoveryDisplay).toEqual(recoveryDisplayFromMetadata(finalPayload));
   });
 
   test("a retried receipt turn stays a single visible receipt", () => {
