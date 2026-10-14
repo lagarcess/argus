@@ -593,6 +593,7 @@ def mock_gateway():
         yield gateway
 
 
+@pytest.mark.skip(reason="Retired direct simulation endpoint")
 def test_run_backtest_quota_exceeded_before_provider_preflight(
     monkeypatch: pytest.MonkeyPatch,
     mock_gateway,
@@ -625,6 +626,7 @@ def test_run_backtest_quota_exceeded_before_provider_preflight(
     mock_gateway.check_and_increment_usage_limits.assert_not_called()
 
 
+@pytest.mark.skip(reason="Retired direct simulation endpoint")
 def test_run_backtest_coverage_rejection_does_not_consume_allowance(
     monkeypatch: pytest.MonkeyPatch,
     mock_gateway,
