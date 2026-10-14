@@ -35,6 +35,34 @@ def test_generated_and_checked_artifacts_are_structurally_compatible(
     assert failures == [], "\n".join(failures)
 
 
+def test_retired_simulation_operations_are_absent(generated: dict) -> None:
+    for path in (
+        "/api/v1/backtests/run",
+        "/api/v1/backtests/{run_id}",
+        "/api/v1/backtest-jobs/by-action/{confirmation_id}",
+    ):
+        assert path not in generated["paths"]
+    assert "get" in generated["paths"]["/api/v1/backtest-jobs/{job_id}"]
+
+
+@pytest.mark.parametrize("action_type", ("run_backtest", "retest_run"))
+def test_retired_chat_execution_actions_are_rejected(action_type: str) -> None:
+    from argus.api.schemas import ChatActionPayload
+    from pydantic import ValidationError
+
+    with pytest.raises(ValidationError):
+        ChatActionPayload.model_validate({"type": action_type, "payload": {}})
+
+
+def test_effective_tool_catalog_has_no_simulation_executor() -> None:
+    from argus.domain.capability_registry import get_tool_catalog
+
+    for include_unavailable in (False, True):
+        assert get_tool_catalog(include_unavailable=include_unavailable).get(
+            "run_backtest"
+        ) is None
+
+
 def test_search_declares_bounded_visible_conversation_recall(
     generated: dict,
 ) -> None:
