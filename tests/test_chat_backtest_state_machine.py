@@ -157,24 +157,24 @@ def _conversation(client: TestClient) -> dict[str, Any]:
 @pytest.mark.parametrize(
     ("headers", "action_payload", "expected_status", "expected_code"),
     [
-        ({}, {"confirmation_id": "confirmation-1"}, 400, "idempotency_key_required"),
+        ({}, {"confirmation_id": "confirmation-1"}, 422, "validation_error"),
         (
             {"X-Idempotency-Key": "confirmation-1"},
             {"confirmation_id": "confirmation-1"},
-            400,
-            "idempotency_key_required",
+            422,
+            "validation_error",
         ),
         (
             {"X-Request-Id": "confirmation-1"},
             {"confirmation_id": "confirmation-1"},
-            400,
-            "idempotency_key_required",
+            422,
+            "validation_error",
         ),
         (
             {"Idempotency-Key": "   "},
             {"confirmation_id": "confirmation-1"},
-            400,
-            "idempotency_key_required",
+            422,
+            "validation_error",
         ),
         (
             {"Idempotency-Key": "confirmation-1"},
@@ -185,12 +185,12 @@ def _conversation(client: TestClient) -> dict[str, Any]:
         (
             {"Idempotency-Key": "confirmation-other"},
             {"confirmation_id": "confirmation-1"},
-            409,
-            "idempotency_conflict",
+            422,
+            "validation_error",
         ),
     ],
 )
-def test_run_action_identity_is_rejected_before_route_side_effects(
+def test_retired_run_is_rejected_before_route_side_effects(
     monkeypatch: pytest.MonkeyPatch,
     headers: dict[str, str],
     action_payload: dict[str, str],
@@ -943,7 +943,7 @@ def test_confirmation_action_requires_pending_confirmation(
     assert runtime_calls == 0
 
 
-def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
+def test_retired_confirmation_run_is_rejected_without_runtime_execution(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from argus.api.routers import agent as agent_router
@@ -993,27 +993,10 @@ def test_confirmation_action_routes_without_fake_yes_and_orders_result_first(
         },
     )
 
-    assert response.status_code == 200
-    assert seen_messages == [
-        "Buy and hold Apple over the past year",
-        "run backtest",
-    ]
-    assert (
-        "Run backtest"
-        in client.get(f"/api/v1/conversations/{conversation['id']}/messages").text
-    )
-    assert "event:" not in response.text
-    assert response.text.count("data: [DONE]") == 1
-    run = _stream_payloads(response.text, "result")[0]["run"]
-    assert [action["type"] for action in run["conversation_result_card"]["actions"]] == [
-        "show_breakdown",
-        "refine_strategy",
-    ]
-    for action in run["conversation_result_card"]["actions"]:
-        assert action["presentation"] == "result"
-        assert action["payload"]["run_id"] == run["id"]
-        assert action["payload"]["strategy_id"] is None
-        assert action["payload"]["conversation_id"] == conversation["id"]
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+    assert seen_messages == ["Buy and hold Apple over the past year"]
+    assert _stream_payloads(response.text, "result") == []
 
 
 @pytest.mark.parametrize(
@@ -1256,7 +1239,7 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
 
     def _runtime(**kwargs: Any) -> dict[str, Any]:
         nonlocal runtime_calls
-        if kwargs["message"] != "run backtest":
+        if kwargs["message"] != "Read my stored result":
             return _confirmation_runtime_result()
         runtime_calls += 1
         return _result_runtime_result()
@@ -1301,33 +1284,16 @@ def test_result_breakdown_action_uses_stored_result_without_rerun(
     )
     client = _client()
     conversation = _conversation(client)
-    confirmation = client.post(
-        "/api/v1/chat/stream",
-        json={
-            "conversation_id": conversation["id"],
-            "message": "Buy and hold Apple over the past year",
-            "language": "en",
-        },
-    )
-    assert confirmation.status_code == 200
-    confirmation_payload = _stream_payloads(confirmation.text, "confirmation")[0][
-        "confirmation"
-    ]
-    run_action = next(
-        action
-        for action in confirmation_payload["actions"]
-        if action["type"] == "run_backtest"
-    )
-
+    # Seed the historical result through mocked publication, not retired Run.
     first = client.post(
         "/api/v1/chat/stream",
-        headers={"Idempotency-Key": run_action["payload"]["confirmation_id"]},
         json={
             "conversation_id": conversation["id"],
-            "action": run_action,
+            "message": "Read my stored result",
             "language": "en",
         },
     )
+    assert first.status_code == 200
     run_id = _stream_payloads(first.text, "result")[0]["run"]["id"]
 
     second = client.post(
