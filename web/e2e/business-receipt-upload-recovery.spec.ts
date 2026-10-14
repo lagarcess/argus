@@ -8,7 +8,7 @@ async function openIntake(page: Page) {
   await installBreakpointFixture(page, { language: "es-419", theme: "light", emptyChat: true });
   const source = createFixtureBusinessDataSource({ chatAvailable: false });
   const attempts: { key: string; consent: string; bytes: Buffer }[] = [];
-  const state = { status: 422 };
+  const state = { status: 422, networkFailure: false };
   await page.route("**/api/v1/business/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname.split("/business/")[1];
@@ -18,6 +18,7 @@ async function openIntake(page: Page) {
     }
     if (path === "receipts" && request.method() === "POST") {
       attempts.push({ key: request.headers()["idempotency-key"], consent: request.headers()["x-extraction-consent"], bytes: request.postDataBuffer() ?? Buffer.alloc(0) });
+      if (state.networkFailure) return route.abort("connectionfailed");
       return route.fulfill({ status: state.status, json: { code: state.status === 415 ? "document_media_type_unsupported" : "invalid_document", detail: "PRIVATE_VALIDATION_DETAIL" } });
     }
     if (path === "space") return route.fulfill({ json: { id: "fixture-space", name: "Negocio de prueba" } });
@@ -53,24 +54,42 @@ for (const width of [1280, 390]) {
       expect(footerBounds.y + footerBounds.height).toBeLessThanOrEqual(844);
       await page.screenshot({ path: testInfo.outputPath(`receipt-upload-consent-${width}.png`) });
       await dialog.getByRole("button", { name: "Guardar los archivos pendientes", exact: true }).click();
-      await expect(dialog.getByRole("alert")).toHaveText("No pudimos leer el recibo. Inténtalo de nuevo.");
+      await expect(dialog.getByRole("alert")).toHaveText("No pudimos leer el recibo. Inténtalo de nuevo. No se guardará dos veces.");
       await expect(dialog).not.toContainText("PRIVATE_VALIDATION_DETAIL");
       await expect(dialog).not.toContainText("422");
       await expect(dialog).not.toContainText("XML, XML");
       // Changing the checkbox cannot change the first attempt's consent.
       await consent.getByRole("checkbox").uncheck();
-      state.status = 415;
-      await dialog.getByRole("button", { name: "Reintentar", exact: true }).click();
-      await expect(dialog.getByRole("alert")).toContainText("Este archivo no es compatible. Prueba con");
+      state.status = 503;
+      const retry = dialog.getByRole("button", { name: "Reintentar", exact: true });
+      await retry.click();
+      await expect(dialog.getByRole("alert")).toHaveText("No pudimos guardar el recibo. Inténtalo de nuevo. No se guardará dos veces.");
+      await expect(dialog).not.toContainText("PRIVATE_VALIDATION_DETAIL");
+      await expect(dialog).not.toContainText("503");
       expect(attempts).toHaveLength(2);
       expect(attempts[1]).toEqual(attempts[0]);
+      await page.screenshot({ path: testInfo.outputPath(`receipt-upload-server-failure-${width}.png`) });
+      state.networkFailure = true;
+      const disconnected = page.waitForEvent("requestfailed", (request) => request.url().endsWith("/business/receipts"));
+      await retry.click();
+      await disconnected;
+      await expect(retry).toBeEnabled();
+      await expect(dialog.getByRole("alert")).toHaveText("No pudimos guardar el recibo. Inténtalo de nuevo. No se guardará dos veces.");
+      expect(attempts).toHaveLength(3);
+      expect(attempts[2]).toEqual(attempts[0]);
+      state.networkFailure = false;
+      state.status = 415;
+      await retry.click();
+      await expect(dialog.getByRole("alert")).toContainText("Este archivo no es compatible. Prueba con");
+      expect(attempts).toHaveLength(4);
+      expect(attempts[3]).toEqual(attempts[0]);
       await expect(dialog.getByRole("button", { name: "Reintentar", exact: true })).toHaveCount(0);
       await page.screenshot({ path: testInfo.outputPath(`receipt-upload-unsupported-${width}.png`) });
       await dialog.getByRole("button", { name: "Elegir otro archivo", exact: true }).click();
       await picker.setInputFiles({ name: "replacement.png", mimeType: "image/png", buffer: Buffer.from("synthetic fixture") });
       await expect(dialog.getByTestId("receipt-upload-queue")).toContainText("replacement.png");
       await expect(dialog.getByTestId("receipt-upload-queue")).not.toContainText("synthetic.jpg");
-      expect(attempts).toHaveLength(2);
+      expect(attempts).toHaveLength(4);
     });
   });
 }

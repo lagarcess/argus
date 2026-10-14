@@ -16,7 +16,8 @@ export function composerUploadDisposition(origin: UploadOrigin, current: { conve
 
 export type ReceiptUpload = UploadFile & (
   | { status: "queued" }
-  | { status: "uploading" | "failed"; consent: boolean }
+  | { status: "uploading"; consent: boolean }
+  | { status: "failed"; consent: boolean; failure: "unreadable" | "save" }
   | { status: "saved"; consent: boolean; receipt: ReceiptSummary }
   | { status: "rejected"; reason: UploadRejection }
 );
@@ -119,7 +120,10 @@ export class ReceiptUploadQueue {
           if (error instanceof Error && "status" in error && error.status === 415) {
             this.replace({ ...item, status: "rejected", reason: "unsupported" });
           } else {
-            this.replace({ ...attempt, status: "failed" });
+            const unreadable = error instanceof Error && "status" in error && error.status === 422 &&
+              "code" in error && typeof error.code === "string" &&
+              ["invalid_document", "document_empty", "empty_document", "unsupported_image_frames"].includes(error.code);
+            this.replace({ ...attempt, status: "failed", failure: unreadable ? "unreadable" : "save" });
           }
           continue;
         }

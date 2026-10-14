@@ -177,3 +177,25 @@ test("a server type rejection asks for another file rather than resending it", a
   await queue.save("inbox", true);
   expect(calls).toBe(1);
 });
+
+test.each([
+  { name: "network interruption", error: new TypeError("PRIVATE_TRANSPORT_DETAIL"), failure: "save" },
+  { name: "server failure", error: Object.assign(new Error("PRIVATE_SERVER_DETAIL"), { status: 503, code: "invalid_document" }), failure: "save" },
+  { name: "unreadable document", error: Object.assign(new Error("PRIVATE_FILE_DETAIL"), { status: 422, code: "invalid_document" }), failure: "unreadable" },
+  { name: "request schema failure", error: Object.assign(new Error("PRIVATE_VALIDATION_DETAIL"), { status: 422, code: "validation_error" }), failure: "save" },
+])("$name keeps a safe failure category, file, key and AI choice for retry", async ({ error, failure }) => {
+  const calls: Array<{ candidate: File; consent: boolean; key: string }> = [];
+  const queue = new ReceiptUploadQueue(async (candidate, consent, key) => {
+    calls.push({ candidate, consent, key });
+    if (calls.length === 1) throw error;
+    return savedReceipt(key);
+  }, () => undefined);
+  const selected = file("receipt.txt");
+  queue.add([selected], limits, "inbox");
+  await queue.save("inbox", true);
+  expect(queue.snapshot()[0]).toMatchObject({ status: "failed", failure });
+  expect(JSON.stringify(queue.snapshot())).not.toContain("PRIVATE_");
+  await queue.save("inbox", false);
+  expect(calls[1]).toEqual(calls[0]);
+  expect(queue.snapshot()[0].status).toBe("saved");
+});

@@ -205,10 +205,10 @@ jobs:
         run: cd web && bunx playwright install --with-deps chromium
 
       - name: Verify browser storage matches the privacy disclosure
-        run: |
-          cd web
-          bunx playwright test e2e/browser-storage-disclosure.spec.ts
-          NEXT_PUBLIC_BUSINESS_PILOT_ENABLED=true PLAYWRIGHT_PORT=3101 bunx playwright test e2e/business-receipt-upload-recovery.spec.ts
+        run: cd web && bunx playwright test e2e/browser-storage-disclosure.spec.ts
+
+      - name: Verify receipt upload recovery
+        run: cd web && NEXT_PUBLIC_BUSINESS_PILOT_ENABLED=true PLAYWRIGHT_PORT=3101 bunx playwright test e2e/business-receipt-upload-recovery.spec.ts
 
       - name: Retain receipt upload browser evidence
         if: always()

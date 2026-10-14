@@ -248,7 +248,9 @@ function IntakeForm({ limits, target, queue, onClose, onReview }: IntakeProps & 
                 {item.status === "failed" ? (
                   <div className="mt-2 space-y-2">
                     <p role="alert" className="text-sm text-[#a8434c] dark:text-[#ec9aa0]">
-                      {t("business.intake.failed", "We couldn't read the receipt. Try again.")}
+                      {item.failure === "unreadable"
+                        ? t("business.intake.failed", "We couldn't read the receipt. Try again. It won't be saved twice.")
+                        : t("business.intake.failed_save", "We couldn't save the receipt. Try again. It won't be saved twice.")}
                     </p>
                     <button type="button" disabled={uploading} className={secondaryButtonClass} onClick={() => void queue.save(target, consent, item.key)}>
                       {t("common.retry", "Retry")}

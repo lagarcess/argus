@@ -2665,7 +2665,8 @@
       "choose": "Choose file",
       "choose_another": "Choose another file",
       "camera": "Take photo",
-      "failed": "We couldn't read the receipt. Try again.",
+      "failed": "We couldn't read the receipt. Try again. It won't be saved twice.",
+      "failed_save": "We couldn't save the receipt. Try again. It won't be saved twice.",
       "consent": "Prepare it with AI after saving. The receipt is sent to our AI provider to fill in the details for your review. Leave this off to fill them in yourself."
     },
     "period": {
