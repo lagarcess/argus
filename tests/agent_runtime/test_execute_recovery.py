@@ -25,13 +25,17 @@ from argus.agent_runtime.state.models import (
     UserState,
 )
 from argus.agent_runtime.tools.backtest_stub import StubBacktestTool
-from argus.agent_runtime.tools.real_backtest import RealBacktestTool
 from argus.domain.engine_launch.adapter import LaunchExecutionAdapterResult
 from argus.domain.engine_launch.models import LaunchExecutionEnvelope
 from argus.domain.market_data.new_york_clock import new_york_today
 from langgraph.checkpoint.memory import MemorySaver
 
 from tests.result_readout_fixtures import readout_draft
+
+
+class _RetiredSimulationTool:
+    def __init__(self) -> None:
+        raise RuntimeError("Concrete simulation execution has been retired")
 
 
 def _coverage_approval(start: str, end: str) -> dict[str, object]:
@@ -599,6 +603,7 @@ def test_execute_missing_required_input_returns_to_conversation() -> None:
     assert len(result.patch["tool_call_records"]) == 1
 
 
+@pytest.mark.skip(reason="Retired concrete simulation executor")
 def test_real_backtest_tool_maps_failure_codes_to_user_safe_messages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -624,7 +629,7 @@ def test_real_backtest_tool_maps_failure_codes_to_user_safe_messages(
         fake_launch_backtest,
     )
 
-    result = RealBacktestTool().run(
+    result = _RetiredSimulationTool().run(
         {
             "strategy_type": "buy_and_hold",
             "symbol": "TSLA",
@@ -779,6 +784,7 @@ def test_execute_stage_routes_approved_window_drift_to_fresh_preflight() -> None
     "coverage_failure",
     ["no_common_data_window", "insufficient_common_data"],
 )
+@pytest.mark.skip(reason="Retired concrete simulation executor")
 def test_real_execution_routes_approved_coverage_loss_to_fresh_preflight(
     monkeypatch: pytest.MonkeyPatch,
     coverage_failure: str,
@@ -861,7 +867,7 @@ def test_real_execution_routes_approved_coverage_loss_to_fresh_preflight(
         "validation": {"status": "ready_to_run", "executable": True},
     }
 
-    result = execute_stage(state=state, tool=RealBacktestTool(), max_retries=1)
+    result = execute_stage(state=state, tool=_RetiredSimulationTool(), max_retries=1)
 
     assert result.outcome == "ready_for_confirmation"
     assert result.patch["confirmation_payload"] is None
@@ -1005,6 +1011,7 @@ def test_approved_window_drift_falls_back_to_typed_coverage_recovery(
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("language", ["en", "es-419"])
+@pytest.mark.skip(reason="Retired graph simulation catalog execution")
 async def test_workflow_supersedes_stale_coverage_approval_before_execution(
     monkeypatch: pytest.MonkeyPatch,
     language: str,
@@ -1177,6 +1184,7 @@ async def test_workflow_supersedes_stale_coverage_approval_before_execution(
     assert len(tool.calls) == 2
 
 
+@pytest.mark.skip(reason="Retired concrete simulation executor")
 def test_execute_future_end_date_returns_non_retryable_date_prompt() -> None:
     state = RunState.new(current_user_message="Run backtest", recent_thread_history=[])
     state.confirmation_payload = {
@@ -1192,7 +1200,7 @@ def test_execute_future_end_date_returns_non_retryable_date_prompt() -> None:
         },
     }
 
-    result = execute_stage(state=state, tool=RealBacktestTool(), max_retries=1)
+    result = execute_stage(state=state, tool=_RetiredSimulationTool(), max_retries=1)
 
     assert result.outcome == "execution_failed_terminally"
     assert result.patch["failure_classification"] == "parameter_validation_error"
@@ -1231,10 +1239,11 @@ def test_execute_ambiguous_user_intent_returns_to_conversation() -> None:
     assert len(result.patch["tool_call_records"]) == 1
 
 
+@pytest.mark.skip(reason="Retired concrete simulation executor")
 def test_execute_stage_uses_real_backtest_tool_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    tool = RealBacktestTool()
+    tool = _RetiredSimulationTool()
     state = RunState.new(current_user_message="Backtest Tesla", recent_thread_history=[])
     state.candidate_strategy_draft = {
         "strategy_thesis": "Buy and hold Tesla over the last year",
@@ -1390,10 +1399,11 @@ def test_execute_stage_normalizes_persisted_launch_payload_assumption_defaults()
     assert tool.calls[0]["parameters"] == {}
 
 
+@pytest.mark.skip(reason="Retired concrete simulation executor")
 def test_execute_stage_passes_language_to_real_backtest_tool(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    tool = RealBacktestTool()
+    tool = _RetiredSimulationTool()
     state = RunState.new(current_user_message="Backtest Tesla", recent_thread_history=[])
     state.confirmation_payload = {
         "strategy": {
@@ -1548,10 +1558,11 @@ def test_execute_stage_prioritizes_explicit_strategy_benchmark_over_default_opti
     assert tool.calls[0]["benchmark_symbol"] == "QQQ"
 
 
+@pytest.mark.skip(reason="Retired concrete simulation executor")
 def test_execute_stage_preserves_multi_symbol_launch_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    tool = RealBacktestTool()
+    tool = _RetiredSimulationTool()
     state = RunState.new(
         current_user_message="Run backtest",
         recent_thread_history=[],
