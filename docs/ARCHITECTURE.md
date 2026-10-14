@@ -12,6 +12,15 @@
 > [!NOTE]
 > This document contains both existing system descriptions and intended runtime contracts. Check code and release evidence for availability. Resolve a concrete discrepancy in the assigned scope; this document does not select the architecture of the new ecosystem or authorize an unrelated migration.
 
+## Legacy Argus removal assignment, October 14, 2026
+
+The founder authorized removal of legacy backtests, Tavily and FRED on the strip
+worker branch. The [bounded spec](superpowers/specs/2026-10-14-argus-strip.md) owns
+this change; dated preservation statements below describe the earlier product.
+Backtest execution and exclusive discovery/result surfaces are retired in this
+candidate. Shared Cuadrao accounting, calculations, auth, conversations and
+Business/Consumer services remain. This is no hosted availability claim.
+
 ---
 
 # 1. Architecture Philosophy

@@ -128,6 +128,15 @@ An approved future experience does not contradict a currently hidden feature.
 Update this table when the corresponding release changes availability. Design
 and experience documents link here rather than maintain separate state lists.
 
+## Legacy Argus removal assignment, October 14, 2026
+
+The founder authorized removal of legacy backtests, Tavily and FRED on the strip
+worker branch. The [bounded spec](superpowers/specs/2026-10-14-argus-strip.md) owns
+this change; dated preservation statements below describe the earlier product.
+Backtest execution and exclusive discovery/result surfaces are retired in this
+candidate. Shared Cuadrao accounting, calculations, auth, conversations and
+Business/Consumer services remain. This is no hosted availability claim.
+
 ---
 
 # 6. Language Experience (Alpha)

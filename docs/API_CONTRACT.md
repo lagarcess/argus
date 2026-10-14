@@ -9,6 +9,19 @@
 > [!IMPORTANT]
 > **Locked Status**: No breaking changes (structural JSON shape changes) are allowed without explicit approval or critical implementation blockers. Additive changes and clarifications are permitted.
 
+## Legacy Argus removal assignment, October 14, 2026
+
+The founder authorized removal of legacy backtests, Tavily and FRED on the strip
+worker branch. The [bounded spec](superpowers/specs/2026-10-14-argus-strip.md) owns
+this change; dated preservation statements below describe the earlier product.
+Backtest execution and exclusive discovery/result surfaces are retired in this
+candidate. Shared Cuadrao accounting, calculations, auth, conversations and
+Business/Consumer services remain. This is no hosted availability claim.
+
+Retired execution contracts: `/backtests/run`, `/backtests/jobs`, job retry/cancel,
+`/backtests/{id}`, and their chat Run/retest/result actions. They are absent from
+the executable API. Shared calculation and conversational routes remain.
+
 ---
 
 # 1. Contract Principles

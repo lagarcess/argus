@@ -6,6 +6,19 @@
 **Audience:** Backend engineers, database agents, API agents, frontend agents
 **Purpose:** Define existing entities, relationships, ownership rules, and persistence contracts. The [MVEE](specs/argus-minimum-viable-ecosystem-experience.md) owns the approved experience; its financial records and household permissions still need explicit schema and access-control design.
 
+## Legacy Argus removal assignment, October 14, 2026
+
+The founder authorized removal of legacy backtests, Tavily and FRED on the strip
+worker branch. The [bounded spec](superpowers/specs/2026-10-14-argus-strip.md) owns
+this change; dated preservation statements below describe the earlier product.
+Backtest execution and exclusive discovery/result surfaces are retired in this
+candidate. Shared Cuadrao accounting, calculations, auth, conversations and
+Business/Consumer services remain. This is no hosted availability claim.
+
+All migration history and stored rows remain. No backtest/strategy/job table is
+dropped, truncated or rewritten. Historical conversation metadata stays stored;
+retained compatibility readers cannot launch simulations.
+
 ---
 
 # 1. Data Model Philosophy
