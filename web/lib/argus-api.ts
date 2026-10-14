@@ -920,31 +920,6 @@ export async function createEvidenceDecision(
 
 // ─── Backtests ────────────────────────────────────────────────────────────────
 
-export async function runBacktest(payload: {
-  template?: string;
-  asset_class?: AssetClass;
-  symbols: string[];
-  strategy_id?: string;
-  conversation_id?: string;
-  timeframe?: string;
-  start_date?: string;
-  end_date?: string;
-  starting_capital?: number;
-}) {
-  return apiFetch<{ run: BacktestRun }>("/backtests/run", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Idempotency-Key": randomId(),
-    },
-    body: JSON.stringify(payload),
-  });
-}
-
-export async function getBacktestRun(runId: string) {
-  return apiFetch<{ run: BacktestRun }>(`/backtests/${runId}`);
-}
-
 export async function getBacktestJob(jobId: string) {
   return apiFetch<BacktestJobResponse>(`/backtest-jobs/${jobId}`);
 }

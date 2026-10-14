@@ -1382,6 +1382,9 @@ describe("Argus Alpha frontend contract", () => {
     expect(chat).not.toContain("getBacktestRun(item.id)");
     expect(chat).toContain("void loadConversation(item.conversation_id)");
     expect(api).toContain("export async function getBacktestJob");
+    expect(api).not.toContain('"/backtests/run"');
+    expect(api).not.toContain('`/backtests/${runId}`');
+    expect(api).toContain('`/backtest-jobs/${jobId}`');
     expect(chat).not.toContain(
       'kind: m.content.includes("result") ? "strategy_result" : "text"',
     );
