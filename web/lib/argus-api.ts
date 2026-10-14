@@ -403,7 +403,7 @@ export type ChatFinalPayload = {
 };
 
 export type ChatActionRequest = {
-  type: NonNullable<ChatActionOption["type"]>;
+  type: Exclude<NonNullable<ChatActionOption["type"]>, "run_backtest" | "retest_run">;
   label?: string;
   labelKey?: string;
   payload?: Record<string, unknown>;
