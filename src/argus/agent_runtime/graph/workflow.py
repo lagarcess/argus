@@ -151,24 +151,6 @@ _TURN_SCOPED_OUTPUT_KEYS = frozenset(
 )
 
 
-class DefaultBacktestTool:
-    def run(self, payload: dict[str, Any]) -> dict[str, Any]:
-        del payload
-        return deepcopy(
-            {
-                "success": True,
-                "payload": {
-                    "total_return": 0.14,
-                    "benchmark_return": 0.09,
-                },
-                "error_type": None,
-                "error_message": None,
-                "retryable": False,
-                "capability_context": {},
-            }
-        )
-
-
 def build_workflow(
     *,
     contract: CapabilityContract | None = None,
@@ -181,7 +163,7 @@ def build_workflow(
     business_runtime: Any | None = None,
 ):
     active_contract = contract or build_default_capability_contract()
-    active_tool = tool or DefaultBacktestTool()
+    active_tool = tool
 
     async def interpret_node(state: WorkflowState) -> WorkflowState:
         if business_runtime is not None:
