@@ -13,7 +13,6 @@ from argus.context.packets import ContextPacket
 def test_freshness_policy_defines_minimum_launch_ttls() -> None:
     assert freshness_policy_for("ohlcv_historical").ttl_seconds > 24 * 60 * 60
     assert freshness_policy_for("ohlcv_recent").ttl_seconds < 60 * 60
-    assert freshness_policy_for("fred_macro").ttl_seconds >= 24 * 60 * 60
     assert freshness_policy_for("alpaca_corporate_actions").ttl_seconds > (
         freshness_policy_for("alpaca_news").ttl_seconds
     )
@@ -47,7 +46,6 @@ def test_freshness_subjects_cover_launch_stack_without_new_provider_scope() -> N
     expected: set[FreshnessSubject] = {
         "ohlcv_historical",
         "ohlcv_recent",
-        "fred_macro",
         "alpaca_corporate_actions",
         "alpaca_news",
         "alpaca_movers",

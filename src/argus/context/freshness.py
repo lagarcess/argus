@@ -9,7 +9,6 @@ from argus.context.packets import ContextFreshness, ContextPacket, ContextPacket
 FreshnessSubject = Literal[
     "ohlcv_historical",
     "ohlcv_recent",
-    "fred_macro",
     "alpaca_corporate_actions",
     "alpaca_news",
     "alpaca_movers",
@@ -33,7 +32,6 @@ _DAY = 24 * 60 * 60
 _POLICIES: dict[FreshnessSubject, FreshnessPolicy] = {
     "ohlcv_historical": FreshnessPolicy("ohlcv_historical", 30 * _DAY),
     "ohlcv_recent": FreshnessPolicy("ohlcv_recent", 15 * 60),
-    "fred_macro": FreshnessPolicy("fred_macro", _DAY),
     "alpaca_corporate_actions": FreshnessPolicy(
         "alpaca_corporate_actions", 7 * _DAY
     ),
@@ -50,7 +48,6 @@ _POLICIES: dict[FreshnessSubject, FreshnessPolicy] = {
 }
 
 _PACKET_SUBJECTS: dict[ContextPacketType, FreshnessSubject] = {
-    "macro": "fred_macro",
     "news": "alpaca_news",
     "corporate_actions": "alpaca_corporate_actions",
     "market_movers": "alpaca_movers",
