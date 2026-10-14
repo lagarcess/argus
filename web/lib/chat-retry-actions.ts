@@ -12,7 +12,6 @@ function stringOrNull(value: unknown): string | null {
 }
 
 const STRUCTURED_CHAT_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"]>>([
-  "run_backtest",
   "change_dates",
   "change_asset",
   "adjust_assumptions",
@@ -23,7 +22,6 @@ const STRUCTURED_CHAT_ACTION_TYPES = new Set<NonNullable<ChatActionOption["type"
   "retry_failed_action",
   "select_response_option",
   "select_discovery_candidate",
-  "retest_run",
 ]);
 
 function structuredChatActionOrNull(value: unknown): ChatActionOption | null {

@@ -235,7 +235,7 @@ describe("failed-action retry UI contract", () => {
     });
   });
 
-  test("preserves a typed chat action for finalization retry", () => {
+  test("does not replay a retired execution action for finalization retry", () => {
     const action = retryLastTurnActionFromMetadata(
       {
         retry_last_turn: {
@@ -251,12 +251,7 @@ describe("failed-action retry UI contract", () => {
       { assistantMessageId: "assistant-finalization-failed" },
     );
 
-    expect(retryLastTurnChatActionFromAction(action)).toEqual({
-      type: "run_backtest",
-      label: "Run backtest",
-      payload: { confirmation_id: "confirmation-1" },
-      presentation: "confirmation",
-    });
+    expect(retryLastTurnChatActionFromAction(action)).toBeNull();
   });
 
   test("retries a failed response option with only its durable request identity", () => {
