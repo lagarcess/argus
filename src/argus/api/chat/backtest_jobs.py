@@ -36,7 +36,6 @@ from argus.domain.backtest_admission import (
 TRUE_VALUES = {"1", "true", "yes", "on"}
 SHADOW_JOB_SCHEMA_VERSION = "backtest_job_launch/v1"
 DEFAULT_WORKFLOW_TASK = "argus-backtests/workflow_proof"
-DEFAULT_REAL_WORKFLOW_TASK = "argus-backtests/run_backtest_job"
 PROOF_JOB_KIND = "render_workflow_proof"
 REAL_BACKTEST_JOB_KIND = "run_backtest_job"
 RENDER_TASK_RUNS_URL = "https://api.render.com/v1/task-runs"
@@ -191,10 +190,6 @@ def _utcnow_iso() -> str:
 
 
 def _workflow_task_id() -> str:
-    if backtest_workflow_execution_enabled():
-        return (
-            os.getenv("ARGUS_BACKTEST_REAL_WORKFLOW_TASK") or DEFAULT_REAL_WORKFLOW_TASK
-        ).strip()
     return (
         os.getenv("ARGUS_BACKTEST_WORKFLOW_TASK")
         or os.getenv("ARGUS_RENDER_WORKFLOW_PROOF_TASK")
