@@ -748,7 +748,7 @@
       ]
     },
     "codex/cuadrao-default-spanish-20261013": {
-      "description": "On a Cuadrao Business build Spanish (es-419) is the language a visitor sees first and the browser's language never decides; a choice saved on the device does, and the account's saved language rules once signed in. The auth page gets a footer link named by the other language (English / Espa\u00f1ol) that switches at once and is saved on the account at sign-in. Consumer builds keep English and browser detection.",
+      "description": "On a Cuadrao Business build Spanish (es-419) is the language a visitor sees first and the browser's language never decides; a choice saved on the device does, and the account's saved language rules once signed in. The auth page gets a footer link named by the other language (English / Español) that switches at once and is saved on the account at sign-in. Consumer builds keep English and browser detection.",
       "base_ref": "origin/codex/private-alpha-next",
       "allow": [
         ".agent/ownership/branch_ownership.json",
@@ -1188,32 +1188,6 @@
         "web/lib/business-api.ts",
         "web/public/locales/en/common.json",
         "web/public/locales/es-419/common.json"
-      ],
-      "deny": [
-        ".env",
-        "web/.env.local",
-        ".env.*",
-        "web/.env.*"
-      ]
-    },
-    "codex/cuadrao-followups-20261013": {
-      "description": "Review follow-ups collected from #1063, #1064, #1067, #1069 and #1072: the expense detail fetches once however often the workspace re-renders; an email receipt carries the mail mark in the Inbox list; a blocked suggestion offers no Confirmar; a Confirmar e2e checks the request and the chip; the expired guest screen offers no temporary chat on a Business build and sends a signed-in person where sign-in goes; the real account boundary ignores the SIGNED_OUT a conversion started; the consumer own-surface e2e returns under its build guard and the Playwright server takes the runner's flag; stale ownership paths dropped.",
-      "base_ref": "origin/codex/private-alpha-next",
-      "allow": [
-        ".agent/ownership/branch_ownership.json",
-        "web/__tests__/business-dossier.test.ts",
-        "web/__tests__/business-shell-no-guest.test.ts",
-        "web/__tests__/chat-account-boundary.dom.test.tsx",
-        "web/__tests__/expense-detail-panel.dom.test.tsx",
-        "web/__tests__/receipt-email-origin.test.tsx",
-        "web/__tests__/receipt-fact-rows.test.tsx",
-        "web/components/business-app/BusinessInboxPanel.tsx",
-        "web/components/business-app/ExpenseDetailPanel.tsx",
-        "web/components/business-app/ReceiptRecordFacts.tsx",
-        "web/components/guest/ExpiredGuestSession.tsx",
-        "web/e2e/business-pilot-preview.spec.ts",
-        "web/e2e/business-record-review.spec.ts",
-        "web/playwright.config.ts"
       ],
       "deny": [
         ".env",
@@ -1811,7 +1785,7 @@
       ]
     },
     "codex/cuadrao-saved-unread-20261013": {
-      "description": "Founder caveat after the email forward test: a receipt saved without a read never looks stuck. One sentence owned by ReceiptReadNotice (Guardado, sin leer. Pulsa \u00abPreparar con IA\u00bb para que Cuadrao lo lea, o compl\u00e9talo t\u00fa.) shown on the receipt page, under the Inbox row and under the captured attachment in Correos recibidos; the status pill reads Guardado, sin leer. The per-receipt button stays the consent; copy only, no API change.",
+      "description": "Founder caveat after the email forward test: a receipt saved without a read never looks stuck. One sentence owned by ReceiptReadNotice (Guardado, sin leer. Pulsa «Preparar con IA» para que Cuadrao lo lea, o complétalo tú.) shown on the receipt page, under the Inbox row and under the captured attachment in Correos recibidos; the status pill reads Guardado, sin leer. The per-receipt button stays the consent; copy only, no API change.",
       "base_ref": "origin/codex/private-alpha-next",
       "allow": [
         ".agent/ownership/branch_ownership.json",
@@ -2020,7 +1994,7 @@
       ]
     },
     "codex/cuadrao-whatsapp-copy-code-20261012": {
-      "description": "A square copy button beside the WhatsApp link code: press it, the full code lands on the clipboard, the icon turns into a check for a moment and comes back; named Copiar c\u00f3digo, Copiado announced politely, a refusing clipboard never crashes the panel.",
+      "description": "A square copy button beside the WhatsApp link code: press it, the full code lands on the clipboard, the icon turns into a check for a moment and comes back; named Copiar código, Copiado announced politely, a refusing clipboard never crashes the panel.",
       "base_ref": "origin/codex/private-alpha-next",
       "allow": [
         ".agent/ownership/branch_ownership.json",
@@ -2130,6 +2104,32 @@
         "src/argus/domain/engine/**",
         "src/argus/domain/market_data/**",
         "tests/section3/**"
+      ]
+    },
+    "codex/cuadrao-followups-20261013": {
+      "description": "Review follow-ups collected from #1063, #1064, #1067, #1069 and #1072: the expense detail fetches once however often the workspace re-renders; an email receipt carries the mail mark in the Inbox list; a blocked suggestion offers no Confirmar; a Confirmar e2e checks the request and the chip; the expired guest screen offers no temporary chat on a Business build and sends a signed-in person where sign-in goes; the real account boundary ignores the SIGNED_OUT a conversion started; the consumer own-surface e2e returns under its build guard and the Playwright server takes the runner's flag; stale ownership paths dropped.",
+      "base_ref": "origin/codex/private-alpha-next",
+      "allow": [
+        ".agent/ownership/branch_ownership.json",
+        "web/__tests__/business-dossier.test.ts",
+        "web/__tests__/business-shell-no-guest.test.ts",
+        "web/__tests__/chat-account-boundary.dom.test.tsx",
+        "web/__tests__/expense-detail-panel.dom.test.tsx",
+        "web/__tests__/receipt-email-origin.test.tsx",
+        "web/__tests__/receipt-fact-rows.test.tsx",
+        "web/components/business-app/BusinessInboxPanel.tsx",
+        "web/components/business-app/ExpenseDetailPanel.tsx",
+        "web/components/business-app/ReceiptRecordFacts.tsx",
+        "web/components/guest/ExpiredGuestSession.tsx",
+        "web/e2e/business-pilot-preview.spec.ts",
+        "web/e2e/business-record-review.spec.ts",
+        "web/playwright.config.ts"
+      ],
+      "deny": [
+        ".env",
+        "web/.env.local",
+        ".env.*",
+        "web/.env.*"
       ]
     }
   }
