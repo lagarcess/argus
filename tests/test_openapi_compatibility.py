@@ -256,14 +256,14 @@ def test_required_parameter_drift_fails_with_named_difference(
     generated: dict, checked: dict
 ) -> None:
     broken = copy.deepcopy(checked)
-    run_parameters = broken["paths"]["/api/v1/backtests/run"]["post"]["parameters"]
-    for parameter in run_parameters:
-        if parameter["name"] == "Idempotency-Key":
+    search_parameters = broken["paths"]["/api/v1/search"]["get"]["parameters"]
+    for parameter in search_parameters:
+        if parameter["name"] == "q":
             parameter["required"] = False
 
     failures = openapi_compat.structural_failures(generated, broken)
     assert any(
-        "POST /api/v1/backtests/run" in failure and "required" in failure
+        "GET /api/v1/search" in failure and "required" in failure
         for failure in failures
     ), failures
 
