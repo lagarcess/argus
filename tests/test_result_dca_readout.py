@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import pytest
 from argus.api.artifact_presentation import reader_payload
 from argus.api.schemas import BacktestRun, BacktestRunResponse
-from argus.domain.backtesting.cards import build_result_card
 from argus.domain.backtest_message_projection import result_fact_bank
 from argus.domain.backtest_run_builder import build_backtest_run_from_result
+from argus.domain.backtesting.cards import build_result_card
 from argus.domain.dca_capital import dca_capital_plan_from_config
 from argus.domain.public_excerpt_turns import project_backtest_turn
 from argus.domain.public_excerpts import PublicExcerptSourceError
