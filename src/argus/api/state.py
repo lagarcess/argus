@@ -9,10 +9,6 @@ from fastapi import FastAPI, Request
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 
-from argus.api.chat.backtest_jobs import (
-    ShadowBacktestJobTool,
-    backtest_workflow_execution_enabled,
-)
 from argus.domain.store import AlphaStore
 from argus.domain.supabase_gateway import SupabaseGateway
 from argus.env import load_project_dotenv
@@ -34,20 +30,6 @@ def _dev_memory_fallback_enabled() -> bool:
     return os.getenv("ARGUS_DEV_MEMORY_FALLBACK", "").strip().lower() == "true"
 
 
-def build_backtest_tool() -> ShadowBacktestJobTool:
-    delegate: Any | None = None
-    if not backtest_workflow_execution_enabled():
-        from argus.agent_runtime.tools.real_backtest import RealBacktestTool
-
-        delegate = RealBacktestTool()
-
-    return ShadowBacktestJobTool(
-        delegate=delegate,
-        gateway_getter=lambda: supabase_gateway,
-        dev_memory_fallback_getter=_dev_memory_fallback_enabled,
-    )
-
-
 def build_agent_runtime_workflow(*, checkpointer: Any):
     from argus.agent_runtime.capabilities.contract import (
         build_default_capability_contract,
@@ -59,7 +41,6 @@ def build_agent_runtime_workflow(*, checkpointer: Any):
     agent_runtime_capability_contract = build_default_capability_contract()
     return build_workflow(
         contract=agent_runtime_capability_contract,
-        tool=build_backtest_tool(),
         structured_interpreter=OpenRouterStructuredInterpreter(
             contract=agent_runtime_capability_contract,
         ),
