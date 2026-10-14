@@ -305,18 +305,16 @@ describe("ambiguous Run response reconciliation", () => {
     expect(confirmationId(runAction, statusError(422, "invalid"))).toBeNull();
   });
 
-  test("ChatInterface checks initial Run SSE errors and empty termination", () => {
+  test("ChatInterface rejects retired actions before transport", () => {
     const chat = readFileSync(
       join(import.meta.dir, "../components/chat/ChatInterface.tsx"),
       "utf-8",
     );
 
-    expect(chat).toContain(
-      'throwIfAmbiguousRunSseError(event, action?.type === "run_backtest")',
-    );
     expect(chat).toMatch(
-      /throwIfAmbiguousRunStreamTermination\(\s*action\?\.type === "run_backtest",\s*runStreamFinalSeen,?\s*\)/,
+      /if \(action\?\.type === "run_backtest" \|\| action\?\.type === "retest_run"\) return false;/,
     );
+    expect(chat).not.toContain("throwIfAmbiguousRunStreamTermination");
   });
 
   test("a second 404 exits through bounded recovery and never triggers a second replay", async () => {

@@ -82,7 +82,7 @@ import {
   retryLastTurnSendOptions,
   retryLoadConversationIdFromAction,
 } from "@/lib/chat-retry-actions";
-import { RETEST_ACTION_TYPE, applyRetestReceipt, retestReceiptFromFinalPayload, settleRetestReceiptProjection } from "@/lib/chat-retest";
+import { applyRetestReceipt, retestReceiptFromFinalPayload, settleRetestReceiptProjection } from "@/lib/chat-retest";
 import { omnisearchActionHandlers } from "./omnisearch-actions";
 import { projectedTranscriptAnchorId } from "@/lib/chat-retry-action-history";
 import {
@@ -1143,7 +1143,6 @@ export default function ChatInterface() {
       content: action?.type ? actionDisplayLabel(action) : trimmed,
       mentions,
       selectedAction: action,
-      retestReceiptPending: action?.type === RETEST_ACTION_TYPE,
     };
     const assistantId = replacementAssistantId ?? randomId();
     const retryLastTurnAction = action?.type
