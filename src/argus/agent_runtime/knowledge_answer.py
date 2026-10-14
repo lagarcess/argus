@@ -419,9 +419,8 @@ async def _market_stats_answer(
             failure_classification="knowledge_answer_period_defaulted",
         )
     try:
-        # Lazy: the API import boundary keeps the backtest compute stack out
-        # of startup; these load only when a market-stats answer actually runs.
-        from argus.domain.engine import classify_symbol
+        # Price readers use shared classification without loading simulations.
+        from argus.domain.market_data.classification import classify_symbol
         from argus.domain.market_data.provider import fetch_price_series
 
         asset = classify_symbol(symbol)
