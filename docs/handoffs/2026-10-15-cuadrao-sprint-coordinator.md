@@ -7,8 +7,8 @@ This file records the exact state for the next coordinator. Read it with the
 
 ## Integration tip
 
-- Branch `codex/private-alpha-next`, tip `16ce641f0` (#1163).
-- Tip checks for `16ce641f0` were still running at wind-down. The `2b2665d63` checks were CI 38843052942 and Private Alpha Local Smoke 38843052978. The previous tip `e0a0706ad` passed Local Smoke 38840944565.
+- Branch `codex/private-alpha-next`, tip `6bfa52658` (#1164).
+- Tip checks for `6bfa52658` were still running at wind-down. The `2b2665d63` checks were CI 38843052942 and Private Alpha Local Smoke 38843052978. The previous tip `e0a0706ad` passed Local Smoke 38840944565.
 - Staging API and web were last confirmed live at `63d6f0135` (#1153). Later commits deploy automatically. Check `render deploys list` before you rely on staging.
 
 ## Landed this sprint
@@ -43,6 +43,7 @@ Each PR was squashed with `--match-head-commit` after an independent Eval passed
 | #1159 | Registrar gasto: approved account-setup copy and defaults, no duplicate account after a lost answer | `96f57c322` |
 | #1161 | Undo notice on Search after delete or archive (decision 16) | `2b2665d63` |
 | #1163 | Release checklist gates external TestFlight and App Review on published legal links | `16ce641f0` |
+| #1164 | iOS sign-up acceptance sentence hidden until Terms and Privacy are both set | `6bfa52658` |
 
 ## Open PRs from this sprint
 
@@ -51,7 +52,6 @@ Do not land any of these without a passing Eval at its current head.
 | PR | Branch | Head | Eval state | Next step |
 |---|---|---|---|---|
 | #1158 Deletion analytics step not applicable when PostHog is unset (decision 1B) | `claude/deletion-analytics-not-applicable` | `a1aa541fe` | Conflicting verdicts at this head. One independent Eval passed it. The coordinator's Opus Eval failed it after reproducing a fail-open on real Postgres: an operator sweep or force run from an environment without the token marked a pending step not applicable and finished the deletion. Not reachable today (deletion off, staging has no token). | Finish the fix on the WIP branch `claude/deletion-analytics-first-pass-wip` (`49ae8cc55`, worktree `argus-worktrees/lane-del-1b`). Rule: only the API route's first pass may record not applicable; a pending step stays pending. Then a fresh Opus Eval. The founder has not yet chosen between landing `a1aa541fe` and waiting for the fix. |
-| #1164 iOS sign-up acceptance sentence hidden until both Terms and Privacy are set | `claude/ios-signup-terms-hidden` | `f8fe1772d` | No Eval. Red on `e0a0706ad`, green at the head for the unit script (Debug and Release) and both sign-up UI tests. CI green at the head (7 pass, docs-checks skipped). Next for independent Eval. | Opus Eval at the head, because it touches consent text. Also take a both-set dark screenshot. `CuadraoCreateAccount.swift` is preview-only and was left alone (FOR LUCAS). With only one URL set, the sentence and its single link both hide. |
 
 Older open PRs predate this sprint and were not touched: #1085 (kept open by decision 8), #1081, #1071, #1068, #927, #925, #896, #781, #732, #646.
 
@@ -79,8 +79,9 @@ Work in flight at wind-down was committed as-is and pushed to its own branch. Ea
 - **Deletion runbook.** If PostHog events were ever sent, turn the deletion adapter on before deletion. Add the same no-token check for production before deletion is enabled there. Do this after #1158, because it is the same runbook.
 - **iOS Profile.** The "links unavailable" line uses two different apostrophes ("aren't" and "aren’t"). Use one.
 - **Decision 17** is recorded in DESIGN.md (#1155) but not yet in `docs/specs/argus-decision-log.md`.
+- **iOS acceptance sentence follow-ups** (#1166): the design-preview `CuadraoCreateAccount.swift` still always shows the sentence; make it follow `hasTermsAndPrivacy`. Add a UI test for the one-URL case.
 - **Undo notice follow-ups** (#1165): move the GuestPlans contribution-delete toast to the shell's `offerUndo`, and rename the close id to `toast.close`.
-- **Eval comments.** The independent Eval write-ups for #1156, #1159, #1161 and #1163 were not posted on their PRs, because the comment files were not on this machine.
+- **Eval comments.** The independent Eval write-ups for #1156, #1159, #1161, #1163 and #1164 were not posted on their PRs, because the comment files were not on this machine.
 - **Legacy consumer web** still hardcodes `/terms` and `/privacy` (`ProfileMenu`, `GuestLegalFooter`). Out of scope for now (#1162).
 
 ## Blocked, with the reason
