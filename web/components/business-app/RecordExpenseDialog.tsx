@@ -212,7 +212,7 @@ function AddPaidFromAccount({ labelledBy, onAdded }: { labelledBy: string; onAdd
         {t("business.record.account_name", "Name")}
         <input className={inputClass} value={nickname} maxLength={60} onChange={(event) => setNickname(event.target.value)} disabled={adding} autoComplete="off" />
       </label>
-      <div className="grid grid-cols-2 items-start gap-3">
+      <div className="grid grid-cols-1 items-start gap-3 tablet:grid-cols-2">
         <label className={label}>
           {t("business.record.account_type", "Account type")}
           <select className={inputClass} value={type} onChange={(event) => setType(event.target.value as ExpenseAccountType)} disabled={adding}>
