@@ -7,8 +7,8 @@ This file records the exact state for the next coordinator. Read it with the
 
 ## Integration tip
 
-- Branch `codex/private-alpha-next`, tip `2b2665d63` (#1161).
-- Tip checks: CI 38843052942 and Private Alpha Local Smoke 38843052978 were still running at wind-down. The previous tip `e0a0706ad` passed Local Smoke 38840944565.
+- Branch `codex/private-alpha-next`, tip `16ce641f0` (#1163).
+- Tip checks for `16ce641f0` were still running at wind-down. The `2b2665d63` checks were CI 38843052942 and Private Alpha Local Smoke 38843052978. The previous tip `e0a0706ad` passed Local Smoke 38840944565.
 - Staging API and web were last confirmed live at `63d6f0135` (#1153). Later commits deploy automatically. Check `render deploys list` before you rely on staging.
 
 ## Landed this sprint
@@ -42,6 +42,7 @@ Each PR was squashed with `--match-head-commit` after an independent Eval passed
 | #1160 | iOS legal links hidden behind one owner, `CuadraoLegalURLs` | `e0a0706ad` |
 | #1159 | Registrar gasto: approved account-setup copy and defaults, no duplicate account after a lost answer | `96f57c322` |
 | #1161 | Undo notice on Search after delete or archive (decision 16) | `2b2665d63` |
+| #1163 | Release checklist gates external TestFlight and App Review on published legal links | `16ce641f0` |
 
 ## Open PRs from this sprint
 
@@ -51,7 +52,6 @@ Do not land any of these without a passing Eval at its current head.
 |---|---|---|---|---|
 | #1158 Deletion analytics step not applicable when PostHog is unset (decision 1B) | `claude/deletion-analytics-not-applicable` | `a1aa541fe` | Conflicting verdicts at this head. One independent Eval passed it. The coordinator's Opus Eval failed it after reproducing a fail-open on real Postgres: an operator sweep or force run from an environment without the token marked a pending step not applicable and finished the deletion. Not reachable today (deletion off, staging has no token). | Finish the fix on the WIP branch `claude/deletion-analytics-first-pass-wip` (`49ae8cc55`, worktree `argus-worktrees/lane-del-1b`). Rule: only the API route's first pass may record not applicable; a pending step stays pending. Then a fresh Opus Eval. The founder has not yet chosen between landing `a1aa541fe` and waiting for the fix. |
 | #1164 iOS sign-up acceptance sentence hidden until both Terms and Privacy are set | `claude/ios-signup-terms-hidden` | `f8fe1772d` | No Eval. Red on `e0a0706ad`, green at the head for the unit script (Debug and Release) and both sign-up UI tests. CI green at the head (7 pass, docs-checks skipped). Next for independent Eval. | Opus Eval at the head, because it touches consent text. Also take a both-set dark screenshot. `CuadraoCreateAccount.swift` is preview-only and was left alone (FOR LUCAS). With only one URL set, the sentence and its single link both hide. |
-| #1163 Release checklist requires published legal links | `claude/release-legal-checklist` | `f84355b31` | Final head, stated in the PR body. Next for independent Eval. Touches `docs/specs/argus-execution-board.md` only. | Docs Eval. |
 
 Older open PRs predate this sprint and were not touched: #1085 (kept open by decision 8), #1081, #1071, #1068, #927, #925, #896, #781, #732, #646.
 
@@ -73,13 +73,14 @@ Work in flight at wind-down was committed as-is and pushed to its own branch. Ea
 
 - **Legal URL variables.** Add `NEXT_PUBLIC_CUADRAO_TERMS_URL`, `NEXT_PUBLIC_CUADRAO_PRIVACY_URL` and `NEXT_PUBLIC_CUADRAO_DATA_DELETION_URL` to `render.yaml` (`sync: false`) and the web env examples. They are build-time values, so publishing needs a rebuild. Set both Terms and Privacy, because one alone shows nothing. Tracked in #1162.
 - **Acceptance line returns before public signup and App Review**, on iOS and web: "Al continuar, aceptas los [Términos] y la [Política de privacidad]." / "By continuing, you agree to the [Terms] and [Privacy Policy].", both linked, no checkbox (founder, October 15). Tracked in #1162 and #1163.
-- **`CuadraoLegalURLs.published`** must be filled with the published URLs before external TestFlight or App Review (#1163).
+- **`CuadraoLegalURLs.published`** must be filled with the published URLs before external TestFlight or App Review (#1163, landed).
+- **iOS acceptance line return.** Require both Terms and Privacy URLs (`hasTermsAndPrivacy` from #1164, not `hasPages`, which passes with one), and match the web wording once product picks "nuestros/our" or "los/the" (#1162 comment).
 - **"Cuenta corriente" is cut off at 390px** in the Registrar gasto account-type picker. #1159 has landed, so this can start now.
 - **Deletion runbook.** If PostHog events were ever sent, turn the deletion adapter on before deletion. Add the same no-token check for production before deletion is enabled there. Do this after #1158, because it is the same runbook.
 - **iOS Profile.** The "links unavailable" line uses two different apostrophes ("aren't" and "aren’t"). Use one.
 - **Decision 17** is recorded in DESIGN.md (#1155) but not yet in `docs/specs/argus-decision-log.md`.
 - **Undo notice follow-ups** (#1165): move the GuestPlans contribution-delete toast to the shell's `offerUndo`, and rename the close id to `toast.close`.
-- **Eval comments.** The independent Eval write-ups for #1156, #1159 and #1161 were not posted on their PRs, because the comment files were not on this machine.
+- **Eval comments.** The independent Eval write-ups for #1156, #1159, #1161 and #1163 were not posted on their PRs, because the comment files were not on this machine.
 - **Legacy consumer web** still hardcodes `/terms` and `/privacy` (`ProfileMenu`, `GuestLegalFooter`). Out of scope for now (#1162).
 
 ## Blocked, with the reason
