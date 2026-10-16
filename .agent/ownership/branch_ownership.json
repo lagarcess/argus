@@ -2266,6 +2266,23 @@
         "web/public/locales/**"
       ]
     },
+    "codex/marketing-business-contact-ctas": {
+      "description": "Marketing Business CTA destinations only; Personal waitlist and language switches remain unchanged.",
+      "base_ref": "origin/codex/private-alpha-next",
+      "allow": [
+        ".agent/ownership/branch_ownership.json",
+        "marketing/components/business-header.tsx",
+        "marketing/components/business-footer.tsx",
+        "marketing/components/touchup-landing.tsx",
+        "marketing/e2e/business-cta.spec.ts"
+      ],
+      "deny": [
+        ".env",
+        "web/.env.local",
+        ".env.*",
+        "web/.env.*"
+      ]
+    },
     "codex/receipt-auto-read-activity": {
       "description": "Business owner consent for automatic receipt reading across email, WhatsApp and uploads, with canonical per-person receipt activity and visible Inbox refresh.",
       "base_ref": "origin/codex/private-alpha-next",
