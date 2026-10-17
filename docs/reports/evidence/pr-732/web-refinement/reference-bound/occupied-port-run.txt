@@ -1,0 +1,4 @@
+Error: http://127.0.0.1:3200/chat is already used, make sure that nothing is running on the port/url or set reuseExistingServer:true in config.webServer.
+
+(node:32483) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)

@@ -1,0 +1,17 @@
+(node:59191) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+
+Running 5 tests using 1 worker
+
+(node:59215) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:59215) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(node:59215) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓  1 e2e/ecosystem-preview-production.gate.ts:5:5 › the ecosystem route is unavailable in a production build (103ms)
+  ✓  2 e2e/ecosystem-preview-production.gate.ts:18:7 › the existing / entry still renders without the preview (13ms)
+  ✓  3 e2e/ecosystem-preview-production.gate.ts:18:7 › the existing /chat entry still renders without the preview (26ms)
+  ✓  4 e2e/ecosystem-preview-production.gate.ts:18:7 › the existing /?auth=login entry still renders without the preview (8ms)
+  ✓  5 e2e/ecosystem-preview-production.gate.ts:18:7 › the existing /?auth=signup entry still renders without the preview (6ms)
+
+  5 passed (612ms)

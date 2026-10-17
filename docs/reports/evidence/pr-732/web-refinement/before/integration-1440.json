@@ -1,0 +1,640 @@
+{
+  "name": "integration-1440",
+  "codeHead": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+  "worktreeChanges": "",
+  "source": {
+    "sourceSha": "c3b2042b9b69c5b75e173d145ed0020f00ccd79e",
+    "webTree": "9793bd5787e957d8bf625ca0ecc68114b4e30464",
+    "extractedWebRoot": "/Users/garces/.codex/worktrees/587e/private-alpha-next/web",
+    "verifiedOwners": [
+      {
+        "path": "web/app/chat/page.tsx",
+        "expectedSha256": "ad67b1fa0ef304bfc2fbb11b9d3f913ed8fc6277f571e3fba4ee89d2ce36bd8b",
+        "actualSha256": "ad67b1fa0ef304bfc2fbb11b9d3f913ed8fc6277f571e3fba4ee89d2ce36bd8b"
+      },
+      {
+        "path": "web/app/layout.tsx",
+        "expectedSha256": "d52de11a476b6f8ebbd3de5c59f97a9c14eba220fdd68e4a000d8874febee574",
+        "actualSha256": "d52de11a476b6f8ebbd3de5c59f97a9c14eba220fdd68e4a000d8874febee574"
+      },
+      {
+        "path": "web/app/globals.css",
+        "expectedSha256": "093bb64919e52bd52d88f1d8b8fa4db4f977b2b01414459baa8be2342818e4a0",
+        "actualSha256": "093bb64919e52bd52d88f1d8b8fa4db4f977b2b01414459baa8be2342818e4a0"
+      },
+      {
+        "path": "web/components/chat/ChatInterface.tsx",
+        "expectedSha256": "20bd639560157a1ee2566490883376a600d38a98f1f46f18bd96cf595a113395",
+        "actualSha256": "20bd639560157a1ee2566490883376a600d38a98f1f46f18bd96cf595a113395"
+      },
+      {
+        "path": "web/components/chat/EmptyChatSurface.tsx",
+        "expectedSha256": "9187864864c96d0dce28f5ced1a3d0c502c4852a4170cefd49ce60c572bfb81d",
+        "actualSha256": "9187864864c96d0dce28f5ced1a3d0c502c4852a4170cefd49ce60c572bfb81d"
+      },
+      {
+        "path": "web/components/sidebar/ChatSidebar.tsx",
+        "expectedSha256": "1285c9bf33bc1c1399f876c4a71779e494174b2f4c8e7c2bc553543b4e6be85e",
+        "actualSha256": "1285c9bf33bc1c1399f876c4a71779e494174b2f4c8e7c2bc553543b4e6be85e"
+      },
+      {
+        "path": "web/components/sidebar/SidebarHeader.tsx",
+        "expectedSha256": "71bcc8de38c2c0d6d6069b4b43765255e11cf8cff1c4af1f6bfb50bb2f3218d8",
+        "actualSha256": "71bcc8de38c2c0d6d6069b4b43765255e11cf8cff1c4af1f6bfb50bb2f3218d8"
+      },
+      {
+        "path": "web/components/sidebar/SidebarShell.tsx",
+        "expectedSha256": "467793fdbff6d80642a9a649001fd12d2db6d80e7e1aa02053279ec638296ab6",
+        "actualSha256": "467793fdbff6d80642a9a649001fd12d2db6d80e7e1aa02053279ec638296ab6"
+      },
+      {
+        "path": "web/components/sidebar/ProfileMenu.tsx",
+        "expectedSha256": "c7bdad596a80cf501a5cfb5fae2f548d698a4015616a4b01650b44a0ed057815",
+        "actualSha256": "c7bdad596a80cf501a5cfb5fae2f548d698a4015616a4b01650b44a0ed057815"
+      },
+      {
+        "path": "web/components/sidebar/ProfileSettingsPanels.tsx",
+        "expectedSha256": "e226bb60c77628f9a827359d63b9b127822d27217d5dabd741450511bb6de13c",
+        "actualSha256": "e226bb60c77628f9a827359d63b9b127822d27217d5dabd741450511bb6de13c"
+      },
+      {
+        "path": "web/components/ui/AdaptivePanel.tsx",
+        "expectedSha256": "c779e64bda44d1d55aac2263d3439e9ead2343fac643d3011a7addc1ac4a1ffb",
+        "actualSha256": "c779e64bda44d1d55aac2263d3439e9ead2343fac643d3011a7addc1ac4a1ffb"
+      },
+      {
+        "path": "web/public/locales/en/common.json",
+        "expectedSha256": "e62991177b24a4f0ce662b118b96d9696cb65ce1de7cc040cc5e7c26d9567e16",
+        "actualSha256": "e62991177b24a4f0ce662b118b96d9696cb65ce1de7cc040cc5e7c26d9567e16"
+      }
+    ]
+  },
+  "origin": "http://127.0.0.1:3199",
+  "captures": [
+    {
+      "file": "integration-1440-cold-chat-expanded-rail.png",
+      "surface": "cold-chat-expanded-rail",
+      "url": "http://127.0.0.1:3199/chat",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "codeHead": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+      "capturedAt": "2026-09-28T22:43:35.136Z"
+    },
+    {
+      "file": "integration-1440-cold-chat-collapsed-rail.png",
+      "surface": "cold-chat-collapsed-rail",
+      "url": "http://127.0.0.1:3199/chat",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "codeHead": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+      "capturedAt": "2026-09-28T22:43:35.318Z"
+    },
+    {
+      "file": "integration-1440-settings-open.png",
+      "surface": "settings-open",
+      "url": "http://127.0.0.1:3199/chat",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "codeHead": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+      "capturedAt": "2026-09-28T22:43:36.313Z"
+    },
+    {
+      "file": "integration-1440-active-chat-fixture.png",
+      "surface": "active-chat-fixture",
+      "url": "http://127.0.0.1:3199/chat?conversation=conversation-alpha",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "codeHead": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+      "capturedAt": "2026-09-28T22:43:37.292Z"
+    }
+  ],
+  "audit": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/chat",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/app_0mlx7m1._.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_sidebar_pointerAffordances_module_0thxiaz.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10z625~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_0553esy.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_115brz8._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_%40swc_helpers_cjs_0-4ujiy._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/_0rqeker._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/turbopack-_0p44nws._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_cross-fetch_dist_browser-ponyfill_0bv09k2.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_09zr_xv._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_%40supabase_postgrest-js_dist_index_mjs_0eu3ylr._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_%40supabase_auth-js_dist_module_0.pzobh._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_03-4b1s._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/_13ogoea._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/app_layout_tsx_004glpo._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_0rh9i3q.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/lib_i18n_ts_0uve1ap._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_guest_0f677-a._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_chat_ChatInterface_tsx_0vhe.mf._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_chat_05nsg7f._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_sidebar_08w4r-9._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_settings_0tay76d._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_0nivp8n._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/lib_0.lyw7.._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/public_locales_03~q21c._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/argus_display_contract_114_0~i._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_lucide-react_dist_esm_0pi3_67._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_micromark-core-commonmark_dev_lib_13dj~6i._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_lightweight-charts_dist_lightweight-charts_development_mjs_05epn23._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_08iika_._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/app_chat_page_tsx_0rh9i3q._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "WEBSOCKET",
+        "url": "ws://127.0.0.1:3199/_next/webpack-hmr?id=5Ujpmq7Ob9AjZnrIMdbC0",
+        "disposition": "local-development-hmr"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10mygs7._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/locales/en/common.json",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/conversations?limit=30&archived=false&deleted=false",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/me",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/memory/availability",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/me",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/conversations?limit=30&archived=false&deleted=false",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/me",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/chat?conversation=conversation-alpha",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/app_0mlx7m1._.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_sidebar_pointerAffordances_module_0thxiaz.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10z625~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_0553esy.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_115brz8._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_%40swc_helpers_cjs_0-4ujiy._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/_0rqeker._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/turbopack-_0p44nws._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_cross-fetch_dist_browser-ponyfill_0bv09k2.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_09zr_xv._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_%40supabase_postgrest-js_dist_index_mjs_0eu3ylr._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_%40supabase_auth-js_dist_module_0.pzobh._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_03-4b1s._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/_13ogoea._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/app_layout_tsx_004glpo._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_0rh9i3q.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/lib_i18n_ts_0uve1ap._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_guest_0f677-a._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_chat_ChatInterface_tsx_0vhe.mf._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_chat_05nsg7f._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_sidebar_08w4r-9._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_settings_0tay76d._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/components_0nivp8n._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/lib_0.lyw7.._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/public_locales_03~q21c._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/argus_display_contract_114_0~i._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_lucide-react_dist_esm_0pi3_67._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_micromark-core-commonmark_dev_lib_13dj~6i._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_lightweight-charts_dist_lightweight-charts_development_mjs_05epn23._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/node_modules_08iika_._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/app_chat_page_tsx_0rh9i3q._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10mygs7._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "WEBSOCKET",
+        "url": "ws://127.0.0.1:3199/_next/webpack-hmr?id=ZnhHZ1cP2eEh84kvhzK8F",
+        "disposition": "local-development-hmr"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/locales/en/common.json",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/conversations?limit=30&archived=false&deleted=false",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/me",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/memory/availability",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/me",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/conversations/conversation-alpha/messages?limit=100",
+        "disposition": "locally-fulfilled-fixture"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3199/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3999/api/v1/conversations?limit=30&archived=false&deleted=false",
+        "disposition": "locally-fulfilled-fixture"
+      }
+    ],
+    "violations": [],
+    "pageErrors": [],
+    "consoleErrors": []
+  },
+  "environment": {
+    "browser": "147.0.7727.15",
+    "node": "v26.10.0",
+    "platform": "darwin",
+    "release": "27.0.0",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "deviceScaleFactor": 1,
+    "timezone": "America/Santo_Domingo",
+    "locale": "en-US",
+    "appearance": "light",
+    "reducedMotion": "reduce",
+    "serviceWorkers": "blocked",
+    "websockets": "only same-origin Next development HMR",
+    "retries": 0
+  },
+  "limitations": [
+    "Local source reference, not hosted-deployment verification or founder visual approval.",
+    "Registered identity and financial/chat readouts are local fixtures; no real authorization, model turn, write or provider call is exercised.",
+    "Only named rendered source owners are byte-verified; the pinned full web Git tree is recorded for context.",
+    "Screenshots freeze animations/caret and hide Next development chrome and the fixture DevModeBadge via shared FREEZE_CSS."
+  ]
+}

@@ -1,0 +1,556 @@
+{
+  "name": "preview-before-834",
+  "codeHead": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+  "worktreeChanges": "",
+  "source": {
+    "sourceSha": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+    "webTree": "416d05a1bf80cff4f181f190a08ee56a0763ca0b"
+  },
+  "origin": "http://127.0.0.1:3197",
+  "captures": [
+    {
+      "file": "preview-before-834-home.png",
+      "surface": "home",
+      "url": "http://127.0.0.1:3197/dev/ecosystem?view=home&state=sample&audience=guest",
+      "viewport": {
+        "width": 834,
+        "height": 1000
+      },
+      "codeHead": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+      "capturedAt": "2026-09-28T22:43:47.557Z"
+    },
+    {
+      "file": "preview-before-834-argus.png",
+      "surface": "argus",
+      "url": "http://127.0.0.1:3197/dev/ecosystem?view=argus&state=sample&audience=guest",
+      "viewport": {
+        "width": 834,
+        "height": 1000
+      },
+      "codeHead": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+      "capturedAt": "2026-09-28T22:43:48.411Z"
+    },
+    {
+      "file": "preview-before-834-settings.png",
+      "surface": "settings",
+      "url": "http://127.0.0.1:3197/dev/ecosystem?view=settings&state=sample&audience=guest",
+      "viewport": {
+        "width": 834,
+        "height": 1000
+      },
+      "codeHead": "2da77b1a09769901b9ca9bfe28d317eddde2ffa1",
+      "capturedAt": "2026-09-28T22:43:49.255Z"
+    }
+  ],
+  "audit": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/dev/ecosystem?view=home&state=sample&audience=guest",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_0mlx7m1._.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_dev_ecosystem_ecosystem-preview_module_0nt7h9t.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10z625~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_0553esy.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_115brz8._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_%40swc_helpers_cjs_0-4ujiy._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/_0rqeker._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/turbopack-_0p44nws._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_cross-fetch_dist_browser-ponyfill_0bv09k2.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_09zr_xv._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_%40supabase_postgrest-js_dist_index_mjs_0eu3ylr._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_%40supabase_auth-js_dist_module_0.pzobh._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_03-4b1s._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/_13ogoea._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_layout_tsx_004glpo._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/lib_i18n_ts_0vr60np._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/_0cuelik._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_0x1ckfd._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_dev_ecosystem_page_tsx_0rh9i3q._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_0rh9i3q.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10mygs7._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "WEBSOCKET",
+        "url": "ws://127.0.0.1:3197/_next/webpack-hmr?id=7BJ_AkuS-ttwTwyGagVq-",
+        "disposition": "local-development-hmr"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/locales/en/common.json",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/dev/ecosystem?view=argus&state=sample&audience=guest",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_0mlx7m1._.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_dev_ecosystem_ecosystem-preview_module_0nt7h9t.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10z625~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_0553esy.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_115brz8._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_%40swc_helpers_cjs_0-4ujiy._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/_0rqeker._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/turbopack-_0p44nws._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_cross-fetch_dist_browser-ponyfill_0bv09k2.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_09zr_xv._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_%40supabase_postgrest-js_dist_index_mjs_0eu3ylr._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_%40supabase_auth-js_dist_module_0.pzobh._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_03-4b1s._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/_13ogoea._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_layout_tsx_004glpo._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/lib_i18n_ts_0vr60np._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/_0cuelik._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_0x1ckfd._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_dev_ecosystem_page_tsx_0rh9i3q._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_0rh9i3q.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10mygs7._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "WEBSOCKET",
+        "url": "ws://127.0.0.1:3197/_next/webpack-hmr?id=p5LAg3N2pCWveMefXUiHi",
+        "disposition": "local-development-hmr"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/locales/en/common.json",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/dev/ecosystem?view=settings&state=sample&audience=guest",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/media/InterVariable-s.p.0r27kd5h06n72.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/media/SpaceGrotesk%5Bwght%5D-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_0mlx7m1._.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_dev_ecosystem_ecosystem-preview_module_0nt7h9t.css",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10z625~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_next-devtools_index_0553esy.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_react-server-dom-turbopack_0p3wegg._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_client_0fhqo1d._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_115brz8._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_%40swc_helpers_cjs_0-4ujiy._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/_0rqeker._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/turbopack-_0p44nws._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_cross-fetch_dist_browser-ponyfill_0bv09k2.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_09zr_xv._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_%40supabase_postgrest-js_dist_index_mjs_0eu3ylr._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_%40supabase_auth-js_dist_module_0.pzobh._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_03-4b1s._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/_13ogoea._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_layout_tsx_004glpo._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/lib_i18n_ts_0vr60np._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/_0cuelik._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_0x1ckfd._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/app_dev_ecosystem_page_tsx_0rh9i3q._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/node_modules_next_dist_client_components_builtin_global-error_0rh9i3q.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_0yjw1oe._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/chunks/%5Bturbopack%5D_browser_dev_hmr-client_hmr-client_ts_10mygs7._.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "WEBSOCKET",
+        "url": "ws://127.0.0.1:3197/_next/webpack-hmr?id=S-3jboDVLH0bFaRI6GzTf",
+        "disposition": "local-development-hmr"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/locales/en/common.json",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3197/_next/static/media/SpaceGrotesk[wght]-s.p.0aamwwh81c45m.woff2",
+        "disposition": "local-page-or-asset"
+      }
+    ],
+    "violations": [],
+    "pageErrors": [],
+    "consoleErrors": []
+  },
+  "environment": {
+    "browser": "147.0.7727.15",
+    "node": "v26.10.0",
+    "platform": "darwin",
+    "release": "27.0.0",
+    "viewport": {
+      "width": 834,
+      "height": 1000
+    },
+    "deviceScaleFactor": 1,
+    "timezone": "America/Santo_Domingo",
+    "locale": "en-US",
+    "appearance": "light",
+    "reducedMotion": "reduce",
+    "serviceWorkers": "blocked",
+    "websockets": "only same-origin Next development HMR",
+    "retries": 0
+  },
+  "limitations": [
+    "Local source reference, not hosted-deployment verification or founder visual approval.",
+    "Registered identity and financial/chat readouts are local fixtures; no real authorization, model turn, write or provider call is exercised.",
+    "Only named rendered source owners are byte-verified; the pinned full web Git tree is recorded for context.",
+    "Screenshots freeze animations/caret and hide Next development chrome and the fixture DevModeBadge via shared FREEZE_CSS."
+  ]
+}

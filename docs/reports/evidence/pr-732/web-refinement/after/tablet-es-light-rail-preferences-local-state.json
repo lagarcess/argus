@@ -1,0 +1,29 @@
+{
+  "name": "tablet-es-light-rail-preferences-local-state",
+  "codeHead": "53029f5d7c18827adba9daf79197936086ea0188",
+  "worktreeChanges": null,
+  "capturedAt": "2026-09-28T23:38:39.247Z",
+  "url": "http://127.0.0.1:3197/dev/ecosystem?view=settings&state=sample&audience=guest",
+  "viewport": {
+    "width": 834,
+    "height": 1112
+  },
+  "browser": "147.0.7727.15",
+  "platform": "darwin 27.0.0 arm64",
+  "node": "v26.10.0",
+  "timezone": "America/Santo_Domingo",
+  "reducedMotion": "reduce",
+  "deviceScaleFactor": 1,
+  "captureOnlyMask": "Next.js development indicator (nextjs-portal) hidden during screenshot capture only",
+  "language": "en",
+  "resolvedTheme": "antialiased h-full dark",
+  "network": {
+    "forbidden": [],
+    "allowedRequests": 32,
+    "pageErrors": []
+  },
+  "limitations": [
+    "Local authored fixtures only",
+    "No model, provider, authentication or financial persistence exercised"
+  ]
+}

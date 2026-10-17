@@ -1,0 +1,423 @@
+{
+  "name": "preview-current-1440",
+  "codeHead": "8e5d74e25bb3e26952019823ab386cdb7153b075",
+  "worktreeChanges": "",
+  "source": {
+    "sourceSha": "8e5d74e25bb3e26952019823ab386cdb7153b075",
+    "webTree": "56941cbf59ef3a2e7fbecbed1c30b0c7100c333a",
+    "extractedWebRoot": "/tmp/argus-web-current-preview-reference-reviewed/web",
+    "verifiedOwners": [
+      {
+        "path": "web/app/chat/page.tsx",
+        "expectedSha256": "ad67b1fa0ef304bfc2fbb11b9d3f913ed8fc6277f571e3fba4ee89d2ce36bd8b",
+        "actualSha256": "ad67b1fa0ef304bfc2fbb11b9d3f913ed8fc6277f571e3fba4ee89d2ce36bd8b"
+      },
+      {
+        "path": "web/app/layout.tsx",
+        "expectedSha256": "d52de11a476b6f8ebbd3de5c59f97a9c14eba220fdd68e4a000d8874febee574",
+        "actualSha256": "d52de11a476b6f8ebbd3de5c59f97a9c14eba220fdd68e4a000d8874febee574"
+      },
+      {
+        "path": "web/app/globals.css",
+        "expectedSha256": "093bb64919e52bd52d88f1d8b8fa4db4f977b2b01414459baa8be2342818e4a0",
+        "actualSha256": "093bb64919e52bd52d88f1d8b8fa4db4f977b2b01414459baa8be2342818e4a0"
+      },
+      {
+        "path": "web/components/chat/ChatInterface.tsx",
+        "expectedSha256": "20bd639560157a1ee2566490883376a600d38a98f1f46f18bd96cf595a113395",
+        "actualSha256": "20bd639560157a1ee2566490883376a600d38a98f1f46f18bd96cf595a113395"
+      },
+      {
+        "path": "web/components/chat/EmptyChatSurface.tsx",
+        "expectedSha256": "9187864864c96d0dce28f5ced1a3d0c502c4852a4170cefd49ce60c572bfb81d",
+        "actualSha256": "9187864864c96d0dce28f5ced1a3d0c502c4852a4170cefd49ce60c572bfb81d"
+      },
+      {
+        "path": "web/components/sidebar/ChatSidebar.tsx",
+        "expectedSha256": "1285c9bf33bc1c1399f876c4a71779e494174b2f4c8e7c2bc553543b4e6be85e",
+        "actualSha256": "1285c9bf33bc1c1399f876c4a71779e494174b2f4c8e7c2bc553543b4e6be85e"
+      },
+      {
+        "path": "web/components/sidebar/SidebarHeader.tsx",
+        "expectedSha256": "71bcc8de38c2c0d6d6069b4b43765255e11cf8cff1c4af1f6bfb50bb2f3218d8",
+        "actualSha256": "71bcc8de38c2c0d6d6069b4b43765255e11cf8cff1c4af1f6bfb50bb2f3218d8"
+      },
+      {
+        "path": "web/components/sidebar/SidebarShell.tsx",
+        "expectedSha256": "467793fdbff6d80642a9a649001fd12d2db6d80e7e1aa02053279ec638296ab6",
+        "actualSha256": "467793fdbff6d80642a9a649001fd12d2db6d80e7e1aa02053279ec638296ab6"
+      },
+      {
+        "path": "web/components/sidebar/ProfileMenu.tsx",
+        "expectedSha256": "c7bdad596a80cf501a5cfb5fae2f548d698a4015616a4b01650b44a0ed057815",
+        "actualSha256": "c7bdad596a80cf501a5cfb5fae2f548d698a4015616a4b01650b44a0ed057815"
+      },
+      {
+        "path": "web/components/sidebar/ProfileSettingsPanels.tsx",
+        "expectedSha256": "e226bb60c77628f9a827359d63b9b127822d27217d5dabd741450511bb6de13c",
+        "actualSha256": "e226bb60c77628f9a827359d63b9b127822d27217d5dabd741450511bb6de13c"
+      },
+      {
+        "path": "web/components/ui/AdaptivePanel.tsx",
+        "expectedSha256": "c779e64bda44d1d55aac2263d3439e9ead2343fac643d3011a7addc1ac4a1ffb",
+        "actualSha256": "c779e64bda44d1d55aac2263d3439e9ead2343fac643d3011a7addc1ac4a1ffb"
+      },
+      {
+        "path": "web/public/locales/en/common.json",
+        "expectedSha256": "e62991177b24a4f0ce662b118b96d9696cb65ce1de7cc040cc5e7c26d9567e16",
+        "actualSha256": "e62991177b24a4f0ce662b118b96d9696cb65ce1de7cc040cc5e7c26d9567e16"
+      },
+      {
+        "path": "web/app/dev/ecosystem/AccountDetail.tsx",
+        "expectedSha256": "2c97d2a34045d3783c9a1d6be367196f7f67d54124c0dd4c3467a347344d3c2d",
+        "actualSha256": "2c97d2a34045d3783c9a1d6be367196f7f67d54124c0dd4c3467a347344d3c2d"
+      },
+      {
+        "path": "web/app/dev/ecosystem/AccountPanels.tsx",
+        "expectedSha256": "3c4f738a3f0b7c2f692119a5e49bc0f3d24fba0b82993d15d656cc08e49ec33e",
+        "actualSha256": "3c4f738a3f0b7c2f692119a5e49bc0f3d24fba0b82993d15d656cc08e49ec33e"
+      },
+      {
+        "path": "web/app/dev/ecosystem/EcosystemPreview.tsx",
+        "expectedSha256": "ce2967aedb526d5d5a605fb0e65fe6dd6d9e06e330c4ba460c27e16eeb7e392a",
+        "actualSha256": "ce2967aedb526d5d5a605fb0e65fe6dd6d9e06e330c4ba460c27e16eeb7e392a"
+      },
+      {
+        "path": "web/app/dev/ecosystem/PreviewChat.tsx",
+        "expectedSha256": "2a5689ac5af4c1acf52b70cc7099e64aa976dcacc8753800c1768c3b1646a099",
+        "actualSha256": "2a5689ac5af4c1acf52b70cc7099e64aa976dcacc8753800c1768c3b1646a099"
+      },
+      {
+        "path": "web/app/dev/ecosystem/PreviewDialogs.tsx",
+        "expectedSha256": "814aa4fae841c76ddb9c1416d32306fcc2ab7c66aa0f3ee66ed809ffc75518a4",
+        "actualSha256": "814aa4fae841c76ddb9c1416d32306fcc2ab7c66aa0f3ee66ed809ffc75518a4"
+      },
+      {
+        "path": "web/app/dev/ecosystem/PreviewNavigation.tsx",
+        "expectedSha256": "f2fde36f1a4ceb6d9d23d4fe97c89da7c28f1f19c3dddeac5fc2f3d74a27f10c",
+        "actualSha256": "f2fde36f1a4ceb6d9d23d4fe97c89da7c28f1f19c3dddeac5fc2f3d74a27f10c"
+      },
+      {
+        "path": "web/app/dev/ecosystem/PreviewPrimitives.tsx",
+        "expectedSha256": "d40386a8d72f60cdd5ad1333e2e02e8b5ccf1e1325bde98dc3b9eb06c89f55cf",
+        "actualSha256": "d40386a8d72f60cdd5ad1333e2e02e8b5ccf1e1325bde98dc3b9eb06c89f55cf"
+      },
+      {
+        "path": "web/app/dev/ecosystem/PreviewViews.tsx",
+        "expectedSha256": "dedba023798c2caff4cfebda865991576070dbb5b139188b6648dc85d7fa19d8",
+        "actualSha256": "dedba023798c2caff4cfebda865991576070dbb5b139188b6648dc85d7fa19d8"
+      },
+      {
+        "path": "web/app/dev/ecosystem/ecosystem-preview.module.css",
+        "expectedSha256": "3f81cab6037e1c0f23d3a12e63cbf0d34b6a50ffb37812f5e8d7b862f97b2f27",
+        "actualSha256": "3f81cab6037e1c0f23d3a12e63cbf0d34b6a50ffb37812f5e8d7b862f97b2f27"
+      },
+      {
+        "path": "web/app/dev/ecosystem/page.tsx",
+        "expectedSha256": "ee0e32ca9a7a71fbff5b346eee2d938f8ec0a36f7d98de434a1e480aae276c3b",
+        "actualSha256": "ee0e32ca9a7a71fbff5b346eee2d938f8ec0a36f7d98de434a1e480aae276c3b"
+      },
+      {
+        "path": "web/app/dev/ecosystem/preview-content.ts",
+        "expectedSha256": "332b7a805d37399866ac1bbcd744056726cce0690f67ededc4acfd8c4c95196c",
+        "actualSha256": "332b7a805d37399866ac1bbcd744056726cce0690f67ededc4acfd8c4c95196c"
+      }
+    ],
+    "completePreviewRoute": true
+  },
+  "origin": "http://127.0.0.1:3201",
+  "server": {
+    "lifecycle": "Playwright webServer",
+    "name": "preview-current",
+    "command": "node node_modules/next/dist/bin/next dev --webpack --hostname 127.0.0.1 --port 3201",
+    "cwd": "/tmp/argus-web-current-preview-reference-reviewed/web",
+    "url": "http://127.0.0.1:3201/dev/ecosystem",
+    "reuseExistingServer": false,
+    "timeout": 120000,
+    "stdout": "pipe",
+    "stderr": "pipe",
+    "env": {
+      "NEXT_DIST_DIR": ".next-reference",
+      "NEXT_TELEMETRY_DISABLED": "1",
+      "NEXT_PUBLIC_MOCK_AUTH": "false",
+      "NEXT_PUBLIC_ENABLE_SPANISH": "true",
+      "NEXT_PUBLIC_ARGUS_API_URL": "http://127.0.0.1:3999/api/v1"
+    }
+  },
+  "captures": [
+    {
+      "file": "preview-current-1440-home.png",
+      "surface": "home",
+      "url": "http://127.0.0.1:3201/dev/ecosystem?view=home&state=sample&audience=guest",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "codeHead": "8e5d74e25bb3e26952019823ab386cdb7153b075",
+      "capturedAt": "2026-09-29T00:08:59.685Z"
+    },
+    {
+      "file": "preview-current-1440-argus.png",
+      "surface": "argus",
+      "url": "http://127.0.0.1:3201/dev/ecosystem?view=argus&state=sample&audience=guest",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "codeHead": "8e5d74e25bb3e26952019823ab386cdb7153b075",
+      "capturedAt": "2026-09-29T00:09:00.911Z"
+    },
+    {
+      "file": "preview-current-1440-settings.png",
+      "surface": "settings",
+      "url": "http://127.0.0.1:3201/dev/ecosystem?view=settings&state=sample&audience=guest",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "codeHead": "8e5d74e25bb3e26952019823ab386cdb7153b075",
+      "capturedAt": "2026-09-29T00:09:02.147Z"
+    }
+  ],
+  "audit": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/dev/ecosystem?view=home&state=sample&audience=guest",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/0336a89fb4e7fc1d-s.p.woff2?v=1790640538406",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/6c9d152e7d33394a-s.p.woff2?v=1790640538406",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/css/app/layout.css?v=1790640538406",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/css/app/dev/ecosystem/page.css?v=1790640538406",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/webpack.js?v=1790640538406",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/main-app.js?v=1790640538406",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/app-pages-internals.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/app/layout.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/app/dev/ecosystem/page.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "WEBSOCKET",
+        "url": "ws://127.0.0.1:3201/_next/webpack-hmr?id=H0oKFwQp7xSedrB0nucv8",
+        "disposition": "local-development-hmr"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/locales/en/common.json",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/0336a89fb4e7fc1d-s.p.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/6c9d152e7d33394a-s.p.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/dev/ecosystem?view=argus&state=sample&audience=guest",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/0336a89fb4e7fc1d-s.p.woff2?v=1790640539691",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/6c9d152e7d33394a-s.p.woff2?v=1790640539691",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/css/app/layout.css?v=1790640539691",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/css/app/dev/ecosystem/page.css?v=1790640539691",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/webpack.js?v=1790640539691",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/main-app.js?v=1790640539691",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/app-pages-internals.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/app/layout.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/app/dev/ecosystem/page.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "WEBSOCKET",
+        "url": "ws://127.0.0.1:3201/_next/webpack-hmr?id=bHKACUSYL2cWCYaivKJvD",
+        "disposition": "local-development-hmr"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/locales/en/common.json",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/0336a89fb4e7fc1d-s.p.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/6c9d152e7d33394a-s.p.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/dev/ecosystem?view=settings&state=sample&audience=guest",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/0336a89fb4e7fc1d-s.p.woff2?v=1790640540916",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/6c9d152e7d33394a-s.p.woff2?v=1790640540916",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/css/app/layout.css?v=1790640540916",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/css/app/dev/ecosystem/page.css?v=1790640540916",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/webpack.js?v=1790640540916",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/main-app.js?v=1790640540916",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/app-pages-internals.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/app/layout.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/chunks/app/dev/ecosystem/page.js",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "WEBSOCKET",
+        "url": "ws://127.0.0.1:3201/_next/webpack-hmr?id=vbiq7K93PNBiQz343bRGx",
+        "disposition": "local-development-hmr"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/locales/en/common.json",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/0336a89fb4e7fc1d-s.p.woff2",
+        "disposition": "local-page-or-asset"
+      },
+      {
+        "method": "GET",
+        "url": "http://127.0.0.1:3201/_next/static/media/6c9d152e7d33394a-s.p.woff2",
+        "disposition": "local-page-or-asset"
+      }
+    ],
+    "violations": [],
+    "pageErrors": [],
+    "consoleErrors": []
+  },
+  "environment": {
+    "browser": "147.0.7727.15",
+    "node": "v26.10.0",
+    "platform": "darwin",
+    "release": "27.0.0",
+    "viewport": {
+      "width": 1440,
+      "height": 1000
+    },
+    "deviceScaleFactor": 1,
+    "timezone": "America/Santo_Domingo",
+    "locale": "en-US",
+    "appearance": "light",
+    "reducedMotion": "reduce",
+    "serviceWorkers": "blocked",
+    "websockets": "only same-origin Next development HMR",
+    "retries": 0
+  },
+  "limitations": [
+    "Local source reference, not hosted-deployment verification or founder visual approval.",
+    "Registered identity and financial/chat readouts are local fixtures; no real authorization, model turn, write or provider call is exercised.",
+    "Named shared rendered owners are byte-verified; current preview also verifies its complete route source file set. Other web files are not byte-verified; the full web Git tree is recorded for context.",
+    "Screenshots freeze animations/caret and hide Next development chrome and the fixture DevModeBadge via shared FREEZE_CSS."
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "test": "200% text and a long account label remain usable: compact-es-light",
+  "codeHead": "53029f5d7c18827adba9daf79197936086ea0188",
+  "recordedAt": "2026-09-28T23:38:35.828Z",
+  "status": "passed",
+  "elapsedMs": 2027,
+  "browser": "147.0.7727.15",
+  "baseURL": "http://127.0.0.1:3197",
+  "network": {
+    "forbidden": [],
+    "allowedRequests": 32,
+    "pageErrors": []
+  },
+  "errors": []
+}

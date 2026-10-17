@@ -1,0 +1,11 @@
+{
+  "name": "reject an unrelated HTTP 200 listener before reference capture",
+  "codeHead": "8e5d74e25bb3e26952019823ab386cdb7153b075",
+  "origin": "http://127.0.0.1:3200",
+  "fixture": "Inert local HTTP 200 server, not an Argus process",
+  "exitCode": 1,
+  "expectedFailure": "Playwright reports the configured origin is already used",
+  "screenshotsAccepted": 0,
+  "result": "passed",
+  "cleanup": "Inert listener stopped in finally block"
+}
