@@ -19,6 +19,25 @@ from tests.agent_runtime.test_result_conversation import (
 LANGUAGES = ("en", "es-419")
 
 
+@pytest.mark.parametrize("language", LANGUAGES)
+@pytest.mark.parametrize("can_search", [True, False])
+def test_next_steps_owns_the_suggestions_in_prompt_and_schema(
+    language: str, can_search: bool
+) -> None:
+    instructions = conversation.result_conversation_instructions(
+        language=language, can_search=can_search
+    )
+    schema = conversation.result_conversation_schema({}, ()).model_json_schema()
+    steps_description = schema["properties"]["next_steps"]["description"]
+
+    assert "only in next_steps" in steps_description
+    assert steps_description in instructions
+    assert "without listing or repeating the suggested tests or questions" in (
+        schema["properties"]["text"]["description"]
+    )
+    assert "write an ordered plan" not in instructions
+
+
 @pytest.fixture(autouse=True)
 def _history_starts(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
